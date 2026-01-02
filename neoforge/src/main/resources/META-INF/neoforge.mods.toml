@@ -1,0 +1,38 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+#issueTrackerURL = ""
+license = "Insert License Here"
+
+[[mods]]
+modId = "palworks"
+version = "${version}"
+displayName = "Palworks"
+authors = "Me!"
+description = '''
+This is an example description! Tell everyone what your mod is about!
+'''
+#logoFile = ""
+
+[[dependencies.palworks]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.palworks]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.palworks]]
+modId = "cobblemon"
+type = "required"
+versionRange = "[1.5.0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[mixins]]
+config = "palworks.mixins.json"
