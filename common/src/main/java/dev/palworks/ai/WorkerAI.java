@@ -2,11 +2,14 @@ package dev.palworks.ai;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.tree.TreeDetector;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 
@@ -76,6 +79,18 @@ public class WorkerAI {
                     pokemon.getSpecies().getName(), reservation.getJobType(), reservation.getStationPos());
             }
 
+            // CRITICAL FIX: Check if reservation is impossibly far away (likely corrupted Y coordinate)
+            // Normal work radius is 32 blocks, so anything over 100 blocks is suspicious
+            BlockPos entityPos = entity.blockPosition();
+            double distanceSq = entityPos.distSqr(reservation.getStationPos());
+            if (distanceSq > 100 * 100) { // 100 block radius check
+                Palworks.LOGGER.warn("{} has impossible reservation distance {} blocks (entity at {}, job at {}) - clearing corrupted reservation!",
+                    pokemon.getSpecies().getName(), Math.sqrt(distanceSq), entityPos, reservation.getStationPos());
+                state.clearReservation();
+                WorkerStateManager.save(pokemon, state);
+                return false;
+            }
+
             // Check if reservation expired
             // Don't expire if worker is actively working (has work progress)
             boolean isActivelyWorking = state.getConsecutiveWorkTicks() > 0;
@@ -91,177 +106,7 @@ public class WorkerAI {
             return executeJob(pokemon, entity, level, state, reservation);
         }
 
-        // Try to find new work
-        return findAndReserveJob(pokemon, entity, level, state);
-    }
-
-    /**
-     * Find and reserve a new job for the worker.
-     */
-    private static boolean findAndReserveJob(
-            Pokemon pokemon,
-            Mob entity,
-            Level level,
-            WorkerState state
-    ) {
-        // Get worker's suitabilities
-        Set<Suitability> suitabilities = state.getSuitabilities();
-        if (suitabilities.isEmpty()) {
-            // No suitabilities - just return false silently (many Pokemon don't have work skills)
-            return false;
-        }
-
-        BlockPos entityPos = entity.blockPosition();
-
-        // Special handling for TRANSPORTING workers - pickup items then deliver to chests
-        if (suitabilities.contains(Suitability.TRANSPORTING)) {
-            boolean hasItems = !state.getWorkInventory().isEmpty();
-
-            if (hasItems) {
-                // Has items - look for chests to deliver to
-                List<JobScanner.JobOpportunity> deliveryOpportunities = JobScanner.scanForDeliveryChests(
-                        level,
-                        entityPos,
-                        WORK_RADIUS,
-                        3
-                );
-
-                if (!deliveryOpportunities.isEmpty()) {
-                    JobScanner.JobOpportunity opportunity = deliveryOpportunities.get(0);
-                    ReservationId reservation = opportunity.createReservation();
-
-                    state.setCurrentReservation(reservation);
-                    state.setAssignedJob(opportunity.getJobType());
-                    WorkerStateManager.save(pokemon, state);
-
-                    if (!level.isClientSide && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                        serverLevel.getServer().getPlayerList().broadcastSystemMessage(
-                            net.minecraft.network.chat.Component.literal("[Palworks] " + pokemon.getSpecies().getName() + " found " + opportunity.getJobType().name() + " job!"),
-                            false
-                        );
-                    }
-
-                    return true;
-                }
-            } else {
-                // No items - look for item entities on ground to pick up
-                List<JobScanner.JobOpportunity> pickupOpportunities = JobScanner.scanForItemEntities(
-                        level,
-                        entityPos,
-                        WORK_RADIUS,
-                        3
-                );
-
-                if (!pickupOpportunities.isEmpty()) {
-                    JobScanner.JobOpportunity opportunity = pickupOpportunities.get(0);
-                    ReservationId reservation = opportunity.createReservation();
-
-                    state.setCurrentReservation(reservation);
-                    state.setAssignedJob(opportunity.getJobType());
-                    WorkerStateManager.save(pokemon, state);
-
-                    if (!level.isClientSide && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                        serverLevel.getServer().getPlayerList().broadcastSystemMessage(
-                            net.minecraft.network.chat.Component.literal("[Palworks] " + pokemon.getSpecies().getName() + " found " + opportunity.getJobType().name() + " job!"),
-                            false
-                        );
-                    }
-
-                    return true;
-                }
-            }
-        }
-
-        // Scan for jobs matching each suitability
-        for (Suitability suitability : suitabilities) {
-            // Check cooldown
-            if (state.isOnCooldown(suitability)) {
-                continue;
-            }
-
-            // Scan for jobs (using simplified scanForJobsSimple without base requirement)
-            List<JobScanner.JobOpportunity> opportunities = JobScanner.scanForJobsSimple(
-                    level,
-                    suitability,
-                    entityPos,
-                    WORK_RADIUS,
-                    3 // Max 3 results
-            );
-
-            if (!opportunities.isEmpty()) {
-                // For planting jobs, check if we have the correct seeds
-                // If not, find and reserve a pickup job for the correct seeds first
-                for (JobScanner.JobOpportunity opportunity : opportunities) {
-                    if (opportunity.getJobType() == dev.palworks.job.JobType.PLANT_SEEDS) {
-                        // Check what seed is needed for this planting job
-                        BlockPos plantPos = opportunity.getPosition();
-                        BlockPos surfacePos = plantPos.below();
-                        net.minecraft.world.level.block.Block surfaceBlock = level.getBlockState(surfacePos).getBlock();
-
-                        net.minecraft.world.item.Item requiredSeed = null;
-                        if (surfaceBlock == net.minecraft.world.level.block.Blocks.SOUL_SAND) {
-                            requiredSeed = net.minecraft.world.item.Items.NETHER_WART;
-                        } else if (surfaceBlock == net.minecraft.world.level.block.Blocks.FARMLAND) {
-                            // For farmland, accept any farmland seed (will use what's in inventory)
-                            // But reject if we only have nether wart
-                            if (state.hasItemInWorkInventory(net.minecraft.world.item.Items.NETHER_WART)) {
-                                continue; // Skip this farmland job, we have wrong seeds
-                            }
-                            requiredSeed = null; // Any farmland seed is ok
-                        }
-
-                        // Check if we have the required seed
-                        if (requiredSeed != null && !state.hasItemInWorkInventory(requiredSeed)) {
-                            // Don't have the required seed - need to get it first
-                            // Look for a chest with this seed
-                            List<JobScanner.JobOpportunity> pickupOpps = JobScanner.scanForJobsSimple(
-                                level, suitability, entityPos, WORK_RADIUS, 3
-                            ).stream()
-                            .filter(opp -> opp.getJobType() == dev.palworks.job.JobType.PICKUP_ITEMS)
-                            .toList();
-
-                            if (!pickupOpps.isEmpty()) {
-                                // Found a chest with seeds - pick those up first
-                                JobScanner.JobOpportunity pickupOpp = pickupOpps.get(0);
-                                ReservationId reservation = pickupOpp.createReservation();
-
-                                state.setCurrentReservation(reservation);
-                                state.setAssignedJob(pickupOpp.getJobType());
-                                WorkerStateManager.save(pokemon, state);
-
-                                if (!level.isClientSide && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                                    serverLevel.getServer().getPlayerList().broadcastSystemMessage(
-                                        net.minecraft.network.chat.Component.literal("[Palworks] " + pokemon.getSpecies().getName() + " found " + pickupOpp.getJobType().name() + " job!"),
-                                        false
-                                    );
-                                }
-                                return true;
-                            }
-                            // No chest with required seeds - skip this planting job
-                        }
-                    }
-                }
-
-                // Reserve the first available job (after checking prerequisites)
-                JobScanner.JobOpportunity opportunity = opportunities.get(0);
-                ReservationId reservation = opportunity.createReservation();
-
-                state.setCurrentReservation(reservation);
-                state.setAssignedJob(opportunity.getJobType());
-                WorkerStateManager.save(pokemon, state);
-
-                // Send chat message if on server
-                if (!level.isClientSide && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                    serverLevel.getServer().getPlayerList().broadcastSystemMessage(
-                        net.minecraft.network.chat.Component.literal("[Palworks] " + pokemon.getSpecies().getName() + " found " + opportunity.getJobType().name() + " job!"),
-                        false
-                    );
-                }
-
-                return true;
-            }
-        }
-
+        // No reservation - idle (JobManager will assign work)
         return false;
     }
 
@@ -277,23 +122,17 @@ public class WorkerAI {
     ) {
         BlockPos targetPos = reservation.getStationPos();
         BlockPos entityPos = entity.blockPosition();
-
         double distanceSq = entityPos.distSqr(targetPos);
-        double distance = Math.sqrt(distanceSq);
-
-        if (DEBUG) {
-            Palworks.LOGGER.debug("{} executing job at {} (distance: {})",
-                pokemon.getSpecies().getName(), targetPos, String.format("%.2f", distance));
-        }
 
         // Check if close enough to work
         if (distanceSq <= ARRIVAL_DISTANCE * ARRIVAL_DISTANCE) {
-            if (DEBUG) {
+            // Only log on first tick of work
+            if (DEBUG && state.getConsecutiveWorkTicks() == 0) {
                 String inventoryInfo = state.getWorkInventory().isEmpty()
                     ? "empty"
                     : state.getWorkInventoryCount() + "x " + state.getWorkInventory().getItem().toString();
-                Palworks.LOGGER.debug("{} arrived at job location, performing work (ticks: {}, inventory: {})",
-                    pokemon.getSpecies().getName(), state.getConsecutiveWorkTicks(), inventoryInfo);
+                Palworks.LOGGER.info("{} arrived at {} job, starting work (inventory: {})",
+                    pokemon.getSpecies().getName(), reservation.getJobType(), inventoryInfo);
             }
 
             // Keep worker stationary while working (for animations)
@@ -304,13 +143,18 @@ public class WorkerAI {
             boolean workComplete = performWork(pokemon, entity, level, state, reservation);
 
             if (workComplete) {
+                // Notify JobManager of completion (for consecutive jobs)
+                if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
+                    JobManager.getInstance(serverLevel).onJobCompleted(pokemon, reservation, level);
+                }
+
                 // Job complete - clear reservation and set cooldown
                 state.clearReservation();
                 state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
                 state.resetPathFailures();
 
                 // Send chat message
-                if (!level.isClientSide && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                     serverLevel.getServer().getPlayerList().broadcastSystemMessage(
                         net.minecraft.network.chat.Component.literal("[Palworks] " + pokemon.getSpecies().getName() + " completed " + reservation.getJobType().name() + "!"),
                         false
@@ -323,9 +167,11 @@ public class WorkerAI {
             return true;
         } else {
             // Need to navigate to job
-            if (DEBUG) {
-                Palworks.LOGGER.debug("{} navigating to job at {} (distance: {}, navDone: {})",
-                    pokemon.getSpecies().getName(), targetPos, String.format("%.2f", distance), entity.getNavigation().isDone());
+            // Only log when starting navigation (not every tick)
+            if (DEBUG && state.getConsecutiveWorkTicks() == 0 && entity.getNavigation().isDone()) {
+                double distance = Math.sqrt(distanceSq);
+                Palworks.LOGGER.info("{} navigating to {} job at {} (distance: {:.1f} blocks)",
+                    pokemon.getSpecies().getName(), reservation.getJobType(), targetPos, distance);
             }
 
             navigateToJob(entity, targetPos);
@@ -374,11 +220,24 @@ public class WorkerAI {
             }
         }
 
-        // For PICKUP_ITEMS jobs, extract seeds from chest OR pick up items from ground
-        if (reservation.getJobType() == dev.palworks.job.JobType.PICKUP_ITEMS && state.getConsecutiveWorkTicks() == 0) {
+        // For GET_SEEDS jobs, extract seeds from chest
+        if (reservation.getJobType() == dev.palworks.job.JobType.GET_SEEDS && state.getConsecutiveWorkTicks() == 0) {
             BlockPos targetPos = reservation.getStationPos();
 
-            // Check if this is a PLANTING worker picking up from chest, NETHER worker picking up nether wart, or TRANSPORTING worker picking up from ground
+            if (DEBUG) {
+                Palworks.LOGGER.info("{} starting GET_SEEDS at {} (inventory: {}, has space: {})",
+                    pokemon.getSpecies().getName(), targetPos, state.getWorkInventory(), state.hasWorkInventorySpace());
+            }
+
+            // Skip extraction if inventory is full, but still complete the job
+            if (!state.hasWorkInventorySpace()) {
+                if (DEBUG) {
+                    Palworks.LOGGER.info("{} skipping GET_SEEDS extraction - inventory already full with {}",
+                        pokemon.getSpecies().getName(), state.getWorkInventory());
+                }
+                // Continue with normal tick cycle to complete the job
+            } else {
+
             if (state.getSuitabilities().contains(Suitability.PLANTING)) {
                 // PLANTING worker - extract seeds from chest
                 net.minecraft.world.item.ItemStack extracted = extractSeedsFromChest(level, targetPos, state);
@@ -388,18 +247,20 @@ public class WorkerAI {
                     state.syncWorkInventoryToHeldItem(pokemon);
 
                     if (DEBUG) {
-                        Palworks.LOGGER.info("{} picked up {} {} seeds from chest at {} ({} leftover)",
+                        Palworks.LOGGER.info("{} got {} {} seeds from chest at {} ({} leftover, inventory now: {})",
                             pokemon.getSpecies().getName(),
                             extracted.getCount() - leftover,
                             extracted.getItem().toString(),
                             targetPos,
-                            leftover);
+                            leftover,
+                            state.getWorkInventory());
                     }
                 } else {
                     if (DEBUG) {
-                        Palworks.LOGGER.warn("{} failed to extract seeds from chest at {}",
+                        Palworks.LOGGER.warn("{} FAILED to get seeds from chest at {} - chest might be empty, treating as complete",
                             pokemon.getSpecies().getName(), targetPos);
                     }
+                    // Treat as complete even if extraction failed (chest might be empty)
                 }
             } else if (state.getSuitabilities().contains(Suitability.NETHER)) {
                 // NETHER worker - extract nether wart from chest
@@ -412,7 +273,7 @@ public class WorkerAI {
                     state.syncWorkInventoryToHeldItem(pokemon);
 
                     if (DEBUG) {
-                        Palworks.LOGGER.info("{} picked up {} nether wart from chest at {} ({} leftover)",
+                        Palworks.LOGGER.info("{} got {} nether wart from chest at {} ({} leftover)",
                             pokemon.getSpecies().getName(),
                             extracted.getCount() - leftover,
                             targetPos,
@@ -420,43 +281,54 @@ public class WorkerAI {
                     }
                 } else {
                     if (DEBUG) {
-                        Palworks.LOGGER.warn("{} failed to extract nether wart from chest at {}",
+                        Palworks.LOGGER.warn("{} FAILED to get nether wart from chest at {} - chest might be empty, treating as complete",
                             pokemon.getSpecies().getName(), targetPos);
                     }
+                    // Treat as complete even if extraction failed
                 }
-            } else if (state.getSuitabilities().contains(Suitability.TRANSPORTING)) {
-                // TRANSPORTING worker - pick up items from ground
-                net.minecraft.world.phys.AABB searchBox = new net.minecraft.world.phys.AABB(targetPos).inflate(2.0);
-                List<net.minecraft.world.entity.item.ItemEntity> items = level.getEntitiesOfClass(
-                    net.minecraft.world.entity.item.ItemEntity.class,
-                    searchBox
-                );
+            } else {
+                if (DEBUG) {
+                    Palworks.LOGGER.warn("{} has GET_SEEDS job but lacks PLANTING/NETHER suitability! Suitabilities: {}",
+                        pokemon.getSpecies().getName(), state.getSuitabilities());
+                }
+                // Complete the job anyway to avoid getting stuck
+            }
+            } // End of hasWorkInventorySpace() else block
+        }
 
-                int pickedUp = 0;
-                for (net.minecraft.world.entity.item.ItemEntity itemEntity : items) {
-                    if (itemEntity.isAlive() && !itemEntity.getItem().isEmpty()) {
-                        net.minecraft.world.item.ItemStack stack = itemEntity.getItem();
-                        int leftover = state.addToWorkInventory(stack);
+        // For COLLECT_DROPS jobs, pick up items from ground
+        if (reservation.getJobType() == dev.palworks.job.JobType.COLLECT_DROPS && state.getConsecutiveWorkTicks() == 0) {
+            BlockPos targetPos = reservation.getStationPos();
+            net.minecraft.world.phys.AABB searchBox = new net.minecraft.world.phys.AABB(targetPos).inflate(2.0);
+            List<net.minecraft.world.entity.item.ItemEntity> items = level.getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class,
+                searchBox
+            );
 
-                        if (leftover < stack.getCount()) {
-                            // Successfully added at least some items
-                            pickedUp += (stack.getCount() - leftover);
-                            itemEntity.discard(); // Remove the item entity
-                        }
+            int pickedUp = 0;
+            for (net.minecraft.world.entity.item.ItemEntity itemEntity : items) {
+                if (itemEntity.isAlive() && !itemEntity.getItem().isEmpty()) {
+                    net.minecraft.world.item.ItemStack stack = itemEntity.getItem();
+                    int leftover = state.addToWorkInventory(stack);
 
-                        if (!state.hasWorkInventorySpace()) {
-                            break; // Inventory full
-                        }
+                    if (leftover < stack.getCount()) {
+                        // Successfully added at least some items
+                        pickedUp += (stack.getCount() - leftover);
+                        itemEntity.discard(); // Remove the item entity
+                    }
+
+                    if (!state.hasWorkInventorySpace()) {
+                        break; // Inventory full
                     }
                 }
+            }
 
-                if (pickedUp > 0) {
-                    state.syncWorkInventoryToHeldItem(pokemon);
+            if (pickedUp > 0) {
+                state.syncWorkInventoryToHeldItem(pokemon);
 
-                    if (DEBUG) {
-                        Palworks.LOGGER.info("{} picked up {} items from ground at {}",
-                            pokemon.getSpecies().getName(), pickedUp, targetPos);
-                    }
+                if (DEBUG) {
+                    Palworks.LOGGER.info("{} collected {} dropped items from ground at {}",
+                        pokemon.getSpecies().getName(), pickedUp, targetPos);
                 }
             }
         }
@@ -553,6 +425,86 @@ public class WorkerAI {
             }
         }
 
+        // For CHOP_TREE jobs, break all tree logs on the last tick
+        if (reservation.getJobType() == dev.palworks.job.JobType.CHOP_TREE) {
+            int requiredTicks = getRequiredWorkTicks(reservation.getJobType());
+            if (state.getConsecutiveWorkTicks() >= requiredTicks - 1) {
+                BlockPos treePos = reservation.getStationPos();
+
+                // Get tree validation result (includes base position and all logs)
+                TreeDetector.TreeValidationResult treeResult = TreeDetector.validateTree(level, treePos);
+
+                if (treeResult.isValid() && !treeResult.getLogPositions().isEmpty()) {
+                    // Get sapling type BEFORE destroying the tree
+                    net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treePos);
+                    BlockPos basePos = treeResult.getBasePosition();
+
+                    int logsChopped = 0;
+
+                    // Break each log with drops and block breaking animation
+                    for (BlockPos logPos : treeResult.getLogPositions()) {
+                        // destroyBlock(pos, true) drops items and plays break sound/particles
+                        boolean destroyed = level.destroyBlock(logPos, true);
+                        if (destroyed) {
+                            logsChopped++;
+                        }
+                    }
+
+                    if (DEBUG) {
+                        Palworks.LOGGER.info("{} chopped tree at {} - {} logs destroyed, base at {}, sapling: {}",
+                            pokemon.getSpecies().getName(), treePos, logsChopped, basePos, saplingItem);
+                    }
+
+                    // Queue consecutive jobs: collect drops + replant sapling
+                    if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
+                        JobManager.getInstance(serverLevel).onTreeChopped(pokemon, basePos, saplingItem, level);
+                    }
+                } else {
+                    // Tree might have been partially destroyed or invalid
+                    // Just try to break the single block
+                    level.destroyBlock(treePos, true);
+
+                    if (DEBUG) {
+                        Palworks.LOGGER.warn("{} could not detect full tree at {}, broke single block",
+                            pokemon.getSpecies().getName(), treePos);
+                    }
+                }
+            }
+        }
+
+        // For PLANT_SAPLING jobs, plant sapling on the last tick
+        if (reservation.getJobType() == dev.palworks.job.JobType.PLANT_SAPLING) {
+            int requiredTicks = getRequiredWorkTicks(reservation.getJobType());
+            if (state.getConsecutiveWorkTicks() >= requiredTicks - 1) {
+                BlockPos plantPos = reservation.getStationPos();
+
+                // Get the sapling type from JobManager's pending saplings
+                net.minecraft.world.item.Item saplingItem = null;
+                if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
+                    saplingItem = JobManager.getInstance(serverLevel).consumePendingSapling(plantPos);
+                }
+
+                if (saplingItem != null) {
+                    boolean planted = TreeDetector.plantSapling(level, plantPos, saplingItem);
+
+                    if (DEBUG) {
+                        if (planted) {
+                            Palworks.LOGGER.info("{} planted {} sapling at {}",
+                                pokemon.getSpecies().getName(), saplingItem, plantPos);
+                        } else {
+                            Palworks.LOGGER.warn("{} failed to plant {} sapling at {}",
+                                pokemon.getSpecies().getName(), saplingItem, plantPos);
+                        }
+                    }
+                } else {
+                    if (DEBUG) {
+                        Palworks.LOGGER.warn("{} has no sapling to plant at {}",
+                            pokemon.getSpecies().getName(), plantPos);
+                    }
+                }
+            }
+        }
+
         // Track work session
         state.recordWorkTick();
 
@@ -601,7 +553,7 @@ public class WorkerAI {
     private static int getRequiredWorkTicks(dev.palworks.job.JobType jobType) {
         // Different jobs take different amounts of time
         return switch (jobType) {
-            case HARVEST_CROPS, PLANT_SEEDS, PICKUP_ITEMS, DELIVER_ITEMS -> 20; // 1 second
+            case HARVEST_CROPS, PLANT_SEEDS, GET_SEEDS, COLLECT_DROPS, DELIVER_ITEMS, PLANT_SAPLING -> 20; // 1 second
             case CHOP_TREE -> 60; // 3 seconds
             case MINE_RESOURCE -> 80; // 4 seconds
             case FUEL_FURNACE -> 200; // 10 seconds (matches one smelting operation)
@@ -611,29 +563,31 @@ public class WorkerAI {
 
     /**
      * Execute the actual job action (break block, place block, etc.).
-     * Note: FUEL_FURNACE ignition now happens at the start of performWork, not here.
+     * Note: Most job actions are now handled directly in performWork for proper timing.
+     * This method is kept for any remaining edge cases.
      */
     private static void executeJobAction(Pokemon pokemon, Level level, BlockPos pos, dev.palworks.job.JobType jobType) {
-        // Simplified - real implementation would handle each job type properly
         switch (jobType) {
             case FUEL_FURNACE -> {
-                // Furnace was already ignited at the start of work
-                // This just marks completion
+                // Furnace ignition handled at start of performWork
             }
-            case HARVEST_CROPS -> dev.palworks.crop.CropAdapter.harvestCrop(level, pos);
-            case CHOP_TREE, MINE_RESOURCE -> level.destroyBlock(pos, true);
+            case HARVEST_CROPS -> {
+                // Handled in performWork on last tick
+            }
+            case CHOP_TREE -> {
+                // Handled in performWork - breaks all tree logs
+            }
+            case MINE_RESOURCE -> level.destroyBlock(pos, true);
             // Other job types would be implemented here
         }
     }
 
     /**
-     * Navigate the entity to a target position.
-     * Placeholder - real implementation would use pathfinding.
+     * Navigate the entity to a target position using built-in pathfinding.
      */
     private static void navigateToJob(Mob entity, BlockPos targetPos) {
-        // Simplified pathfinding - just move toward target
-        // Real implementation would use entity.getNavigation().moveTo(...)
-        entity.getNavigation().moveTo(targetPos.getX(), targetPos.getY(), targetPos.getZ(), 1.0);
+        // Use normal walking speed (0.6 = 60% speed, feels more natural than 1.0 running)
+        entity.getNavigation().moveTo(targetPos.getX(), targetPos.getY(), targetPos.getZ(), 0.6);
     }
 
     /**

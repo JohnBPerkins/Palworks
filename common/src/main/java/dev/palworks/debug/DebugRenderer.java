@@ -1,51 +1,14 @@
 package dev.palworks.debug;
 
-import dev.palworks.base.BaseState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Helper for debug visualization rendering.
- * Provides geometry for rendering base radius, paths, etc.
+ * Provides geometry for rendering paths, targets, etc.
  */
 public class DebugRenderer {
-
-    /**
-     * Get the bounding box for a base's work radius.
-     * Used for rendering the sphere/cylinder of the base range.
-     */
-    public static AABB getBaseRadiusBox(BaseState base) {
-        BlockPos pos = base.getBasePos();
-        int radius = base.getWorkRadius();
-
-        return new AABB(
-                pos.getX() - radius, pos.getY() - 16, pos.getZ() - radius,
-                pos.getX() + radius, pos.getY() + 16, pos.getZ() + radius
-        );
-    }
-
-    /**
-     * Get points for rendering a circular base radius at ground level.
-     * Returns a list of points forming a circle.
-     */
-    public static List<Vec3> getBaseRadiusCircle(BaseState base, int segments) {
-        List<Vec3> points = new ArrayList<>();
-        BlockPos pos = base.getBasePos();
-        int radius = base.getWorkRadius();
-
-        for (int i = 0; i <= segments; i++) {
-            double angle = 2 * Math.PI * i / segments;
-            double x = pos.getX() + 0.5 + radius * Math.cos(angle);
-            double z = pos.getZ() + 0.5 + radius * Math.sin(angle);
-            points.add(new Vec3(x, pos.getY() + 0.1, z));
-        }
-
-        return points;
-    }
 
     /**
      * Get a line from a worker to their job target.

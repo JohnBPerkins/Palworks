@@ -18,7 +18,6 @@ public class WorkerState {
     private boolean enabled;
     private JobType assignedJob;
     private ReservationId currentReservation;
-    private BlockPos basePos; // "base" link
 
     // Cached suitabilities (calculated once, stored for performance)
     private Set<Suitability> cachedSuitabilities;
@@ -43,7 +42,6 @@ public class WorkerState {
         this.enabled = false;
         this.assignedJob = null;
         this.currentReservation = null;
-        this.basePos = null;
         this.cachedSuitabilities = null;
         this.suitabilitiesDirty = true;
         this.cooldowns = new HashMap<>();
@@ -89,20 +87,6 @@ public class WorkerState {
 
     public void clearReservation() {
         this.currentReservation = null;
-    }
-
-    // Base link
-    @Nullable
-    public BlockPos getBasePos() {
-        return basePos;
-    }
-
-    public void setBasePos(@Nullable BlockPos pos) {
-        this.basePos = pos;
-    }
-
-    public boolean isLinkedToBase() {
-        return basePos != null;
     }
 
     // Suitability caching (call this ONCE when worker is initialized)
@@ -286,9 +270,6 @@ public class WorkerState {
         if (assignedJob != null) {
             tag.putString("assignedJob", assignedJob.getId());
         }
-        if (basePos != null) {
-            tag.putLong("basePos", basePos.asLong());
-        }
 
         // Serialize cached suitabilities
         if (cachedSuitabilities != null && !cachedSuitabilities.isEmpty()) {
@@ -316,7 +297,12 @@ public class WorkerState {
         // Serialize current reservation
         if (currentReservation != null) {
             CompoundTag reservationTag = new CompoundTag();
-            reservationTag.putLong("stationPos", currentReservation.getStationPos().asLong());
+            BlockPos pos = currentReservation.getStationPos();
+            // CRITICAL FIX: Store X, Y, Z separately instead of using asLong()
+            // This avoids BlockPos.asLong() bugs with negative Y coordinates
+            reservationTag.putInt("posX", pos.getX());
+            reservationTag.putInt("posY", pos.getY());
+            reservationTag.putInt("posZ", pos.getZ());
             reservationTag.putString("jobType", currentReservation.getJobType().getId());
             reservationTag.putLong("timestamp", currentReservation.getTimestamp());
             tag.put("currentReservation", reservationTag);
@@ -341,10 +327,6 @@ public class WorkerState {
             } catch (IllegalArgumentException e) {
                 assignedJob = null;
             }
-        }
-
-        if (tag.contains("basePos")) {
-            basePos = BlockPos.of(tag.getLong("basePos"));
         }
 
         // Deserialize cached suitabilities
@@ -380,7 +362,27 @@ public class WorkerState {
         // Deserialize current reservation
         if (tag.contains("currentReservation")) {
             CompoundTag reservationTag = tag.getCompound("currentReservation");
-            BlockPos stationPos = BlockPos.of(reservationTag.getLong("stationPos"));
+
+            BlockPos stationPos;
+            // CRITICAL FIX: Read X, Y, Z separately (new format) or fall back to old asLong format
+            if (reservationTag.contains("posX")) {
+                // New format: separate X, Y, Z integers
+                int x = reservationTag.getInt("posX");
+                int y = reservationTag.getInt("posY");
+                int z = reservationTag.getInt("posZ");
+                stationPos = new BlockPos(x, y, z);
+            } else {
+                // Old format: packed long (may be corrupted)
+                stationPos = BlockPos.of(reservationTag.getLong("stationPos"));
+                dev.palworks.Palworks.LOGGER.warn("Loaded reservation from OLD format (asLong): {} - this may be corrupted!", stationPos);
+                // Clear corrupted reservations immediately during migration
+                if (Math.abs(stationPos.getY()) > 300) {
+                    dev.palworks.Palworks.LOGGER.warn("Old reservation has suspicious Y coordinate {}, clearing it!", stationPos.getY());
+                    currentReservation = null;
+                    return; // Skip rest of deserialization
+                }
+            }
+
             String jobTypeId = reservationTag.getString("jobType");
             long timestamp = reservationTag.getLong("timestamp");
 
@@ -407,5 +409,23 @@ public class WorkerState {
         WorkerState state = new WorkerState();
         state.deserializeNBT(tag);
         return state;
+    }
+
+    /**
+     * Get a debug status string for rendering above the Pokemon.
+     */
+    public String getDebugStatusString() {
+        if (!enabled) {
+            return "§7DISABLED";
+        }
+
+        if (currentReservation != null) {
+            BlockPos pos = currentReservation.getStationPos();
+            return String.format("§e%s §7[%d, %d, %d]",
+                currentReservation.getJobType().name(),
+                pos.getX(), pos.getY(), pos.getZ());
+        }
+
+        return "§aIDLE";
     }
 }

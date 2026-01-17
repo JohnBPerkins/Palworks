@@ -28,10 +28,7 @@ public class PalworksCommands {
                     .executes(ctx -> toggleDebug(ctx, DebugManager.DebugFlag.WORKER_INFO)))
                 .then(Commands.literal("station")
                     .executes(ctx -> toggleDebug(ctx, DebugManager.DebugFlag.STATION_INFO)))
-                .then(Commands.literal("base")
-                    .executes(ctx -> toggleDebug(ctx, DebugManager.DebugFlag.BASE_INFO)))
-                .then(Commands.literal("radius")
-                    .executes(ctx -> toggleDebug(ctx, DebugManager.DebugFlag.BASE_RADIUS)))
+                // Base debug commands removed
                 .then(Commands.literal("paths")
                     .executes(ctx -> toggleDebug(ctx, DebugManager.DebugFlag.WORKER_PATHS)))
                 .then(Commands.literal("targets")
@@ -43,8 +40,8 @@ public class PalworksCommands {
             .then(Commands.literal("inspect")
                 .then(Commands.literal("worker")
                     .executes(this::inspectWorker))
-                .then(Commands.literal("base")
-                    .executes(this::inspectBase)))
+                // Base inspect removed
+            )
 
             // Worker management commands
             .then(Commands.literal("worker")
@@ -52,16 +49,16 @@ public class PalworksCommands {
                     .executes(this::enableWorker))
                 .then(Commands.literal("disable")
                     .executes(this::disableWorker))
+                .then(Commands.literal("clear")
+                    .executes(this::clearReservations))
+                .then(Commands.literal("inventory")
+                    .executes(this::showInventory))
+                .then(Commands.literal("clearinv")
+                    .executes(this::clearInventory))
                 .then(Commands.literal("test")
                     .executes(this::testTickWorker)))
 
-            // Base management commands
-            .then(Commands.literal("base")
-                .then(Commands.literal("create")
-                    .executes(this::createBase))
-                .then(Commands.literal("radius")
-                    .then(Commands.argument("radius", IntegerArgumentType.integer(8, 128))
-                        .executes(this::setBaseRadius))))
+            // Base management commands removed
 
             // List command
             .then(Commands.literal("list")
@@ -109,31 +106,32 @@ public class PalworksCommands {
         }
     }
 
-    private int inspectBase(CommandContext<CommandSourceStack> ctx) {
+    // Base system removed - inspectBase(), createBase(), and setBaseRadius() methods removed
+
+    private int clearReservations(CommandContext<CommandSourceStack> ctx) {
         try {
             ServerPlayer player = ctx.getSource().getPlayerOrException();
-            DebugCommand.showNearestBaseInfo(player);
+            DebugCommand.clearAllReservations(player);
             return 1;
         } catch (Exception e) {
             return 0;
         }
     }
 
-    private int createBase(CommandContext<CommandSourceStack> ctx) {
+    private int showInventory(CommandContext<CommandSourceStack> ctx) {
         try {
             ServerPlayer player = ctx.getSource().getPlayerOrException();
-            DebugCommand.createBase(player);
+            DebugCommand.showWorkerInventory(player);
             return 1;
         } catch (Exception e) {
             return 0;
         }
     }
 
-    private int setBaseRadius(CommandContext<CommandSourceStack> ctx) {
+    private int clearInventory(CommandContext<CommandSourceStack> ctx) {
         try {
             ServerPlayer player = ctx.getSource().getPlayerOrException();
-            int radius = IntegerArgumentType.getInteger(ctx, "radius");
-            DebugCommand.setBaseRadius(player, radius);
+            DebugCommand.clearWorkerInventory(player);
             return 1;
         } catch (Exception e) {
             return 0;

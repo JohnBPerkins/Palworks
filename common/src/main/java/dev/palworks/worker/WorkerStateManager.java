@@ -62,13 +62,7 @@ public class WorkerStateManager {
         CompoundTag stateTag = state.serializeNBT();
         persistentData.put(WORKER_STATE_KEY, stateTag);
 
-        // Debug: Log when saving state with reservation
-        if (state.getCurrentReservation() != null) {
-            Palworks.LOGGER.debug("Saved state for {} with reservation: {} at {}",
-                pokemon.getSpecies().getName(),
-                state.getCurrentReservation().getJobType(),
-                state.getCurrentReservation().getStationPos());
-        }
+        // Removed excessive save logging - only log important state changes elsewhere
     }
 
     /**
