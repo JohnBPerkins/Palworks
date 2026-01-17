@@ -1,8 +1,6 @@
 package dev.palworks.debug;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import dev.palworks.base.BaseState;
-import dev.palworks.base.BaseStateManager;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.station.StationState;
 import dev.palworks.station.StationStateManager;
@@ -51,32 +49,6 @@ public class DebugInfo {
     }
 
     /**
-     * Get debug info for a base at a position.
-     */
-    @Nullable
-    public static BaseDebugInfo getBaseInfo(Level level, BlockPos pos) {
-        BaseState state = BaseStateManager.get(level, pos);
-        if (state == null) {
-            return null;
-        }
-
-        return new BaseDebugInfo(state, pos);
-    }
-
-    /**
-     * Get debug info for the nearest base to a position.
-     */
-    @Nullable
-    public static BaseDebugInfo getNearestBaseInfo(Level level, BlockPos pos, int maxRadius) {
-        BaseState state = BaseStateManager.findNearestBase(level, pos, maxRadius);
-        if (state == null) {
-            return null;
-        }
-
-        return new BaseDebugInfo(state, state.getBasePos());
-    }
-
-    /**
      * Worker debug information.
      */
     public static class WorkerDebugInfo {
@@ -106,10 +78,7 @@ public class DebugInfo {
                 this.currentReservation = "None";
             }
 
-            BlockPos basePos = state.getBasePos();
-            this.basePosition = basePos != null ?
-                    String.format("[%d, %d, %d]", basePos.getX(), basePos.getY(), basePos.getZ()) :
-                    "Not linked";
+            this.basePosition = "N/A";  // Base system removed
 
             this.suitabilities = new ArrayList<>();
             Set<Suitability> suits = state.getSuitabilities();
@@ -203,46 +172,6 @@ public class DebugInfo {
                 lines.add("Progress: " + String.format("%.1f%%", progress));
             }
             lines.add("Reserved By: " + reservedWorker);
-            return lines;
-        }
-    }
-
-    /**
-     * Base debug information.
-     */
-    public static class BaseDebugInfo {
-        public final BlockPos position;
-        public final int workRadius;
-        public final int linkedWorkers;
-        public final int maxWorkers;
-        public final int registeredStations;
-        public final boolean autoAssignJobs;
-        public final String primaryStorage;
-
-        public BaseDebugInfo(BaseState state, BlockPos pos) {
-            this.position = pos;
-            this.workRadius = state.getWorkRadius();
-            this.linkedWorkers = state.getLinkedWorkerCount();
-            this.maxWorkers = state.getMaxActiveWorkers();
-            this.registeredStations = state.getStationCount();
-            this.autoAssignJobs = state.isAutoAssignJobs();
-
-            BlockPos storage = state.getPrimaryStoragePos();
-            this.primaryStorage = storage != null ?
-                    String.format("[%d, %d, %d]", storage.getX(), storage.getY(), storage.getZ()) :
-                    "None";
-        }
-
-        public List<String> toStringList() {
-            List<String> lines = new ArrayList<>();
-            lines.add("=== Base ===");
-            lines.add(String.format("Position: [%d, %d, %d]",
-                    position.getX(), position.getY(), position.getZ()));
-            lines.add("Work Radius: " + workRadius);
-            lines.add("Workers: " + linkedWorkers + "/" + maxWorkers);
-            lines.add("Stations: " + registeredStations);
-            lines.add("Auto Assign: " + (autoAssignJobs ? "Yes" : "No"));
-            lines.add("Primary Storage: " + primaryStorage);
             return lines;
         }
     }

@@ -31,6 +31,7 @@ public enum JobType {
 
     // Lumbering jobs
     CHOP_TREE(Suitability.LUMBERING),
+    PLANT_SAPLING(Suitability.LUMBERING),
 
     // Mining jobs
     MINE_RESOURCE(Suitability.MINING),
@@ -42,8 +43,9 @@ public enum JobType {
     COOL_CONTAINER(Suitability.COOLING),
 
     // Transporting jobs
-    PICKUP_ITEMS(Suitability.TRANSPORTING),
-    DELIVER_ITEMS(Suitability.TRANSPORTING),
+    GET_SEEDS(Suitability.PLANTING),          // Get seeds from chest for planting
+    COLLECT_DROPS(Suitability.TRANSPORTING),  // Pick up dropped items from ground
+    DELIVER_ITEMS(Suitability.TRANSPORTING),  // Deliver items to destination
 
     // Farming jobs (ranch)
     PRODUCE_RANCH_ITEMS(Suitability.FARMING);

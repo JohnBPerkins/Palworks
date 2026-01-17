@@ -1,7 +1,6 @@
 package dev.palworks.ai;
 
 import dev.palworks.Palworks;
-import dev.palworks.base.BaseState;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
@@ -10,6 +9,7 @@ import dev.palworks.station.StationDetector;
 import dev.palworks.station.StationState;
 import dev.palworks.station.StationStateManager;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.tree.TreeDetector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Items;
@@ -147,66 +147,7 @@ public class JobScanner {
     }
 
     /**
-     * Scan for available jobs matching a suitability within a base.
-     * Uses sparse scanning to avoid performance issues.
-     *
-     * @param level The world
-     * @param base The base to scan within
-     * @param suitability The suitability to match
-     * @param scanCenter The position to start scanning from (usually worker position)
-     * @param maxResults Maximum number of results to return
-     * @return List of available job positions
-     */
-    public static List<JobOpportunity> scanForJobs(
-            Level level,
-            BaseState base,
-            Suitability suitability,
-            BlockPos scanCenter,
-            int maxResults
-    ) {
-        List<JobOpportunity> opportunities = new ArrayList<>();
-        int blocksScanned = 0;
-        int radius = base.getWorkRadius();
-
-        // Convert suitability to job types
-        List<JobType> matchingJobs = getJobTypesForSuitability(suitability);
-
-        // Scan in a spiral pattern starting from scanCenter
-        for (int r = 0; r <= radius && blocksScanned < MAX_BLOCKS_PER_TICK; r++) {
-            for (int dx = -r; dx <= r && blocksScanned < MAX_BLOCKS_PER_TICK; dx++) {
-                for (int dy = -4; dy <= 4 && blocksScanned < MAX_BLOCKS_PER_TICK; dy++) {
-                    for (int dz = -r; dz <= r && blocksScanned < MAX_BLOCKS_PER_TICK; dz++) {
-                        // Only check blocks on the edge of current radius
-                        if (Math.abs(dx) != r && Math.abs(dz) != r) {
-                            continue;
-                        }
-
-                        BlockPos checkPos = scanCenter.offset(dx, dy, dz);
-                        blocksScanned++;
-
-                        // Check if position is in base range
-                        if (!base.isInRange(checkPos)) {
-                            continue;
-                        }
-
-                        // Check for matching job opportunities
-                        JobOpportunity opportunity = checkPosition(level, checkPos, matchingJobs, suitability);
-                        if (opportunity != null) {
-                            opportunities.add(opportunity);
-                            if (opportunities.size() >= maxResults) {
-                                return opportunities;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return opportunities;
-    }
-
-    /**
-     * Check a specific position for job opportunities.
+     * Check a sific position for job opportunities.
      */
     @Nullable
     private static JobOpportunity checkPosition(
@@ -280,7 +221,7 @@ public class JobScanner {
                 if (DEBUG) {
                     Palworks.LOGGER.debug("Found chest with seeds at {} for PLANTING worker", pos);
                 }
-                return new JobOpportunity(pos, JobType.PICKUP_ITEMS, suitability);
+                return new JobOpportunity(pos, JobType.GET_SEEDS, suitability);
             }
         }
 
@@ -291,13 +232,16 @@ public class JobScanner {
                 if (DEBUG) {
                     Palworks.LOGGER.debug("Found chest with nether wart at {} for NETHER worker", pos);
                 }
-                return new JobOpportunity(pos, JobType.PICKUP_ITEMS, suitability);
+                return new JobOpportunity(pos, JobType.GET_SEEDS, suitability);
             }
         }
 
         // Check for lumbering jobs (trees)
-        if (suitability == Suitability.LUMBERING && isTree(level, pos)) {
-            return new JobOpportunity(pos, JobType.CHOP_TREE, suitability);
+        // Uses TreeDetector for proper BFS-based tree validation
+        if (suitability == Suitability.LUMBERING && TreeDetector.isLog(level.getBlockState(pos))) {
+            if (TreeDetector.isValidTree(level, pos)) {
+                return new JobOpportunity(pos, JobType.CHOP_TREE, suitability);
+            }
         }
 
         // Check for mining jobs (ores)
@@ -321,24 +265,6 @@ public class JobScanner {
         }
 
         return jobs;
-    }
-
-    /**
-     * Check if a block is part of a tree (log).
-     */
-    private static boolean isTree(Level level, BlockPos pos) {
-        Block block = level.getBlockState(pos).getBlock();
-
-        return block == Blocks.OAK_LOG ||
-               block == Blocks.BIRCH_LOG ||
-               block == Blocks.SPRUCE_LOG ||
-               block == Blocks.JUNGLE_LOG ||
-               block == Blocks.ACACIA_LOG ||
-               block == Blocks.DARK_OAK_LOG ||
-               block == Blocks.CHERRY_LOG ||
-               block == Blocks.MANGROVE_LOG ||
-               block == Blocks.CRIMSON_STEM ||
-               block == Blocks.WARPED_STEM;
     }
 
     /**
@@ -405,7 +331,7 @@ public class JobScanner {
         for (ItemEntity itemEntity : items) {
             if (itemEntity.isAlive() && !itemEntity.getItem().isEmpty()) {
                 BlockPos itemPos = itemEntity.blockPosition();
-                opportunities.add(new JobOpportunity(itemPos, JobType.PICKUP_ITEMS, Suitability.TRANSPORTING));
+                opportunities.add(new JobOpportunity(itemPos, JobType.COLLECT_DROPS, Suitability.TRANSPORTING));
 
                 if (opportunities.size() >= maxResults) {
                     break;

@@ -1,8 +1,6 @@
 package dev.palworks.command;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import dev.palworks.base.BaseState;
-import dev.palworks.base.BaseStateManager;
 import dev.palworks.debug.DebugInfo;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.worker.WorkerState;
@@ -33,6 +31,86 @@ public class DebugCommand {
 
         DebugManager.DebugFlags flags = DebugManager.getFlags(playerUUID);
         player.sendSystemMessage(Component.literal(flags.getStatusString()));
+    }
+
+    /**
+     * Clear all worker reservations (force fresh job assignments).
+     */
+    public static void clearAllReservations(ServerPlayer player) {
+        int count = 0;
+        if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            for (Entity entity : serverLevel.getAllEntities()) {
+                if (entity instanceof com.cobblemon.mod.common.entity.pokemon.PokemonEntity pokemonEntity) {
+                    Pokemon pokemon = pokemonEntity.getPokemon();
+                    if (pokemon != null && pokemon.getOwnerUUID() != null) {
+                        WorkerState state = WorkerStateManager.get(pokemon);
+                        if (state != null && state.getCurrentReservation() != null) {
+                            state.clearReservation();
+                            WorkerStateManager.save(pokemon, state);
+                            count++;
+                        }
+                    }
+                }
+            }
+        }
+        player.sendSystemMessage(Component.literal("Cleared reservations for " + count + " workers"));
+    }
+
+    /**
+     * Show inventory of nearest worker.
+     */
+    public static void showWorkerInventory(ServerPlayer player) {
+        Pokemon pokemon = findNearestOwnedPokemon(player);
+        if (pokemon == null) {
+            player.sendSystemMessage(Component.literal("No owned Pokemon nearby"));
+            return;
+        }
+
+        WorkerState state = WorkerStateManager.get(pokemon);
+        if (state == null) {
+            player.sendSystemMessage(Component.literal(pokemon.getSpecies().getName() + " is not a worker"));
+            return;
+        }
+
+        player.sendSystemMessage(Component.literal("=== " + pokemon.getSpecies().getName() + " Inventory ==="));
+
+        net.minecraft.world.item.ItemStack workInv = state.getWorkInventory();
+        if (workInv.isEmpty()) {
+            player.sendSystemMessage(Component.literal("Work Inventory: EMPTY"));
+        } else {
+            player.sendSystemMessage(Component.literal(String.format("Work Inventory: %dx %s",
+                workInv.getCount(), workInv.getItem().toString())));
+        }
+
+        if (state.getCurrentReservation() != null) {
+            player.sendSystemMessage(Component.literal("Current Job: " + state.getCurrentReservation().getJobType()));
+            player.sendSystemMessage(Component.literal("Work Ticks: " + state.getConsecutiveWorkTicks()));
+        } else {
+            player.sendSystemMessage(Component.literal("Current Job: IDLE"));
+        }
+    }
+
+    /**
+     * Clear inventory of nearest worker.
+     */
+    public static void clearWorkerInventory(ServerPlayer player) {
+        Pokemon pokemon = findNearestOwnedPokemon(player);
+        if (pokemon == null) {
+            player.sendSystemMessage(Component.literal("No owned Pokemon nearby"));
+            return;
+        }
+
+        WorkerState state = WorkerStateManager.get(pokemon);
+        if (state == null) {
+            player.sendSystemMessage(Component.literal(pokemon.getSpecies().getName() + " is not a worker"));
+            return;
+        }
+
+        state.clearWorkInventory();
+        state.syncWorkInventoryToHeldItem(pokemon);
+        WorkerStateManager.save(pokemon, state);
+
+        player.sendSystemMessage(Component.literal("Cleared " + pokemon.getSpecies().getName() + "'s inventory"));
     }
 
     /**
@@ -76,22 +154,7 @@ public class DebugCommand {
         }
     }
 
-    /**
-     * Show base info for the nearest base or the player's linked base.
-     */
-    public static void showNearestBaseInfo(ServerPlayer player) {
-        BlockPos playerPos = player.blockPosition();
-        DebugInfo.BaseDebugInfo info = DebugInfo.getNearestBaseInfo(player.level(), playerPos, 128);
-
-        if (info == null) {
-            player.sendSystemMessage(Component.literal("No bases nearby"));
-            return;
-        }
-
-        for (String line : info.toStringList()) {
-            player.sendSystemMessage(Component.literal(line));
-        }
-    }
+    // Base system removed - method disabled
 
     /**
      * Show info for a station at the player's target block.
@@ -113,34 +176,9 @@ public class DebugCommand {
         }
     }
 
-    /**
-     * Create a new base at the player's position.
-     */
-    public static void createBase(ServerPlayer player) {
-        BlockPos pos = player.blockPosition();
-        BaseState base = BaseStateManager.getOrCreate(player.level(), pos);
+    // Base system removed - createBase() disabled
 
-        player.sendSystemMessage(Component.literal("Created base at " +
-                String.format("[%d, %d, %d]", pos.getX(), pos.getY(), pos.getZ())));
-    }
-
-    /**
-     * Set work radius for the nearest base.
-     */
-    public static void setBaseRadius(ServerPlayer player, int radius) {
-        BlockPos playerPos = player.blockPosition();
-        BaseState base = BaseStateManager.findNearestBase(player.level(), playerPos, 128);
-
-        if (base == null) {
-            player.sendSystemMessage(Component.literal("No base nearby"));
-            return;
-        }
-
-        base.setWorkRadius(radius);
-        BaseStateManager.save(player.level(), base.getBasePos(), base);
-
-        player.sendSystemMessage(Component.literal("Set base radius to " + radius));
-    }
+    // Base system removed - setBaseRadius() disabled
 
     /**
      * List all debug info in range.
@@ -154,9 +192,7 @@ public class DebugCommand {
         int stationCount = DebugManager.getAllStationInfo().size();
         player.sendSystemMessage(Component.literal("Stations: " + stationCount));
 
-        // Bases
-        int baseCount = DebugManager.getAllBaseInfo().size();
-        player.sendSystemMessage(Component.literal("Bases: " + baseCount));
+        // Base system removed - no base count
     }
 
     /**
@@ -209,22 +245,7 @@ public class DebugCommand {
 
         // Enable the worker
         state.setEnabled(true);
-
-        // Link to nearest base or create one
-        BlockPos playerPos = player.blockPosition();
-        BaseState base = BaseStateManager.findNearestBase(player.level(), playerPos, 128);
-
-        if (base == null) {
-            // Create a base at player position
-            base = BaseStateManager.getOrCreate(player.level(), playerPos);
-            player.sendSystemMessage(Component.literal("Created base at your position"));
-        }
-
-        state.setBasePos(base.getBasePos());
-        base.linkWorker(pokemon.getUuid());
-
         WorkerStateManager.save(pokemon, state);
-        BaseStateManager.save(player.level(), base.getBasePos(), base);
 
         player.sendSystemMessage(Component.literal("Enabled " + pokemon.getSpecies().getName() + " as a worker!"));
     }
@@ -243,16 +264,6 @@ public class DebugCommand {
         if (state == null || !state.isEnabled()) {
             player.sendSystemMessage(Component.literal(pokemon.getSpecies().getName() + " is not a worker"));
             return;
-        }
-
-        // Unlink from base
-        BlockPos basePos = state.getBasePos();
-        if (basePos != null) {
-            BaseState base = BaseStateManager.get(player.level(), basePos);
-            if (base != null) {
-                base.unlinkWorker(pokemon.getUuid());
-                BaseStateManager.save(player.level(), basePos, base);
-            }
         }
 
         // Disable the worker

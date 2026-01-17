@@ -21,7 +21,6 @@ public class DebugManager {
     // Cached debug info (updated per tick for performance)
     private static final Map<UUID, DebugInfo.WorkerDebugInfo> cachedWorkerInfo = new HashMap<>();
     private static final Map<BlockPos, DebugInfo.StationDebugInfo> cachedStationInfo = new HashMap<>();
-    private static final Map<BlockPos, DebugInfo.BaseDebugInfo> cachedBaseInfo = new HashMap<>();
 
     /**
      * Get or create debug flags for a player.
@@ -79,18 +78,6 @@ public class DebugManager {
     }
 
     /**
-     * Update cached debug info for a base.
-     */
-    public static void updateBaseInfo(Level level, BlockPos pos) {
-        DebugInfo.BaseDebugInfo info = DebugInfo.getBaseInfo(level, pos);
-        if (info != null) {
-            cachedBaseInfo.put(pos, info);
-        } else {
-            cachedBaseInfo.remove(pos);
-        }
-    }
-
-    /**
      * Get cached worker debug info.
      */
     @Nullable
@@ -104,14 +91,6 @@ public class DebugManager {
     @Nullable
     public static DebugInfo.StationDebugInfo getStationInfo(BlockPos pos) {
         return cachedStationInfo.get(pos);
-    }
-
-    /**
-     * Get cached base debug info.
-     */
-    @Nullable
-    public static DebugInfo.BaseDebugInfo getBaseInfo(BlockPos pos) {
-        return cachedBaseInfo.get(pos);
     }
 
     /**
@@ -129,19 +108,11 @@ public class DebugManager {
     }
 
     /**
-     * Get all cached base info.
-     */
-    public static Map<BlockPos, DebugInfo.BaseDebugInfo> getAllBaseInfo() {
-        return new HashMap<>(cachedBaseInfo);
-    }
-
-    /**
      * Clear all cached debug info.
      */
     public static void clearCache() {
         cachedWorkerInfo.clear();
         cachedStationInfo.clear();
-        cachedBaseInfo.clear();
     }
 
     /**

@@ -3,6 +3,7 @@ package dev.palworks.neoforge.event;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkerAI;
+import dev.palworks.manager.JobManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -16,7 +17,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  */
 @EventBusSubscriber(modid = "palworks")
 public class WorkerTickHandler {
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;  // Reduced debug spam
     private static long lastDebugLog = 0;
     private static int tickCounter = 0;
 
@@ -26,7 +27,10 @@ public class WorkerTickHandler {
 
         // Get all server levels
         for (ServerLevel level : event.getServer().getAllLevels()) {
-            // Iterate through all entities
+            // Tick JobManager FIRST (scan jobs, assign work)
+            JobManager.getInstance(level).tick(level);
+
+            // Then tick individual workers (execute assigned jobs)
             for (Entity entity : level.getAllEntities()) {
                 // Check if entity is a Cobblemon Pokemon
                 if (entity instanceof PokemonEntity pokemonEntity) {
@@ -45,7 +49,11 @@ public class WorkerTickHandler {
 
                     // Cast to Mob for navigation
                     if (pokemonEntity instanceof Mob mob) {
-                        WorkerAI.tick(pokemon, mob, pokemonEntity.level());
+                        // Register worker with JobManager
+                        JobManager.getInstance(level).registerWorker(pokemon, mob, level);
+
+                        // Execute assigned work
+                        WorkerAI.tick(pokemon, mob, level);
                     }
                 }
             }

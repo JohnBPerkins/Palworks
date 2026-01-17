@@ -1,12 +1,22 @@
 package dev.palworks.crop;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -18,6 +28,14 @@ import java.util.List;
  * Makes it easy to add modded crop support later.
  */
 public class CropAdapter {
+    // Cobblemon berry tag for modded berry support
+    private static final TagKey<Block> COBBLEMON_BERRIES = TagKey.create(
+        Registries.BLOCK,
+        new ResourceLocation("cobblemon", "berries")
+    );
+
+    // Galarica nut bush - special berry that harvests at age 3 and resets to age 1
+    private static final ResourceLocation GALARICA_NUT_BUSH_ID = new ResourceLocation("cobblemon", "galarica_nut_bush");
 
     /**
      * Check if a block is a plantable crop surface (e.g., farmland).
@@ -38,6 +56,45 @@ public class CropAdapter {
 
         // Note: Cocoa beans plant on jungle logs (checked separately)
         return false;
+    }
+
+    /**
+     * Check if a block is a berry that can be harvested by right-clicking.
+     */
+    private static boolean isBerry(BlockState state) {
+        Block block = state.getBlock();
+
+        // Vanilla berries
+        if (block instanceof SweetBerryBushBlock ||
+            block == Blocks.CAVE_VINES ||
+            block == Blocks.CAVE_VINES_PLANT) {
+            return true;
+        }
+
+        // Galarica nut bush
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
+        if (GALARICA_NUT_BUSH_ID.equals(blockId)) {
+            return true;
+        }
+
+        // Cobblemon berries (tagged)
+        return state.is(COBBLEMON_BERRIES);
+    }
+
+    /**
+     * Check if a block is a galarica nut bush.
+     */
+    private static boolean isGalaricaNutBush(Block block) {
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
+        return GALARICA_NUT_BUSH_ID.equals(blockId);
+    }
+
+    /**
+     * Check if a block at a position is a berry bush.
+     * Public helper for JobManager to determine if replanting is needed.
+     */
+    public static boolean isBerryBush(Level level, BlockPos pos) {
+        return isBerry(level.getBlockState(pos));
     }
 
     /**
@@ -77,6 +134,33 @@ public class CropAdapter {
             return state.getValue(net.minecraft.world.level.block.CaveVines.BERRIES);
         }
 
+        // Galarica nut bush - harvestable at age 3
+        if (isGalaricaNutBush(block)) {
+            for (Property<?> property : state.getProperties()) {
+                if (property.getName().equals("age") && property instanceof IntegerProperty) {
+                    IntegerProperty ageProperty = (IntegerProperty) property;
+                    int age = state.getValue(ageProperty);
+                    return age >= 3; // Galarica is harvestable at age 3
+                }
+            }
+            return false;
+        }
+
+        // Cobblemon berries - harvestable at age 5
+        // Cobblemon berry blocks use an AGE property (0-5)
+        if (state.is(COBBLEMON_BERRIES)) {
+            // Find the AGE property dynamically (Cobblemon berries use their own AGE property)
+            for (Property<?> property : state.getProperties()) {
+                if (property.getName().equals("age") && property instanceof IntegerProperty) {
+                    IntegerProperty ageProperty = (IntegerProperty) property;
+                    int age = state.getValue(ageProperty);
+                    return age >= 5; // Cobblemon berries are harvestable at age 5
+                }
+            }
+            // No age property found - not harvestable
+            return false;
+        }
+
         return false;
     }
 
@@ -93,7 +177,8 @@ public class CropAdapter {
                block instanceof CocoaBlock ||
                block instanceof SweetBerryBushBlock ||
                block == Blocks.CAVE_VINES ||
-               block == Blocks.CAVE_VINES_PLANT;
+               block == Blocks.CAVE_VINES_PLANT ||
+               state.is(COBBLEMON_BERRIES);
     }
 
     /**
@@ -212,25 +297,168 @@ public class CropAdapter {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
-        // Sweet berry bushes reset to age 1 when harvested, don't break
-        if (block instanceof SweetBerryBushBlock) {
-            // Drop sweet berries
-            int berryCount = 1 + level.random.nextInt(2); // 1-2 berries
-            net.minecraft.world.level.block.Block.popResource(level, pos, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SWEET_BERRIES, berryCount));
-            level.setBlock(pos, state.setValue(SweetBerryBushBlock.AGE, 1), 2);
+        // Berries (vanilla and Cobblemon) are harvested and reset their age
+        if (isBerry(state)) {
+            // Galarica nut bush - drop berries and reset to age 1
+            if (isGalaricaNutBush(block)) {
+                Item berryItem = block.asItem();
+                int berryCount = 1 + level.random.nextInt(3); // 1-3 berries
+                Block.popResource(level, pos, new ItemStack(berryItem, berryCount));
+
+                // Find AGE property and reset to 1
+                IntegerProperty ageProperty = null;
+                for (Property<?> property : state.getProperties()) {
+                    if (property.getName().equals("age") && property instanceof IntegerProperty) {
+                        ageProperty = (IntegerProperty) property;
+                        break;
+                    }
+                }
+
+                if (ageProperty != null) {
+                    int currentAge = state.getValue(ageProperty);
+                    level.setBlock(pos, state.setValue(ageProperty, 1), 3);
+
+                    dev.palworks.Palworks.LOGGER.info("Harvested Galarica nut at {}: was age {}, dropped {} x{}, reset to age 1",
+                        pos, currentAge, berryItem, berryCount);
+                }
+
+                return true;
+            }
+
+            // Cobblemon berries - drop berries and reset to age 3
+            if (state.is(COBBLEMON_BERRIES)) {
+                // Get the berry item from the block
+                Item berryItem = block.asItem();
+
+                // Drop 1-3 berries (similar to vanilla sweet berries)
+                int berryCount = 1 + level.random.nextInt(3); // 1-3 berries
+                Block.popResource(level, pos, new ItemStack(berryItem, berryCount));
+
+                // Find the AGE property and reset to 3
+                IntegerProperty ageProperty = null;
+                for (Property<?> property : state.getProperties()) {
+                    if (property.getName().equals("age") && property instanceof IntegerProperty) {
+                        ageProperty = (IntegerProperty) property;
+                        break;
+                    }
+                }
+
+                if (ageProperty != null) {
+                    int currentAge = state.getValue(ageProperty);
+                    BlockState newState = state.setValue(ageProperty, 3);
+
+                    // Use UPDATE_ALL (flag 3) to properly persist the state change
+                    // Flag 3 = UPDATE_NEIGHBORS (1) + UPDATE_CLIENTS (2)
+                    level.setBlock(pos, newState, 3);
+
+                    // Verify the block was actually set correctly
+                    BlockState verifyState = level.getBlockState(pos);
+                    IntegerProperty verifyAgeProperty = null;
+                    for (Property<?> property : verifyState.getProperties()) {
+                        if (property.getName().equals("age") && property instanceof IntegerProperty) {
+                            verifyAgeProperty = (IntegerProperty) property;
+                            break;
+                        }
+                    }
+                    int verifyAge = verifyAgeProperty != null ? verifyState.getValue(verifyAgeProperty) : -1;
+
+                    dev.palworks.Palworks.LOGGER.info("Harvested Cobblemon berry at {}: was age {}, set to age 3, verified as age {}. Dropped {} x{}",
+                        pos, currentAge, verifyAge, berryItem, berryCount);
+                } else {
+                    dev.palworks.Palworks.LOGGER.warn("Could not reset Cobblemon berry at {} - no age property", pos);
+                }
+
+                return true;
+            }
+
+            // Vanilla sweet berries - drop berries and reset to age 1
+            if (block instanceof SweetBerryBushBlock) {
+                int berryCount = 1 + level.random.nextInt(2); // 1-2 berries
+                Block.popResource(level, pos, new ItemStack(Items.SWEET_BERRIES, berryCount));
+                level.setBlock(pos, state.setValue(SweetBerryBushBlock.AGE, 1), 2);
+                dev.palworks.Palworks.LOGGER.info("Harvested sweet berries, dropped {}, reset to age 1 at {}", berryCount, pos);
+                return true;
+            }
+
+            // Glow berries - drop berries and remove berries from vine
+            if (block == Blocks.CAVE_VINES || block == Blocks.CAVE_VINES_PLANT) {
+                Block.popResource(level, pos, new ItemStack(Items.GLOW_BERRIES, 1));
+                level.setBlock(pos, state.setValue(net.minecraft.world.level.block.CaveVines.BERRIES, false), 2);
+                dev.palworks.Palworks.LOGGER.info("Harvested glow berries at {}", pos);
+                return true;
+            }
+
             return true;
         }
 
-        // Glow berries - just remove the berries, don't break the vine
-        if (block == Blocks.CAVE_VINES || block == Blocks.CAVE_VINES_PLANT) {
-            // Drop the glow berry
-            net.minecraft.world.level.block.Block.popResource(level, pos, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.GLOW_BERRIES, 1));
-            // Remove berries from the vine
-            level.setBlock(pos, state.setValue(net.minecraft.world.level.block.CaveVines.BERRIES, false), 2);
-            return true;
+        // Check if this is hearty grains (multi-block crop)
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
+        boolean isHeartyGrains = blockId.toString().contains("hearty_grain");
+
+        if (isHeartyGrains) {
+            // Hearty grains - two-block crop, reset bottom to age 3 and break top
+            IntegerProperty ageProperty = null;
+            for (Property<?> property : state.getProperties()) {
+                if (property.getName().equals("age") && property instanceof IntegerProperty) {
+                    ageProperty = (IntegerProperty) property;
+                    break;
+                }
+            }
+
+            if (ageProperty != null) {
+                int currentAge = state.getValue(ageProperty);
+
+                // Get the crop item and drop it
+                Item cropItem = block.asItem();
+                int dropCount = 1 + level.random.nextInt(3);
+                Block.popResource(level, pos, new ItemStack(cropItem, dropCount));
+
+                // Reset bottom block to age 3
+                level.setBlock(pos, state.setValue(ageProperty, 3), 3);
+
+                // Break the top block (one block above)
+                BlockPos topPos = pos.above();
+                BlockState topState = level.getBlockState(topPos);
+                if (topState.getBlock() == block) {
+                    level.destroyBlock(topPos, false); // Don't drop items from top block
+                }
+
+                dev.palworks.Palworks.LOGGER.info("Harvested hearty grains at {}: was age {}, dropped {} x{}, reset to age 3, broke top block",
+                    pos, currentAge, cropItem, dropCount);
+                return true;
+            }
         }
 
-        // Other crops break completely
+        // Other crops - check if they have an age property
+        IntegerProperty ageProperty = null;
+        for (Property<?> property : state.getProperties()) {
+            if (property.getName().equals("age") && property instanceof IntegerProperty) {
+                ageProperty = (IntegerProperty) property;
+                break;
+            }
+        }
+
+        if (ageProperty != null) {
+            // This crop has an age property - harvest and reset to age 0
+            int currentAge = state.getValue(ageProperty);
+            int maxAge = ageProperty.getPossibleValues().stream().max(Integer::compareTo).orElse(7);
+
+            // Only harvest if at max age
+            if (currentAge >= maxAge) {
+                Item cropItem = block.asItem();
+                int dropCount = 1 + level.random.nextInt(3);
+                Block.popResource(level, pos, new ItemStack(cropItem, dropCount));
+
+                // Reset to age 0
+                level.setBlock(pos, state.setValue(ageProperty, 0), 3);
+
+                dev.palworks.Palworks.LOGGER.info("Harvested aged crop at {}: was age {}, dropped {} x{}, reset to age 0",
+                    pos, currentAge, cropItem, dropCount);
+                return true;
+            }
+        }
+
+        // Default: break the block completely (for crops like wheat, carrots, etc.)
         level.destroyBlock(pos, true);
         return true;
     }
