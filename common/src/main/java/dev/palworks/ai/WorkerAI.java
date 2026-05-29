@@ -313,6 +313,7 @@ public class WorkerAI {
         if (ticks == 0) {
             handler.onStart(ctx);
         }
+        handler.onWorkTick(ctx, ticks);
         if (ticks >= required - 1) {
             handler.onFinish(ctx);
         }
@@ -349,6 +350,8 @@ public class WorkerAI {
         int requiredTicks();
         /** Runs once on the first work tick (consecutiveWorkTicks == 0). */
         default void onStart(JobContext ctx) {}
+        /** Runs every work tick; {@code ticksElapsed} is the 0-based tick within this session. */
+        default void onWorkTick(JobContext ctx, int ticksElapsed) {}
         /** Runs on the final work tick (consecutiveWorkTicks == requiredTicks - 1). */
         default void onFinish(JobContext ctx) {}
         /** If true when the timer completes, reset and work again instead of finishing. */
@@ -387,14 +390,24 @@ public class WorkerAI {
     private static final class FuelFurnaceHandler implements JobHandler {
         @Override public int requiredTicks() { return 200; } // matches one smelting operation
 
-        @Override public void onStart(JobContext ctx) {
-            int burnDuration = dev.palworks.station.FurnaceHelper.getBurnDuration();
-            dev.palworks.station.FurnaceHelper.igniteFurnace(ctx.level(), ctx.pos(), burnDuration);
-            // Play the real move's full presentation (animation + particles + sound, Cobblemon's
-            // own timing). Swap which move by changing FURNACE_IGNITE_MOVE; no other code changes.
-            playMoveActionEffect(ctx, FURNACE_IGNITE_MOVE);
-            if (DEBUG) {
-                Palworks.LOGGER.info("{} ignited furnace at {} for {} ticks", ctx.name(), ctx.pos(), burnDuration);
+        @Override public void onWorkTick(JobContext ctx, int ticksElapsed) {
+            if (ticksElapsed == FURNACE_EFFECT_START_TICK) {
+                // Start the move a few ticks after arrival, not on the arrival tick: on the first
+                // cycle the worker has just stopped walking, and starting the move during the
+                // walk→idle transition gets the animation dropped (later cycles play fine because
+                // the worker has been standing). The brief settle delay fixes the first cycle.
+                // Swap which move by changing FURNACE_IGNITE_MOVE; no other code changes.
+                playMoveActionEffect(ctx, FURNACE_IGNITE_MOVE);
+            } else if (ticksElapsed == FURNACE_EFFECT_START_TICK + FURNACE_IGNITE_DELAY_TICKS) {
+                // Light the furnace when the move's flames reach it (FURNACE_IGNITE_DELAY_TICKS into
+                // the animation) so the fire starts on impact. Re-igniting once per cycle keeps it lit
+                // across repeats — the 201-tick burn covers the 200-tick gap to the next ignite, so
+                // the phase offset doesn't matter for smelting continuity.
+                int burnDuration = dev.palworks.station.FurnaceHelper.getBurnDuration();
+                dev.palworks.station.FurnaceHelper.igniteFurnace(ctx.level(), ctx.pos(), burnDuration);
+                if (DEBUG) {
+                    Palworks.LOGGER.info("{} ignited furnace at {} for {} ticks", ctx.name(), ctx.pos(), burnDuration);
+                }
             }
         }
 
@@ -682,6 +695,15 @@ public class WorkerAI {
     /** Which Cobblemon move's action effect a Kindling worker performs to light a furnace. Swap this
      * one id to use a different move's animation/particles/sound — no other code changes. */
     private static final ResourceLocation FURNACE_IGNITE_MOVE = ResourceLocation.fromNamespaceAndPath("cobblemon", "ember");
+    /** Ticks after arrival before the worker performs the move, to let it settle out of its walk
+     * animation first (otherwise the move animation is dropped on the first smelt cycle). */
+    private static final int FURNACE_EFFECT_START_TICK = 8;
+    /** Ticks into the move animation at which the furnace lights, tuned so the fire starts when the
+     * flames reach it (Ember's impact is ~1.75s in). Re-tune if you change FURNACE_IGNITE_MOVE. */
+    private static final int FURNACE_IGNITE_DELAY_TICKS = 35;
+    /** Height within the furnace block (0=bottom, 1=top) the flames aim at — low so they hit the
+     * fire chamber near the base rather than the block's center. */
+    private static final double FURNACE_TARGET_Y = 0.125;
 
     /**
      * Play a Cobblemon move's full action-effect presentation (animation + particles + sound, with
@@ -720,7 +742,7 @@ public class WorkerAI {
             targetMarker.setSavesToWorld(false);
             targetMarker.setNoGravity(true);
             targetMarker.setScale(0.01f); // effectively invisible; just a position/locator anchor
-            targetMarker.moveTo(furnace.getX() + 0.5, furnace.getY() + 0.5, furnace.getZ() + 0.5, 0.0f, 0.0f);
+            targetMarker.moveTo(furnace.getX() + 0.5, furnace.getY() + FURNACE_TARGET_Y, furnace.getZ() + 0.5, 0.0f, 0.0f);
             serverLevel.addFreshEntity(targetMarker);
 
             MoLangRuntime runtime = new MoLangRuntime();
