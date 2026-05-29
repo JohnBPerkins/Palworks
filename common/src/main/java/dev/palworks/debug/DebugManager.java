@@ -1,169 +1,42 @@
 package dev.palworks.debug;
 
-import com.cobblemon.mod.common.pokemon.Pokemon;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Manages debug state and provides debug information.
- * Tracks which debug overlays are enabled and caches debug data.
+ * Tracks which players have opted in (via {@code /palworks debug}) to seeing worker job activity
+ * — assignments, completions, etc. — broadcast in chat. Off by default.
+ *
+ * <p>This is the only live debug state. The old per-player render flags, the worker/station info
+ * caches, and the geometry renderer were never wired to anything and have been removed.
  */
 public class DebugManager {
-    // Debug toggle flags (per player)
-    private static final Map<UUID, DebugFlags> playerDebugFlags = new HashMap<>();
+    private static final Map<UUID, Boolean> workerActivityChat = new HashMap<>();
 
-    // Cached debug info (updated per tick for performance)
-    private static final Map<UUID, DebugInfo.WorkerDebugInfo> cachedWorkerInfo = new HashMap<>();
-    private static final Map<BlockPos, DebugInfo.StationDebugInfo> cachedStationInfo = new HashMap<>();
-
-    /**
-     * Get or create debug flags for a player.
-     */
-    public static DebugFlags getFlags(UUID playerUUID) {
-        return playerDebugFlags.computeIfAbsent(playerUUID, k -> new DebugFlags());
+    /** Whether this player currently sees worker activity in chat. */
+    public static boolean showsWorkerActivity(UUID playerUUID) {
+        return workerActivityChat.getOrDefault(playerUUID, false);
     }
 
-    /**
-     * Toggle a debug flag for a player.
-     */
-    public static void toggle(UUID playerUUID, DebugFlag flag) {
-        DebugFlags flags = getFlags(playerUUID);
-        switch (flag) {
-            case WORKER_INFO -> flags.showWorkerInfo = !flags.showWorkerInfo;
-            case STATION_INFO -> flags.showStationInfo = !flags.showStationInfo;
-            case BASE_INFO -> flags.showBaseInfo = !flags.showBaseInfo;
-            case BASE_RADIUS -> flags.showBaseRadius = !flags.showBaseRadius;
-            case WORKER_PATHS -> flags.showWorkerPaths = !flags.showWorkerPaths;
-            case JOB_TARGETS -> flags.showJobTargets = !flags.showJobTargets;
-            case ALL -> {
-                boolean newState = !flags.isAnyEnabled();
-                flags.showWorkerInfo = newState;
-                flags.showStationInfo = newState;
-                flags.showBaseInfo = newState;
-                flags.showBaseRadius = newState;
-                flags.showWorkerPaths = newState;
-                flags.showJobTargets = newState;
+    /** Toggle worker-activity chat for a player; returns the new state. */
+    public static boolean toggleWorkerActivity(UUID playerUUID) {
+        boolean next = !showsWorkerActivity(playerUUID);
+        workerActivityChat.put(playerUUID, next);
+        return next;
+    }
+
+    /** Send a worker-activity line to every player in the level who has opted in. */
+    public static void broadcastActivity(ServerLevel level, String message) {
+        Component line = Component.literal("§7[Palworks] §f" + message);
+        for (ServerPlayer player : level.players()) {
+            if (showsWorkerActivity(player.getUUID())) {
+                player.sendSystemMessage(line);
             }
         }
-    }
-
-    /**
-     * Update cached debug info for a worker.
-     */
-    public static void updateWorkerInfo(UUID workerUUID, Pokemon pokemon, @Nullable Mob entity) {
-        DebugInfo.WorkerDebugInfo info = DebugInfo.getWorkerInfo(pokemon, entity);
-        if (info != null) {
-            cachedWorkerInfo.put(workerUUID, info);
-        } else {
-            cachedWorkerInfo.remove(workerUUID);
-        }
-    }
-
-    /**
-     * Update cached debug info for a station.
-     */
-    public static void updateStationInfo(Level level, BlockPos pos) {
-        DebugInfo.StationDebugInfo info = DebugInfo.getStationInfo(level, pos);
-        if (info != null) {
-            cachedStationInfo.put(pos, info);
-        } else {
-            cachedStationInfo.remove(pos);
-        }
-    }
-
-    /**
-     * Get cached worker debug info.
-     */
-    @Nullable
-    public static DebugInfo.WorkerDebugInfo getWorkerInfo(UUID workerUUID) {
-        return cachedWorkerInfo.get(workerUUID);
-    }
-
-    /**
-     * Get cached station debug info.
-     */
-    @Nullable
-    public static DebugInfo.StationDebugInfo getStationInfo(BlockPos pos) {
-        return cachedStationInfo.get(pos);
-    }
-
-    /**
-     * Get all cached worker info.
-     */
-    public static Map<UUID, DebugInfo.WorkerDebugInfo> getAllWorkerInfo() {
-        return new HashMap<>(cachedWorkerInfo);
-    }
-
-    /**
-     * Get all cached station info.
-     */
-    public static Map<BlockPos, DebugInfo.StationDebugInfo> getAllStationInfo() {
-        return new HashMap<>(cachedStationInfo);
-    }
-
-    /**
-     * Clear all cached debug info.
-     */
-    public static void clearCache() {
-        cachedWorkerInfo.clear();
-        cachedStationInfo.clear();
-    }
-
-    /**
-     * Clear cached info for a specific worker.
-     */
-    public static void clearWorkerCache(UUID workerUUID) {
-        cachedWorkerInfo.remove(workerUUID);
-    }
-
-    /**
-     * Debug flags for a player.
-     */
-    public static class DebugFlags {
-        public boolean showWorkerInfo = false;
-        public boolean showStationInfo = false;
-        public boolean showBaseInfo = false;
-        public boolean showBaseRadius = false;
-        public boolean showWorkerPaths = false;
-        public boolean showJobTargets = false;
-
-        public boolean isAnyEnabled() {
-            return showWorkerInfo || showStationInfo || showBaseInfo ||
-                   showBaseRadius || showWorkerPaths || showJobTargets;
-        }
-
-        public String getStatusString() {
-            if (!isAnyEnabled()) {
-                return "Debug: OFF";
-            }
-
-            StringBuilder sb = new StringBuilder("Debug: ");
-            if (showWorkerInfo) sb.append("Workers ");
-            if (showStationInfo) sb.append("Stations ");
-            if (showBaseInfo) sb.append("Bases ");
-            if (showBaseRadius) sb.append("Radius ");
-            if (showWorkerPaths) sb.append("Paths ");
-            if (showJobTargets) sb.append("Targets ");
-            return sb.toString().trim();
-        }
-    }
-
-    /**
-     * Debug flag types.
-     */
-    public enum DebugFlag {
-        WORKER_INFO,
-        STATION_INFO,
-        BASE_INFO,
-        BASE_RADIUS,
-        WORKER_PATHS,
-        JOB_TARGETS,
-        ALL
     }
 }

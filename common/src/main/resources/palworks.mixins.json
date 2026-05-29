@@ -6,6 +6,7 @@
   "client": [
   ],
   "mixins": [
+    "CobblemonNetworkMixin"
   ],
   "injectors": {
     "defaultRequire": 1

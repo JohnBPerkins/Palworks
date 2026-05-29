@@ -2,6 +2,10 @@ architectury {
     common rootProject.enabled_platforms.split(',')
 }
 
+loom {
+    accessWidenerPath = file("src/main/resources/palworks.accesswidener")
+}
+
 dependencies {
     mappings loom.officialMojangMappings()
 
@@ -15,4 +19,16 @@ dependencies {
 
     // Cobblemon API for suitability detection
     modCompileOnly("com.cobblemon:fabric:1.7.1+1.21.1")
+
+    // Kotlin stdlib for Cobblemon API interop (provided at runtime by Cobblemon)
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:1.9.21")
+
+    // Unit tests for pure logic (no running game required).
+    testImplementation platform("org.junit:junit-bom:5.10.2")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+    useJUnitPlatform()
 }

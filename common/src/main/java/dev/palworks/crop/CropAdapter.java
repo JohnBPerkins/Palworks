@@ -299,6 +299,41 @@ public class CropAdapter {
 
         // Berries (vanilla and Cobblemon) are harvested and reset their age
         if (isBerry(state)) {
+            // Cobblemon berry blocks (incl. Galarica nut bush) carry a BerryBlockEntity. Delegate to
+            // Cobblemon's own harvest(level, state, pos): it computes the correct yield AND resets the
+            // growth timers + age stage. Previously we only lowered the blockstate `age` and left the
+            // block entity mature, so Cobblemon re-grew it to max next tick == infinite berries.
+            net.minecraft.world.level.block.entity.BlockEntity berryBe = level.getBlockEntity(pos);
+            if (berryBe instanceof com.cobblemon.mod.common.block.entity.BerryBlockEntity berryEntity) {
+                int dropped = 0;
+                for (ItemStack drop : berryEntity.harvest(level, state, pos)) {
+                    if (!drop.isEmpty()) {
+                        Block.popResource(level, pos, drop);
+                        dropped += drop.getCount();
+                    }
+                }
+
+                // Safety net: if Cobblemon's harvest left the berry still fully grown, reset its grow
+                // timers so it can't instantly re-mature (the infinite-berry bug).
+                if (isFullyGrown(level, pos)) {
+                    berryEntity.resetGrowTimers(pos, level.getBlockState(pos));
+                }
+
+                // Some berries' harvest() yields nothing (e.g. no growth points generated); make sure
+                // the worker still gets a berry so harvesting never silently does nothing. (A player
+                // right-clicking these would also get nothing, so this is strictly more forgiving.)
+                if (dropped == 0) {
+                    Block.popResource(level, pos, new ItemStack(block.asItem(), 1 + level.random.nextInt(3)));
+                }
+
+                // Match the right-click harvest's sound for parity.
+                level.playSound(null, pos, com.cobblemon.mod.common.CobblemonSounds.BERRY_HARVEST,
+                    net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 1.0f);
+
+                dev.palworks.Palworks.LOGGER.info("Harvested Cobblemon berry at {} ({} dropped from Cobblemon harvest)", pos, dropped);
+                return true;
+            }
+
             // Galarica nut bush - drop berries and reset to age 1
             if (isGalaricaNutBush(block)) {
                 Item berryItem = block.asItem();
@@ -320,52 +355,6 @@ public class CropAdapter {
 
                     dev.palworks.Palworks.LOGGER.info("Harvested Galarica nut at {}: was age {}, dropped {} x{}, reset to age 1",
                         pos, currentAge, berryItem, berryCount);
-                }
-
-                return true;
-            }
-
-            // Cobblemon berries - drop berries and reset to age 3
-            if (state.is(COBBLEMON_BERRIES)) {
-                // Get the berry item from the block
-                Item berryItem = block.asItem();
-
-                // Drop 1-3 berries (similar to vanilla sweet berries)
-                int berryCount = 1 + level.random.nextInt(3); // 1-3 berries
-                Block.popResource(level, pos, new ItemStack(berryItem, berryCount));
-
-                // Find the AGE property and reset to 3
-                IntegerProperty ageProperty = null;
-                for (Property<?> property : state.getProperties()) {
-                    if (property.getName().equals("age") && property instanceof IntegerProperty) {
-                        ageProperty = (IntegerProperty) property;
-                        break;
-                    }
-                }
-
-                if (ageProperty != null) {
-                    int currentAge = state.getValue(ageProperty);
-                    BlockState newState = state.setValue(ageProperty, 3);
-
-                    // Use UPDATE_ALL (flag 3) to properly persist the state change
-                    // Flag 3 = UPDATE_NEIGHBORS (1) + UPDATE_CLIENTS (2)
-                    level.setBlock(pos, newState, 3);
-
-                    // Verify the block was actually set correctly
-                    BlockState verifyState = level.getBlockState(pos);
-                    IntegerProperty verifyAgeProperty = null;
-                    for (Property<?> property : verifyState.getProperties()) {
-                        if (property.getName().equals("age") && property instanceof IntegerProperty) {
-                            verifyAgeProperty = (IntegerProperty) property;
-                            break;
-                        }
-                    }
-                    int verifyAge = verifyAgeProperty != null ? verifyState.getValue(verifyAgeProperty) : -1;
-
-                    dev.palworks.Palworks.LOGGER.info("Harvested Cobblemon berry at {}: was age {}, set to age 3, verified as age {}. Dropped {} x{}",
-                        pos, currentAge, verifyAge, berryItem, berryCount);
-                } else {
-                    dev.palworks.Palworks.LOGGER.warn("Could not reset Cobblemon berry at {} - no age property", pos);
                 }
 
                 return true;
