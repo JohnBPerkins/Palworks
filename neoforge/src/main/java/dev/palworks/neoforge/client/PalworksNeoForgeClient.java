@@ -1,0 +1,28 @@
+package dev.palworks.neoforge.client;
+
+import dev.palworks.client.gui.PokemonInteractHandler;
+import dev.palworks.inventory.WorkerInventoryScreen;
+import dev.palworks.neoforge.inventory.NeoForgeModMenuTypes;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+
+@EventBusSubscriber(modid = "palworks", bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+public class PalworksNeoForgeClient {
+
+    @SubscribeEvent
+    public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
+        // Register screens using NeoForge API
+        event.register(NeoForgeModMenuTypes.WORKER_INVENTORY.get(), WorkerInventoryScreen::new);
+    }
+
+    @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            // Register Pokemon interact wheel handler
+            PokemonInteractHandler.init();
+        });
+    }
+}

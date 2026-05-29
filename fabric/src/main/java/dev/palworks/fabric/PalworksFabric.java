@@ -1,7 +1,10 @@
 package dev.palworks.fabric;
 
-import dev.palworks.fabric.event.WorkerTickHandler;
 import dev.palworks.fabric.command.PalworksCommands;
+import dev.palworks.fabric.event.WorkerTickHandler;
+import dev.palworks.fabric.inventory.FabricMenuOpener;
+import dev.palworks.fabric.inventory.FabricModMenuTypes;
+import dev.palworks.inventory.MenuOpener;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import org.slf4j.Logger;
@@ -14,6 +17,12 @@ public class PalworksFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         LOGGER.info("Palworks Fabric initializing...");
+
+        // Register menu types (Fabric-specific)
+        FabricModMenuTypes.register();
+
+        // Set up menu opener
+        MenuOpener.Holder.setInstance(new FabricMenuOpener());
 
         // Register commands
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {

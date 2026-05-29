@@ -1,6 +1,9 @@
 package dev.palworks.neoforge;
 
+import dev.palworks.inventory.MenuOpener;
 import dev.palworks.neoforge.command.PalworksCommands;
+import dev.palworks.neoforge.inventory.NeoForgeMenuOpener;
+import dev.palworks.neoforge.inventory.NeoForgeModMenuTypes;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
@@ -17,6 +20,12 @@ public class PalworksNeoForge {
         LOGGER.info("PALWORKS NEOFORGE INITIALIZING...");
         LOGGER.info("==================================================");
         System.out.println("[Palworks] NeoForge mod is loading!");
+
+        // Register menu types (NeoForge-specific)
+        NeoForgeModMenuTypes.register(modEventBus);
+
+        // Set up menu opener
+        MenuOpener.Holder.setInstance(new NeoForgeMenuOpener());
 
         // Register command handler (WorkerTickHandler is auto-registered via @EventBusSubscriber)
         NeoForge.EVENT_BUS.register(new PalworksCommands());

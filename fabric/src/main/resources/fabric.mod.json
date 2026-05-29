@@ -17,11 +17,15 @@
   "entrypoints": {
     "main": [
       "dev.palworks.fabric.PalworksFabric"
+    ],
+    "client": [
+      "dev.palworks.fabric.PalworksFabricClient"
     ]
   },
   "mixins": [
     "palworks.mixins.json"
   ],
+  "accessWidener": "palworks.accesswidener",
   "depends": {
     "fabricloader": ">=0.18.4",
     "minecraft": "~1.21.1",

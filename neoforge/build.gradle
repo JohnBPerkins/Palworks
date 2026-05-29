@@ -7,6 +7,10 @@ architectury {
     neoForge()
 }
 
+loom {
+    accessWidenerPath = project(":common").file("src/main/resources/palworks.accesswidener")
+}
+
 configurations {
     common {
         canBeResolved = true
