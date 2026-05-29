@@ -1,8 +1,26 @@
+# IDE
 .idea
-.claude
+*.iml
 
+# Run directories
+run
 */run
 
-# gradle
+# Gradle / build output
 build
 .gradle
+.architectury-transformer
+
+# Logs
+logs
+*/logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local AI assistant config / dev notes (not part of the public repo)
+.claude
+CLAUDE.md
+.references
