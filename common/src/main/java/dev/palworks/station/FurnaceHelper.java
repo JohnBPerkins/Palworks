@@ -2,9 +2,15 @@ package dev.palworks.station;
 
 import dev.palworks.Palworks;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.BlastFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.SmokerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
@@ -13,7 +19,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
  * Handles detection of work opportunities and ignition.
  */
 public class FurnaceHelper {
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = Palworks.DEBUG;
 
     /**
      * Check if a furnace has items in the input slot and needs fuel.
@@ -31,6 +37,17 @@ public class FurnaceHelper {
             return false;
         }
 
+        // Only worth igniting if the input can actually be smelted in this furnace type.
+        if (!hasSmeltableInput(level, furnace)) {
+            return false;
+        }
+
+        // If the furnace already has its own fuel, leave it alone - a worker's heat is meant for
+        // furnaces that LACK fuel. (An already-lit furnace is skipped by the LIT check below.)
+        if (hasOwnFuel(furnace)) {
+            return false;
+        }
+
         // Check if not currently lit
         BlockState state = level.getBlockState(pos);
         boolean isLit = false;
@@ -45,6 +62,37 @@ public class FurnaceHelper {
         }
 
         return needsFuel;
+    }
+
+    /**
+     * Check that the furnace's input can actually be smelted in this furnace type, so workers
+     * don't waste heat igniting a furnace full of non-smeltable junk. Picks the recipe type from
+     * the block entity (smelting / blasting / smoking).
+     */
+    private static boolean hasSmeltableInput(Level level, AbstractFurnaceBlockEntity furnace) {
+        ItemStack input = furnace.getItem(0);
+        if (input.isEmpty()) {
+            return false;
+        }
+
+        SingleRecipeInput recipeInput = new SingleRecipeInput(input);
+        RecipeManager recipes = level.getRecipeManager();
+
+        if (furnace instanceof BlastFurnaceBlockEntity) {
+            return recipes.getRecipeFor(RecipeType.BLASTING, recipeInput, level).isPresent();
+        } else if (furnace instanceof SmokerBlockEntity) {
+            return recipes.getRecipeFor(RecipeType.SMOKING, recipeInput, level).isPresent();
+        }
+        return recipes.getRecipeFor(RecipeType.SMELTING, recipeInput, level).isPresent();
+    }
+
+    /**
+     * Whether the furnace's fuel slot (slot 1) holds a valid fuel item, i.e. the furnace can
+     * burn on its own without a worker's heat.
+     */
+    private static boolean hasOwnFuel(AbstractFurnaceBlockEntity furnace) {
+        ItemStack fuel = furnace.getItem(1);
+        return !fuel.isEmpty() && AbstractFurnaceBlockEntity.getFuel().containsKey(fuel.getItem());
     }
 
     /**
@@ -67,30 +115,19 @@ public class FurnaceHelper {
             return false;
         }
 
-        try {
-            // Use reflection to set burn time (fields are protected)
-            java.lang.reflect.Field litTimeField = AbstractFurnaceBlockEntity.class.getDeclaredField("litTime");
-            java.lang.reflect.Field litDurationField = AbstractFurnaceBlockEntity.class.getDeclaredField("litDuration");
+        // Set the burn time directly. The litTime/litDuration fields are exposed via the
+        // palworks access widener (see palworks.accesswidener) - no reflection needed.
+        furnace.litTime = burnDuration;
+        furnace.litDuration = burnDuration;
 
-            litTimeField.setAccessible(true);
-            litDurationField.setAccessible(true);
-
-            litTimeField.setInt(furnace, burnDuration);
-            litDurationField.setInt(furnace, burnDuration);
-
-            // Update the lit state
-            BlockState state = level.getBlockState(pos);
-            if (state.hasProperty(BlockStateProperties.LIT) && !state.getValue(BlockStateProperties.LIT)) {
-                level.setBlock(pos, state.setValue(BlockStateProperties.LIT, true), 3);
-            }
-
-            furnace.setChanged();
-            return true;
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            // Reflection failed - this needs platform-specific access widener
-            // For now, just return false
-            return false;
+        // Update the lit state
+        BlockState state = level.getBlockState(pos);
+        if (state.hasProperty(BlockStateProperties.LIT) && !state.getValue(BlockStateProperties.LIT)) {
+            level.setBlock(pos, state.setValue(BlockStateProperties.LIT, true), 3);
         }
+
+        furnace.setChanged();
+        return true;
     }
 
     /**
@@ -118,18 +155,12 @@ public class FurnaceHelper {
 
     /**
      * Get the remaining burn time for a furnace.
-     * Uses reflection to access protected field.
+     * Reads the access-widened litTime field directly.
      */
     public static int getRemainingBurnTime(Level level, BlockPos pos) {
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity instanceof AbstractFurnaceBlockEntity furnace) {
-            try {
-                java.lang.reflect.Field litTimeField = AbstractFurnaceBlockEntity.class.getDeclaredField("litTime");
-                litTimeField.setAccessible(true);
-                return litTimeField.getInt(furnace);
-            } catch (NoSuchFieldException | IllegalAccessException e) {
-                return 0;
-            }
+            return furnace.litTime;
         }
         return 0;
     }

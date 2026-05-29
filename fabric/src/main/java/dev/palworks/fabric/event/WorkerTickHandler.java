@@ -4,8 +4,11 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.fabric.PalworksFabric;
+import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.manager.JobManager;
+import dev.palworks.worker.WorkerStateManager;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
@@ -30,6 +33,13 @@ public class WorkerTickHandler {
         // Register server entity load event
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
             // Entities are loaded, we'll tick them via the tick event
+        });
+
+        // Clear per-dimension state on shutdown so it doesn't leak across world reloads.
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            JobManager.clearAll();
+            WorkerInventoryManager.clearCache();
+            WorkerStateManager.clearCache();
         });
     }
 

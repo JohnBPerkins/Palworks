@@ -44,19 +44,21 @@ public class ReservationId {
         return System.currentTimeMillis() - timestamp > timeoutMillis;
     }
 
+    // Identity is the (station, job) pair. The timestamp is deliberately excluded: it's
+    // freshness metadata (for isExpired / refresh), not part of what makes two reservations
+    // "the same job". Including it made every refreshed reservation compare unequal.
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ReservationId that = (ReservationId) o;
-        return timestamp == that.timestamp &&
-                Objects.equals(stationPos, that.stationPos) &&
+        return Objects.equals(stationPos, that.stationPos) &&
                 jobType == that.jobType;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(stationPos, jobType, timestamp);
+        return Objects.hash(stationPos, jobType);
     }
 
     @Override
