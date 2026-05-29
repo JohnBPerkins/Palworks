@@ -1,0 +1,53 @@
+name: Bug report
+description: Report something that isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please fill out the sections below so we can
+        reproduce and fix it quickly.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Step-by-step so we can see it ourselves. In-game setups (which Pokémon, what blocks/stations) are very helpful.
+      placeholder: |
+        1. Send out a ...
+        2. Place a ... nearby
+        3. Observe ...
+    validations:
+      required: true
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Mod loader
+      options:
+        - Fabric
+        - NeoForge
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Minecraft, loader, Cobblemon, and Palworks versions.
+      placeholder: "MC 1.21.1, Fabric Loader 0.18.4, Cobblemon 1.7.1, Palworks 1.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log output or a crash report. Running with `-Dpalworks.debug=true` enables verbose Palworks logging.
+      render: text
+    validations:
+      required: false
