@@ -100,9 +100,9 @@ appear in the release notes**; the rest are only in the full changelog:
   Minecraft version, changing save data, renaming a datapack tag. For example,
   `build!: require Cobblemon 1.8 or newer`.
 
-An optional scope is fine, such as `fix(furnace): ...`. Maintainers rename PRs that don't follow
-the format before merging. Commit messages inside a PR aren't affected, but conventional ones are
-still appreciated.
+An optional scope is fine, such as `fix(furnace): ...` (lowercase). A required **PR title** check
+fails until the title follows the format; editing the title re-runs it. Commit messages inside a
+PR aren't checked, but conventional ones are still appreciated.
 
 ## Releasing
 
