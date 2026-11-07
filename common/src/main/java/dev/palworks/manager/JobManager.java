@@ -150,10 +150,21 @@ public class JobManager {
      */
     public void registerWorker(Pokemon pokemon, Mob entity, Level level) {
         UUID uuid = pokemon.getUuid();
+        boolean isNewWorker = !WorkerStateManager.hasWorkerState(pokemon);
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
 
-        // Don't register disabled workers
+        if (isNewWorker && level instanceof ServerLevel serverLevel) {
+            // Opt-in activity message (only players who ran /palworks debug see it)
+            DebugManager.broadcastActivity(serverLevel, pokemon.getSpecies().getName() + " is now a worker");
+        }
+
+        // Disabled workers get no jobs. If one was registered before being disabled, drop it from
+        // the registry and free its job, or assignment would keep handing it work.
         if (!state.isEnabled()) {
+            WorkerInfo removed = activeWorkers.remove(uuid);
+            if (removed != null && removed.currentReservation != null) {
+                releaseJobReservation(removed.currentReservation.getStationPos());
+            }
             return;
         }
 

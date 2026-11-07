@@ -39,7 +39,7 @@ public class WorkerState {
     private ItemStack workInventory;
 
     public WorkerState() {
-        this.enabled = false;
+        this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
         this.currentReservation = null;
         this.cachedSuitabilities = null;
@@ -303,7 +303,8 @@ public class WorkerState {
     }
 
     public void deserializeNBT(CompoundTag tag) {
-        enabled = tag.getBoolean("enabled");
+        // Missing key means the state predates this field: treat as enabled (the default).
+        enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
 
         if (tag.contains("assignedJob")) {
             String jobId = tag.getString("assignedJob");

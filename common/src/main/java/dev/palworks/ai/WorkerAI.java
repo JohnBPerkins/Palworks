@@ -79,15 +79,10 @@ public class WorkerAI {
 
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
 
-        // Auto-enable if not already enabled
+        // New workers start enabled (see WorkerState), so a disabled state means it was turned off
+        // on purpose (/palworks worker disable). Respect that instead of re-enabling it.
         if (!state.isEnabled()) {
-            state.setEnabled(true);
-            WorkerStateManager.save(pokemon, state);
-
-            // Opt-in activity message (only players who ran /palworks debug see it)
-            if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                DebugManager.broadcastActivity(serverLevel, pokemon.getSpecies().getName() + " is now a worker");
-            }
+            return false;
         }
 
         // Check if suitabilities need recalculation
