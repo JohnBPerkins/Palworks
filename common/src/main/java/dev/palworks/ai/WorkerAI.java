@@ -23,6 +23,7 @@ import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -78,6 +79,9 @@ public class WorkerAI {
         // The commands already filter for owned Pokemon
 
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
+
+        // Before the enabled check: a disabled worker still shows what it's carrying.
+        showCarriedItem(entity, WorkerInventoryManager.getOrCreate(pokemon));
 
         // New workers start enabled (see WorkerState), so a disabled state means it was turned off
         // on purpose (/palworks worker disable). Respect that instead of re-enabling it.
@@ -750,6 +754,26 @@ public class WorkerAI {
             Palworks.LOGGER.warn("Failed to play Cobblemon action effect {} on {}: {}",
                 actionEffectId, ctx.name(), e.toString());
         }
+    }
+
+    /**
+     * Show the first item the worker is carrying, without touching its real Cobblemon held item.
+     *
+     * <p>Cobblemon renders a Pokemon's held item if it has one (and it isn't hidden), and otherwise
+     * whatever is in the entity's main hand, which Cobblemon itself never uses. So a display copy
+     * goes in the main hand. Covers every way the inventory changes (jobs, the inventory screen,
+     * debug commands) because it runs every tick; the comparison keeps it from resending.
+     */
+    private static void showCarriedItem(Mob entity, WorkerInventory inventory) {
+        ItemStack carried = inventory.getFirstItem();
+        if (ItemStack.isSameItemSameComponents(entity.getMainHandItem(), carried)) {
+            return;
+        }
+        // Count doesn't matter for display, and one item keeps the copy obviously cosmetic.
+        entity.setItemSlot(EquipmentSlot.MAINHAND, carried.copyWithCount(1));
+        // The copy is purely visual: it must never drop (on death, or when vanilla swaps a mob's
+        // equipment), or it would duplicate the item that's still in the worker's inventory.
+        entity.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
     }
 
     /**
