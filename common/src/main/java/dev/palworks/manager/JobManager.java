@@ -462,7 +462,7 @@ public class JobManager {
                     JobRecord job = new JobRecord();
                     job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                     job.type = JobType.FUEL_FURNACE;
-                    job.requiredSuitability = Suitability.KINDLING;
+                    job.requiredSuitabilities = EnumSet.of(Suitability.KINDLING);
                     job.discoveryTime = System.currentTimeMillis();
                     job.priority = 7;
                     return job;
@@ -475,7 +475,7 @@ public class JobManager {
                         JobRecord job = new JobRecord();
                         job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                         job.type = stationJob;
-                        job.requiredSuitability = stationJob.getRequiredSuitability();
+                        job.requiredSuitabilities = EnumSet.of(stationJob.getRequiredSuitability());
                         job.discoveryTime = System.currentTimeMillis();
                         job.priority = 6;
                         return job;
@@ -489,7 +489,7 @@ public class JobManager {
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.HARVEST_CROPS;
-            job.requiredSuitability = Suitability.GATHERING;
+            job.requiredSuitabilities = EnumSet.of(Suitability.GATHERING);
             job.discoveryTime = System.currentTimeMillis();
             job.priority = 8; // High priority for ripe crops
             return job;
@@ -507,7 +507,7 @@ public class JobManager {
                     JobRecord job = new JobRecord();
                     job.position = abovePos;
                     job.type = JobType.PLANT_SEEDS;
-                    job.requiredSuitability = Suitability.NETHER;
+                    job.requiredSuitabilities = EnumSet.of(Suitability.NETHER);
                     job.discoveryTime = System.currentTimeMillis();
                     job.priority = 5;
                     return job;
@@ -521,7 +521,7 @@ public class JobManager {
                     JobRecord job = new JobRecord();
                     job.position = abovePos;
                     job.type = JobType.PLANT_SEEDS;
-                    job.requiredSuitability = Suitability.PLANTING;
+                    job.requiredSuitabilities = EnumSet.of(Suitability.PLANTING);
                     job.discoveryTime = System.currentTimeMillis();
                     job.priority = 5;
                     return job;
@@ -535,7 +535,7 @@ public class JobManager {
                 JobRecord job = new JobRecord();
                 job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                 job.type = JobType.GET_SEEDS;
-                job.requiredSuitability = Suitability.PLANTING;
+                job.requiredSuitabilities = EnumSet.of(Suitability.PLANTING);
                 job.discoveryTime = System.currentTimeMillis();
                 job.priority = 6;
                 return job;
@@ -544,7 +544,7 @@ public class JobManager {
                 JobRecord job = new JobRecord();
                 job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                 job.type = JobType.GET_SEEDS;
-                job.requiredSuitability = Suitability.NETHER;
+                job.requiredSuitabilities = EnumSet.of(Suitability.NETHER);
                 job.discoveryTime = System.currentTimeMillis();
                 job.priority = 6;
                 return job;
@@ -568,7 +568,10 @@ public class JobManager {
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.CHOP_TREE;
-            job.requiredSuitability = Suitability.LUMBERING;
+            job.requiredSuitabilities = EnumSet.of(Suitability.LUMBERING);
+            if (TreeDetector.isNetherStem(state)) {
+                job.requiredSuitabilities.add(Suitability.NETHER); // nether trees need Lumbering + Nether
+            }
             job.discoveryTime = System.currentTimeMillis();
             job.priority = 4;
             return job;
@@ -580,7 +583,7 @@ public class JobManager {
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.MINE_RESOURCE;
-            job.requiredSuitability = Suitability.MINING;
+            job.requiredSuitabilities = EnumSet.of(Suitability.MINING);
             job.discoveryTime = System.currentTimeMillis();
             job.priority = 7; // High priority for ores
             return job;
@@ -752,7 +755,7 @@ public class JobManager {
             JobRecord job = new JobRecord();
             job.position = nearest;
             job.type = JobType.DELIVER_ITEMS;
-            job.requiredSuitability = Suitability.TRANSPORTING;
+            job.requiredSuitabilities = EnumSet.of(Suitability.TRANSPORTING);
             job.discoveryTime = System.currentTimeMillis();
             job.priority = 10; // Highest priority - must deliver before doing anything else
             return job;
@@ -790,7 +793,7 @@ public class JobManager {
         List<JobRecord> candidates = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
             // Skip if worker lacks suitability
-            if (!worker.suitabilities.contains(job.requiredSuitability)) {
+            if (!canDoJob(worker, job)) {
                 continue;
             }
 
@@ -836,6 +839,14 @@ public class JobManager {
         }
 
         return null;
+    }
+
+    /**
+     * Whether a worker has every suitability a job needs (e.g. nether trees need Nether as well as
+     * Lumbering).
+     */
+    private static boolean canDoJob(WorkerInfo worker, JobRecord job) {
+        return worker.suitabilities.containsAll(job.requiredSuitabilities);
     }
 
     /**
@@ -1132,7 +1143,7 @@ public class JobManager {
         JobRecord collectJob = new JobRecord();
         collectJob.position = request.sourceJobLocation;
         collectJob.type = JobType.COLLECT_DROPS;
-        collectJob.requiredSuitability = Suitability.TRANSPORTING;
+        collectJob.requiredSuitabilities = EnumSet.of(Suitability.TRANSPORTING);
         collectJob.discoveryTime = System.currentTimeMillis();
         collectJob.isConsecutiveJob = true;
         collectJob.priority = HIGH_PRIORITY;
@@ -1192,7 +1203,7 @@ public class JobManager {
         JobRecord plantJob = new JobRecord();
         plantJob.position = request.sourceJobLocation;
         plantJob.type = JobType.PLANT_SEEDS;
-        plantJob.requiredSuitability = suitability;
+        plantJob.requiredSuitabilities = EnumSet.of(suitability);
         plantJob.discoveryTime = System.currentTimeMillis();
         plantJob.isConsecutiveJob = true;
         plantJob.priority = HIGH_PRIORITY;
@@ -1287,7 +1298,10 @@ public class JobManager {
         JobRecord saplingJob = new JobRecord();
         saplingJob.position = plantPos;
         saplingJob.type = JobType.PLANT_SAPLING;
-        saplingJob.requiredSuitability = Suitability.LUMBERING;
+        saplingJob.requiredSuitabilities = EnumSet.of(Suitability.LUMBERING);
+        if (TreeDetector.isNetherSapling(request.saplingItem)) {
+            saplingJob.requiredSuitabilities.add(Suitability.NETHER); // fungi, like nether trees, need both
+        }
         saplingJob.discoveryTime = System.currentTimeMillis();
         saplingJob.isConsecutiveJob = true;
         saplingJob.priority = HIGH_PRIORITY;
@@ -1299,8 +1313,7 @@ public class JobManager {
 
         // Try to assign to suggested worker first
         WorkerInfo suggestedWorker = activeWorkers.get(request.suggestedWorkerUUID);
-        if (suggestedWorker != null && suggestedWorker.idle &&
-            suggestedWorker.suitabilities.contains(Suitability.LUMBERING)) {
+        if (suggestedWorker != null && suggestedWorker.idle && canDoJob(suggestedWorker, saplingJob)) {
             assignJobToWorker(level, suggestedWorker, saplingJob);
 
             if (DEBUG) {
@@ -1464,7 +1477,7 @@ public class JobManager {
                 JobType type = entry.getKey();
                 List<JobRecord> jobs = entry.getValue();
                 lines.add(String.format("  §a%s§f: %d jobs (need §b%s§f)",
-                    type.name(), jobs.size(), jobs.get(0).requiredSuitability.name()));
+                    type.name(), jobs.size(), jobs.get(0).requiredSuitabilities));
                 // Show first 3 positions
                 int shown = 0;
                 for (JobRecord job : jobs) {
@@ -1544,7 +1557,7 @@ public class JobManager {
 
             for (JobRecord job : availableJobs.values()) {
                 // Check suitability
-                if (!worker.suitabilities.contains(job.requiredSuitability)) {
+                if (!canDoJob(worker, job)) {
                     noSuitability++;
                     continue;
                 }
@@ -1617,7 +1630,7 @@ public class JobManager {
     public static class JobRecord {
         public BlockPos position;
         public JobType type;
-        public Suitability requiredSuitability;
+        public Set<Suitability> requiredSuitabilities = EnumSet.noneOf(Suitability.class); // Worker needs all of them
         public long discoveryTime;
         public UUID reservedByWorker;  // null if available
         public int priority;           // 0-10, higher = more important

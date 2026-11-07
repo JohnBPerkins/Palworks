@@ -27,7 +27,8 @@ import java.util.*;
  * A valid tree must:
  * - Have its base log touching grass, dirt, podzol, mud, or similar ground blocks
  * - Consist of blocks tagged as #minecraft:logs, plus mangrove roots (which aren't in that tag)
- * - Have a minimum number of leaves (#minecraft:leaves) within the tree area
+ * - Have a minimum number of leaves (#minecraft:leaves) within the tree area. For huge fungi
+ *   (nether trees) the canopy counts instead: nether/warped wart blocks and shroomlights
  * - Not exceed the maximum block search limit
  * - Not be connected to invalid blocks (only logs, leaves, air, and vines are allowed)
  */
@@ -38,6 +39,14 @@ public class TreeDetector {
     private static final int MAX_TREE_BLOCKS = 256;      // Max logs to search before considering tree too big
     private static final int MIN_LEAF_COUNT = 4;         // Minimum leaves required for a valid tree
     private static final int LEAF_SEARCH_RADIUS = 2;     // Radius around logs to search for leaves
+    // Huge fungus canopies don't decay like leaves, so they're broken with the stem. Same rule as the
+    // FallingTree mod: warts connected to the tree, within this x/z distance of the chopped block, and
+    // no higher than one above the top stem.
+    private static final int WART_BREAK_RADIUS = 4;
+    private static final int MAX_WART_BLOCKS = 512;      // Safety cap on canopy blocks broken per tree
+    // How far (x/z) from the chopped block to look for neighbouring fungi's stems: far enough to
+    // catch one whose canopy (up to ~4 blocks from its stem) reaches into the wart-break column.
+    private static final int NEIGHBOR_STEM_SEARCH_RADIUS = WART_BREAK_RADIUS + 4;
 
     // Ground blocks that a tree base can touch
     private static final Set<Block> VALID_GROUND_BLOCKS = Set.of(
@@ -159,10 +168,11 @@ public class TreeDetector {
                         visitedLogs.add(neighbor);
                         queue.add(neighbor);
                     }
-                } else if (isLeaf(neighborState)) {
-                    // Leaf block - allowed touching the tree, but only natural leaves count toward
-                    // MIN_LEAF_COUNT, so a log pillar dressed with player-placed leaves isn't a tree.
-                    if (isNaturalLeaf(neighborState)) {
+                } else if (isLeaf(neighborState) || isNetherCanopy(neighborState)) {
+                    // Leaf (or huge fungus canopy) block - allowed touching the tree, but only natural
+                    // ones count toward MIN_LEAF_COUNT, so a log pillar dressed with player-placed
+                    // leaves isn't a tree.
+                    if (isNaturalCanopy(neighborState)) {
                         leaves.add(neighbor);
                     }
                 } else if (isValidGroundBlock(neighborState)) {
@@ -196,7 +206,7 @@ public class TreeDetector {
                 for (int dy = -LEAF_SEARCH_RADIUS; dy <= LEAF_SEARCH_RADIUS; dy++) {
                     for (int dz = -LEAF_SEARCH_RADIUS; dz <= LEAF_SEARCH_RADIUS; dz++) {
                         BlockPos checkPos = logPos.offset(dx, dy, dz);
-                        if (!leaves.contains(checkPos) && isNaturalLeaf(level.getBlockState(checkPos))) {
+                        if (!leaves.contains(checkPos) && isNaturalCanopy(level.getBlockState(checkPos))) {
                             leaves.add(checkPos);
                         }
                     }
@@ -298,6 +308,141 @@ public class TreeDetector {
             return false;
         }
         return !state.hasProperty(LeavesBlock.PERSISTENT) || !state.getValue(LeavesBlock.PERSISTENT);
+    }
+
+    /**
+     * The canopy of a huge fungus (nether tree): nether wart blocks, warped wart blocks and
+     * shroomlights. These play the part leaves do for overworld trees.
+     */
+    public static boolean isNetherCanopy(BlockState state) {
+        return state.is(BlockTags.WART_BLOCKS) || state.is(Blocks.SHROOMLIGHT);
+    }
+
+    /**
+     * The huge fungus canopy to break along with a chopped nether tree, since wart blocks and
+     * shroomlights never decay the way leaves do. Copies the FallingTree mod's rule: canopy blocks
+     * reachable from the tree's stems through other canopy blocks (diagonals included), within
+     * {@link #WART_BREAK_RADIUS} blocks of {@code origin} on x and z, and at most one block above the
+     * top stem.
+     *
+     * <p>Unlike FallingTree, neighbouring fungi keep their canopy: each canopy block belongs to the
+     * nearest stem (by x/z distance; ties go to the tree being chopped), and blocks that belong to a
+     * neighbour are neither broken nor searched through. So where two canopies touch, each fungus
+     * keeps roughly its own half.
+     *
+     * @param treeBlocks the tree's stems (from {@link TreeValidationResult#getLogPositions()})
+     * @param origin the block the chop started from (the job position)
+     */
+    public static Set<BlockPos> findNetherCanopyToBreak(Level level, Set<BlockPos> treeBlocks, BlockPos origin) {
+        int topY = Integer.MIN_VALUE;
+        int bottomY = Integer.MAX_VALUE;
+        Set<Long> ownColumns = new HashSet<>();
+        for (BlockPos pos : treeBlocks) {
+            topY = Math.max(topY, pos.getY());
+            bottomY = Math.min(bottomY, pos.getY());
+            ownColumns.add(columnKey(pos.getX(), pos.getZ()));
+        }
+
+        // Stems of neighbouring fungi near enough for their canopy to reach into the break column
+        Set<Long> neighborColumns = new HashSet<>();
+        BlockPos.MutableBlockPos scan = new BlockPos.MutableBlockPos();
+        for (int x = origin.getX() - NEIGHBOR_STEM_SEARCH_RADIUS; x <= origin.getX() + NEIGHBOR_STEM_SEARCH_RADIUS; x++) {
+            for (int z = origin.getZ() - NEIGHBOR_STEM_SEARCH_RADIUS; z <= origin.getZ() + NEIGHBOR_STEM_SEARCH_RADIUS; z++) {
+                long column = columnKey(x, z);
+                if (ownColumns.contains(column) || neighborColumns.contains(column)) {
+                    continue;
+                }
+                for (int y = bottomY; y <= topY + 1; y++) {
+                    if (isNetherStem(level.getBlockState(scan.set(x, y, z)))) {
+                        neighborColumns.add(column);
+                        break;
+                    }
+                }
+            }
+        }
+
+        Set<BlockPos> canopy = new HashSet<>();
+        Set<BlockPos> visited = new HashSet<>(treeBlocks);
+        Queue<BlockPos> queue = new ArrayDeque<>(treeBlocks);
+        while (!queue.isEmpty() && canopy.size() < MAX_WART_BLOCKS) {
+            BlockPos current = queue.poll();
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dy == 0 && dz == 0) {
+                            continue;
+                        }
+                        BlockPos neighbor = current.offset(dx, dy, dz);
+                        if (!visited.add(neighbor)
+                                || Math.abs(neighbor.getX() - origin.getX()) > WART_BREAK_RADIUS
+                                || Math.abs(neighbor.getZ() - origin.getZ()) > WART_BREAK_RADIUS
+                                || neighbor.getY() > topY + 1) {
+                            continue;
+                        }
+                        if (isNetherCanopy(level.getBlockState(neighbor))
+                                && !isCloserToNeighbor(neighbor, ownColumns, neighborColumns)) {
+                            canopy.add(neighbor);
+                            queue.add(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+        return canopy;
+    }
+
+    /** Whether a canopy block is horizontally closer to a neighbouring fungus's stem than to ours. */
+    private static boolean isCloserToNeighbor(BlockPos pos, Set<Long> ownColumns, Set<Long> neighborColumns) {
+        if (neighborColumns.isEmpty()) {
+            return false;
+        }
+        return nearestColumnDistSq(pos, neighborColumns) < nearestColumnDistSq(pos, ownColumns);
+    }
+
+    private static long nearestColumnDistSq(BlockPos pos, Set<Long> columns) {
+        long best = Long.MAX_VALUE;
+        for (long column : columns) {
+            long dx = pos.getX() - columnX(column);
+            long dz = pos.getZ() - columnZ(column);
+            best = Math.min(best, dx * dx + dz * dz);
+        }
+        return best;
+    }
+
+    private static long columnKey(int x, int z) {
+        return ((long) x << 32) | (z & 0xFFFFFFFFL);
+    }
+
+    private static int columnX(long key) {
+        return (int) (key >> 32);
+    }
+
+    private static int columnZ(long key) {
+        return (int) key;
+    }
+
+    /**
+     * A canopy block that counts toward MIN_LEAF_COUNT: a natural leaf, or a huge fungus canopy
+     * block. Unlike leaves, wart blocks and shroomlights have no "player placed" flag, so they always
+     * count; few builds use them, and solid blocks around a "trunk" still rule most builds out.
+     */
+    private static boolean isNaturalCanopy(BlockState state) {
+        return isNaturalLeaf(state) || isNetherCanopy(state);
+    }
+
+    /**
+     * A crimson or warped stem (or hyphae, stripped or not): the "log" of a nether tree. Chopping a
+     * nether tree needs the Nether suitability as well as Lumbering.
+     */
+    public static boolean isNetherStem(BlockState state) {
+        return state.is(BlockTags.CRIMSON_STEMS) || state.is(BlockTags.WARPED_STEMS);
+    }
+
+    /**
+     * Whether a sapling item is a nether fungus (planting it needs the Nether suitability too).
+     */
+    public static boolean isNetherSapling(@Nullable Item saplingItem) {
+        return saplingItem == Items.CRIMSON_FUNGUS || saplingItem == Items.WARPED_FUNGUS;
     }
 
     /**

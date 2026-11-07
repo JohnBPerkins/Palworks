@@ -598,16 +598,25 @@ public class WorkerAI {
                 net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treePos);
                 BlockPos basePos = treeResult.getBasePosition();
 
+                // Huge fungus canopies never decay, so they come down with the stem (found before
+                // anything is broken, while the tree is still intact)
+                java.util.Set<BlockPos> canopy = TreeDetector.isNetherStem(level.getBlockState(treePos))
+                    ? TreeDetector.findNetherCanopyToBreak(level, treeResult.getLogPositions(), treePos)
+                    : java.util.Set.of();
+
                 int logsChopped = 0;
                 for (BlockPos logPos : treeResult.getLogPositions()) {
                     if (level.destroyBlock(logPos, true)) {
                         logsChopped++;
                     }
                 }
+                for (BlockPos canopyPos : canopy) {
+                    level.destroyBlock(canopyPos, true);
+                }
 
                 if (DEBUG) {
-                    Palworks.LOGGER.info("{} chopped tree at {} - {} logs destroyed, base at {}, sapling: {}",
-                        ctx.name(), treePos, logsChopped, basePos, saplingItem);
+                    Palworks.LOGGER.info("{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
+                        ctx.name(), treePos, logsChopped, canopy.size(), basePos, saplingItem);
                 }
 
                 // Queue consecutive jobs: collect drops + replant sapling
