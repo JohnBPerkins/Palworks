@@ -1,6 +1,12 @@
 # IDE
 .idea
 *.iml
+# VS Code's Java extension compiles into bin/ (and may add Eclipse project files)
+bin
+.project
+.classpath
+.settings
+.vscode
 
 # Run directories
 run

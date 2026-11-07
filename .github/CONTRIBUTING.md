@@ -31,13 +31,37 @@ the loader-specific seams (tick hooks, registration, menus).
 
 ## Testing and Cobblemon
 
-Cobblemon is a **compile-only** dependency: the code compiles against its API, but Cobblemon
-**cannot load in the dev environment**. This means:
+Dev runs load Cobblemon, so you can test in-game straight from Gradle (JDK 21 required):
+
+| Command | What it starts |
+|---|---|
+| `./gradlew :fabric:runClient` | Fabric game client with Cobblemon and Palworks |
+| `./gradlew :neoforge:runClient` | NeoForge game client with Cobblemon and Palworks |
+| `./gradlew :fabric:runServer` | Fabric dedicated server (same for `:neoforge:runServer`) |
+
+These use the oldest supported Cobblemon (`cobblemon_version` in `gradle.properties`). Add
+`-Pcobblemon_version=1.8.4` to try the newest. Each loader keeps its world and settings in its own
+`run/` folder, which git ignores. The first server start stops until you accept the EULA in
+`run/eula.txt`.
+
+Dev runs also include the [spark](https://spark.lucko.me/docs) profiler, to measure what Palworks
+costs per tick:
+
+- `/spark profiler start`, play for a minute or two, then `/spark profiler stop`. It prints a link
+  to an interactive view; search it for `dev.palworks` to see where Palworks spends time. The link
+  uploads the profile to spark's public viewer; add `--save-to-file` to keep it local instead.
+- `/spark profiler start --only-ticks-over 50` records only ticks slower than 50 ms, to catch
+  lag spikes.
+- `/spark tps` shows recent TPS and tick times.
+
+Cobblemon and spark are only added to these dev runs: they never end up in the published jars or
+their dependencies.
 
 - Pure logic (enums, mappings, suitability, IDs) is unit-tested under `common/src/test/java` and
   must pass `./gradlew :common:test`. New logic that doesn't need a running game belongs here.
-- Behavior that touches Cobblemon or live world state must be tested **in an actual Minecraft
-  instance** (Fabric+Cobblemon or NeoForge+Cobblemon), verified in-game.
+- Behavior that touches Cobblemon or live world state needs an in-game check: use the dev runs
+  above, or a normal Minecraft instance with the built jar from `fabric/build/libs` or
+  `neoforge/build/libs`.
 
 ## Conventions
 
