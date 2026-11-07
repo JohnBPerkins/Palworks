@@ -72,6 +72,7 @@ public class JobManager {
     private static final int CONSECUTIVE_JOB_PLANT_DELAY = 25;   // Ticks to wait before replanting
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
     private static final boolean MINING_JOBS_ENABLED = false;     // Flip on once MINE_RESOURCE breaks ores
+    private static final int REPLANT_PRIORITY = 7;                // Below harvests (8), above other planting (5)
 
     // Singleton instances (one per ServerLevel)
     private static final Map<String, JobManager> instances = new ConcurrentHashMap<>();
@@ -813,6 +814,13 @@ public class JobManager {
             candidates.add(job);
         }
 
+        // Harvest everything first, then plant: while this worker has any harvest it could take,
+        // planting jobs wait. Unreachable harvests drop out of candidates (recentlyFailedJobs), so
+        // they can't hold planting back.
+        if (candidates.stream().anyMatch(j -> j.type == JobType.HARVEST_CROPS)) {
+            candidates.removeIf(j -> j.type == JobType.PLANT_SEEDS);
+        }
+
         if (candidates.isEmpty()) {
             return null;
         }
@@ -1206,27 +1214,16 @@ public class JobManager {
         plantJob.requiredSuitabilities = EnumSet.of(suitability);
         plantJob.discoveryTime = System.currentTimeMillis();
         plantJob.isConsecutiveJob = true;
-        plantJob.priority = HIGH_PRIORITY;
+        plantJob.priority = REPLANT_PRIORITY;
         plantJob.reservedByWorker = request.suggestedWorkerUUID;  // Hint for assignment
 
-        // Try to assign to suggested worker first
-        WorkerInfo suggestedWorker = activeWorkers.get(request.suggestedWorkerUUID);
-        if (suggestedWorker != null && suggestedWorker.idle &&
-            suggestedWorker.suitabilities.contains(suitability)) {
-            assignJobToWorker(level, suggestedWorker, plantJob);
+        // Always goes to the pool rather than straight to the harvester: harvests come first, and
+        // findBestJobForWorker holds back planting while the worker still has harvests to do.
+        availableJobs.put(plantJob.position, plantJob);
 
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Assigned consecutive plant job to original harvester at {}",
-                    request.sourceJobLocation);
-            }
-        } else {
-            // Otherwise add to available jobs
-            availableJobs.put(plantJob.position, plantJob);
-
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Added consecutive plant job to available pool at {}",
-                    request.sourceJobLocation);
-            }
+        if (DEBUG) {
+            Palworks.LOGGER.debug("Added consecutive plant job to available pool at {}",
+                request.sourceJobLocation);
         }
     }
 
