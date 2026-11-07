@@ -40,9 +40,14 @@ jobs:
           restore-keys: |
             loom-${{ runner.os }}-
 
-      # `build` includes `check`, which runs the unit tests.
-      - name: Build and test
-        run: ./gradlew build --no-daemon
+      # `assemble` + `check` is exactly what `build` runs, split so a compile failure and a test
+      # failure show up as different steps. No --no-daemon: the second step reuses the warm Gradle
+      # daemon from the first, and setup-gradle stops it at the end of the job.
+      - name: Build
+        run: ./gradlew assemble
+
+      - name: Test
+        run: ./gradlew check
 
       - name: Upload artifacts
         if: success()
