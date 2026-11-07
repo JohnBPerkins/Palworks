@@ -621,12 +621,11 @@ public class WorkerAI {
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                     JobManager.getInstance(serverLevel).onTreeChopped(ctx.pokemon(), basePos, saplingItem, level);
                 }
-            } else {
-                // Tree might have been partially destroyed or invalid - break the single block
-                level.destroyBlock(treePos, true);
-                if (DEBUG) {
-                    Palworks.LOGGER.warn("{} could not detect full tree at {}, broke single block", ctx.name(), treePos);
-                }
+            } else if (DEBUG) {
+                // Not a valid tree any more (partly chopped, or it's a player build). Leave it alone:
+                // breaking "just this log" is how builds that fail tree detection got griefed.
+                Palworks.LOGGER.warn("{} found no valid tree at {} ({}), leaving it alone",
+                    ctx.name(), treePos, treeResult.getReason());
             }
         }
     }
