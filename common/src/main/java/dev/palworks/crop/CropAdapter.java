@@ -235,6 +235,13 @@ public class CropAdapter {
     }
 
     /**
+     * Whether an item is a seed or other plantable item (what a planter's seed pouch may hold).
+     */
+    public static boolean isSeed(Item item) {
+        return getPlantedBlock(item) != null;
+    }
+
+    /**
      * Get the block that should be placed when planting a seed.
      * Returns null if the seed cannot be planted.
      */

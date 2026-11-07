@@ -445,6 +445,7 @@ public class WorkerAI {
                 ItemStack extracted = extractSeedsFromChest(ctx.level(), targetPos);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
+                    returnToChest(ctx.level(), targetPos, extracted, leftover);
                     if (DEBUG) {
                         Palworks.LOGGER.info("{} got {} {} seeds from chest at {} ({} leftover)",
                             ctx.name(), extracted.getCount() - leftover, extracted.getItem().toString(), targetPos, leftover);
@@ -458,6 +459,7 @@ public class WorkerAI {
                     ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
+                    returnToChest(ctx.level(), targetPos, extracted, leftover);
                     if (DEBUG) {
                         Palworks.LOGGER.info("{} got {} nether wart from chest at {} ({} leftover)",
                             ctx.name(), extracted.getCount() - leftover, targetPos, leftover);
@@ -521,11 +523,11 @@ public class WorkerAI {
             for (int i = 0; i < inventory.getContainerSize(); i++) {
                 ItemStack stack = inventory.getItem(i);
                 if (!stack.isEmpty()) {
-                    ItemStack toDeliver = stack.copy();
-                    if (addItemsToChest(ctx.level(), chestPos, toDeliver)) {
-                        totalDelivered += stack.getCount();
-                        inventory.setItem(i, ItemStack.EMPTY);
-                    }
+                    int count = stack.getCount();
+                    int left = addItemsToChest(ctx.level(), chestPos, stack);
+                    totalDelivered += count - left;
+                    // Keep whatever didn't fit (it used to be deleted when a stack only partly fit)
+                    inventory.setItem(i, left == 0 ? ItemStack.EMPTY : stack.copyWithCount(left));
                 }
             }
 
@@ -807,36 +809,52 @@ public class WorkerAI {
     }
 
     /**
-     * Add items to a chest.
-     * Returns true if successful.
+     * Add as much of a stack to a chest as fits: first onto matching stacks, then into empty slots.
+     * Doesn't modify {@code stack}. Returns how many items didn't fit (the whole count if the block
+     * isn't a container).
      */
-    private static boolean addItemsToChest(Level level, BlockPos chestPos, ItemStack stack) {
+    private static int addItemsToChest(Level level, BlockPos chestPos, ItemStack stack) {
         net.minecraft.world.level.block.entity.BlockEntity blockEntity = level.getBlockEntity(chestPos);
         if (!(blockEntity instanceof net.minecraft.world.Container container)) {
-            return false;
+            return stack.getCount();
         }
 
-        // Try to add items to the chest
-        for (int i = 0; i < container.getContainerSize(); i++) {
+        int remaining = stack.getCount();
+        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
             ItemStack slotStack = container.getItem(i);
-
-            if (slotStack.isEmpty()) {
-                // Empty slot - put items here
-                container.setItem(i, stack.copy());
-                container.setChanged();
-                return true;
-            } else if (ItemStack.isSameItemSameComponents(slotStack, stack)) {
-                // Matching stack - try to merge
-                int space = slotStack.getMaxStackSize() - slotStack.getCount();
-                if (space > 0) {
-                    int toAdd = Math.min(space, stack.getCount());
+            if (!slotStack.isEmpty() && ItemStack.isSameItemSameComponents(slotStack, stack)) {
+                int toAdd = Math.min(slotStack.getMaxStackSize() - slotStack.getCount(), remaining);
+                if (toAdd > 0) {
                     slotStack.grow(toAdd);
-                    container.setChanged();
-                    return true;
+                    remaining -= toAdd;
                 }
             }
         }
+        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
+            if (container.getItem(i).isEmpty()) {
+                int toAdd = Math.min(remaining, stack.getMaxStackSize());
+                container.setItem(i, stack.copyWithCount(toAdd));
+                remaining -= toAdd;
+            }
+        }
 
-        return false; // Chest is full
+        if (remaining < stack.getCount()) {
+            container.setChanged();
+        }
+        return remaining;
+    }
+
+    /**
+     * Put back the part of an extracted stack the worker couldn't carry (it used to be deleted),
+     * dropping it next to the chest if the chest has since filled up.
+     */
+    private static void returnToChest(Level level, BlockPos chestPos, ItemStack extracted, int leftover) {
+        if (leftover <= 0) {
+            return;
+        }
+        int stillLeft = addItemsToChest(level, chestPos, extracted.copyWithCount(leftover));
+        if (stillLeft > 0) {
+            net.minecraft.world.level.block.Block.popResource(level, chestPos.above(), extracted.copyWithCount(stillLeft));
+        }
     }
 }

@@ -4,7 +4,9 @@ import com.cobblemon.mod.common.api.net.ServerNetworkPacketHandler;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.ModMenuTypes;
+import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.net.packets.OpenInventoryPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -60,6 +62,16 @@ public class OpenInventoryHandler implements ServerNetworkPacketHandler<OpenInve
                     player.getName().getString(), pokemon.getSpecies().getName(), entityUUID);
             player.displayClientMessage(
                     Component.translatable("palworks.message.inventory.not_owner"),
+                    true
+            );
+            return;
+        }
+
+        // Only Transporting (full inventory) and planters (seed pouch) carry anything. The client
+        // hides the button for everyone else; this guards against a modified client.
+        if (WorkerInventoryManager.carryModeFor(pokemon) == CarryMode.NONE) {
+            player.displayClientMessage(
+                    Component.translatable("palworks.message.inventory.carries_nothing", pokemon.getSpecies().getTranslatedName()),
                     true
             );
             return;

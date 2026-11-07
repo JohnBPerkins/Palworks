@@ -29,6 +29,7 @@ public class WorkerInventoryManager {
         // Check cache first
         WorkerInventory cached = inventoryCache.get(uuid);
         if (cached != null) {
+            cached.setMode(carryModeFor(pokemon)); // suitabilities can change (e.g. evolution)
             return cached;
         }
 
@@ -52,6 +53,8 @@ public class WorkerInventoryManager {
             inventory = new WorkerInventory(uuid);
         }
 
+        inventory.setMode(carryModeFor(pokemon));
+
         // Set up auto-save on change
         inventory.setOnChanged(() -> save(pokemon, inventory));
 
@@ -59,6 +62,11 @@ public class WorkerInventoryManager {
         inventoryCache.put(uuid, inventory);
 
         return inventory;
+    }
+
+    /** What this Pokemon may carry, from its (cached) worker suitabilities. */
+    public static CarryMode carryModeFor(Pokemon pokemon) {
+        return CarryMode.forSuitabilities(WorkerStateManager.getOrCreate(pokemon).getSuitabilities());
     }
 
     /**

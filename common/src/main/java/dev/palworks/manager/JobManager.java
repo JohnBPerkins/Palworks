@@ -634,7 +634,10 @@ public class JobManager {
             // registerWorker, so no separate desync re-check is needed here.
             Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
 
-            if (pokemon != null && WorkerInventoryManager.hasItems(pokemon)) {
+            // Only Transporting Pokemon deliver: they're the only ones with a real inventory. A
+            // planter's seed pouch is work supplies, used up planting, never delivered.
+            if (pokemon != null && worker.suitabilities.contains(Suitability.TRANSPORTING)
+                    && WorkerInventoryManager.hasItems(pokemon)) {
                 // Check if worker needs these items for their job
                 boolean needsItems = workerNeedsItemsForJob(worker, pokemon);
 
@@ -789,6 +792,7 @@ public class JobManager {
 
         Map<BlockPos, Long> failed = recentlyFailedJobs.get(worker.pokemonUUID);
         long now = level.getGameTime();
+        boolean carriesSeeds = inventory != null && inventory.hasAnySeed();
 
         // Collect viable candidates and score them cheaply (NO pathfinding in this pass).
         List<JobRecord> candidates = new ArrayList<>();
@@ -798,8 +802,17 @@ public class JobManager {
                 continue;
             }
 
-            // Skip GET_SEEDS jobs if worker's inventory is full
-            if (job.type == JobType.GET_SEEDS && inventory != null && !inventory.hasSpace()) {
+            // Planters fetch seeds only once they've run out (then plant until the stack is gone),
+            // and only if there's room to carry them
+            if (job.type == JobType.GET_SEEDS && inventory != null
+                    && (carriesSeeds || !inventory.hasSpace())) {
+                continue;
+            }
+
+            // Planting: a just-harvested tile is replanted for free; new farmland needs a seed the
+            // worker carries that can be planted there (wart on soul sand, the rest on farmland)
+            if (job.type == JobType.PLANT_SEEDS && !pendingReplantSeeds.containsKey(job.position)
+                    && !(carriesSeeds && carriesSeedFor(inventory, job.position))) {
                 continue;
             }
 
@@ -847,6 +860,20 @@ public class JobManager {
         }
 
         return null;
+    }
+
+    /** Whether the worker carries a seed that can be planted at {@code plantPos}. */
+    private boolean carriesSeedFor(@Nullable WorkerInventory inventory, BlockPos plantPos) {
+        if (inventory == null) {
+            return false;
+        }
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
+            if (!stack.isEmpty() && CropAdapter.canPlantSeed(stack.getItem(), level, plantPos.below())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

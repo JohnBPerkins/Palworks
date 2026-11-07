@@ -12,8 +12,9 @@ import net.minecraft.world.item.ItemStack;
 import java.util.UUID;
 
 /**
- * A multi-slot inventory for worker Pokemon.
- * Provides 3 slots for storing items the worker collects or uses.
+ * A worker Pokemon's carried items. Always 3 slots of storage, but how many it may use, and for
+ * what, depends on its {@link CarryMode}: all 3 for Transporting, one seeds-only slot for planters,
+ * none for everyone else. Adding items ({@link #addItem}, the GUI) respects the mode.
  */
 public class WorkerInventory implements Container {
     public static final int INVENTORY_SIZE = 3;
@@ -21,6 +22,7 @@ public class WorkerInventory implements Container {
     private final NonNullList<ItemStack> items;
     private final UUID ownerUUID;
     private Runnable onChanged;
+    private CarryMode mode = CarryMode.FULL;
 
     public WorkerInventory(UUID ownerUUID) {
         this.items = NonNullList.withSize(INVENTORY_SIZE, ItemStack.EMPTY);
@@ -33,6 +35,34 @@ public class WorkerInventory implements Container {
 
     public void setOnChanged(Runnable callback) {
         this.onChanged = callback;
+    }
+
+    public CarryMode getMode() {
+        return mode;
+    }
+
+    /** Set from the worker's suitabilities (see WorkerInventoryManager.getOrCreate). */
+    public void setMode(CarryMode mode) {
+        this.mode = mode;
+    }
+
+    /** Whether this inventory's mode allows the item at all (in some slot). */
+    public boolean accepts(ItemStack stack) {
+        return accepts(mode, stack);
+    }
+
+    /** Whether a carry mode allows an item: anything for FULL, only plantables for a seed pouch. */
+    public static boolean accepts(CarryMode mode, ItemStack stack) {
+        return switch (mode) {
+            case FULL -> true;
+            case SEED_POUCH -> dev.palworks.crop.CropAdapter.isSeed(stack.getItem());
+            case NONE -> false;
+        };
+    }
+
+    @Override
+    public boolean canPlaceItem(int slot, ItemStack stack) {
+        return mode.usesSlot(slot) && accepts(stack);
     }
 
     @Override
@@ -111,10 +141,17 @@ public class WorkerInventory implements Container {
             return 0;
         }
 
+        if (!accepts(stack)) {
+            return stack.getCount();
+        }
+
         int remaining = stack.getCount();
 
         // First, try to merge with existing stacks
         for (int i = 0; i < INVENTORY_SIZE && remaining > 0; i++) {
+            if (!mode.usesSlot(i)) {
+                continue;
+            }
             ItemStack slotStack = items.get(i);
             if (ItemStack.isSameItemSameComponents(slotStack, stack)) {
                 int space = slotStack.getMaxStackSize() - slotStack.getCount();
@@ -128,7 +165,7 @@ public class WorkerInventory implements Container {
 
         // Then, try to add to empty slots
         for (int i = 0; i < INVENTORY_SIZE && remaining > 0; i++) {
-            if (items.get(i).isEmpty()) {
+            if (mode.usesSlot(i) && items.get(i).isEmpty()) {
                 int toAdd = Math.min(remaining, stack.getMaxStackSize());
                 ItemStack newStack = stack.copy();
                 newStack.setCount(toAdd);
@@ -148,8 +185,19 @@ public class WorkerInventory implements Container {
      * Check if there's space for at least one item.
      */
     public boolean hasSpace() {
+        for (int i = 0; i < INVENTORY_SIZE; i++) {
+            ItemStack stack = items.get(i);
+            if (mode.usesSlot(i) && (stack.isEmpty() || stack.getCount() < stack.getMaxStackSize())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether it carries any seed or other plantable item. */
+    public boolean hasAnySeed() {
         for (ItemStack stack : items) {
-            if (stack.isEmpty() || stack.getCount() < stack.getMaxStackSize()) {
+            if (!stack.isEmpty() && dev.palworks.crop.CropAdapter.isSeed(stack.getItem())) {
                 return true;
             }
         }
