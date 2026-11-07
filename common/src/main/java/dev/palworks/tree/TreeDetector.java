@@ -172,8 +172,8 @@ public class TreeDetector {
                     // Air is fine
                 } else if (isVine(neighborState)) {
                     // Vines are allowed (swamp trees have vines)
-                } else if (isAllowedTreeNeighbor(neighborState)) {
-                    // Water, moss carpet, hanging propagules: what mangroves grow among
+                } else if (isAllowedTreeNeighbor(level, neighbor, neighborState)) {
+                    // Plants and other no-collision blocks, water, moss carpet
                 } else {
                     // Invalid block touching the tree!
                     Block invalidBlock = neighborState.getBlock();
@@ -269,14 +269,15 @@ public class TreeDetector {
     }
 
     /**
-     * Blocks that may touch a tree without disqualifying it, besides air, leaves, vines and ground:
-     * water (mangrove roots stand in it), moss carpet (grows on mangrove roots) and mangrove
-     * propagules (hang under mangrove leaves).
+     * Blocks that may touch a tree without disqualifying it, besides air, leaves, vines and ground.
+     * Anything you can walk through: short grass, ferns and flowers next to a trunk, snow layers,
+     * water around mangrove roots, hanging mangrove propagules. Plus moss carpet, which grows on
+     * mangrove roots but has a thin collision box. Player builds are still kept out by solid blocks
+     * and the natural-leaves check.
      */
-    private static boolean isAllowedTreeNeighbor(BlockState state) {
-        return state.is(Blocks.WATER)
-            || state.is(Blocks.MOSS_CARPET)
-            || state.is(Blocks.MANGROVE_PROPAGULE);
+    private static boolean isAllowedTreeNeighbor(Level level, BlockPos pos, BlockState state) {
+        return state.getCollisionShape(level, pos).isEmpty()
+            || state.is(Blocks.MOSS_CARPET);
     }
 
     /**
