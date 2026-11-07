@@ -35,7 +35,7 @@ ordering = "AFTER"
 side = "BOTH"
 
 [[mixins]]
-config = "palworks.mixins.json"
+config = "palworks-common.mixins.json"
 
 [[accessTransformers]]
 file = "META-INF/accesstransformer.cfg"
