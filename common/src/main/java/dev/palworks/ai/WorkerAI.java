@@ -547,23 +547,25 @@ public class WorkerAI {
             BlockPos plantPos = ctx.pos();
             WorkerInventory inventory = ctx.inventory();
 
-            // Plant the crop that was harvested here if we hold its seed, otherwise any held item
-            // that can be planted on this block. (Not just the first item: that may be the harvest.)
-            net.minecraft.world.item.Item preferred = ctx.level() instanceof ServerLevel serverLevel
+            // A tile that was just harvested gets the same crop back for free (like saplings).
+            net.minecraft.world.item.Item replant = ctx.level() instanceof ServerLevel serverLevel
                 ? JobManager.getInstance(serverLevel).consumePendingReplantSeed(plantPos) : null;
+            if (replant != null && dev.palworks.crop.CropAdapter.plantSeed(replant, ctx.level(), plantPos.below())) {
+                if (DEBUG) {
+                    Palworks.LOGGER.info("{} replanted {} at {}", ctx.name(), replant, plantPos);
+                }
+                return;
+            }
+
+            // New farmland: plant a carried seed (any held item that can be planted on this block,
+            // not just the first item, which may be something else).
             ItemStack seedStack = ItemStack.EMPTY;
             for (int i = 0; i < inventory.getContainerSize(); i++) {
                 ItemStack stack = inventory.getItem(i);
-                if (stack.isEmpty()
-                        || !dev.palworks.crop.CropAdapter.canPlantSeed(stack.getItem(), ctx.level(), plantPos.below())) {
-                    continue;
-                }
-                if (preferred != null && stack.is(preferred)) {
+                if (!stack.isEmpty()
+                        && dev.palworks.crop.CropAdapter.canPlantSeed(stack.getItem(), ctx.level(), plantPos.below())) {
                     seedStack = stack;
                     break;
-                }
-                if (seedStack.isEmpty()) {
-                    seedStack = stack;
                 }
             }
             if (seedStack.isEmpty()) {
