@@ -71,6 +71,7 @@ public class JobManager {
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2;   // Ticks to wait for items to spawn
     private static final int CONSECUTIVE_JOB_PLANT_DELAY = 25;   // Ticks to wait before replanting
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
+    private static final boolean MINING_JOBS_ENABLED = false;     // Flip on once MINE_RESOURCE breaks ores
 
     // Singleton instances (one per ServerLevel)
     private static final Map<String, JobManager> instances = new ConcurrentHashMap<>();
@@ -562,8 +563,9 @@ public class JobManager {
             return job;
         }
 
-        // Check for mining jobs (ores)
-        if (state.is(JobBlockTags.ORES)) {
+        // Check for mining jobs (ores). Off until mining is implemented (MINE_RESOURCE's handler
+        // doesn't break the ore yet), so workers don't walk to ores and stand there forever.
+        if (MINING_JOBS_ENABLED && state.is(JobBlockTags.ORES)) {
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.MINE_RESOURCE;

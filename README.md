@@ -4,7 +4,7 @@ Palworks is a multi-loader Minecraft mod (**1.21.1**, **Fabric + NeoForge**) tha
 owned [Cobblemon](https://cobblemon.com) Pokémon into automated workers — Palworld-style "Pals."
 
 Send one of your Pokémon out into the world and it scans for nearby work and does it on its own:
-smelting, farming, lumbering, mining, and hauling. What a Pokémon is good at depends on its
+smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on its
 **suitability** (derived from its type/species), so different Pals are better at different jobs.
 
 > **Requires [Cobblemon](https://cobblemon.com).** Palworks reads your owned Pokémon and assigns
@@ -14,8 +14,8 @@ smelting, farming, lumbering, mining, and hauling. What a Pokémon is good at de
 
 - **Autonomous workers** — a sent-out Pokémon scans the area around it (~32-block radius) for
   available work and performs it without micromanagement.
-- **Jobs** — smelting (furnaces), planting & harvesting crops, lumbering (chopping trees),
-  mining (ores), and hauling finished goods to nearby chests.
+- **Jobs** — smelting (furnaces), planting & harvesting crops, lumbering (chopping trees), and
+  hauling finished goods to nearby chests. Mining is in progress.
 - **Suitability** — type- and species-based mapping decides which jobs a given Pokémon can do
   and how well.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
