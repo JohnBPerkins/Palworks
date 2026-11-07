@@ -44,8 +44,18 @@ These use the oldest supported Cobblemon (`cobblemon_version` in `gradle.propert
 `run/` folder, which git ignores. The first server start stops until you accept the EULA in
 `run/eula.txt`.
 
-Cobblemon is only added to these dev runs: it never ends up in the published jars or their
-dependencies.
+Dev runs also include the [spark](https://spark.lucko.me/docs) profiler, to measure what Palworks
+costs per tick:
+
+- `/spark profiler start`, play for a minute or two, then `/spark profiler stop`. It prints a link
+  to an interactive view; search it for `dev.palworks` to see where Palworks spends time. The link
+  uploads the profile to spark's public viewer; add `--save-to-file` to keep it local instead.
+- `/spark profiler start --only-ticks-over 50` records only ticks slower than 50 ms, to catch
+  lag spikes.
+- `/spark tps` shows recent TPS and tick times.
+
+Cobblemon and spark are only added to these dev runs: they never end up in the published jars or
+their dependencies.
 
 - Pure logic (enums, mappings, suitability, IDs) is unit-tested under `common/src/test/java` and
   must pass `./gradlew :common:test`. New logic that doesn't need a running game belongs here.

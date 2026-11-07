@@ -66,6 +66,9 @@ dependencies {
     // Maven artifact pulls Kotlin in as plain jars, which Cobblemon can't see. localRuntime, not
     // modLocalRuntime: Loom's mod remapping drops the bundled jars, and it needs no remapping.
     localRuntime("maven.modrinth:kotlin-for-forge:5.12.0") { transitive = false }
+    // spark profiler, for dev runs only (/spark profiler, /spark tps). See CONTRIBUTING. Already
+    // uses NeoForge's names, so it needs no remapping.
+    localRuntime("maven.modrinth:spark:1.10.124-neoforge-1.21.1") { transitive = false }
 }
 
 processResources {
