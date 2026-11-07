@@ -49,5 +49,7 @@ jobs:
           shellcheck --version | head -2
           actionlint -color
 
-      - name: Check helper scripts compile
-        run: python3 -m py_compile .github/scripts/*.py
+      - name: Check helper scripts
+        run: |
+          shellcheck .github/scripts/*.sh
+          python3 -m py_compile .github/scripts/*.py
