@@ -7,11 +7,11 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.manager.JobManager;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -30,36 +30,43 @@ public class WorkerTickHandler {
 
         // Get all server levels
         for (ServerLevel level : event.getServer().getAllLevels()) {
-            // Tick JobManager FIRST (scan jobs, assign work)
+            // Scan jobs, assign work. Workers have already ticked this tick (see onEntityTick).
             JobManager.getInstance(level).tick(level);
+        }
+    }
 
-            // Then tick individual workers (execute assigned jobs)
-            for (Entity entity : level.getAllEntities()) {
-                // Check if entity is a Cobblemon Pokemon
-                if (entity instanceof PokemonEntity pokemonEntity) {
-                    Pokemon pokemon = pokemonEntity.getPokemon();
-                    if (pokemon == null) continue;
+    /**
+     * Run each worker from its own entity tick, like the Fabric mixin does, instead of looping
+     * over every entity in the level. Entities in non-ticking chunks don't tick, so they stop
+     * reporting in and JobManager unregisters them.
+     */
+    @SubscribeEvent
+    public static void onEntityTick(EntityTickEvent.Post event) {
+        if (!(event.getEntity() instanceof PokemonEntity pokemonEntity)
+                || !(pokemonEntity.level() instanceof ServerLevel level)) {
+            return;
+        }
 
-                    // ONLY process owned Pokemon
-                    if (pokemon.getOwnerUUID() == null) {
-                        continue; // Skip wild Pokemon
-                    }
+        Pokemon pokemon = pokemonEntity.getPokemon();
+        if (pokemon == null) return;
 
-                    // ONLY process Pokemon that are currently out in the world
-                    if (pokemon.getEntity() == null) {
-                        continue; // Skip Pokemon not in world
-                    }
+        // ONLY process owned Pokemon
+        if (pokemon.getOwnerUUID() == null) {
+            return; // Skip wild Pokemon
+        }
 
-                    // Cast to Mob for navigation
-                    if (pokemonEntity instanceof Mob mob) {
-                        // Register worker with JobManager
-                        JobManager.getInstance(level).registerWorker(pokemon, mob, level);
+        // ONLY process Pokemon that are currently out in the world
+        if (pokemon.getEntity() == null) {
+            return; // Skip Pokemon not in world
+        }
 
-                        // Execute assigned work
-                        WorkerAI.tick(pokemon, mob, level);
-                    }
-                }
-            }
+        // Cast to Mob for navigation
+        if (pokemonEntity instanceof Mob mob) {
+            // Register worker with JobManager
+            JobManager.getInstance(level).registerWorker(pokemon, mob, level);
+
+            // Execute assigned work
+            WorkerAI.tick(pokemon, mob, level);
         }
     }
 

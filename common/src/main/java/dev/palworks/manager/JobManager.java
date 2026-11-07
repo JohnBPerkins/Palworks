@@ -63,6 +63,8 @@ public class JobManager {
     private static final int DELIVERY_SEARCH_RADIUS = 32;        // Horizontal reach for picking a delivery chest
     private static final int DELIVERY_SEARCH_VERTICAL = 4;       // Y reach for picking a delivery chest
     private static final int JOB_FAILURE_BLACKLIST_TICKS = 1200; // 60s a worker won't retry a job it couldn't reach
+    private static final int WORKER_STALE_TICKS = 5;             // Unregister a worker this long after it stops ticking
+                                                                 // (a little slack so a skipped tick isn't a despawn)
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2;   // Ticks to wait for items to spawn
     private static final int CONSECUTIVE_JOB_PLANT_DELAY = 25;   // Ticks to wait before replanting
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
@@ -187,6 +189,13 @@ public class JobManager {
         info.suitabilities = state.getSuitabilities();
         info.currentReservation = stateReservation;
         info.idle = (stateReservation == null);
+
+        // Every live worker reports in here on its own tick; updateWorkerRegistry() drops the ones
+        // that stop reporting (despawned, recalled, disabled, in a non-ticking chunk, changed dimension).
+        info.lastSeenTick = level.getGameTime();
+        if (entity instanceof PokemonEntity pokemonEntity) {
+            entityCache.put(uuid, pokemonEntity);
+        }
     }
 
     /**
@@ -206,35 +215,22 @@ public class JobManager {
             }
         }
         // Drop per-worker caches so they don't leak after the worker is gone.
+        entityCache.remove(pokemonUUID);
         recentlyFailedJobs.remove(pokemonUUID);
         WorkerInventoryManager.unload(pokemonUUID);
         WorkerStateManager.unload(pokemonUUID);
     }
 
     /**
-     * Update worker registry by detecting dead/unloaded workers.
+     * Unregister workers that have stopped reporting in through {@link #registerWorker}.
+     * Costs O(workers), not O(entities in the level).
      */
     private void updateWorkerRegistry(ServerLevel level) {
-        // Build set of currently active Pokemon UUIDs and refresh the per-tick entity cache.
-        Set<UUID> activePokemonUUIDs = new HashSet<>();
-        entityCache.clear();
-
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof PokemonEntity pokemonEntity) {
-                Pokemon pokemon = pokemonEntity.getPokemon();
-                if (pokemon != null && pokemon.getOwnerUUID() != null) {
-                    UUID pokemonUUID = pokemon.getUuid();
-                    activePokemonUUIDs.add(pokemonUUID);
-                    entityCache.put(pokemonUUID, pokemonEntity);
-                }
-            }
-        }
-
-        // Remove workers that are no longer active
+        long now = level.getGameTime();
         List<UUID> toRemove = new ArrayList<>();
-        for (UUID uuid : activeWorkers.keySet()) {
-            if (!activePokemonUUIDs.contains(uuid)) {
-                toRemove.add(uuid);
+        for (Map.Entry<UUID, WorkerInfo> entry : activeWorkers.entrySet()) {
+            if (now - entry.getValue().lastSeenTick > WORKER_STALE_TICKS) {
+                toRemove.add(entry.getKey());
             }
         }
 
@@ -821,26 +817,13 @@ public class JobManager {
     }
 
     /**
-     * Get a PokemonEntity (Mob) by Pokemon UUID for navigation checks.
-     * Uses the per-tick entityCache for O(1) lookup, falling back to a scan on a miss.
+     * Get a registered worker's PokemonEntity (Mob) by Pokemon UUID for navigation checks.
+     * Only workers are looked up, and registerWorker() keeps entityCache current for them.
      */
     @Nullable
     private PokemonEntity getEntityByUUID(ServerLevel level, UUID uuid) {
         PokemonEntity cached = entityCache.get(uuid);
-        if (cached != null && cached.isAlive()) {
-            return cached;
-        }
-        // Cache miss (e.g. a lookup before the first registry update this tick): scan once.
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof PokemonEntity pokemonEntity) {
-                Pokemon pokemon = pokemonEntity.getPokemon();
-                if (pokemon != null && pokemon.getUuid().equals(uuid)) {
-                    entityCache.put(uuid, pokemonEntity);
-                    return pokemonEntity;
-                }
-            }
-        }
-        return null;
+        return cached != null && cached.isAlive() ? cached : null;
     }
 
     /**
@@ -1525,6 +1508,7 @@ public class JobManager {
         public ReservationId currentReservation;
         public boolean idle;
         public long lastAssignmentTime;
+        public long lastSeenTick;      // Game tick of the worker's last registerWorker() call
 
         public WorkerInfo() {
             this.suitabilities = new HashSet<>();
