@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,14 +23,31 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # Caches the Gradle distribution, dependencies, and Loom's shared files. Only runs on main
+      # save this cache; PR runs restore it read-only.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Loom keeps project-specific Minecraft jars (remapped, with our access widener/transformer
+      # applied) in .gradle/loom-cache inside the repo, which setup-gradle doesn't cache.
+      - name: Cache Loom project files
+        uses: actions/cache@v4
+        with:
+          path: |
+            .gradle/loom-cache
+            */.gradle/loom-cache
+          key: loom-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+          restore-keys: |
+            loom-${{ runner.os }}-
+
+      # `assemble` + `check` is exactly what `build` runs, split so a compile failure and a test
+      # failure show up as different steps. No --no-daemon: the second step reuses the warm Gradle
+      # daemon from the first, and setup-gradle stops it at the end of the job.
       - name: Build
-        run: ./gradlew build --no-daemon
+        run: ./gradlew assemble
 
       - name: Test
-        run: ./gradlew :common:test --no-daemon
+        run: ./gradlew check
 
       - name: Upload artifacts
         if: success()
