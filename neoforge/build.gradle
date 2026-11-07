@@ -58,7 +58,8 @@ dependencies {
 
     // Cobblemon: Available for compilation only
     // To test: build your mod and install in a real Minecraft instance with Cobblemon
-    modCompileOnly("curse.maven:cobblemon-687131:7273151")
+    // Version comes from gradle.properties (cobblemon_version); see common/build.gradle.
+    modCompileOnly("com.cobblemon:neoforge:${rootProject.cobblemon_version}+${rootProject.minecraft_version}") { transitive = false }
 }
 
 processResources {
