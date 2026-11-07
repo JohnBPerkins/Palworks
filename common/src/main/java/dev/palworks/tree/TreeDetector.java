@@ -44,6 +44,9 @@ public class TreeDetector {
     // no higher than one above the top stem.
     private static final int WART_BREAK_RADIUS = 4;
     private static final int MAX_WART_BLOCKS = 512;      // Safety cap on canopy blocks broken per tree
+    // How far (x/z) from the chopped block to look for neighbouring fungi's stems: far enough to
+    // catch one whose canopy (up to ~4 blocks from its stem) reaches into the wart-break column.
+    private static final int NEIGHBOR_STEM_SEARCH_RADIUS = WART_BREAK_RADIUS + 4;
 
     // Ground blocks that a tree base can touch
     private static final Set<Block> VALID_GROUND_BLOCKS = Set.of(
@@ -320,16 +323,42 @@ public class TreeDetector {
      * shroomlights never decay the way leaves do. Copies the FallingTree mod's rule: canopy blocks
      * reachable from the tree's stems through other canopy blocks (diagonals included), within
      * {@link #WART_BREAK_RADIUS} blocks of {@code origin} on x and z, and at most one block above the
-     * top stem. Like FallingTree, it doesn't check which tree a block "belongs" to, so a neighbouring
-     * fungus whose canopy touches this one within that box loses that part.
+     * top stem.
+     *
+     * <p>Unlike FallingTree, neighbouring fungi keep their canopy: each canopy block belongs to the
+     * nearest stem (by x/z distance; ties go to the tree being chopped), and blocks that belong to a
+     * neighbour are neither broken nor searched through. So where two canopies touch, each fungus
+     * keeps roughly its own half.
      *
      * @param treeBlocks the tree's stems (from {@link TreeValidationResult#getLogPositions()})
      * @param origin the block the chop started from (the job position)
      */
     public static Set<BlockPos> findNetherCanopyToBreak(Level level, Set<BlockPos> treeBlocks, BlockPos origin) {
         int topY = Integer.MIN_VALUE;
+        int bottomY = Integer.MAX_VALUE;
+        Set<Long> ownColumns = new HashSet<>();
         for (BlockPos pos : treeBlocks) {
             topY = Math.max(topY, pos.getY());
+            bottomY = Math.min(bottomY, pos.getY());
+            ownColumns.add(columnKey(pos.getX(), pos.getZ()));
+        }
+
+        // Stems of neighbouring fungi near enough for their canopy to reach into the break column
+        Set<Long> neighborColumns = new HashSet<>();
+        BlockPos.MutableBlockPos scan = new BlockPos.MutableBlockPos();
+        for (int x = origin.getX() - NEIGHBOR_STEM_SEARCH_RADIUS; x <= origin.getX() + NEIGHBOR_STEM_SEARCH_RADIUS; x++) {
+            for (int z = origin.getZ() - NEIGHBOR_STEM_SEARCH_RADIUS; z <= origin.getZ() + NEIGHBOR_STEM_SEARCH_RADIUS; z++) {
+                long column = columnKey(x, z);
+                if (ownColumns.contains(column) || neighborColumns.contains(column)) {
+                    continue;
+                }
+                for (int y = bottomY; y <= topY + 1; y++) {
+                    if (isNetherStem(level.getBlockState(scan.set(x, y, z)))) {
+                        neighborColumns.add(column);
+                        break;
+                    }
+                }
+            }
         }
 
         Set<BlockPos> canopy = new HashSet<>();
@@ -350,7 +379,8 @@ public class TreeDetector {
                                 || neighbor.getY() > topY + 1) {
                             continue;
                         }
-                        if (isNetherCanopy(level.getBlockState(neighbor))) {
+                        if (isNetherCanopy(level.getBlockState(neighbor))
+                                && !isCloserToNeighbor(neighbor, ownColumns, neighborColumns)) {
                             canopy.add(neighbor);
                             queue.add(neighbor);
                         }
@@ -359,6 +389,36 @@ public class TreeDetector {
             }
         }
         return canopy;
+    }
+
+    /** Whether a canopy block is horizontally closer to a neighbouring fungus's stem than to ours. */
+    private static boolean isCloserToNeighbor(BlockPos pos, Set<Long> ownColumns, Set<Long> neighborColumns) {
+        if (neighborColumns.isEmpty()) {
+            return false;
+        }
+        return nearestColumnDistSq(pos, neighborColumns) < nearestColumnDistSq(pos, ownColumns);
+    }
+
+    private static long nearestColumnDistSq(BlockPos pos, Set<Long> columns) {
+        long best = Long.MAX_VALUE;
+        for (long column : columns) {
+            long dx = pos.getX() - columnX(column);
+            long dz = pos.getZ() - columnZ(column);
+            best = Math.min(best, dx * dx + dz * dz);
+        }
+        return best;
+    }
+
+    private static long columnKey(int x, int z) {
+        return ((long) x << 32) | (z & 0xFFFFFFFFL);
+    }
+
+    private static int columnX(long key) {
+        return (int) (key >> 32);
+    }
+
+    private static int columnZ(long key) {
+        return (int) key;
     }
 
     /**
