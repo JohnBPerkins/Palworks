@@ -103,11 +103,18 @@ remapJar {
 fabricApi {
     configureTests {
         createSourceSet = true
-        modId = "palworks-gametest"
+        modId = "palworks_gametest"
         enableGameTests = true
         enableClientGameTests = false
         eula = true
     }
+}
+
+// The tests themselves are shared with NeoForge: they live in common/src/gametest (compiled only by
+// the loaders' gametest source sets, not by common). This module adds just its fabric.mod.json.
+sourceSets.matching { it.name == "gametest" }.configureEach {
+    java.srcDir project(":common").file("src/gametest/java")
+    resources.srcDir project(":common").file("src/gametest/resources")
 }
 
 // JUnit-style report, next to the unit tests' results (CI's test summary reads both)

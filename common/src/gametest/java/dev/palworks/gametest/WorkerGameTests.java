@@ -5,7 +5,6 @@ import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -23,7 +22,7 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
  * Each test has its own batch so it runs alone: workers look for jobs 32 blocks around them, and
  * would otherwise wander into neighbouring tests' scenes.
  */
-public class WorkerGameTests implements FabricGameTest {
+public class WorkerGameTests {
 
     private static final CropBlock WHEAT = (CropBlock) Blocks.WHEAT;
     private static final BlockPos START = new BlockPos(3, 1, 1);
@@ -38,15 +37,18 @@ public class WorkerGameTests implements FabricGameTest {
 
     private static void assertWheatRow(GameTestHelper helper, int age, String what) {
         for (int x = 2; x <= 4; x++) {
-            helper.assertTrue(helper.getBlockState(new BlockPos(x, 1, 5)).equals(WHEAT.getStateForAge(age)),
-                "wheat at x=" + x + " should be " + what);
+            BlockPos crop = new BlockPos(x, 1, 5);
+            helper.assertTrue(helper.getBlockState(crop).equals(WHEAT.getStateForAge(age)),
+                "wheat at x=" + x + " should be " + what + ", but there's " + helper.getBlockState(crop)
+                    + " on " + helper.getBlockState(crop.below()));
         }
     }
 
     // ---- Each kind of job ----
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_harvest", timeoutTicks = 600)
+    @GameTest(template = Templates.EMPTY, batch = "worker_harvest", timeoutTicks = 600)
     public void grassTypeHarvestsRipeWheat(GameTestHelper helper) {
+        Workers.isolate(helper);
         // Also covers a just-sent-out worker taking the jobs right next to it (it used to mark them
         // unreachable while it was still dropping to the ground)
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
@@ -56,8 +58,9 @@ public class WorkerGameTests implements FabricGameTest {
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested and reset"));
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_chop", timeoutTicks = 800)
+    @GameTest(template = Templates.EMPTY, batch = "worker_chop", timeoutTicks = 800)
     public void lumberjackChopsAndReplants(GameTestHelper helper) {
+        Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 5, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
         Workers.sendOut(helper, "machop level=20", START); // Fighting: Lumbering
@@ -70,8 +73,9 @@ public class WorkerGameTests implements FabricGameTest {
         });
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_furnace", timeoutTicks = 800)
+    @GameTest(template = Templates.EMPTY, batch = "worker_furnace", timeoutTicks = 800)
     public void fireTypeLightsAFurnace(GameTestHelper helper) {
+        Workers.isolate(helper);
         Scenes.floor(helper, Blocks.STONE);
         BlockPos furnacePos = new BlockPos(3, 1, 6);
         helper.setBlock(furnacePos, Blocks.FURNACE.defaultBlockState().setValue(AbstractFurnaceBlock.FACING, Direction.NORTH));
@@ -85,8 +89,9 @@ public class WorkerGameTests implements FabricGameTest {
 
     // ---- Planting ----
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_plant_pouch", timeoutTicks = 800)
+    @GameTest(template = Templates.EMPTY, batch = "worker_plant_pouch", timeoutTicks = 800)
     public void planterPlantsFromItsSeedPouch(GameTestHelper helper) {
+        Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         for (int x = 2; x <= 4; x++) {
             helper.setBlock(x, 0, 5, Blocks.FARMLAND);
@@ -102,8 +107,9 @@ public class WorkerGameTests implements FabricGameTest {
         });
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_plant_chest", timeoutTicks = 1000)
+    @GameTest(template = Templates.EMPTY, batch = "worker_plant_chest", timeoutTicks = 1000)
     public void planterFetchesSeedsFromAChest(GameTestHelper helper) {
+        Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         for (int x = 2; x <= 4; x++) {
             helper.setBlock(x, 0, 5, Blocks.FARMLAND);
@@ -117,8 +123,9 @@ public class WorkerGameTests implements FabricGameTest {
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "planted with seeds from the chest"));
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_plant_none", timeoutTicks = 400)
+    @GameTest(template = Templates.EMPTY, batch = "worker_plant_none", timeoutTicks = 400)
     public void planterWithNoSeedsLeavesFarmlandAlone(GameTestHelper helper) {
+        Workers.isolate(helper);
         // It used to walk to empty farmland with no seeds, plant nothing, and repeat
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         for (int x = 2; x <= 4; x++) {
@@ -136,8 +143,9 @@ public class WorkerGameTests implements FabricGameTest {
 
     // ---- Transporting ----
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_transport", timeoutTicks = 1600)
+    @GameTest(template = Templates.EMPTY, batch = "worker_transport", timeoutTicks = 1600)
     public void harvesterAndTransporterStoreTheHarvest(GameTestHelper helper) {
+        Workers.isolate(helper);
         // The Grass type harvests (it carries no inventory); the Flying type picks the wheat up
         // and puts it in the chest
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
@@ -161,8 +169,9 @@ public class WorkerGameTests implements FabricGameTest {
 
     // ---- When workers shouldn't work ----
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_disabled", timeoutTicks = 400)
+    @GameTest(template = Templates.EMPTY, batch = "worker_disabled", timeoutTicks = 400)
     public void aDisabledWorkerDoesNothing(GameTestHelper helper) {
+        Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         ripeWheatRow(helper);
         PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
@@ -176,8 +185,9 @@ public class WorkerGameTests implements FabricGameTest {
         });
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_busy", timeoutTicks = 1000)
+    @GameTest(template = Templates.EMPTY, batch = "worker_busy", timeoutTicks = 1000)
     public void aBusyWorkerPausesThenCarriesOn(GameTestHelper helper) {
+        Workers.isolate(helper);
         // Busy is what a battle (or evolving) sets on the Pokémon; it should stop working until free
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         ripeWheatRow(helper);
@@ -193,8 +203,9 @@ public class WorkerGameTests implements FabricGameTest {
 
     // ---- Reachability ----
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_unreachable", timeoutTicks = 1200)
+    @GameTest(template = Templates.EMPTY, batch = "worker_unreachable", timeoutTicks = 1200)
     public void aBoxedInWorkerHarvestsAsSoonAsTheWayOpens(GameTestHelper helper) {
+        Workers.isolate(helper);
         // The worker can't get out of a glass box, so it can't reach the wheat; breaking one wall
         // should make it try again straight away (block change hook), not after the 30s backstop
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
@@ -240,8 +251,9 @@ public class WorkerGameTests implements FabricGameTest {
         }
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_nether_no", timeoutTicks = 400)
+    @GameTest(template = Templates.EMPTY, batch = "worker_nether_no", timeoutTicks = 400)
     public void lumberjacksWithoutNetherLeaveNetherTreesAlone(GameTestHelper helper) {
+        Workers.isolate(helper);
         crimsonFungus(helper);
         Workers.sendOut(helper, "machop level=20", START); // Fighting: Lumbering only
 
@@ -251,8 +263,9 @@ public class WorkerGameTests implements FabricGameTest {
         });
     }
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_nether_yes", timeoutTicks = 1000)
+    @GameTest(template = Templates.EMPTY, batch = "worker_nether_yes", timeoutTicks = 1000)
     public void ghostLumberjacksChopNetherTreesAndTheirCanopy(GameTestHelper helper) {
+        Workers.isolate(helper);
         crimsonFungus(helper);
         Workers.sendOut(helper, "honedge level=20", START); // Steel/Ghost: Lumbering + Nether
 
@@ -265,8 +278,9 @@ public class WorkerGameTests implements FabricGameTest {
 
     // ---- Handing a job over ----
 
-    @GameTest(template = EMPTY_STRUCTURE, batch = "worker_handover", timeoutTicks = 1600)
+    @GameTest(template = Templates.EMPTY, batch = "worker_handover", timeoutTicks = 1600)
     public void aRecalledLumberjacksReplantIsFinishedByAnother(GameTestHelper helper) {
+        Workers.isolate(helper);
         // The first lumberjack is recalled between the chop and the replant. The job, with "still
         // needs replanting", goes to the second one, which plants the sapling.
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
@@ -284,6 +298,107 @@ public class WorkerGameTests implements FabricGameTest {
         helper.succeedWhen(() -> {
             helper.assertTrue(recalled[0], "the first lumberjack chopped the tree");
             helper.assertBlockPresent(Blocks.OAK_SAPLING, new BlockPos(3, 1, 5));
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_faint_handover", timeoutTicks = 1600)
+    public void aFaintedLumberjacksReplantIsFinishedByAnother(GameTestHelper helper) {
+        // Fainting (e.g. in a battle) hands the job over, with "still needs replanting"
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        Scenes.tree(helper, 3, 5, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
+        PokemonEntity first = Workers.sendOut(helper, "machop level=20", START);
+        boolean[] fainted = {false};
+
+        helper.onEachTick(() -> {
+            if (!fainted[0] && helper.getBlockState(new BlockPos(3, 2, 5)).isAir()) {
+                fainted[0] = true; // the trunk just came down: faint before it replants
+                first.getPokemon().setCurrentHealth(0);
+                Workers.sendOut(helper, "machop level=20", new BlockPos(1, 1, 1));
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(fainted[0], "the first lumberjack chopped the tree");
+            helper.assertBlockPresent(Blocks.OAK_SAPLING, new BlockPos(3, 1, 5));
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_unreachable_chest", timeoutTicks = 1200)
+    public void aTransporterSkipsAChestItCantReach(GameTestHelper helper) {
+        // The nearest chest is sealed in glass: it must deliver to the further one, not keep
+        // walking at the sealed one
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos sealed = new BlockPos(3, 1, 3);
+        helper.setBlock(sealed, Blocks.CHEST);
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int y = 1; y <= 2; y++) {
+                    if (dx != 0 || dz != 0 || y == 2) {
+                        helper.setBlock(sealed.getX() + dx, y, sealed.getZ() + dz, Blocks.GLASS);
+                    }
+                }
+            }
+        }
+        BlockPos open = new BlockPos(6, 1, 7);
+        helper.setBlock(open, Blocks.CHEST);
+        PokemonEntity worker = Workers.sendOut(helper, "drowzee level=20", new BlockPos(1, 1, 6)); // Psychic: Transporting
+        WorkerInventoryManager.getOrCreate(worker.getPokemon()).addItem(new ItemStack(Items.WHEAT, 20));
+
+        helper.succeedWhen(() -> {
+            var chest = (ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(open));
+            helper.assertTrue(chest.countItem(Items.WHEAT) == 20, "all 20 wheat in the reachable chest, got " + chest.countItem(Items.WHEAT));
+        });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "worker_turn_back", timeoutTicks = 600)
+    public void aWorkerTurnsBackWhenItsCropIsHarvestedFirst(GameTestHelper helper) {
+        // Someone else harvests the crop while the worker is on its way: it should drop the job
+        // within a second, not finish the walk for nothing
+        Workers.isolate(helper);
+        RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
+        BlockPos crop = new BlockPos(8, 1, 14);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(8, 1, 1));
+        long[] harvestedAt = {-1};
+
+        helper.onEachTick(() -> {
+            WorkerState state = WorkerStateManager.get(worker.getPokemon());
+            boolean onItsWay = state != null && state.getCurrentReservation() != null && !state.isWorking();
+            if (harvestedAt[0] < 0 && onItsWay && worker.blockPosition().getZ() - helper.absolutePos(BlockPos.ZERO).getZ() >= 4) {
+                harvestedAt[0] = helper.getTick();
+                helper.setBlock(crop, WHEAT.getStateForAge(0)); // a player got there first
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(harvestedAt[0] >= 0, "the worker set off for the crop");
+            WorkerState state = WorkerStateManager.get(worker.getPokemon());
+            helper.assertTrue(state.getCurrentReservation() == null, "it should have dropped the job");
+            helper.assertTrue(helper.getTick() - harvestedAt[0] <= 30,
+                "within a second and a half of the crop going, took " + (helper.getTick() - harvestedAt[0]) + " ticks");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_two_harvesters", timeoutTicks = 800)
+    public void twoHarvestersNeverTakeTheSameCrop(GameTestHelper helper) {
+        // Six ripe wheat, two Bulbasaur: every crop harvested exactly once (one wheat each)
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        for (int x = 1; x <= 6; x++) {
+            helper.setBlock(x, 0, 5, Blocks.FARMLAND);
+            helper.setBlock(x, 1, 5, WHEAT.getStateForAge(7));
+        }
+        Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(1, 1, 1));
+        Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(6, 1, 1));
+
+        helper.succeedWhen(() -> {
+            for (int x = 1; x <= 6; x++) {
+                helper.assertTrue(helper.getBlockState(new BlockPos(x, 1, 5)).equals(WHEAT.getStateForAge(0)),
+                    "wheat at x=" + x + " should be harvested");
+            }
+            helper.assertTrue(Scenes.itemsOnGround(helper, Items.WHEAT) == 6,
+                "each crop harvested exactly once: 6 wheat, got " + Scenes.itemsOnGround(helper, Items.WHEAT));
         });
     }
 }

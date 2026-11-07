@@ -87,3 +87,42 @@ shadowJar {
 remapJar {
     inputFile.set shadowJar.archiveFile
 }
+
+// In-game tests (GameTests), the same ones Fabric runs: the tests live in common/src/gametest,
+// this module adds only the small mod that registers them (src/gametest). Dev runs only, never
+// published. `./gradlew :neoforge:runGameTest` boots a headless server with Palworks, Cobblemon and
+// the tests, runs them all, and exits non-zero if any fail. See "Automated tests" in CONTRIBUTING.
+sourceSets {
+    gametest {
+        java.srcDir project(":common").file("src/gametest/java")
+        resources.srcDir project(":common").file("src/gametest/resources")
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+dependencies {
+    // The tests call Cobblemon's Kotlin API; Kotlin for Forge provides the runtime (dev runs above)
+    gametestCompileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.21"
+}
+
+loom {
+    mods {
+        palworks_gametest {
+            sourceSet sourceSets.gametest
+        }
+    }
+    runs {
+        gameTest {
+            server()
+            name "Game Test"
+            source sourceSets.gametest
+            runDir "build/run/gameTest"
+            property "neoforge.gameTestServer", "true"
+            property "neoforge.enableGameTest", "true"
+            property "neoforge.enabledGameTestNamespaces", "palworks_gametest"
+            // JUnit-style report, like Fabric's, next to the unit tests' results
+            property "palworks.gametest.report", layout.buildDirectory.file("test-results/gametest/TEST-gametest.xml").get().asFile.absolutePath
+        }
+    }
+}
