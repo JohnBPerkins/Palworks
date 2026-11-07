@@ -16,9 +16,11 @@ concurrency:
 permissions:
   contents: read
 
-# Supported Cobblemon range: the oldest is cobblemon_version in gradle.properties (what `build`
-# compiles and releases against); the newest is listed in the compile/boot matrices below.
-# To support a newer Cobblemon, bump the newest version in both matrices.
+# Supported Cobblemon range (currently 1.7.0 to 1.8.x):
+#   oldest: cobblemon_version in gradle.properties (what `build` compiles and releases against)
+#   newest: the last version in the compile/boot matrices below
+#   players: the Cobblemon range in fabric.mod.json and neoforge.mods.toml
+# To support a newer Cobblemon, update the matrices and widen both metadata ranges.
 env:
   FABRIC_INSTALLER_VERSION: "1.1.2"
 
@@ -128,7 +130,7 @@ jobs:
       fail-fast: false
       matrix:
         loader: [fabric, neoforge]
-        cobblemon: ["1.7.1", "1.8.4"]
+        cobblemon: ["1.7.0", "1.8.4"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
