@@ -170,8 +170,11 @@ jobs:
           # PATTERN (or NOT matching it, with -v), with the "type(scope)!: " prefix removed.
           # Prints nothing if no titles qualify.
           section() {
-            local items
-            items=$(grep -iE ${3:-} "$2" subjects.txt | sed -E 's/^([A-Za-z]+(\([^)]*\))?!?: *)?/- /' || true)
+            local items flags=(-iE)
+            if [ "${3:-}" = -v ]; then
+              flags+=(-v)
+            fi
+            items=$(grep "${flags[@]}" -- "$2" subjects.txt | sed -E 's/^([A-Za-z]+(\([^)]*\))?!?: *)?/- /' || true)
             if [ -n "$items" ]; then
               printf '## %s\n\n%s\n\n' "$1" "$items"
             fi

@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# A new push to a PR cancels that PR's still-running build, since its result is already outdated.
+# Runs on main are never cancelled, so every main commit gets a result and saves the caches.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -47,7 +53,24 @@ jobs:
         run: ./gradlew assemble
 
       - name: Test
+        id: test
         run: ./gradlew check
+
+      # Runs whether the tests passed or failed (but not if the build itself failed), and puts a
+      # results table plus each failure's message in the run summary and as PR annotations.
+      - name: Test results
+        if: ${{ !cancelled() && steps.test.conclusion != 'skipped' }}
+        run: python3 -I .github/scripts/test_summary.py '*/build/test-results/test'
+
+      - name: Upload test reports
+        if: ${{ failure() && steps.test.conclusion == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            */build/reports/tests/test/
+            */build/test-results/test/
+          retention-days: 14
 
       - name: Upload artifacts
         if: success()
