@@ -222,6 +222,15 @@ public class JobManager {
      */
     public void registerWorker(Pokemon pokemon, Mob entity, Level level) {
         UUID uuid = pokemon.getUuid();
+
+        // Fainted (e.g. in a battle): it can't work until it's healed, so it isn't a worker until
+        // then. Unregistering hands its job over, with any progress, for another worker to finish.
+        if (WorkerEligibility.isFainted(pokemon)) {
+            if (activeWorkers.containsKey(uuid)) {
+                unregisterWorker(uuid);
+            }
+            return;
+        }
         boolean isNewWorker = !WorkerStateManager.hasWorkerState(pokemon);
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
 

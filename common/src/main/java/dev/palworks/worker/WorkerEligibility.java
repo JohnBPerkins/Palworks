@@ -32,6 +32,11 @@ public class WorkerEligibility {
         return entity instanceof PokemonEntity pokemonEntity && pokemonEntity.isBusy();
     }
 
+    /** Whether the Pokemon has fainted (0 HP): it can't work until it's healed. */
+    public static boolean isFainted(Pokemon pokemon) {
+        return pokemon.getCurrentHealth() <= 0;
+    }
+
     public static boolean isEligible(Pokemon pokemon) {
         // Must be owned
         if (!isOwned(pokemon)) {

@@ -65,6 +65,9 @@ public class WorkerAI {
     // lives in the WorkerStateManager cache; staggered per-entity to avoid a save spike.
     private static final int WORK_SAVE_INTERVAL = 20;
 
+    // How stale a paused job's reservation may get before it's refreshed (well under the 30s expiry).
+    private static final long PAUSED_RESERVATION_REFRESH_MS = 10_000;
+
     // How often (ticks) a walking worker re-checks that its job still exists (staggered per entity).
     private static final int JOB_RECHECK_INTERVAL = 10;
 
@@ -92,17 +95,18 @@ public class WorkerAI {
             return false;
         }
 
-        // In a battle (or evolving): stop working. Let go of the current job so it goes back to the
-        // pool for someone else (JobManager.registerWorker releases it once the reservation is
-        // cleared), and don't steer the Pokemon, since Cobblemon's battle positioning needs it.
-        // It gets no new jobs until it's free again (see registerWorker).
+        // Fainted: it can't work until it's healed. Its job has already been handed over (with any
+        // progress) by JobManager.registerWorker, which stops registering fainted workers.
+        if (dev.palworks.worker.WorkerEligibility.isFainted(pokemon)) {
+            return false;
+        }
+
+        // In a battle (or evolving): pause. It keeps its job, and the step it reached, for however
+        // long the battle takes, then carries on (registerWorker gives it no new jobs meanwhile).
+        ReservationId paused = state.getCurrentReservation();
         if (dev.palworks.worker.WorkerEligibility.isBusy(entity)) {
-            if (state.getCurrentReservation() != null) {
-                entity.getNavigation().stop(); // once: it may still be walking to the job
-                state.clearReservation();
-                state.resetWorkSession();
-                state.resetPathFailures();
-                WorkerStateManager.save(pokemon, state);
+            if (paused != null) {
+                pauseJob(entity, level, state, paused);
             }
             return false;
         }
@@ -170,6 +174,29 @@ public class WorkerAI {
 
         // No reservation - idle (JobManager will assign work)
         return false;
+    }
+
+    /**
+     * Keep a busy worker's job paused: the step it was on starts over when it's back (its effect
+     * hadn't happened yet), the reservation is kept fresh so it doesn't expire however long the
+     * battle takes, and the worker isn't steered. Its walk to the job is stopped, but only if that's
+     * still where it's headed: Cobblemon moves it into its battle position, and that's left alone.
+     */
+    private static void pauseJob(Mob entity, Level level, WorkerState state, ReservationId reservation) {
+        if (state.getStepTicks() > 0) {
+            state.restartStep();
+        }
+        if (reservation.isExpired(PAUSED_RESERVATION_REFRESH_MS)) {
+            state.setCurrentReservation(new ReservationId(reservation.getStationPos(), reservation.getJobType()));
+        }
+        BlockPos heading = entity.getNavigation().getTargetPos();
+        if (heading != null) {
+            BlockPos standPos = WorkPositions.standingPosFor(
+                level, reservation.getStationPos(), reservation.getJobType(), entity);
+            if (heading.equals(standPos)) {
+                entity.getNavigation().stop();
+            }
+        }
     }
 
     /**
