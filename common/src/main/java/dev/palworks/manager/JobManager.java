@@ -469,9 +469,14 @@ public class JobManager {
             }
         }
 
-        // Check for lumbering jobs (trees). Uses the same log test as the tree validator
-        // (#minecraft:logs, minus apricorns); validateTree() gates it again at chop time.
-        if (TreeDetector.isLog(state)) {
+        // Check for lumbering jobs (trees). One job per tree, at its base log (a log standing on
+        // valid ground), and only if it's a valid natural tree. Validating here instead of only at
+        // chop time stops workers repeatedly walking to builds they'll refuse to chop, and checking
+        // the base first keeps the tree search to once per tree rather than once per log.
+        // validateTree() still runs again at chop time.
+        if (TreeDetector.isLog(state)
+                && TreeDetector.isValidGroundBlock(level.getBlockState(pos.below()))
+                && TreeDetector.isValidTree(level, pos)) {
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.CHOP_TREE;

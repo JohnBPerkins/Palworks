@@ -12,6 +12,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -157,8 +158,11 @@ public class TreeDetector {
                         queue.add(neighbor);
                     }
                 } else if (isLeaf(neighborState)) {
-                    // Leaf block - track it
-                    leaves.add(neighbor);
+                    // Leaf block - allowed touching the tree, but only natural leaves count toward
+                    // MIN_LEAF_COUNT, so a log pillar dressed with player-placed leaves isn't a tree.
+                    if (isNaturalLeaf(neighborState)) {
+                        leaves.add(neighbor);
+                    }
                 } else if (isValidGroundBlock(neighborState)) {
                     // Ground block - valid connection point
                     foundGroundConnection = true;
@@ -184,7 +188,7 @@ public class TreeDetector {
                 for (int dy = -LEAF_SEARCH_RADIUS; dy <= LEAF_SEARCH_RADIUS; dy++) {
                     for (int dz = -LEAF_SEARCH_RADIUS; dz <= LEAF_SEARCH_RADIUS; dz++) {
                         BlockPos checkPos = logPos.offset(dx, dy, dz);
-                        if (!leaves.contains(checkPos) && isLeaf(level.getBlockState(checkPos))) {
+                        if (!leaves.contains(checkPos) && isNaturalLeaf(level.getBlockState(checkPos))) {
                             leaves.add(checkPos);
                         }
                     }
@@ -247,6 +251,18 @@ public class TreeDetector {
      */
     public static boolean isLeaf(BlockState state) {
         return state.is(BlockTags.LEAVES) && !state.is(APRICORN_LEAVES);
+    }
+
+    /**
+     * Check if a block state is a leaf that grew naturally (from worldgen or a sapling), as opposed
+     * to one a player placed. Vanilla marks player-placed leaves with {@code persistent=true}. Leaves
+     * without that property (some modded leaves) can't be told apart, so they count as natural.
+     */
+    public static boolean isNaturalLeaf(BlockState state) {
+        if (!isLeaf(state)) {
+            return false;
+        }
+        return !state.hasProperty(LeavesBlock.PERSISTENT) || !state.getValue(LeavesBlock.PERSISTENT);
     }
 
     /**
