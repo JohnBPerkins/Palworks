@@ -13,6 +13,7 @@ import dev.palworks.station.StationState;
 import dev.palworks.station.StationStateManager;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import dev.palworks.inventory.WorkerInventory;
@@ -266,7 +267,8 @@ public class JobManager {
         info.position = entityPos;
         info.suitabilities = state.getSuitabilities();
         info.currentReservation = stateReservation;
-        info.idle = (stateReservation == null);
+        // A busy worker (in a battle, evolving) gets no new jobs; WorkerAI drops the one it had.
+        info.idle = (stateReservation == null) && !WorkerEligibility.isBusy(entity);
 
         // Every live worker reports in here on its own tick; updateWorkerRegistry() drops the ones
         // that stop reporting (despawned, recalled, disabled, in a non-ticking chunk, changed dimension).

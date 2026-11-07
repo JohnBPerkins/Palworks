@@ -92,6 +92,21 @@ public class WorkerAI {
             return false;
         }
 
+        // In a battle (or evolving): stop working. Let go of the current job so it goes back to the
+        // pool for someone else (JobManager.registerWorker releases it once the reservation is
+        // cleared), and don't steer the Pokemon, since Cobblemon's battle positioning needs it.
+        // It gets no new jobs until it's free again (see registerWorker).
+        if (dev.palworks.worker.WorkerEligibility.isBusy(entity)) {
+            if (state.getCurrentReservation() != null) {
+                entity.getNavigation().stop(); // once: it may still be walking to the job
+                state.clearReservation();
+                state.resetWorkSession();
+                state.resetPathFailures();
+                WorkerStateManager.save(pokemon, state);
+            }
+            return false;
+        }
+
         // Check if suitabilities need recalculation
         if (state.areSuitabilitiesDirty()) {
             state.initializeSuitabilities(pokemon);
