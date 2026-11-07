@@ -608,6 +608,12 @@ public class WorkerAI {
                 net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treePos);
                 BlockPos basePos = treeResult.getBasePosition();
 
+                // Where to replant: a 2x2 trunk (dark oak, giant spruce/jungle) gets a 2x2 of saplings
+                // in the same spots, anything else one at its base. Worked out while the trunk is
+                // still there to look at.
+                java.util.List<BlockPos> saplingSpots =
+                    TreeDetector.saplingPositions(level, treeResult.getLogPositions(), basePos);
+
                 // Huge fungus canopies never decay, so they come down with the stem (found before
                 // anything is broken, while the tree is still intact)
                 java.util.Set<BlockPos> canopy = TreeDetector.isNetherStem(level.getBlockState(treePos))
@@ -631,10 +637,17 @@ public class WorkerAI {
 
                 // Replant right away, as part of the chop. The sapling is free: the leaves still drop
                 // their usual saplings as they decay, and nothing has dropped yet to pay with.
-                boolean replanted = saplingItem != null && TreeDetector.plantSapling(level, basePos, saplingItem);
+                int replanted = 0;
+                if (saplingItem != null) {
+                    for (BlockPos spot : saplingSpots) {
+                        if (TreeDetector.plantSapling(level, spot, saplingItem)) {
+                            replanted++;
+                        }
+                    }
+                }
                 if (DEBUG) {
-                    Palworks.LOGGER.info("{} {} {} at {}", ctx.name(),
-                        replanted ? "replanted" : "couldn't replant", saplingItem, basePos);
+                    Palworks.LOGGER.info("{} replanted {} of {} {} at {}", ctx.name(),
+                        replanted, saplingSpots.size(), saplingItem, saplingSpots);
                 }
 
                 // Queue a job to collect the drops
