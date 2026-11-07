@@ -940,7 +940,14 @@ public class JobManager {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position, job.type, entity);
-            if (standPos != null && canPathTo(entity, standPos)) {
+            Reach reach = standPos == null ? Reach.NO : canPathTo(entity, standPos);
+            if (reach == Reach.UNKNOWN) {
+                // The worker can't pathfind at all right now (e.g. it was just sent out and is still
+                // dropping to the ground, or is mid-step): that says nothing about the jobs, so
+                // don't remember any as unreachable. Try again next tick.
+                return null;
+            }
+            if (reach == Reach.YES) {
                 // Take it out of the pool first so no other worker gets it too. Only if the pool
                 // holds this job: a delivery shares its chest's position with a GET_SEEDS job.
                 availableJobs.remove(job.position, job);
@@ -1080,13 +1087,18 @@ public class JobManager {
         return cached != null && cached.isAlive() ? cached : null;
     }
 
+    /** Whether a path reaches a spot: yes, no, or unknown (no path could be computed right now). */
+    private enum Reach { YES, NO, UNKNOWN }
+
     /**
-     * Check if an entity can path to a target position.
-     * Returns true if a valid path exists.
+     * Whether an entity can walk to a spot. {@link Reach#UNKNOWN} when its navigation can't compute
+     * a path at the moment: ground navigation returns no path at all while the mob isn't on the
+     * ground (just sent out and still dropping, mid-step, ...). That isn't "unreachable"; treating it
+     * as such made workers skip the jobs right next to them for up to 30 seconds.
      */
-    private boolean canPathTo(Mob entity, BlockPos standPos) {
+    private Reach canPathTo(Mob entity, BlockPos standPos) {
         if (entity == null) {
-            return false;
+            return Reach.UNKNOWN;
         }
 
         // No "close enough" shortcut: a job can be one block away yet blocked by a fence or ledge
@@ -1095,7 +1107,10 @@ public class JobManager {
         // non-fragile test here - the old "any path object = reachable" let workers take jobs they
         // couldn't actually get to.
         net.minecraft.world.level.pathfinder.Path path = entity.getNavigation().createPath(standPos, 1);
-        return path != null && path.canReach();
+        if (path == null) {
+            return Reach.UNKNOWN;
+        }
+        return path.canReach() ? Reach.YES : Reach.NO;
     }
 
     // ============================================
@@ -1573,7 +1588,7 @@ public class JobManager {
                 // Check pathfinding to the resolved stand position
                 BlockPos standPos = entity != null
                     ? WorkPositions.standingPosFor(level, job.position, job.type, entity) : null;
-                if (entity != null && (standPos == null || !canPathTo(entity, standPos))) {
+                if (entity != null && (standPos == null || canPathTo(entity, standPos) != Reach.YES)) {
                     noPath++;
                     noPathByType.merge(job.type, 1, Integer::sum);
                     continue;
