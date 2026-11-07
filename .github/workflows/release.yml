@@ -149,12 +149,38 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           PREVIOUS: ${{ steps.version.outputs.previous }}
         run: |
-          # GitHub builds the notes from the PRs merged since the previous release.
-          args=(-f tag_name="v$VERSION" -f target_commitish="$GITHUB_SHA")
+          # Built from main's commit titles since the previous release. Each squash-merged PR is one
+          # commit whose title ends in "(#N)", which GitHub turns into a PR link. (GitHub's own
+          # generator lists nothing for a first release and depends on commit-to-PR links that a
+          # history rewrite breaks.)
           if [ -n "$PREVIOUS" ]; then
-            args+=(-f previous_tag_name="$PREVIOUS")
+            range="$PREVIOUS..HEAD"
+            full_changelog="https://github.com/$GITHUB_REPOSITORY/compare/$PREVIOUS...v$VERSION"
+          else
+            range="HEAD"
+            full_changelog="https://github.com/$GITHUB_REPOSITORY/commits/v$VERSION"
           fi
-          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" "${args[@]}" --jq .body > release-notes.md
+          git log --first-parent --format='%s' "$range" > subjects.txt
+
+          # Prints one "## Title" section of titles whose conventional-commit type matches $2,
+          # with the "type(scope): " prefix removed. Prints nothing when there are none.
+          section() {
+            local items
+            items=$(grep -iE "^($2)(\([^)]*\))?!?: " subjects.txt | sed -E 's/^[A-Za-z]+(\([^)]*\))?!?: */- /' || true)
+            if [ -n "$items" ]; then
+              printf '## %s\n\n%s\n\n' "$1" "$items"
+            fi
+          }
+          {
+            section "Features" "feat"
+            section "Fixes" "fix"
+            # Everything else, including titles without a type prefix.
+            other=$(grep -viE '^(feat|fix)(\([^)]*\))?!?: ' subjects.txt | sed -E 's/^([A-Za-z]+(\([^)]*\))?!?: *)?/- /' || true)
+            if [ -n "$other" ]; then
+              printf '## Other changes\n\n%s\n\n' "$other"
+            fi
+            echo "**Full changelog:** $full_changelog"
+          } > release-notes.md
 
       - name: Summary
         env:
@@ -164,18 +190,32 @@ jobs:
           MODRINTH: ${{ steps.targets.outputs.modrinth }}
           CURSEFORGE: ${{ steps.targets.outputs.curseforge }}
         run: |
+          # In a dry run nothing is published, so describe what a real run would do.
+          target() { # $1 = site configured (true/false)
+            if [ "$1" != true ]; then
+              echo "Skipped (not configured)"
+            elif [ "$DRY_RUN" = true ]; then
+              echo "Would publish"
+            else
+              echo "Publishing"
+            fi
+          }
           {
             if [ "$DRY_RUN" = true ]; then
-              echo "## Dry run: v$VERSION ($CHANNEL) was NOT released"
+              echo "## Dry run: nothing was released"
+              echo
+              echo "This is a preview of **v$VERSION ($CHANNEL)**. Run the workflow again with **Dry run** unticked to release it."
             else
-              echo "## Released v$VERSION ($CHANNEL)"
+              echo "## Releasing v$VERSION ($CHANNEL)"
+              echo
+              echo "Each target's own step below shows whether it succeeded."
             fi
             echo
-            echo "| Target | Publishing |"
+            echo "| Target | Result |"
             echo "|---|---|"
-            echo "| GitHub Release | yes |"
-            echo "| Modrinth | $MODRINTH |"
-            echo "| CurseForge | $CURSEFORGE |"
+            echo "| Git tag v$VERSION + GitHub Release | $(target true) |"
+            echo "| Modrinth | $(target "$MODRINTH") |"
+            echo "| CurseForge | $(target "$CURSEFORGE") |"
             echo
             echo "### Release notes"
             echo
