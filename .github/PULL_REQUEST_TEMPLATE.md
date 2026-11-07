@@ -17,7 +17,7 @@
 
 - [ ] `./gradlew build` passes
 - [ ] `./gradlew :common:test` passes
-- [ ] Verified in-game (note loader + which behavior you checked, since Cobblemon can't load in the dev environment)
+- [ ] Verified in-game (note loader + which behavior you checked; `./gradlew :fabric:runClient` or `:neoforge:runClient` starts a game with Cobblemon)
 
 ## Checklist
 

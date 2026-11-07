@@ -26,6 +26,25 @@ configurations {
         canBeResolved = true
         canBeConsumed = false
     }
+
+    // See the ICU4J note in dependencies.
+    cobblemonDevIcu {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
+// Dev runs (runClient/runServer): common's jar holds the access widener, mixins and assets, so it
+// has to be part of the palworks mod. Without this, Fabric Loader loads it as a separate nameless
+// mod and palworks crashes with "Missing classTweaker file palworks.accesswidener".
+loom {
+    mods {
+        palworks {
+            sourceSet sourceSets.main
+            modFiles.from(configurations.common)
+        }
+    }
 }
 
 dependencies {
@@ -42,11 +61,17 @@ dependencies {
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     shadowBundle project(path: ':common', configuration: 'transformProductionFabric')
 
-    // Cobblemon: Available for compilation, but not loaded in dev environment
-    // To test with Cobblemon: build your mod and install in a real Minecraft instance
+    // Cobblemon: compiled against, and loaded in dev runs (see below).
     // Version comes from gradle.properties (cobblemon_version); CI also builds against the newest
     // supported Cobblemon. Non-transitive: Cobblemon's runtime libraries aren't needed to compile.
     modCompileOnly("com.cobblemon:fabric:${rootProject.cobblemon_version}+${rootProject.minecraft_version}") { transitive = false }
+    // Dev runs only (runClient/runServer): never part of the published jar or its dependencies.
+    modLocalRuntime("com.cobblemon:fabric:${rootProject.cobblemon_version}+${rootProject.minecraft_version}")
+    // Cobblemon 1.8.x's battle engine (GraalJS) needs ICU4J 71.1, which Cobblemon bundles. In dev,
+    // Gradle would merge it with Minecraft's trimmed ICU4J 73.2 (no DateFormat) and keep only that,
+    // so it's added as a plain file, outside version resolution.
+    cobblemonDevIcu "com.ibm.icu:icu4j:71.1"
+    localRuntime files(configurations.cobblemonDevIcu)
 
     modImplementation("net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0")
 }
