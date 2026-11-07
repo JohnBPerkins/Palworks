@@ -206,6 +206,27 @@ public class CropAdapter {
     }
 
     /**
+     * The seed to replant after harvesting the crop at {@code pos} (wheat seeds for wheat, a carrot
+     * for carrots, nether wart for nether wart). Call before harvesting, while the crop is still
+     * there. Returns null for berries (they regrow instead) and for anything that can't be planted
+     * back on the block below.
+     */
+    @Nullable
+    public static Item getReplantSeed(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (isBerry(state)) {
+            return null;
+        }
+        // A crop's pick-block item is its seed (CropBlock returns its base seed)
+        ItemStack clone = state.getBlock().getCloneItemStack(level, pos, state);
+        if (clone.isEmpty()) {
+            return null;
+        }
+        Item seed = clone.getItem();
+        return canPlantSeed(seed, level, pos.below()) ? seed : null;
+    }
+
+    /**
      * Check if a seed item can be planted on this surface.
      */
     public static boolean canPlantSeed(Item seed, Level level, BlockPos surfacePos) {

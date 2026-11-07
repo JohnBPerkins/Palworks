@@ -546,7 +546,26 @@ public class WorkerAI {
         @Override public void onStart(JobContext ctx) {
             BlockPos plantPos = ctx.pos();
             WorkerInventory inventory = ctx.inventory();
-            ItemStack seedStack = inventory.getFirstItem();
+
+            // Plant the crop that was harvested here if we hold its seed, otherwise any held item
+            // that can be planted on this block. (Not just the first item: that may be the harvest.)
+            net.minecraft.world.item.Item preferred = ctx.level() instanceof ServerLevel serverLevel
+                ? JobManager.getInstance(serverLevel).consumePendingReplantSeed(plantPos) : null;
+            ItemStack seedStack = ItemStack.EMPTY;
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                ItemStack stack = inventory.getItem(i);
+                if (stack.isEmpty()
+                        || !dev.palworks.crop.CropAdapter.canPlantSeed(stack.getItem(), ctx.level(), plantPos.below())) {
+                    continue;
+                }
+                if (preferred != null && stack.is(preferred)) {
+                    seedStack = stack;
+                    break;
+                }
+                if (seedStack.isEmpty()) {
+                    seedStack = stack;
+                }
+            }
             if (seedStack.isEmpty()) {
                 if (DEBUG) {
                     Palworks.LOGGER.warn("{} has no seeds to plant at {}", ctx.name(), plantPos);
@@ -574,6 +593,11 @@ public class WorkerAI {
 
         @Override public void onFinish(JobContext ctx) {
             BlockPos harvestPos = ctx.pos();
+            // Note what to replant here before the crop is gone (see JobManager.onJobCompleted)
+            if (ctx.level() instanceof ServerLevel serverLevel) {
+                JobManager.getInstance(serverLevel).noteHarvestedCrop(harvestPos,
+                    dev.palworks.crop.CropAdapter.getReplantSeed(ctx.level(), harvestPos));
+            }
             boolean harvested = dev.palworks.crop.CropAdapter.harvestCrop(ctx.level(), harvestPos);
             if (DEBUG) {
                 if (harvested) {

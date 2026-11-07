@@ -22,6 +22,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -120,7 +121,9 @@ public class JobManager {
         this.availableJobs = new ConcurrentHashMap<>();
         this.reservedJobs = new ConcurrentHashMap<>();
         this.chunkCaches = new ConcurrentHashMap<>();
-        this.consecutiveJobQueue = new LinkedList<>();
+        // Ordered by due time: requests have different delays (pickup 2 ticks, replant 0 or 25), so
+        // insertion order isn't due order, and processConsecutiveJobs stops at the first one not due.
+        this.consecutiveJobQueue = new PriorityQueue<>(Comparator.comparingLong(r -> r.creationTime));
     }
 
     /**
@@ -1012,17 +1015,28 @@ public class JobManager {
 
             consecutiveJobQueue.add(pickupRequest);
 
-            // Queue 2: Replant seeds (delay 25 ticks to allow pickup first)
+            // Queue 2: Replant seeds
             // SKIP for berry bushes since they reset their age instead of being replanted
             if (!isBerry) {
+                // If the harvester already holds this crop's seed, it replants right away (due now,
+                // so it's handed the job this same tick, before assignment can give it something
+                // else) and then moves on. Otherwise it's a normal replant job, after a delay so the
+                // drops can be picked up first, and planting waits until harvesting is done.
+                Item seed = pendingReplantSeeds.get(jobPos);
+                boolean harvesterHasSeed = seed != null && holdsItem(pokemon, seed);
+
                 ConsecutiveJobRequest plantRequest = new ConsecutiveJobRequest();
                 plantRequest.sourceJobLocation = jobPos;
                 plantRequest.nextJobType = JobType.PLANT_SEEDS;
                 plantRequest.requiredSuitability = Suitability.PLANTING;
                 plantRequest.suggestedWorkerUUID = workerUUID;  // Prefer same worker
-                plantRequest.creationTime = currentTime + CONSECUTIVE_JOB_PLANT_DELAY;
+                plantRequest.replantByHarvester = harvesterHasSeed;
+                plantRequest.creationTime = harvesterHasSeed
+                    ? currentTime : currentTime + CONSECUTIVE_JOB_PLANT_DELAY;
 
                 consecutiveJobQueue.add(plantRequest);
+            } else {
+                pendingReplantSeeds.remove(jobPos);
             }
         }
 
@@ -1189,14 +1203,17 @@ public class JobManager {
             if (DEBUG) {
                 Palworks.LOGGER.debug("Farmland no longer exists at {} for replant job", farmlandPos);
             }
+            pendingReplantSeeds.remove(request.sourceJobLocation);
             return;
         }
 
-        // Verify the air above is still empty
+        // Verify the air above is still empty (crops that reset their age instead of breaking,
+        // like hearty grains, never need replanting and stop here)
         if (!level.getBlockState(request.sourceJobLocation).isAir()) {
             if (DEBUG) {
                 Palworks.LOGGER.debug("Position {} is no longer air for replant job", request.sourceJobLocation);
             }
+            pendingReplantSeeds.remove(request.sourceJobLocation);
             return;
         }
 
@@ -1217,8 +1234,20 @@ public class JobManager {
         plantJob.priority = REPLANT_PRIORITY;
         plantJob.reservedByWorker = request.suggestedWorkerUUID;  // Hint for assignment
 
-        // Always goes to the pool rather than straight to the harvester: harvests come first, and
-        // findBestJobForWorker holds back planting while the worker still has harvests to do.
+        // The harvester replants its own tile right away if it holds the seed (and is still free).
+        // Otherwise the job goes to the pool, where findBestJobForWorker holds planting back until
+        // the worker has no harvests left.
+        WorkerInfo harvester = activeWorkers.get(request.suggestedWorkerUUID);
+        if (request.replantByHarvester && harvester != null && harvester.idle
+                && harvester.suitabilities.contains(suitability)) {
+            assignJobToWorker(level, harvester, plantJob);
+            if (DEBUG) {
+                Palworks.LOGGER.debug("Harvester replanting its own tile at {} right away",
+                    request.sourceJobLocation);
+            }
+            return;
+        }
+
         availableJobs.put(plantJob.position, plantJob);
 
         if (DEBUG) {
@@ -1333,6 +1362,36 @@ public class JobManager {
      */
     public net.minecraft.world.item.Item consumePendingSapling(BlockPos pos) {
         return pendingSaplingPlants.remove(pos);
+    }
+
+    // Seed to replant at each recently harvested position (noted by the harvest handler before the
+    // crop is broken; taken by the planter). Entries are removed when planted or when the tile
+    // can no longer be replanted.
+    private final Map<BlockPos, Item> pendingReplantSeeds = new ConcurrentHashMap<>();
+
+    /** Record the seed that should be replanted where a crop is about to be harvested. */
+    public void noteHarvestedCrop(BlockPos pos, @Nullable Item seed) {
+        if (seed != null) {
+            pendingReplantSeeds.put(pos.immutable(), seed);
+        } else {
+            pendingReplantSeeds.remove(pos);
+        }
+    }
+
+    /** Get and remove the seed to replant at a position, or null if none was noted. */
+    @Nullable
+    public Item consumePendingReplantSeed(BlockPos pos) {
+        return pendingReplantSeeds.remove(pos);
+    }
+
+    private static boolean holdsItem(Pokemon pokemon, Item item) {
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            if (inventory.getItem(i).is(item)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Temporary storage for sapling types at plant positions
@@ -1665,6 +1724,7 @@ public class JobManager {
         public UUID suggestedWorkerUUID;
         public long creationTime;  // Game time when this job should be created
         public net.minecraft.world.item.Item saplingItem;  // For PLANT_SAPLING jobs
+        public boolean replantByHarvester;  // PLANT_SEEDS: harvester holds the seed, give it the job now
 
         public ConsecutiveJobRequest() {
             this.creationTime = 0;
