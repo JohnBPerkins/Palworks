@@ -1,6 +1,7 @@
 package dev.palworks.crop;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
@@ -109,9 +110,10 @@ public class CropAdapter {
             return crop.isMaxAge(state);
         }
 
-        // Stems (pumpkin/melon stems)
+        // Pumpkin/melon stems are never harvested themselves, even fully grown: their fruit is (see
+        // attachedFruitPos / isAttachedFruit)
         if (block instanceof StemBlock) {
-            return state.getValue(StemBlock.AGE) >= StemBlock.MAX_AGE;
+            return false;
         }
 
         // Nether wart
@@ -161,6 +163,31 @@ public class CropAdapter {
             return false;
         }
 
+        return false;
+    }
+
+    /**
+     * For an attached stem (a pumpkin or melon stem, or a modded gourd's, that has grown its fruit),
+     * the position of that fruit; otherwise null. Harvest jobs for gourds are found from the stem so
+     * the chunk scan doesn't have to check every block's neighbours.
+     */
+    @Nullable
+    public static BlockPos attachedFruitPos(BlockState state, BlockPos stemPos) {
+        if (state.getBlock() instanceof AttachedStemBlock) {
+            return stemPos.relative(state.getValue(AttachedStemBlock.FACING));
+        }
+        return null;
+    }
+
+    /** Whether the block at {@code pos} is the fruit of an attached stem next to it. */
+    public static boolean isAttachedFruit(Level level, BlockPos pos) {
+        for (Direction dir : Direction.Plane.HORIZONTAL) {
+            BlockState neighbor = level.getBlockState(pos.relative(dir));
+            if (neighbor.getBlock() instanceof AttachedStemBlock
+                    && neighbor.getValue(AttachedStemBlock.FACING) == dir.getOpposite()) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -301,6 +328,13 @@ public class CropAdapter {
      * Returns true if successfully harvested.
      */
     public static boolean harvestCrop(Level level, BlockPos pos) {
+        // A pumpkin, melon (or modded gourd) grown by a stem next to it: break it like a player
+        // would, with its normal drops. The stem detaches by itself and grows another.
+        if (isAttachedFruit(level, pos)) {
+            level.destroyBlock(pos, true);
+            return true;
+        }
+
         if (!isFullyGrown(level, pos)) {
             return false;
         }

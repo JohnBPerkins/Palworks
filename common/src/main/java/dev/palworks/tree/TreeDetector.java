@@ -553,6 +553,47 @@ public class TreeDetector {
     }
 
     /**
+     * Where to replant a chopped tree, worked out before it's chopped. A tree whose trunk stands on
+     * a 2x2 of logs (dark oak, which only grows from a 2x2 of saplings, and giant spruce and jungle)
+     * is replanted as a 2x2 in the same four spots; any other tree gets one sapling at its base.
+     * Based on the trunk's shape rather than a list of tree types, so it covers any 2x2 tree.
+     * Mangroves stand on roots, not logs, so they always get one propagule.
+     *
+     * @param treeBlocks the tree's blocks (from {@link TreeValidationResult#getLogPositions()})
+     * @param basePos the tree's lowest block (from {@link TreeValidationResult#getBasePosition()})
+     */
+    public static List<BlockPos> saplingPositions(Level level, Set<BlockPos> treeBlocks, BlockPos basePos) {
+        int bottomY = Integer.MAX_VALUE;
+        for (BlockPos pos : treeBlocks) {
+            bottomY = Math.min(bottomY, pos.getY());
+        }
+        List<BlockPos> bottom = new ArrayList<>();
+        for (BlockPos pos : treeBlocks) {
+            if (pos.getY() == bottomY) {
+                bottom.add(pos);
+            }
+        }
+        if (bottom.size() == 4 && isTwoByTwo(bottom)
+                && bottom.stream().allMatch(pos -> isLog(level.getBlockState(pos)))) {
+            return bottom;
+        }
+        return List.of(basePos);
+    }
+
+    /** Whether four positions (on one Y level) form a 2x2 square. */
+    private static boolean isTwoByTwo(List<BlockPos> positions) {
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPos pos : positions) {
+            minX = Math.min(minX, pos.getX());
+            maxX = Math.max(maxX, pos.getX());
+            minZ = Math.min(minZ, pos.getZ());
+            maxZ = Math.max(maxZ, pos.getZ());
+        }
+        // Four distinct positions within a 2x2 box fill it
+        return maxX - minX == 1 && maxZ - minZ == 1 && new HashSet<>(positions).size() == 4;
+    }
+
+    /**
      * Check if a sapling can be planted at this position.
      * Saplings need air (or, for a mangrove propagule, still water) and valid ground below.
      */
