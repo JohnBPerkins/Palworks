@@ -30,9 +30,12 @@ public class WorkerState {
     private int pathFailCount;
     private long lastPathFailTime;
 
-    // Work session tracking
-    private long lastWorkTime;
-    private int consecutiveWorkTicks;
+    // Progress through the current job's steps (see WorkerAI's JobHandler.steps). The step index
+    // and its data are saved, so a paused or reloaded job carries on from the step it was on; ticks
+    // within the step aren't, so that step restarts (with its animation) when the worker resumes.
+    private int jobStep;
+    private int stepTicks;
+    private CompoundTag jobData;
 
     // Work inventory - separate from Cobblemon's held item, used for job items
     // Single slot that can hold a full stack (up to 64 items)
@@ -47,8 +50,9 @@ public class WorkerState {
         this.cooldowns = new HashMap<>();
         this.pathFailCount = 0;
         this.lastPathFailTime = 0;
-        this.lastWorkTime = 0;
-        this.consecutiveWorkTicks = 0;
+        this.jobStep = 0;
+        this.stepTicks = 0;
+        this.jobData = new CompoundTag();
         this.workInventory = ItemStack.EMPTY;
     }
 
@@ -85,8 +89,10 @@ public class WorkerState {
         this.currentReservation = reservation;
     }
 
+    /** Drop the current job, and any progress through it (capture that first if it's handed over). */
     public void clearReservation() {
         this.currentReservation = null;
+        resetJobProgress();
     }
 
     // Suitability caching (call this ONCE when worker is initialized)
@@ -162,23 +168,56 @@ public class WorkerState {
         return pathFailCount >= 3; // Stuck if 3+ path failures in 5 seconds
     }
 
-    // Work session tracking
-    public void recordWorkTick() {
-        long now = System.currentTimeMillis();
-        if (now - lastWorkTime > 1000) { // Reset if > 1 second gap
-            consecutiveWorkTicks = 0;
-        }
-        consecutiveWorkTicks++;
-        lastWorkTime = now;
+    // Job progress (steps)
+
+    /** Start a job: from its first step, or from where another worker left it (handed over). */
+    public void startJob(int step, @Nullable CompoundTag data) {
+        this.jobStep = Math.max(0, step);
+        this.stepTicks = 0;
+        this.jobData = data != null ? data.copy() : new CompoundTag();
     }
 
-    public void resetWorkSession() {
-        consecutiveWorkTicks = 0;
-        lastWorkTime = 0;
+    public void resetJobProgress() {
+        startJob(0, null);
     }
 
-    public int getConsecutiveWorkTicks() {
-        return consecutiveWorkTicks;
+    /** Index of the step the job is on (0 = the first). */
+    public int getJobStep() {
+        return jobStep;
+    }
+
+    /** Ticks spent on the current step so far. */
+    public int getStepTicks() {
+        return stepTicks;
+    }
+
+    public void addStepTick() {
+        stepTicks++;
+    }
+
+    /** Restart the current step (e.g. the worker left its spot): its effect hasn't happened yet. */
+    public void restartStep() {
+        stepTicks = 0;
+    }
+
+    public void nextStep() {
+        jobStep++;
+        stepTicks = 0;
+    }
+
+    /** Whether the job is past its first step, i.e. something has already been done. */
+    public boolean hasJobProgress() {
+        return jobStep > 0;
+    }
+
+    /** Whether the worker is partway through the job, including the current step. */
+    public boolean isWorking() {
+        return jobStep > 0 || stepTicks > 0;
+    }
+
+    /** Data the job's steps leave for later steps (e.g. where to replant after a chop). */
+    public CompoundTag getJobData() {
+        return jobData;
     }
 
     // Work Inventory Management
@@ -255,6 +294,8 @@ public class WorkerState {
         if (assignedJob != null) {
             tag.putString("assignedJob", assignedJob.getId());
         }
+        tag.putInt("jobStep", jobStep);
+        tag.put("jobData", jobData.copy());
 
         // Serialize cached suitabilities
         if (cachedSuitabilities != null && !cachedSuitabilities.isEmpty()) {
@@ -381,6 +422,11 @@ public class WorkerState {
         } else {
             currentReservation = null;
         }
+
+        // Job progress (missing in older saves: start of the job)
+        jobStep = tag.contains("jobStep") ? Math.max(0, tag.getInt("jobStep")) : 0;
+        jobData = tag.contains("jobData") ? tag.getCompound("jobData").copy() : new CompoundTag();
+        stepTicks = 0;
 
         // Deserialize work inventory
         if (tag.contains("workInventory")) {

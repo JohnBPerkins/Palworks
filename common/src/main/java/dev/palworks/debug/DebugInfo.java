@@ -37,7 +37,8 @@ public class DebugInfo {
         public final List<String> cooldowns;
         public final int pathFailCount;
         public final boolean isStuck;
-        public final int consecutiveWorkTicks;
+        public final int jobStep;
+        public final int stepTicks;
         public final BlockPos entityPosition;
 
         public WorkerDebugInfo(Pokemon pokemon, WorkerState state, @Nullable Mob entity) {
@@ -73,7 +74,8 @@ public class DebugInfo {
 
             this.pathFailCount = state.getPathFailCount();
             this.isStuck = state.isStuck();
-            this.consecutiveWorkTicks = state.getConsecutiveWorkTicks();
+            this.jobStep = state.getJobStep();
+            this.stepTicks = state.getStepTicks();
             this.entityPosition = entity != null ? entity.blockPosition() : null;
         }
 
@@ -101,7 +103,7 @@ public class DebugInfo {
                 }
             }
 
-            lines.add("Work Ticks: " + consecutiveWorkTicks);
+            lines.add("Job Step: " + jobStep + " (" + stepTicks + " ticks in)");
             lines.add("Path Fails: " + pathFailCount + (isStuck ? " (STUCK)" : ""));
 
             return lines;

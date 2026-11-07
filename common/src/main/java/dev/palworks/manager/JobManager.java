@@ -284,6 +284,18 @@ public class JobManager {
         if (removed != null) {
             // Free up the reserved job
             if (removed.currentReservation != null) {
+                // The worker is gone (recalled, despawned, unloaded, disabled): hand its job over,
+                // with any progress (e.g. a chopped tree that still needs replanting), so another
+                // worker carries on from there. It drops the job itself, so it doesn't redo it
+                // when it comes back.
+                PokemonEntity entity = entityCache.get(pokemonUUID);
+                Pokemon pokemon = entity != null ? entity.getPokemon() : null;
+                WorkerState state = pokemon != null ? WorkerStateManager.get(pokemon) : null;
+                if (state != null) {
+                    captureProgress(state, removed.currentReservation.getStationPos());
+                    state.clearReservation();
+                    WorkerStateManager.save(pokemon, state);
+                }
                 releaseJobReservation(removed.currentReservation.getStationPos());
 
                 if (DEBUG) {
@@ -480,7 +492,7 @@ public class JobManager {
      */
     private void removeScannedJob(BlockPos pos) {
         JobRecord job = availableJobs.get(pos);
-        if (job != null && !job.isConsecutiveJob) {
+        if (job != null && !job.isConsecutiveJob && !job.isHandedOver()) {
             availableJobs.remove(pos);
         }
     }
@@ -992,10 +1004,8 @@ public class JobManager {
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
         state.setCurrentReservation(reservation);
         state.setAssignedJob(job.type);
-        // Start the work timer at 0 for the new job. Without this, a stale consecutiveWorkTicks
-        // (now kept in the WorkerStateManager cache) can be non-zero on arrival, so performWork
-        // skips the onStart action (e.g. furnace ignition) - the worker "works" but does nothing.
-        state.resetWorkSession();
+        // Start from the job's first step, or from where the previous worker left it (handed over)
+        state.startJob(job.resumeStep, job.resumeData);
         WorkerStateManager.save(pokemon, state);
 
         // Mirror into the in-memory caches; registerWorker re-derives these from
@@ -1129,6 +1139,12 @@ public class JobManager {
         WorkerInfo info = activeWorkers.get(workerUUID);
 
         rememberUnreachable(workerUUID, info != null ? info.position : null, pos, serverLevel.getGameTime());
+
+        // If it had already done part of the job, hand that progress over with it
+        WorkerState state = WorkerStateManager.get(pokemon);
+        if (state != null) {
+            captureProgress(state, pos);
+        }
 
         if (DEBUG) {
             Palworks.LOGGER.debug("{} abandoned {} at {}; won't retry it until terrain changes or it moves (max {} ticks)",
@@ -1311,13 +1327,32 @@ public class JobManager {
     }
 
     /**
-     * Release a job reservation (make it available again).
+     * Release a job reservation (make it available again). A delivery is dropped instead: it's
+     * only meaningful to the worker carrying the items, and back in the pool (at the top priority)
+     * it would send other transporters to deliver nothing.
      */
     private void releaseJobReservation(BlockPos position) {
         JobRecord job = reservedJobs.remove(position);
-        if (job != null) {
-            job.reservedByWorker = null;
-            availableJobs.put(position, job);
+        if (job == null || job.type == JobType.DELIVER_ITEMS) {
+            return;
+        }
+        job.reservedByWorker = null;
+        if (job.isHandedOver()) {
+            job.discoveryTime = System.currentTimeMillis(); // don't let the pool's expiry drop it straight away
+        }
+        availableJobs.put(position, job);
+    }
+
+    /**
+     * If the worker has done part of its job (past its first step), store that progress on the job,
+     * so whoever takes it next carries on from there instead of starting over. Call before the
+     * worker's reservation (and with it, its progress) is cleared.
+     */
+    private void captureProgress(WorkerState state, BlockPos jobPos) {
+        JobRecord job = reservedJobs.get(jobPos);
+        if (job != null && state.hasJobProgress()) {
+            job.resumeStep = state.getJobStep();
+            job.resumeData = state.getJobData().copy();
         }
     }
 
@@ -1577,6 +1612,15 @@ public class JobManager {
         public UUID reservedByWorker;  // null if available
         public int priority;           // 0-10, higher = more important
         public boolean isConsecutiveJob;
+        // Progress left by a previous worker (handed over): the step to carry on from, and the
+        // job's data (e.g. where to replant after a chop). 0 / null for a fresh job.
+        public int resumeStep;
+        @Nullable public net.minecraft.nbt.CompoundTag resumeData;
+
+        /** Whether a previous worker already did part of this job. */
+        public boolean isHandedOver() {
+            return resumeStep > 0;
+        }
 
         public JobRecord() {
             this.priority = 5;  // Default priority
