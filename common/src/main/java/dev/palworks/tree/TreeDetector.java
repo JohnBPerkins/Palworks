@@ -27,7 +27,8 @@ import java.util.*;
  * A valid tree must:
  * - Have its base log touching grass, dirt, podzol, mud, or similar ground blocks
  * - Consist of blocks tagged as #minecraft:logs, plus mangrove roots (which aren't in that tag)
- * - Have a minimum number of leaves (#minecraft:leaves) within the tree area
+ * - Have a minimum number of leaves (#minecraft:leaves) within the tree area. For huge fungi
+ *   (nether trees) the canopy counts instead: nether/warped wart blocks and shroomlights
  * - Not exceed the maximum block search limit
  * - Not be connected to invalid blocks (only logs, leaves, air, and vines are allowed)
  */
@@ -159,10 +160,11 @@ public class TreeDetector {
                         visitedLogs.add(neighbor);
                         queue.add(neighbor);
                     }
-                } else if (isLeaf(neighborState)) {
-                    // Leaf block - allowed touching the tree, but only natural leaves count toward
-                    // MIN_LEAF_COUNT, so a log pillar dressed with player-placed leaves isn't a tree.
-                    if (isNaturalLeaf(neighborState)) {
+                } else if (isLeaf(neighborState) || isNetherCanopy(neighborState)) {
+                    // Leaf (or huge fungus canopy) block - allowed touching the tree, but only natural
+                    // ones count toward MIN_LEAF_COUNT, so a log pillar dressed with player-placed
+                    // leaves isn't a tree.
+                    if (isNaturalCanopy(neighborState)) {
                         leaves.add(neighbor);
                     }
                 } else if (isValidGroundBlock(neighborState)) {
@@ -196,7 +198,7 @@ public class TreeDetector {
                 for (int dy = -LEAF_SEARCH_RADIUS; dy <= LEAF_SEARCH_RADIUS; dy++) {
                     for (int dz = -LEAF_SEARCH_RADIUS; dz <= LEAF_SEARCH_RADIUS; dz++) {
                         BlockPos checkPos = logPos.offset(dx, dy, dz);
-                        if (!leaves.contains(checkPos) && isNaturalLeaf(level.getBlockState(checkPos))) {
+                        if (!leaves.contains(checkPos) && isNaturalCanopy(level.getBlockState(checkPos))) {
                             leaves.add(checkPos);
                         }
                     }
@@ -298,6 +300,40 @@ public class TreeDetector {
             return false;
         }
         return !state.hasProperty(LeavesBlock.PERSISTENT) || !state.getValue(LeavesBlock.PERSISTENT);
+    }
+
+    /**
+     * The canopy of a huge fungus (nether tree): nether wart blocks, warped wart blocks and
+     * shroomlights. These play the part leaves do for overworld trees.
+     */
+    public static boolean isNetherCanopy(BlockState state) {
+        return state.is(Blocks.NETHER_WART_BLOCK)
+            || state.is(Blocks.WARPED_WART_BLOCK)
+            || state.is(Blocks.SHROOMLIGHT);
+    }
+
+    /**
+     * A canopy block that counts toward MIN_LEAF_COUNT: a natural leaf, or a huge fungus canopy
+     * block. Unlike leaves, wart blocks and shroomlights have no "player placed" flag, so they always
+     * count; few builds use them, and solid blocks around a "trunk" still rule most builds out.
+     */
+    private static boolean isNaturalCanopy(BlockState state) {
+        return isNaturalLeaf(state) || isNetherCanopy(state);
+    }
+
+    /**
+     * A crimson or warped stem (or hyphae, stripped or not): the "log" of a nether tree. Chopping a
+     * nether tree needs the Nether suitability as well as Lumbering.
+     */
+    public static boolean isNetherStem(BlockState state) {
+        return state.is(BlockTags.CRIMSON_STEMS) || state.is(BlockTags.WARPED_STEMS);
+    }
+
+    /**
+     * Whether a sapling item is a nether fungus (planting it needs the Nether suitability too).
+     */
+    public static boolean isNetherSapling(@Nullable Item saplingItem) {
+        return saplingItem == Items.CRIMSON_FUNGUS || saplingItem == Items.WARPED_FUNGUS;
     }
 
     /**

@@ -569,6 +569,9 @@ public class JobManager {
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.CHOP_TREE;
             job.requiredSuitability = Suitability.LUMBERING;
+            if (TreeDetector.isNetherStem(state)) {
+                job.alsoRequires = Suitability.NETHER; // nether trees need Lumbering + Nether
+            }
             job.discoveryTime = System.currentTimeMillis();
             job.priority = 4;
             return job;
@@ -790,7 +793,7 @@ public class JobManager {
         List<JobRecord> candidates = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
             // Skip if worker lacks suitability
-            if (!worker.suitabilities.contains(job.requiredSuitability)) {
+            if (!canDoJob(worker, job)) {
                 continue;
             }
 
@@ -836,6 +839,15 @@ public class JobManager {
         }
 
         return null;
+    }
+
+    /**
+     * Whether a worker has every suitability a job needs: its main one, plus {@code alsoRequires}
+     * if set (e.g. nether trees need Nether as well as Lumbering).
+     */
+    private static boolean canDoJob(WorkerInfo worker, JobRecord job) {
+        return worker.suitabilities.contains(job.requiredSuitability)
+            && (job.alsoRequires == null || worker.suitabilities.contains(job.alsoRequires));
     }
 
     /**
@@ -1288,6 +1300,9 @@ public class JobManager {
         saplingJob.position = plantPos;
         saplingJob.type = JobType.PLANT_SAPLING;
         saplingJob.requiredSuitability = Suitability.LUMBERING;
+        if (TreeDetector.isNetherSapling(request.saplingItem)) {
+            saplingJob.alsoRequires = Suitability.NETHER; // fungi, like nether trees, need both
+        }
         saplingJob.discoveryTime = System.currentTimeMillis();
         saplingJob.isConsecutiveJob = true;
         saplingJob.priority = HIGH_PRIORITY;
@@ -1299,8 +1314,7 @@ public class JobManager {
 
         // Try to assign to suggested worker first
         WorkerInfo suggestedWorker = activeWorkers.get(request.suggestedWorkerUUID);
-        if (suggestedWorker != null && suggestedWorker.idle &&
-            suggestedWorker.suitabilities.contains(Suitability.LUMBERING)) {
+        if (suggestedWorker != null && suggestedWorker.idle && canDoJob(suggestedWorker, saplingJob)) {
             assignJobToWorker(level, suggestedWorker, saplingJob);
 
             if (DEBUG) {
@@ -1544,7 +1558,7 @@ public class JobManager {
 
             for (JobRecord job : availableJobs.values()) {
                 // Check suitability
-                if (!worker.suitabilities.contains(job.requiredSuitability)) {
+                if (!canDoJob(worker, job)) {
                     noSuitability++;
                     continue;
                 }
@@ -1618,6 +1632,7 @@ public class JobManager {
         public BlockPos position;
         public JobType type;
         public Suitability requiredSuitability;
+        @Nullable public Suitability alsoRequires;  // Optional second suitability the worker must also have
         public long discoveryTime;
         public UUID reservedByWorker;  // null if available
         public int priority;           // 0-10, higher = more important
