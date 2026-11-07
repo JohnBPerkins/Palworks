@@ -91,14 +91,6 @@ public class CropAdapter {
     }
 
     /**
-     * Check if a block at a position is a berry bush.
-     * Public helper for JobManager to determine if replanting is needed.
-     */
-    public static boolean isBerryBush(Level level, BlockPos pos) {
-        return isBerry(level.getBlockState(pos));
-    }
-
-    /**
      * Check if a block is a fully grown crop ready for harvest.
      */
     public static boolean isFullyGrown(Level level, BlockPos pos) {
@@ -267,6 +259,13 @@ public class CropAdapter {
 
         // Cocoa on jungle logs (checked at planting time)
         return false;
+    }
+
+    /**
+     * Whether an item is a seed or other plantable item (what a planter's seed pouch may hold).
+     */
+    public static boolean isSeed(Item item) {
+        return getPlantedBlock(item) != null;
     }
 
     /**

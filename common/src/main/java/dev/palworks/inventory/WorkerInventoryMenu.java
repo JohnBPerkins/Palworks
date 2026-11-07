@@ -5,6 +5,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -18,6 +19,9 @@ import java.util.UUID;
 public class WorkerInventoryMenu extends AbstractContainerMenu {
     private final Container workerInventory;
     private final UUID pokemonUUID;
+    // The worker's CarryMode (ordinal), synced to the client so it shows only the slots the worker
+    // can use (all 3, or the single seed-pouch slot). Starts as NONE on the client until synced.
+    private final DataSlot carryMode = DataSlot.standalone();
 
     // Slot indices
     private static final int WORKER_SLOTS_START = 0;
@@ -37,11 +41,16 @@ public class WorkerInventoryMenu extends AbstractContainerMenu {
 
         checkContainerSize(workerInventory, WorkerInventory.INVENTORY_SIZE);
 
-        // Worker inventory slots (3 slots, centered)
+        if (workerInventory instanceof WorkerInventory inventory) {
+            carryMode.set(inventory.getMode().ordinal()); // server side; synced to the client
+        }
+        addDataSlot(carryMode);
+
+        // Worker inventory slots (3 slots, centered). A seed pouch uses only the middle one.
         // To center 3 slots (54px total) in 176px width: start at x=62
         int workerSlotStartX = 62;
         for (int i = 0; i < WorkerInventory.INVENTORY_SIZE; i++) {
-            addSlot(new Slot(workerInventory, i, workerSlotStartX + i * 18, 20));
+            addSlot(new WorkerSlot(workerInventory, i, workerSlotStartX + i * 18, 20));
         }
 
         // Player inventory (3 rows of 9)
@@ -66,6 +75,27 @@ public class WorkerInventoryMenu extends AbstractContainerMenu {
 
     public UUID getPokemonUUID() {
         return pokemonUUID;
+    }
+
+    public CarryMode getCarryMode() {
+        return CarryMode.fromOrdinal(carryMode.get());
+    }
+
+    /** A worker inventory slot: hidden unless the worker's carry mode uses it, and filtered by it. */
+    private class WorkerSlot extends Slot {
+        WorkerSlot(Container container, int slot, int x, int y) {
+            super(container, slot, x, y);
+        }
+
+        @Override
+        public boolean isActive() {
+            return getCarryMode().usesSlot(getContainerSlot());
+        }
+
+        @Override
+        public boolean mayPlace(ItemStack stack) {
+            return isActive() && WorkerInventory.accepts(getCarryMode(), stack);
+        }
     }
 
     @Override

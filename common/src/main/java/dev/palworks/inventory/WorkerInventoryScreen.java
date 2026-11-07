@@ -51,8 +51,12 @@ public class WorkerInventoryScreen extends AbstractContainerScreen<WorkerInvento
         // Hopper slot area is at y=20, 18px tall
         graphics.fill(x + 43, y + 19, x + 133, y + 38, 0xFFC6C6C6); // Cover slot area
 
-        // Draw 3 slot backgrounds centered (at x=62 to match menu slot positions)
+        // Draw slot backgrounds for the slots this worker can use (at x=62 to match menu slot
+        // positions): all 3 for Transporting, just the middle one for a planter's seed pouch.
         for (int i = 0; i < WorkerInventory.INVENTORY_SIZE; i++) {
+            if (!this.menu.getCarryMode().usesSlot(i)) {
+                continue;
+            }
             int slotX = x + 61 + i * 18;
             int slotY = y + 19;
 
