@@ -33,9 +33,15 @@ repositories {
         name = 'NeoForged'
         url = 'https://maven.neoforged.net/releases'
     }
-    maven {
-        name = 'Kotlin for Forge'
-        url = 'https://thedarkcolour.github.io/KotlinForForge/'
+    // Only serves Kotlin for Forge; limited to its group like the mod repos in the root build.gradle.
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Kotlin for Forge'
+                url = 'https://thedarkcolour.github.io/KotlinForForge/'
+            }
+        }
+        filter { includeGroup 'thedarkcolour' }
     }
 }
 
