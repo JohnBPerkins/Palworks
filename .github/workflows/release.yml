@@ -1,0 +1,282 @@
+name: Release
+
+# Run from the Actions tab: Release -> Run workflow. The workflow picks the next version from the
+# latest vX.Y.Z tag, builds both loaders, creates the tag and GitHub Release, and uploads the jars
+# to Modrinth/CurseForge when those are configured. See "Releasing" in .github/CONTRIBUTING.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version part to increase (ignored for the first release, which is 0.1.0)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      channel:
+        description: "Release channel shown on Modrinth and CurseForge"
+        type: choice
+        options: [alpha, beta, release]
+        default: alpha
+      dry_run:
+        description: "Dry run: build and preview the release without tagging or publishing"
+        type: boolean
+        default: true
+
+# Never run two releases at once; a second one waits instead of racing for the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release
+    # Releases are only cut from main.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Upload tokens are stored as secrets of this environment, which only main can use.
+    environment: release
+    permissions:
+      contents: write # create the tag and the GitHub Release
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags, to find the previous release
+
+      - name: Work out the version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          # Latest exact vX.Y.Z tag (ignores anything like v1.0.0-rc), compared numerically.
+          previous=$(git tag --list --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
+          if [ -z "$previous" ]; then
+            version=0.1.0
+          else
+            IFS=. read -r major minor patch <<< "${previous#v}"
+            case "$BUMP" in
+              major) version="$((major + 1)).0.0" ;;
+              minor) version="$major.$((minor + 1)).0" ;;
+              patch) version="$major.$minor.$((patch + 1))" ;;
+            esac
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::Tag v$version already exists."
+            exit 1
+          fi
+          minecraft=$(sed -n 's/^minecraft_version *= *//p' gradle.properties)
+          {
+            echo "version=$version"
+            echo "previous=$previous"
+            echo "minecraft=$minecraft"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing v$version for Minecraft $minecraft (previous release: ${previous:-none})"
+
+      - name: Check publishing setup
+        id: targets
+        env:
+          MODRINTH_ID: ${{ vars.MODRINTH_PROJECT_ID }}
+          CURSEFORGE_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          HAS_MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN != '' }}
+          HAS_CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN != '' }}
+        run: |
+          # A project ID without its token is a setup mistake, not a reason to quietly skip a site.
+          if [ -n "$MODRINTH_ID" ] && [ "$HAS_MODRINTH_TOKEN" != true ]; then
+            echo "::error::MODRINTH_PROJECT_ID is set but the MODRINTH_TOKEN secret is missing."
+            exit 1
+          fi
+          if [ -n "$CURSEFORGE_ID" ] && [ "$HAS_CURSEFORGE_TOKEN" != true ]; then
+            echo "::error::CURSEFORGE_PROJECT_ID is set but the CURSEFORGE_TOKEN secret is missing."
+            exit 1
+          fi
+          [ -n "$MODRINTH_ID" ] && modrinth=true || modrinth=false
+          [ -n "$CURSEFORGE_ID" ] && curseforge=true || curseforge=false
+          echo "modrinth=$modrinth" >> "$GITHUB_OUTPUT"
+          echo "curseforge=$curseforge" >> "$GITHUB_OUTPUT"
+          echo "Modrinth: $modrinth, CurseForge: $curseforge"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Reuse the caches the Build workflow saves on main, but never write them from a release.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+
+      - name: Restore Loom project files
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .gradle/loom-cache
+            */.gradle/loom-cache
+          key: loom-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+          restore-keys: |
+            loom-${{ runner.os }}-
+
+      - name: Build and test
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./gradlew build -Pmod_version="$VERSION"
+
+      - name: Find jars
+        id: jars
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          fabric="fabric/build/libs/palworks-fabric-$VERSION.jar"
+          neoforge="neoforge/build/libs/palworks-neoforge-$VERSION.jar"
+          for jar in "$fabric" "$neoforge"; do
+            if [ ! -f "$jar" ]; then
+              echo "::error::Expected $jar was not built."
+              ls -la fabric/build/libs neoforge/build/libs
+              exit 1
+            fi
+          done
+          echo "fabric=$fabric" >> "$GITHUB_OUTPUT"
+          echo "neoforge=$neoforge" >> "$GITHUB_OUTPUT"
+
+      - name: Write release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PREVIOUS: ${{ steps.version.outputs.previous }}
+        run: |
+          # Built from main's commit titles since the previous release. Each squash-merged PR is one
+          # commit whose title ends in "(#N)", which GitHub turns into a PR link. (GitHub's own
+          # generator lists nothing for a first release and depends on commit-to-PR links that a
+          # history rewrite breaks.)
+          if [ -n "$PREVIOUS" ]; then
+            range="$PREVIOUS..HEAD"
+            full_changelog="https://github.com/$GITHUB_REPOSITORY/compare/$PREVIOUS...v$VERSION"
+          else
+            range="HEAD"
+            full_changelog="https://github.com/$GITHUB_REPOSITORY/commits/v$VERSION"
+          fi
+          git log --first-parent --format='%s' "$range" > subjects.txt
+
+          # Prints one "## Title" section of titles whose conventional-commit type matches $2,
+          # with the "type(scope): " prefix removed. Prints nothing when there are none.
+          section() {
+            local items
+            items=$(grep -iE "^($2)(\([^)]*\))?!?: " subjects.txt | sed -E 's/^[A-Za-z]+(\([^)]*\))?!?: */- /' || true)
+            if [ -n "$items" ]; then
+              printf '## %s\n\n%s\n\n' "$1" "$items"
+            fi
+          }
+          {
+            section "Features" "feat"
+            section "Fixes" "fix"
+            # Everything else, including titles without a type prefix.
+            other=$(grep -viE '^(feat|fix)(\([^)]*\))?!?: ' subjects.txt | sed -E 's/^([A-Za-z]+(\([^)]*\))?!?: *)?/- /' || true)
+            if [ -n "$other" ]; then
+              printf '## Other changes\n\n%s\n\n' "$other"
+            fi
+            echo "**Full changelog:** $full_changelog"
+          } > release-notes.md
+
+      - name: Summary
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          MODRINTH: ${{ steps.targets.outputs.modrinth }}
+          CURSEFORGE: ${{ steps.targets.outputs.curseforge }}
+        run: |
+          # In a dry run nothing is published, so describe what a real run would do.
+          target() { # $1 = site configured (true/false)
+            if [ "$1" != true ]; then
+              echo "Skipped (not configured)"
+            elif [ "$DRY_RUN" = true ]; then
+              echo "Would publish"
+            else
+              echo "Publishing"
+            fi
+          }
+          {
+            if [ "$DRY_RUN" = true ]; then
+              echo "## Dry run: nothing was released"
+              echo
+              echo "This is a preview of **v$VERSION ($CHANNEL)**. Run the workflow again with **Dry run** unticked to release it."
+            else
+              echo "## Releasing v$VERSION ($CHANNEL)"
+              echo
+              echo "Each target's own step below shows whether it succeeded."
+            fi
+            echo
+            echo "| Target | Result |"
+            echo "|---|---|"
+            echo "| Git tag v$VERSION + GitHub Release | $(target true) |"
+            echo "| Modrinth | $(target "$MODRINTH") |"
+            echo "| CurseForge | $(target "$CURSEFORGE") |"
+            echo
+            echo "### Release notes"
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create tag and GitHub Release
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CHANNEL: ${{ inputs.channel }}
+          FABRIC_JAR: ${{ steps.jars.outputs.fabric }}
+          NEOFORGE_JAR: ${{ steps.jars.outputs.neoforge }}
+        run: |
+          flags=()
+          if [ "$CHANNEL" != release ]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "v$VERSION" "$FABRIC_JAR" "$NEOFORGE_JAR" \
+            --target "$GITHUB_SHA" \
+            --title "Palworks $VERSION" \
+            --notes-file release-notes.md \
+            "${flags[@]}"
+
+      # Each site is skipped while its token is empty (i.e. until its project ID is configured).
+      - name: Publish Fabric jar to Modrinth and CurseForge
+        if: ${{ !inputs.dry_run && (steps.targets.outputs.modrinth == 'true' || steps.targets.outputs.curseforge == 'true') }}
+        uses: Kira-NT/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ steps.targets.outputs.modrinth == 'true' && secrets.MODRINTH_TOKEN || '' }}
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ steps.targets.outputs.curseforge == 'true' && secrets.CURSEFORGE_TOKEN || '' }}
+          files: ${{ steps.jars.outputs.fabric }}
+          name: Palworks ${{ steps.version.outputs.version }} (Fabric)
+          version: ${{ steps.version.outputs.version }}+fabric
+          version-type: ${{ inputs.channel }}
+          changelog-file: release-notes.md
+          loaders: fabric
+          game-versions: ${{ steps.version.outputs.minecraft }}
+          java: 21
+          dependencies: |
+            fabric-api(required)
+            cobblemon(required)
+
+      - name: Publish NeoForge jar to Modrinth and CurseForge
+        if: ${{ !inputs.dry_run && (steps.targets.outputs.modrinth == 'true' || steps.targets.outputs.curseforge == 'true') }}
+        uses: Kira-NT/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
+        with:
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ steps.targets.outputs.modrinth == 'true' && secrets.MODRINTH_TOKEN || '' }}
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ steps.targets.outputs.curseforge == 'true' && secrets.CURSEFORGE_TOKEN || '' }}
+          files: ${{ steps.jars.outputs.neoforge }}
+          name: Palworks ${{ steps.version.outputs.version }} (NeoForge)
+          version: ${{ steps.version.outputs.version }}+neoforge
+          version-type: ${{ inputs.channel }}
+          changelog-file: release-notes.md
+          loaders: neoforge
+          game-versions: ${{ steps.version.outputs.minecraft }}
+          java: 21
+          dependencies: |
+            cobblemon(required)
+            kotlin-for-forge(required)

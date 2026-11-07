@@ -1,4 +1,7 @@
-<!-- Thanks for contributing to Palworks! Please fill out the sections below. -->
+<!-- Thanks for contributing to Palworks! Please fill out the sections below.
+     PR title format: `type: short description`, e.g. `fix: stop workers pathing to broken furnaces`.
+     The title becomes the release-note line. Types and details: .github/CONTRIBUTING.md#pr-titles -->
+
 
 ## Summary
 
