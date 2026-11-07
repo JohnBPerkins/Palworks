@@ -90,14 +90,6 @@ public class CropAdapter {
     }
 
     /**
-     * Check if a block at a position is a berry bush.
-     * Public helper for JobManager to determine if replanting is needed.
-     */
-    public static boolean isBerryBush(Level level, BlockPos pos) {
-        return isBerry(level.getBlockState(pos));
-    }
-
-    /**
      * Check if a block is a fully grown crop ready for harvest.
      */
     public static boolean isFullyGrown(Level level, BlockPos pos) {
