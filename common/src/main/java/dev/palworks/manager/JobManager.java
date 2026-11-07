@@ -485,6 +485,19 @@ public class JobManager {
             }
         }
 
+        // Pumpkins and melons: a stem that has grown its fruit is "attached" to it. The harvest job
+        // goes on the fruit (the stem itself is never harvested).
+        BlockPos fruitPos = CropAdapter.attachedFruitPos(state, pos);
+        if (fruitPos != null) {
+            JobRecord job = new JobRecord();
+            job.position = fruitPos.immutable();
+            job.type = JobType.HARVEST_CROPS;
+            job.requiredSuitabilities = EnumSet.of(Suitability.GATHERING);
+            job.discoveryTime = System.currentTimeMillis();
+            job.priority = 8; // Same as ripe crops
+            return job;
+        }
+
         // Check for gathering jobs (harvestable crops)
         if (CropAdapter.isFullyGrown(level, pos)) {
             JobRecord job = new JobRecord();
@@ -559,7 +572,7 @@ public class JobManager {
         // (2x2 trunks, a mangrove's many root columns), keeps it to one tree search per tree.
         // validateTree() still runs again at chop time.
         if (TreeDetector.isTreeBlock(state)
-                && TreeDetector.isValidGroundBlock(level.getBlockState(pos.below()))
+                && TreeDetector.standsOnGround(level, pos, state)
                 && !treeBlocksSeenThisScan.contains(pos)) {
             TreeDetector.TreeValidationResult tree = TreeDetector.validateTree(level, pos);
             if (!tree.isValid()) {

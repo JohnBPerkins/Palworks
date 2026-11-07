@@ -17,10 +17,15 @@ dependencies {
     // Architectury API. This is optional, and you can comment it out if you don't need it.
     modImplementation "dev.architectury:architectury:$rootProject.architectury_api_version"
 
-    // Cobblemon API for suitability detection
+    // Cobblemon's own common module (artifact `mod`), the counterpart of this project. Not the
+    // Fabric jar: Loom shares remapped mod jars between projects, and remapping the Fabric jar here
+    // (without Fabric API on the classpath) left it broken for the Fabric dev runs.
     // Version comes from gradle.properties (cobblemon_version); CI also builds against the newest
     // supported Cobblemon. Non-transitive: Cobblemon's runtime libraries aren't needed to compile.
-    modCompileOnly("com.cobblemon:fabric:${rootProject.cobblemon_version}+${rootProject.minecraft_version}") { transitive = false }
+    modCompileOnly("com.cobblemon:mod:${rootProject.cobblemon_version}+${rootProject.minecraft_version}") { transitive = false }
+    // Cobblemon's MoLang library. Bundled inside Cobblemon's loader jars (so it's there at runtime),
+    // but not in the common artifact. Same version in every supported Cobblemon (1.7.0 to 1.8.x).
+    compileOnly("com.bedrockk:molang:1.1.20")
 
     // Kotlin stdlib for Cobblemon API interop (provided at runtime by Cobblemon)
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:1.9.21")

@@ -56,10 +56,19 @@ dependencies {
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     shadowBundle project(path: ':common', configuration: 'transformProductionNeoForge')
 
-    // Cobblemon: Available for compilation only
-    // To test: build your mod and install in a real Minecraft instance with Cobblemon
+    // Cobblemon: compiled against, and loaded in dev runs (see below).
     // Version comes from gradle.properties (cobblemon_version); see common/build.gradle.
     modCompileOnly("com.cobblemon:neoforge:${rootProject.cobblemon_version}+${rootProject.minecraft_version}") { transitive = false }
+    // Dev runs only (runClient/runServer): never part of the published jar or its dependencies.
+    modLocalRuntime("com.cobblemon:neoforge:${rootProject.cobblemon_version}+${rootProject.minecraft_version}")
+    // Cobblemon is written in Kotlin; on NeoForge the Kotlin runtime comes from Kotlin for Forge.
+    // The Modrinth jar (what players install) bundles Kotlin so NeoForge loads it for mods; the
+    // Maven artifact pulls Kotlin in as plain jars, which Cobblemon can't see. localRuntime, not
+    // modLocalRuntime: Loom's mod remapping drops the bundled jars, and it needs no remapping.
+    localRuntime("maven.modrinth:kotlin-for-forge:5.12.0") { transitive = false }
+    // spark profiler, for dev runs only (/spark profiler, /spark tps). See CONTRIBUTING. Already
+    // uses NeoForge's names, so it needs no remapping.
+    localRuntime("maven.modrinth:spark:1.10.124-neoforge-1.21.1") { transitive = false }
 }
 
 processResources {

@@ -2,6 +2,7 @@ plugins {
     id 'dev.architectury.loom' version '1.11-SNAPSHOT' apply false
     id 'architectury-plugin' version '3.4-SNAPSHOT'
     id 'com.gradleup.shadow' version '8.3.6' apply false
+    id 'org.jetbrains.kotlin.jvm' version '2.3.0' apply false
 }
 
 architectury {
@@ -22,7 +23,10 @@ allprojects {
         // fails while looking up an unrelated library there.
         exclusiveContent {
             forRepository { maven { name = "ImpactDev"; url = "https://maven.impactdev.net/repository/development/" } }
-            filter { includeGroup "com.cobblemon" }
+            filter {
+                includeGroup "com.cobblemon"
+                includeGroup "com.bedrockk" // Cobblemon's MoLang library
+            }
         }
         exclusiveContent {
             forRepository { maven { name = "Modrinth"; url = "https://api.modrinth.com/maven" } }
@@ -41,6 +45,11 @@ allprojects {
 
 subprojects {
     apply plugin: 'dev.architectury.loom'
+    // There's no Kotlin code in Palworks: Loom only remaps the Kotlin metadata inside mod jars when
+    // this plugin is applied. Without it, Cobblemon's metadata keeps production names (class_2960)
+    // and Cobblemon crashes in dev runs as soon as it uses Kotlin reflection. Applied to every
+    // subproject because they share one cache of remapped mod jars.
+    apply plugin: 'org.jetbrains.kotlin.jvm'
     apply plugin: 'architectury-plugin'
     apply plugin: 'maven-publish'
 

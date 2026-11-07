@@ -3,12 +3,13 @@ package dev.palworks.tree;
 import dev.palworks.Palworks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -20,6 +21,7 @@ import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Detects valid trees using BFS traversal.
@@ -48,23 +50,9 @@ public class TreeDetector {
     // catch one whose canopy (up to ~4 blocks from its stem) reaches into the wart-break column.
     private static final int NEIGHBOR_STEM_SEARCH_RADIUS = WART_BREAK_RADIUS + 4;
 
-    // Ground blocks that a tree base can touch
-    private static final Set<Block> VALID_GROUND_BLOCKS = Set.of(
-        Blocks.GRASS_BLOCK,
-        Blocks.DIRT,
-        Blocks.COARSE_DIRT,
-        Blocks.ROOTED_DIRT,
-        Blocks.PODZOL,
-        Blocks.MYCELIUM,
-        Blocks.MUD,
-        Blocks.MUDDY_MANGROVE_ROOTS,
-        Blocks.MOSS_BLOCK,
-        // Nether ground for nether trees
-        Blocks.NETHERRACK,
-        Blocks.WARPED_NYLIUM,
-        Blocks.CRIMSON_NYLIUM,
-        Blocks.SOUL_SOIL
-    );
+    // Block -> its tree's sapling, found by name (see SaplingNames; empty if none was found).
+    // Registries don't change after loading, so this never goes stale.
+    private static final Map<Block, Optional<Item>> SAPLING_CACHE = new ConcurrentHashMap<>();
 
     // Directions for BFS traversal (6 cardinal directions)
     private static final Direction[] DIRECTIONS = Direction.values();
@@ -82,22 +70,24 @@ public class TreeDetector {
         private final Set<BlockPos> logPositions;
         private final int leafCount;
         private final BlockPos basePosition;
+        private final Set<Block> leafBlocks;
 
         private TreeValidationResult(boolean valid, String reason, Set<BlockPos> logPositions,
-                                      int leafCount, BlockPos basePosition) {
+                                      int leafCount, BlockPos basePosition, Set<Block> leafBlocks) {
             this.valid = valid;
             this.reason = reason;
             this.logPositions = logPositions != null ? logPositions : Collections.emptySet();
             this.leafCount = leafCount;
             this.basePosition = basePosition;
+            this.leafBlocks = leafBlocks != null ? leafBlocks : Collections.emptySet();
         }
 
         public static TreeValidationResult invalid(String reason) {
-            return new TreeValidationResult(false, reason, null, 0, null);
+            return new TreeValidationResult(false, reason, null, 0, null, null);
         }
 
-        public static TreeValidationResult valid(Set<BlockPos> logs, int leafCount, BlockPos base) {
-            return new TreeValidationResult(true, "Valid tree", logs, leafCount, base);
+        public static TreeValidationResult valid(Set<BlockPos> logs, int leafCount, BlockPos base, Set<Block> leafBlocks) {
+            return new TreeValidationResult(true, "Valid tree", logs, leafCount, base, leafBlocks);
         }
 
         public boolean isValid() { return valid; }
@@ -105,6 +95,8 @@ public class TreeDetector {
         public Set<BlockPos> getLogPositions() { return logPositions; }
         public int getLeafCount() { return leafCount; }
         public BlockPos getBasePosition() { return basePosition; }
+        /** The kinds of leaf (canopy) block the tree has, for finding its sapling by name. */
+        public Set<Block> getLeafBlocks() { return leafBlocks; }
     }
 
     /**
@@ -127,8 +119,12 @@ public class TreeDetector {
         Set<BlockPos> visitedForValidation = new HashSet<>();
         Queue<BlockPos> queue = new LinkedList<>();
         Set<BlockPos> leaves = new HashSet<>();
+        Set<Block> leafBlocks = new HashSet<>();
         BlockPos lowestLog = startPos;
         boolean foundGroundConnection = false;
+        // Anything this tree's sapling can grow on counts as ground (modded soils), as well as the
+        // usual ground tags. Null if no sapling was found; then only the tags count.
+        @Nullable Item sapling = saplingFor(startState.getBlock());
 
         queue.add(startPos);
         visitedLogs.add(startPos);
@@ -174,8 +170,9 @@ public class TreeDetector {
                     // leaves isn't a tree.
                     if (isNaturalCanopy(neighborState)) {
                         leaves.add(neighbor);
+                        leafBlocks.add(neighborState.getBlock());
                     }
-                } else if (isValidGroundBlock(neighborState)) {
+                } else if (isValidGroundBlock(neighborState) || isSoilFor(sapling, level, neighbor)) {
                     // Ground block - valid connection point
                     foundGroundConnection = true;
                 } else if (neighborState.isAir()) {
@@ -206,8 +203,13 @@ public class TreeDetector {
                 for (int dy = -LEAF_SEARCH_RADIUS; dy <= LEAF_SEARCH_RADIUS; dy++) {
                     for (int dz = -LEAF_SEARCH_RADIUS; dz <= LEAF_SEARCH_RADIUS; dz++) {
                         BlockPos checkPos = logPos.offset(dx, dy, dz);
-                        if (!leaves.contains(checkPos) && isNaturalCanopy(level.getBlockState(checkPos))) {
+                        if (leaves.contains(checkPos)) {
+                            continue;
+                        }
+                        BlockState checkState = level.getBlockState(checkPos);
+                        if (isNaturalCanopy(checkState)) {
                             leaves.add(checkPos);
+                            leafBlocks.add(checkState.getBlock());
                         }
                     }
                 }
@@ -219,7 +221,7 @@ public class TreeDetector {
         // Check 1: Tree must be touching ground
         // Also check the block directly below the lowest log
         BlockPos belowLowest = lowestLog.below();
-        if (isValidGroundBlock(level.getBlockState(belowLowest))) {
+        if (isValidGroundBlock(level.getBlockState(belowLowest)) || isSoilFor(sapling, level, belowLowest)) {
             foundGroundConnection = true;
         }
 
@@ -245,7 +247,7 @@ public class TreeDetector {
                 startPos, visitedLogs.size(), leaves.size(), lowestLog);
         }
 
-        return TreeValidationResult.valid(visitedLogs, leaves.size(), lowestLog);
+        return TreeValidationResult.valid(visitedLogs, leaves.size(), lowestLog, leafBlocks);
     }
 
     /**
@@ -461,7 +463,38 @@ public class TreeDetector {
      * Check if a block state is valid ground for a tree base.
      */
     public static boolean isValidGroundBlock(BlockState state) {
-        return VALID_GROUND_BLOCKS.contains(state.getBlock());
+        // #minecraft:dirt is what vanilla saplings grow on (grass, dirt, podzol, mycelium, moss, mud,
+        // muddy mangrove roots...), and tree mods add their own soils to it so vanilla saplings work
+        // there too. Plus the nether: nylium, netherrack and soul soil.
+        return state.is(BlockTags.DIRT)
+            || state.is(BlockTags.NYLIUM)
+            || state.is(Blocks.NETHERRACK)
+            || state.is(Blocks.SOUL_SOIL);
+    }
+
+    /**
+     * Whether a tree block stands on ground, making it a possible base for the tree (job discovery
+     * looks for these). Ground is {@link #isValidGroundBlock} or anything the tree's sapling can
+     * grow on, which covers modded soils that aren't tagged.
+     */
+    public static boolean standsOnGround(Level level, BlockPos pos, BlockState state) {
+        BlockPos below = pos.below();
+        BlockState belowState = level.getBlockState(below);
+        if (isValidGroundBlock(belowState)) {
+            return true;
+        }
+        // Cheap reject first: most tree blocks stand on another log, or on air or leaves (branches)
+        if (belowState.isAir() || isTreeBlock(belowState) || isLeaf(belowState)) {
+            return false;
+        }
+        return isSoilFor(saplingFor(state.getBlock()), level, below);
+    }
+
+    /** Whether a sapling (item) could grow on the block at {@code soilPos}. False if it's null. */
+    private static boolean isSoilFor(@Nullable Item sapling, Level level, BlockPos soilPos) {
+        Block saplingBlock = getSaplingBlock(sapling);
+        // Saplings check the block below them, so ask as if it were planted on top of the soil
+        return saplingBlock != null && saplingBlock.defaultBlockState().canSurvive(level, soilPos.above());
     }
 
     /**
@@ -474,114 +507,121 @@ public class TreeDetector {
     }
 
     /**
-     * Get the sapling item that corresponds to a log block.
-     * Returns null if the log type is not recognized.
+     * The sapling for a tree, found by name from its blocks: first its logs (or roots), then its
+     * leaves. E.g. "minecraft:dark_oak_log" -> "minecraft:dark_oak_sapling", "minecraft:mangrove_roots"
+     * -> "minecraft:mangrove_propagule", "minecraft:crimson_stem" -> "minecraft:crimson_fungus", and
+     * the same for a mod's "somemod:redwood_log" -> "somemod:redwood_sapling". Null if none is found:
+     * the tree is still chopped, just not replanted.
      */
     @Nullable
-    public static Item getSaplingForLog(BlockState logState) {
-        Block block = logState.getBlock();
-
-        // Overworld trees
-        if (block == Blocks.OAK_LOG || block == Blocks.STRIPPED_OAK_LOG) {
-            return Items.OAK_SAPLING;
+    public static Item getSaplingForTree(Level level, TreeValidationResult tree) {
+        Set<Block> tried = new HashSet<>();
+        for (BlockPos pos : tree.getLogPositions()) {
+            Block block = level.getBlockState(pos).getBlock();
+            if (tried.add(block)) {
+                Item sapling = saplingFor(block);
+                if (sapling != null) {
+                    return sapling;
+                }
+            }
         }
-        if (block == Blocks.BIRCH_LOG || block == Blocks.STRIPPED_BIRCH_LOG) {
-            return Items.BIRCH_SAPLING;
+        for (Block leaf : tree.getLeafBlocks()) {
+            Item sapling = saplingFor(leaf);
+            if (sapling != null) {
+                return sapling;
+            }
         }
-        if (block == Blocks.SPRUCE_LOG || block == Blocks.STRIPPED_SPRUCE_LOG) {
-            return Items.SPRUCE_SAPLING;
-        }
-        if (block == Blocks.JUNGLE_LOG || block == Blocks.STRIPPED_JUNGLE_LOG) {
-            return Items.JUNGLE_SAPLING;
-        }
-        if (block == Blocks.ACACIA_LOG || block == Blocks.STRIPPED_ACACIA_LOG) {
-            return Items.ACACIA_SAPLING;
-        }
-        if (block == Blocks.DARK_OAK_LOG || block == Blocks.STRIPPED_DARK_OAK_LOG) {
-            return Items.DARK_OAK_SAPLING;
-        }
-        if (block == Blocks.CHERRY_LOG || block == Blocks.STRIPPED_CHERRY_LOG) {
-            return Items.CHERRY_SAPLING;
-        }
-        if (block == Blocks.MANGROVE_LOG || block == Blocks.STRIPPED_MANGROVE_LOG) {
-            return Items.MANGROVE_PROPAGULE;
-        }
-
-        // Nether "trees" (fungi)
-        if (block == Blocks.CRIMSON_STEM || block == Blocks.STRIPPED_CRIMSON_STEM) {
-            return Items.CRIMSON_FUNGUS;
-        }
-        if (block == Blocks.WARPED_STEM || block == Blocks.STRIPPED_WARPED_STEM) {
-            return Items.WARPED_FUNGUS;
-        }
-
         return null;
     }
 
-    /**
-     * Get the sapling item for a tree at a given position.
-     * Returns null if not a valid tree or log type not recognized.
-     */
+    /** The sapling for a log, root or leaf block, found by name (cached); null if none. */
     @Nullable
-    public static Item getSaplingForTree(Level level, BlockPos logPos) {
-        BlockState state = level.getBlockState(logPos);
-        if (isMangroveRoots(state)) {
-            return Items.MANGROVE_PROPAGULE;
+    public static Item saplingFor(Block block) {
+        return SAPLING_CACHE.computeIfAbsent(block, TreeDetector::findSaplingByName).orElse(null);
+    }
+
+    private static Optional<Item> findSaplingByName(Block block) {
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        for (String path : SaplingNames.saplingCandidates(id.getPath())) {
+            ResourceLocation candidate = ResourceLocation.tryBuild(id.getNamespace(), path);
+            if (candidate == null) {
+                continue;
+            }
+            Optional<Item> item = BuiltInRegistries.ITEM.getOptional(candidate);
+            if (item.isPresent() && item.get() instanceof BlockItem) {
+                return item;
+            }
         }
-        if (!isLog(state)) {
-            return null;
-        }
-        return getSaplingForLog(state);
+        return Optional.empty();
     }
 
     /**
-     * Get the block that should be placed for a sapling item.
+     * The block a sapling item places (saplings are block items), or null if it isn't one.
      */
     @Nullable
-    public static Block getSaplingBlock(Item saplingItem) {
-        if (saplingItem == Items.OAK_SAPLING) return Blocks.OAK_SAPLING;
-        if (saplingItem == Items.BIRCH_SAPLING) return Blocks.BIRCH_SAPLING;
-        if (saplingItem == Items.SPRUCE_SAPLING) return Blocks.SPRUCE_SAPLING;
-        if (saplingItem == Items.JUNGLE_SAPLING) return Blocks.JUNGLE_SAPLING;
-        if (saplingItem == Items.ACACIA_SAPLING) return Blocks.ACACIA_SAPLING;
-        if (saplingItem == Items.DARK_OAK_SAPLING) return Blocks.DARK_OAK_SAPLING;
-        if (saplingItem == Items.CHERRY_SAPLING) return Blocks.CHERRY_SAPLING;
-        if (saplingItem == Items.MANGROVE_PROPAGULE) return Blocks.MANGROVE_PROPAGULE;
-        if (saplingItem == Items.CRIMSON_FUNGUS) return Blocks.CRIMSON_FUNGUS;
-        if (saplingItem == Items.WARPED_FUNGUS) return Blocks.WARPED_FUNGUS;
-        return null;
+    public static Block getSaplingBlock(@Nullable Item saplingItem) {
+        return saplingItem instanceof BlockItem blockItem ? blockItem.getBlock() : null;
     }
 
     /**
-     * Check if a sapling can be planted at this position.
-     * Saplings need air (or, for a mangrove propagule, still water) and valid ground below.
+     * Where to replant a chopped tree, worked out before it's chopped. A tree whose trunk stands on
+     * a 2x2 of logs (dark oak, which only grows from a 2x2 of saplings, and giant spruce and jungle)
+     * is replanted as a 2x2 in the same four spots; any other tree gets one sapling at its base.
+     * Based on the trunk's shape rather than a list of tree types, so it covers any 2x2 tree.
+     * Mangroves stand on roots, not logs, so they always get one propagule.
+     *
+     * @param treeBlocks the tree's blocks (from {@link TreeValidationResult#getLogPositions()})
+     * @param basePos the tree's lowest block (from {@link TreeValidationResult#getBasePosition()})
+     */
+    public static List<BlockPos> saplingPositions(Level level, Set<BlockPos> treeBlocks, BlockPos basePos) {
+        int bottomY = Integer.MAX_VALUE;
+        for (BlockPos pos : treeBlocks) {
+            bottomY = Math.min(bottomY, pos.getY());
+        }
+        List<BlockPos> bottom = new ArrayList<>();
+        for (BlockPos pos : treeBlocks) {
+            if (pos.getY() == bottomY) {
+                bottom.add(pos);
+            }
+        }
+        if (bottom.size() == 4 && isTwoByTwo(bottom)
+                && bottom.stream().allMatch(pos -> isLog(level.getBlockState(pos)))) {
+            return bottom;
+        }
+        return List.of(basePos);
+    }
+
+    /** Whether four positions (on one Y level) form a 2x2 square. */
+    private static boolean isTwoByTwo(List<BlockPos> positions) {
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPos pos : positions) {
+            minX = Math.min(minX, pos.getX());
+            maxX = Math.max(maxX, pos.getX());
+            minZ = Math.min(minZ, pos.getZ());
+            maxZ = Math.max(maxZ, pos.getZ());
+        }
+        // Four distinct positions within a 2x2 box fill it
+        return maxX - minX == 1 && maxZ - minZ == 1 && new HashSet<>(positions).size() == 4;
+    }
+
+    /**
+     * Check if a sapling can be planted at this position: the spot is air (or a water source, for a
+     * sapling that can be waterlogged, like a mangrove propagule), and the sapling itself says it
+     * can grow there. Asking the sapling covers every soil rule, vanilla or modded: grass and dirt
+     * for most saplings, mud and clay for propagules, nylium for fungi.
      */
     public static boolean canPlantSaplingAt(Level level, BlockPos pos, Item saplingItem) {
-        // Position must be air. A mangrove's base is often in water once its roots are chopped, and
-        // propagules can be planted underwater (waterlogged), so they also accept a water source.
+        Block saplingBlock = getSaplingBlock(saplingItem);
+        if (saplingBlock == null) {
+            return false;
+        }
+        BlockState saplingState = saplingBlock.defaultBlockState();
         BlockState here = level.getBlockState(pos);
-        boolean underwater = saplingItem == Items.MANGROVE_PROPAGULE && isWaterSource(here);
+        boolean underwater = isWaterSource(here) && saplingState.hasProperty(BlockStateProperties.WATERLOGGED);
         if (!here.isAir() && !underwater) {
             return false;
         }
-
-        // Ground below must be valid for saplings
-        BlockState groundState = level.getBlockState(pos.below());
-        Block ground = groundState.getBlock();
-
-        // Most saplings can be planted on grass, dirt, etc.
-        return ground == Blocks.GRASS_BLOCK ||
-               ground == Blocks.DIRT ||
-               ground == Blocks.COARSE_DIRT ||
-               ground == Blocks.ROOTED_DIRT ||
-               ground == Blocks.PODZOL ||
-               ground == Blocks.MYCELIUM ||
-               ground == Blocks.MOSS_BLOCK ||
-               ground == Blocks.MUD ||
-               ground == Blocks.MUDDY_MANGROVE_ROOTS ||
-               // Nether fungi need nylium
-               ground == Blocks.CRIMSON_NYLIUM ||
-               ground == Blocks.WARPED_NYLIUM;
+        return saplingState.canSurvive(level, pos);
     }
 
     /**
