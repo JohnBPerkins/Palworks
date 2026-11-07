@@ -64,3 +64,30 @@ Cobblemon is a **compile-only** dependency: the code compiles against its API, b
 
 PRs need a maintainer's approval and a passing CI build, and are squash-merged into `main`.
 Thanks for contributing!
+
+## Releasing
+
+_Maintainers only._ Releases are made entirely by the **Release** workflow; there's no version
+to edit by hand. The git tag is the version: `gradle.properties` only holds `0.0.0-dev` for
+development builds.
+
+1. Go to **Actions → Release → Run workflow** (on `main`).
+2. Pick the **bump** (`patch`, `minor` or `major`) and the **channel** (`alpha`, `beta` or
+   `release`). The first release is always `0.1.0`.
+3. Leave **Dry run** ticked the first time to preview the version and release notes in the run
+   summary, then run it again with it unticked to release.
+
+The workflow builds and tests both loaders, creates the `vX.Y.Z` tag and a GitHub Release with
+both jars and notes generated from merged PRs, then uploads to Modrinth and CurseForge.
+
+### Publishing setup
+
+Modrinth and CurseForge are skipped until they're configured. In **Settings → Environments →
+release**:
+
+| Site | Variable (project ID) | Secret (API token) |
+|---|---|---|
+| Modrinth | `MODRINTH_PROJECT_ID` | `MODRINTH_TOKEN`: a personal access token with only the *Create versions* scope |
+| CurseForge | `CURSEFORGE_PROJECT_ID` | `CURSEFORGE_TOKEN`: an API token from CurseForge's account settings |
+
+Setting a project ID without its token fails the release instead of silently skipping that site.
