@@ -809,9 +809,10 @@ public class JobManager {
                 continue;
             }
 
-            // Planting: a just-harvested tile is replanted for free; new farmland needs a seed the
-            // worker carries that can be planted there (wart on soul sand, the rest on farmland)
-            if (job.type == JobType.PLANT_SEEDS && !pendingReplantSeeds.containsKey(job.position)
+            // Planting needs a seed the worker carries that can be planted there (wart on soul
+            // sand, the rest on farmland). Harvested tiles don't come through here: they're reset in
+            // place by the harvest.
+            if (job.type == JobType.PLANT_SEEDS
                     && !(carriesSeeds && carriesSeedFor(inventory, job.position))) {
                 continue;
             }
