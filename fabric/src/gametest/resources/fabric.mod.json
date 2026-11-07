@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "palworks-gametest",
+  "version": "1.0.0",
+  "name": "Palworks GameTests",
+  "description": "In-game tests for Palworks. Dev runs only (./gradlew :fabric:runGameTest); never published.",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "dev.palworks.gametest.TreeGameTests",
+      "dev.palworks.gametest.CropGameTests",
+      "dev.palworks.gametest.JobGameTests",
+      "dev.palworks.gametest.WorkerGameTests"
+    ]
+  },
+  "depends": {
+    "palworks": "*",
+    "fabric-gametest-api-v1": "*"
+  }
+}

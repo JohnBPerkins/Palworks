@@ -11,9 +11,11 @@ Clone and build as described in the [README](../README.md#building-from-source) 
 Gradle wrapper provides the right Gradle version). The commands you'll use day to day:
 
 ```bash
-./gradlew build          # builds both loaders -> fabric/build/libs/, neoforge/build/libs/
-./gradlew :common:test   # runs the pure-logic unit tests
-./gradlew clean          # if you hit Minecraft mapping errors
+./gradlew build                # builds both loaders -> fabric/build/libs/, neoforge/build/libs/,
+                               # and runs both kinds of tests
+./gradlew :common:test         # runs the unit tests (seconds)
+./gradlew :fabric:runGameTest  # runs the in-game tests on a headless server (about 30 seconds)
+./gradlew clean                # if you hit Minecraft mapping errors
 ```
 
 ## Project layout
@@ -57,11 +59,41 @@ costs per tick:
 Cobblemon and spark are only added to these dev runs: they never end up in the published jars or
 their dependencies.
 
-- Pure logic (enums, mappings, suitability, IDs) is unit-tested under `common/src/test/java` and
-  must pass `./gradlew :common:test`. New logic that doesn't need a running game belongs here.
-- Behavior that touches Cobblemon or live world state needs an in-game check: use the dev runs
-  above, or a normal Minecraft instance with the built jar from `fabric/build/libs` or
-  `neoforge/build/libs`.
+## Automated tests
+
+There are two kinds, and CI runs both on every PR:
+
+| Kind | Where | Run with | For |
+|---|---|---|---|
+| Unit tests | `common/src/test/java` | `./gradlew :common:test` | Logic that doesn't need a world: rules (steps, carry modes, sapling names), saved state, items |
+| In-game tests (GameTests) | `fabric/src/gametest/java` | `./gradlew :fabric:runGameTest` | Anything that needs a real world: blocks, block tags, loot, entities, and real Cobblemon Pokémon doing jobs |
+
+**Unit tests** can use items, blocks and block states after `Bootstrap.bootStrap()` (see
+`WorkerStateTest`), but not block tags or a world: tags only exist once a world loads its data.
+Pull logic into a small class with no world dependency when you can, as `StepRunner`,
+`CarryMode` and `SaplingNames` do, so it can be tested here.
+
+**In-game tests** boot a headless Fabric server with Palworks, Cobblemon and the tests (a separate
+`palworks-gametest` mod, never published), run every test, and fail the build if any fail. Each
+test builds its own small scene in an 8x8x8 area and checks the result:
+
+- `TreeGameTests`, `CropGameTests`, `JobGameTests`: Palworks' world logic against real blocks
+  (what counts as a tree, what a harvest drops, whether a job is still there...). `Scenes` has
+  helpers for floors, trees and counting dropped items.
+- `WorkerGameTests`: real Pokémon (`Workers.sendOut`) finding and doing jobs end to end. Give each
+  worker test its own `batch`: workers look for jobs 32 blocks around them and would wander into
+  neighbouring tests' scenes otherwise; batches run one after another.
+
+The test server ticks as fast as it can, so a 600-tick timeout passes in a second or two. Avoid
+anything timed in real (wall-clock) milliseconds in code you want to test this way.
+
+Add a GameTest class to `entrypoints."fabric-gametest"` in `fabric/src/gametest/resources/fabric.mod.json`.
+A GameTest that never fails isn't testing anything: when adding one, briefly break the behavior
+it covers and check that it fails.
+
+Behavior that's hard to automate (how something looks, a full play session) still needs an
+in-game check: use the dev runs above, or a normal Minecraft instance with the built jar from
+`fabric/build/libs` or `neoforge/build/libs`.
 
 ## Conventions
 
@@ -80,7 +112,8 @@ their dependencies.
 1. **Open an issue first** for anything non-trivial so the approach can be discussed before you
    invest a lot of time.
 2. Branch from `main` and keep your branch focused on a single change.
-3. Make sure `./gradlew build` and `./gradlew :common:test` pass before pushing.
+3. Make sure `./gradlew build`, `./gradlew :common:test` and `./gradlew :fabric:runGameTest` pass
+   before pushing.
 4. Open a PR against `main` with a title in the format below, and fill out the template,
    including how you tested (unit tests and/or what you verified in-game) and any related issue.
 

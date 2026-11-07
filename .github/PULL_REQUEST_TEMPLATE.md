@@ -17,10 +17,11 @@
 
 - [ ] `./gradlew build` passes
 - [ ] `./gradlew :common:test` passes
+- [ ] `./gradlew :fabric:runGameTest` passes (in-game tests)
 - [ ] Verified in-game (note loader + which behavior you checked; `./gradlew :fabric:runClient` or `:neoforge:runClient` starts a game with Cobblemon)
 
 ## Checklist
 
 - [ ] Changes are focused and don't reformat/refactor unrelated code
-- [ ] New pure logic has unit tests under `common/src/test/java` where practical
+- [ ] New logic has tests: unit tests under `common/src/test/java`, or in-game tests under `fabric/src/gametest/java` for anything that needs a world
 - [ ] Follows the existing code style and `palworks:*` naming conventions

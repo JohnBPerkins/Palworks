@@ -3,7 +3,11 @@
 Writes a table of totals and the details of every failed test to the job summary, and adds an
 error annotation per failure so it shows up on the PR's "Files changed" tab and the run page.
 
-Usage: python3 test_summary.py <results dir glob>...   (e.g. '*/build/test-results/test')
+Usage: python3 test_summary.py [--title TITLE] <results dir glob>...
+  e.g. test_summary.py '*/build/test-results/test'
+       test_summary.py --title "In-game tests" 'fabric/build/test-results/gametest'
+Counts the <testcase> elements themselves rather than trusting suite totals, so it reads both
+Gradle's reports and Fabric's GameTest report (which nests suites and omits their totals).
 Exits 0 even when tests failed: the Gradle step already fails the job; this only reports.
 """
 
@@ -21,6 +25,9 @@ def escape_annotation(text: str) -> str:
 
 def source_path(classname: str) -> str | None:
     # dev.palworks.job.JobTypeTest -> <module>/src/test/java/dev/palworks/job/JobTypeTest.java
+    # (GameTest cases have no Java class name, so they get no file annotation)
+    if ":" in classname:
+        return None
     relative = os.path.join(*classname.split("$")[0].split(".")) + ".java"
     for candidate in glob.glob(os.path.join("*", "src", "test", "java", relative)):
         return candidate
@@ -28,18 +35,27 @@ def source_path(classname: str) -> str | None:
 
 
 def main() -> None:
-    files = sorted({f for pattern in sys.argv[1:] for f in glob.glob(os.path.join(pattern, "*.xml"))})
+    args = sys.argv[1:]
+    title = "Unit tests"
+    if len(args) >= 2 and args[0] == "--title":
+        title, args = args[1], args[2:]
+    files = sorted({f for pattern in args for f in glob.glob(os.path.join(pattern, "*.xml"))})
     totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
     failed = []
 
     for path in files:
-        suite = ET.parse(path).getroot()
-        for key in totals:
-            totals[key] += int(suite.get(key, 0))
-        for case in suite.iter("testcase"):
+        root = ET.parse(path).getroot()
+        for case in root.iter("testcase"):
+            totals["tests"] += 1
+            if case.find("skipped") is not None:
+                totals["skipped"] += 1
             problem = case.find("failure")
-            if problem is None:
+            if problem is not None:
+                totals["failures"] += 1
+            else:
                 problem = case.find("error")
+                if problem is not None:
+                    totals["errors"] += 1
             if problem is not None:
                 failed.append((case.get("classname", "?"), case.get("name", "?"), problem))
 
@@ -52,7 +68,7 @@ def main() -> None:
         status = f"❌ {broken} failed"
     else:
         status = "✅ all passed"
-    lines = [f"## Unit tests: {status}", ""]
+    lines = [f"## {title}: {status}", ""]
     if not files:
         lines.append("_No test results found. Did the tests run?_")
     else:
