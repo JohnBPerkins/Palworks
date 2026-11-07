@@ -36,6 +36,9 @@ public class WorkerState {
     private int jobStep;
     private int stepTicks;
     private CompoundTag jobData;
+    // Whether it has started walking to its current job (not saved). A walk that ends short of the
+    // stand tile but within reach of a crop or tree still lets it work; before any walk it mustn't.
+    private boolean walkedToJob;
 
     // Work inventory - separate from Cobblemon's held item, used for job items
     // Single slot that can hold a full stack (up to 64 items)
@@ -175,6 +178,15 @@ public class WorkerState {
         this.jobStep = Math.max(0, step);
         this.stepTicks = 0;
         this.jobData = data != null ? data.copy() : new CompoundTag();
+        this.walkedToJob = false;
+    }
+
+    public boolean hasWalkedToJob() {
+        return walkedToJob;
+    }
+
+    public void setWalkedToJob(boolean walkedToJob) {
+        this.walkedToJob = walkedToJob;
     }
 
     public void resetJobProgress() {

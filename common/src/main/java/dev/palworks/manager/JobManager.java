@@ -70,6 +70,7 @@ public class JobManager {
     private static final int WORKER_STALE_TICKS = 5;             // Unregister a worker this long after it stops ticking
                                                                  // (a little slack so a skipped tick isn't a despawn)
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2;   // Ticks to wait for items to spawn
+    private static final int FOLLOW_UP_RECHECK_INTERVAL = 20;    // Ticks between checks that follow-up jobs still exist
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
     private static final boolean MINING_JOBS_ENABLED = false;     // Flip on once MINE_RESOURCE breaks ores
 
@@ -80,8 +81,11 @@ public class JobManager {
 
     // Core registries
     private final Map<UUID, WorkerInfo> activeWorkers;           // All active workers
-    private final Map<BlockPos, JobRecord> availableJobs;        // Discovered jobs
-    private final Map<BlockPos, JobRecord> reservedJobs;         // Currently assigned
+    // Keyed by position AND job type: several jobs can share a block, e.g. chopping a tree and
+    // picking up its drops both happen at its base. Keyed by position alone, one overwrote the
+    // other (a fainted lumberjack's half-done chop, still needing its replant, was lost that way).
+    private final Map<JobKey, JobRecord> availableJobs;          // Discovered jobs
+    private final Map<JobKey, JobRecord> reservedJobs;           // Currently assigned
 
     // Chunk-based job cache (performance optimization)
     private final Map<ChunkPos, ChunkJobCache> chunkCaches;
@@ -244,7 +248,7 @@ public class JobManager {
         if (!state.isEnabled()) {
             WorkerInfo removed = activeWorkers.remove(uuid);
             if (removed != null && removed.currentReservation != null) {
-                releaseJobReservation(removed.currentReservation.getStationPos());
+                releaseJobReservation(JobKey.of(removed.currentReservation));
             }
             return;
         }
@@ -264,7 +268,7 @@ public class JobManager {
         // available pool so it can be reassigned. Without this, abandoned jobs leak.
         ReservationId stateReservation = state.getCurrentReservation();
         if (info.currentReservation != null && stateReservation == null) {
-            releaseJobReservation(info.currentReservation.getStationPos());
+            releaseJobReservation(JobKey.of(info.currentReservation));
             if (DEBUG) {
                 Palworks.LOGGER.debug("{} dropped its reservation; released job at {} back to the pool",
                     pokemon.getSpecies().getName(), info.currentReservation.getStationPos());
@@ -303,11 +307,11 @@ public class JobManager {
                 Pokemon pokemon = entity != null ? entity.getPokemon() : null;
                 WorkerState state = pokemon != null ? WorkerStateManager.get(pokemon) : null;
                 if (state != null) {
-                    captureProgress(state, removed.currentReservation.getStationPos());
+                    captureProgress(state, JobKey.of(removed.currentReservation));
                     state.clearReservation();
                     WorkerStateManager.save(pokemon, state);
                 }
-                releaseJobReservation(removed.currentReservation.getStationPos());
+                releaseJobReservation(JobKey.of(removed.currentReservation));
 
                 if (DEBUG) {
                     Palworks.LOGGER.debug("Unregistered worker {} and released job at {}",
@@ -454,12 +458,12 @@ public class JobManager {
 
                     // Check for job opportunities at this position
                     JobRecord job = scanPositionForJob(level, pos, state);
-                    if (job != null && !isJobReserved(job.position)) {
+                    if (job != null && !reservedJobs.containsKey(JobKey.of(job))) {
                         if (DEBUG) {
                             Palworks.LOGGER.info("Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
                                 job.type, job.position, new BlockPos(worldX, y, worldZ), job.position);
                         }
-                        availableJobs.put(job.position, job);
+                        availableJobs.put(JobKey.of(job), job);
                         cache.cachedJobs.computeIfAbsent(job.type, k -> new ArrayList<>())
                             .add(job.position);
                     }
@@ -480,12 +484,11 @@ public class JobManager {
 
     /** Remove the available jobs an earlier scan found that a newer scan of the same chunk didn't. */
     private void removeJobsNotFoundAgain(ChunkJobCache previous, ChunkJobCache current) {
-        Set<BlockPos> stillThere = new HashSet<>();
-        current.cachedJobs.values().forEach(stillThere::addAll);
-        previous.cachedJobs.values().forEach(positions -> {
+        previous.cachedJobs.forEach((type, positions) -> {
+            List<BlockPos> stillThere = current.cachedJobs.getOrDefault(type, List.of());
             for (BlockPos pos : positions) {
                 if (!stillThere.contains(pos)) {
-                    removeScannedJob(pos);
+                    removeScannedJob(new JobKey(pos, type));
                 }
             }
         });
@@ -493,7 +496,8 @@ public class JobManager {
 
     /** Remove all of a chunk cache's available jobs (when the cache itself is dropped). */
     private void removeJobsOf(ChunkJobCache cache) {
-        cache.cachedJobs.values().forEach(positions -> positions.forEach(this::removeScannedJob));
+        cache.cachedJobs.forEach((type, positions) ->
+            positions.forEach(pos -> removeScannedJob(new JobKey(pos, type))));
     }
 
     /**
@@ -501,10 +505,10 @@ public class JobManager {
      * and follow-up jobs (e.g. picking up drops after a harvest) don't come from the scan, so a
      * rescan not finding them says nothing about them.
      */
-    private void removeScannedJob(BlockPos pos) {
-        JobRecord job = availableJobs.get(pos);
+    private void removeScannedJob(JobKey key) {
+        JobRecord job = availableJobs.get(key);
         if (job != null && !job.isConsecutiveJob && !job.isHandedOver()) {
-            availableJobs.remove(pos);
+            availableJobs.remove(key);
         }
     }
 
@@ -948,9 +952,9 @@ public class JobManager {
                 return null;
             }
             if (reach == Reach.YES) {
-                // Take it out of the pool first so no other worker gets it too. Only if the pool
-                // holds this job: a delivery shares its chest's position with a GET_SEEDS job.
-                availableJobs.remove(job.position, job);
+                // Take it out of the pool first so no other worker gets it too (a delivery isn't
+                // in the pool, so this does nothing for one)
+                availableJobs.remove(JobKey.of(job), job);
                 assignJobToWorker(level, worker, job);
                 return job;
             }
@@ -1033,7 +1037,7 @@ public class JobManager {
                 Palworks.LOGGER.warn("Failed to assign {} job at {} - Pokemon entity not found for UUID {}",
                     job.type, job.position, worker.pokemonUUID);
             }
-            availableJobs.put(job.position, job);
+            availableJobs.put(JobKey.of(job), job);
             return;
         }
 
@@ -1053,7 +1057,7 @@ public class JobManager {
         worker.idle = false;
         worker.lastAssignmentTime = System.currentTimeMillis();
         job.reservedByWorker = worker.pokemonUUID;
-        reservedJobs.put(job.position, job);
+        reservedJobs.put(JobKey.of(job), job);
 
         if (DEBUG) {
             String dist = String.format("%.1f", Math.sqrt(worker.position.distSqr(job.position)));
@@ -1161,8 +1165,9 @@ public class JobManager {
         }
 
         // IMPORTANT: Remove completed job entirely (don't put back in available pool!)
-        reservedJobs.remove(jobPos);
-        availableJobs.remove(jobPos);  // Also remove from available in case it's there
+        JobKey completedKey = JobKey.of(completedReservation);
+        reservedJobs.remove(completedKey);
+        availableJobs.remove(completedKey);  // Also remove from available in case it's there
 
         // Mark worker as idle so they can receive new assignments
         WorkerInfo workerInfo = activeWorkers.get(workerUUID);
@@ -1190,7 +1195,7 @@ public class JobManager {
         // If it had already done part of the job, hand that progress over with it
         WorkerState state = WorkerStateManager.get(pokemon);
         if (state != null) {
-            captureProgress(state, pos);
+            captureProgress(state, JobKey.of(reservation));
         }
 
         if (DEBUG) {
@@ -1212,8 +1217,8 @@ public class JobManager {
         if (!(level instanceof ServerLevel)) return;
 
         BlockPos pos = reservation.getStationPos();
-        reservedJobs.remove(pos);
-        availableJobs.remove(pos);
+        reservedJobs.remove(JobKey.of(reservation));
+        availableJobs.remove(JobKey.of(reservation));
 
         WorkerInfo workerInfo = activeWorkers.get(pokemon.getUuid());
         if (workerInfo != null) {
@@ -1302,7 +1307,7 @@ public class JobManager {
             }
         } else {
             // Otherwise add to available jobs
-            availableJobs.put(collectJob.position, collectJob);
+            availableJobs.put(JobKey.of(collectJob), collectJob);
 
             if (DEBUG) {
                 Palworks.LOGGER.debug("Added consecutive collect drops job to available pool at {} ({} items)",
@@ -1360,16 +1365,9 @@ public class JobManager {
             }
         }
 
-        // Remove job if it was at this position
-        JobRecord removed = availableJobs.remove(pos);
-        if (removed == null) {
-            removed = reservedJobs.remove(pos);
-        }
-
-        if (removed != null && DEBUG) {
-            Palworks.LOGGER.debug("Removed {} job at {} due to block change",
-                removed.type, pos);
-        }
+        // Remove any jobs at this position
+        availableJobs.keySet().removeIf(key -> key.pos().equals(pos));
+        reservedJobs.keySet().removeIf(key -> key.pos().equals(pos));
     }
 
     /**
@@ -1377,8 +1375,8 @@ public class JobManager {
      * only meaningful to the worker carrying the items, and back in the pool (at the top priority)
      * it would send other transporters to deliver nothing.
      */
-    private void releaseJobReservation(BlockPos position) {
-        JobRecord job = reservedJobs.remove(position);
+    private void releaseJobReservation(JobKey key) {
+        JobRecord job = reservedJobs.remove(key);
         if (job == null || job.type == JobType.DELIVER_ITEMS) {
             return;
         }
@@ -1386,7 +1384,7 @@ public class JobManager {
         if (job.isHandedOver()) {
             job.discoveryTime = System.currentTimeMillis(); // don't let the pool's expiry drop it straight away
         }
-        availableJobs.put(position, job);
+        availableJobs.put(key, job);
     }
 
     /**
@@ -1394,8 +1392,8 @@ public class JobManager {
      * so whoever takes it next carries on from there instead of starting over. Call before the
      * worker's reservation (and with it, its progress) is cleared.
      */
-    private void captureProgress(WorkerState state, BlockPos jobPos) {
-        JobRecord job = reservedJobs.get(jobPos);
+    private void captureProgress(WorkerState state, JobKey key) {
+        JobRecord job = reservedJobs.get(key);
         if (job != null && state.hasJobProgress()) {
             job.resumeStep = state.getJobStep();
             job.resumeData = state.getJobData().copy();
@@ -1403,17 +1401,22 @@ public class JobManager {
     }
 
     /**
-     * Check if a job is currently reserved.
-     */
-    private boolean isJobReserved(BlockPos position) {
-        return reservedJobs.containsKey(position);
-    }
-
-    /**
      * Clean up expired data (old reservations, stale caches).
      */
     private void cleanupExpiredData(ServerLevel level) {
         long currentTime = level.getGameTime();
+
+        // Follow-up jobs (e.g. picking up a harvest's drops) don't come from the chunk scan, so a
+        // rescan never removes them: drop the ones that are gone (the items were picked up or
+        // despawned), or transporters keep being sent to them. Handed-over jobs are left alone:
+        // their original target (a chopped tree) being gone is expected.
+        if (currentTime % FOLLOW_UP_RECHECK_INTERVAL == 0) {
+            availableJobs.entrySet().removeIf(entry -> {
+                JobRecord job = entry.getValue();
+                return job.isConsecutiveJob && !job.isHandedOver()
+                    && !isJobStillThere(level, job.type, job.position);
+            });
+        }
 
         // Remove stale chunk caches (older than cache lifetime), and their jobs: no worker is near
         // enough to rescan them, so nothing would ever notice those jobs disappearing.
@@ -1440,8 +1443,8 @@ public class JobManager {
         failureAnchors.keySet().retainAll(recentlyFailedJobs.keySet());
 
         // Release orphaned reservations (jobs reserved by workers that no longer exist)
-        List<BlockPos> orphanedJobs = new ArrayList<>();
-        for (Map.Entry<BlockPos, JobRecord> entry : reservedJobs.entrySet()) {
+        List<JobKey> orphanedJobs = new ArrayList<>();
+        for (Map.Entry<JobKey, JobRecord> entry : reservedJobs.entrySet()) {
             JobRecord job = entry.getValue();
             if (job.reservedByWorker != null && !activeWorkers.containsKey(job.reservedByWorker)) {
                 orphanedJobs.add(entry.getKey());
@@ -1452,10 +1455,10 @@ public class JobManager {
             }
         }
 
-        for (BlockPos pos : orphanedJobs) {
-            releaseJobReservation(pos);
+        for (JobKey key : orphanedJobs) {
+            releaseJobReservation(key);
             if (DEBUG) {
-                Palworks.LOGGER.debug("Released orphaned job reservation at {}", pos);
+                Palworks.LOGGER.debug("Released orphaned {} job reservation at {}", key.type(), key.pos());
             }
         }
     }
@@ -1644,6 +1647,17 @@ public class JobManager {
             this.suitabilities = new HashSet<>();
             this.idle = true;
             this.lastAssignmentTime = 0;
+        }
+    }
+
+    /** What identifies a job: where it is and what it is (several jobs can share a block). */
+    record JobKey(BlockPos pos, JobType type) {
+        static JobKey of(JobRecord job) {
+            return new JobKey(job.position, job.type);
+        }
+
+        static JobKey of(ReservationId reservation) {
+            return new JobKey(reservation.getStationPos(), reservation.getJobType());
         }
     }
 

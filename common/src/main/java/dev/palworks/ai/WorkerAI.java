@@ -54,10 +54,12 @@ public class WorkerAI {
     // side tiles (front-only) while keeping arrival prompt — no fidgeting to hit an exact tile.
     private static final double ARRIVAL_DISTSQ = 1.5;
 
-    // Only count a path failure when the pathfinder stops MORE than this far short of the stand
-    // tile. Closer-but-not-arrived keeps approaching instead of failing (the 30s reservation expiry
-    // is the backstop), which avoids spurious "stuck" right next to the target.
-    private static final double APPROACH_GIVEUP_DISTSQ = 6.25;
+    // Also arrived when its walk has finished within this squared distance of the stand tile: a
+    // diagonal neighbour, or one a block up or down. A path counts as reaching a tile when it ends
+    // within a block of it, so a worker that can't fit on the tile itself (a big Pokémon, a tight
+    // spot under leaves) stops next to it. That used to be "not arrived" but also "not stuck", so it
+    // stood there until the 30s reservation expiry.
+    private static final double SETTLED_DISTSQ = 3.0;
 
     // Work radius around the worker (no base required)
     private static final int WORK_RADIUS = 32;
@@ -133,6 +135,7 @@ public class WorkerAI {
             if (distanceSq > 100 * 100) { // 100 block radius check
                 Palworks.LOGGER.warn("{} has impossible reservation distance {} blocks (entity at {}, job at {}) - clearing corrupted reservation!",
                     pokemon.getSpecies().getName(), Math.sqrt(distanceSq), entityPos, reservation.getStationPos());
+                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
                 return false;
@@ -164,6 +167,7 @@ public class WorkerAI {
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                     JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                 }
+                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
                 return false;
@@ -221,6 +225,7 @@ public class WorkerAI {
                     && !state.hasJobProgress()
                     && !JobManager.isJobStillThere(level, reservation.getJobType(), targetPos)) {
                 JobManager.getInstance(goneLevel).onJobInvalidated(pokemon, reservation, level);
+                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                 state.clearReservation();
                 state.resetPathFailures();
                 WorkerStateManager.save(pokemon, state);
@@ -234,6 +239,7 @@ public class WorkerAI {
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                 JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
             }
+            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
             state.clearReservation();
             state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
             WorkerStateManager.save(pokemon, state);
@@ -260,15 +266,20 @@ public class WorkerAI {
                     pokemon.getSpecies().getName(), reservation.getJobType(), targetPos);
             }
             JobManager.getInstance(validationLevel).onJobInvalidated(pokemon, reservation, level);
+            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
             state.clearReservation();
             state.resetPathFailures();
             WorkerStateManager.save(pokemon, state);
             return false;
         }
 
-        // Arrived when within ARRIVAL_DISTSQ of the stand tile. Prompt (no exact-tile fidgeting); the
-        // stand tile is a block back from the station so this still excludes the station's sides.
-        if (distanceSq <= ARRIVAL_DISTSQ) {
+        // Arrived when within ARRIVAL_DISTSQ of the stand tile (prompt, no fidgeting to hit the exact
+        // tile), or when its walk has ended right next to the tile (SETTLED_DISTSQ), or, for a job
+        // that doesn't need a particular side (a tree, a crop), anywhere within reach of it.
+        boolean navDone = entity.getNavigation().isDone();
+        boolean closeEnough = navDone && state.hasWalkedToJob()
+            && !WorkPositions.isDirectional(level, targetPos) && WorkPositions.withinWorkReach(entity, targetPos);
+        if (distanceSq <= ARRIVAL_DISTSQ || (navDone && distanceSq <= SETTLED_DISTSQ) || closeEnough) {
             // Only log on first tick of work
             if (DEBUG && !state.isWorking()) {
                 WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
@@ -279,9 +290,11 @@ public class WorkerAI {
                     pokemon.getSpecies().getName(), reservation.getJobType(), inventoryInfo);
             }
 
-            // Keep worker stationary while working (for animations)
+            // Keep worker stationary while working (for animations). Only horizontally: zeroing its
+            // vertical motion too stops gravity registering it as on the ground, and ground
+            // navigation won't plan a path for a mob that isn't on the ground.
             entity.getNavigation().stop();
-            entity.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
 
             // Face the worked block so animations/effects line up (groundwork for furnace fx, etc.)
             faceTarget(entity, targetPos);
@@ -329,11 +342,12 @@ public class WorkerAI {
                 state.restartStep();
             }
             navigateToJob(entity, standPos);
+            state.setWalkedToJob(true);
 
-            // Track path failures for stuck detection. Only count a failure when the pathfinder has
-            // stopped WELL SHORT of the stand tile; if it's close but not yet on the front tile,
-            // keep approaching (avoids spurious "stuck" right next to the furnace).
-            if (entity.getNavigation().isDone() && distanceSq > APPROACH_GIVEUP_DISTSQ) {
+            // Track path failures for stuck detection: its walk has ended (on the ground, so not just
+            // falling or knocked about) without getting next to the stand tile, so the path can't
+            // get it there. A few in a row and it gives up the job instead of standing around.
+            if (entity.getNavigation().isDone() && entity.onGround() && distanceSq > SETTLED_DISTSQ) {
                 state.recordPathFailure();
 
                 if (state.isStuck()) {
@@ -343,6 +357,7 @@ public class WorkerAI {
                     if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                         JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                     }
+                    entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                     state.clearReservation();
                     state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
                     state.resetPathFailures();
