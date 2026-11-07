@@ -22,6 +22,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -69,7 +70,6 @@ public class JobManager {
     private static final int WORKER_STALE_TICKS = 5;             // Unregister a worker this long after it stops ticking
                                                                  // (a little slack so a skipped tick isn't a despawn)
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2;   // Ticks to wait for items to spawn
-    private static final int CONSECUTIVE_JOB_PLANT_DELAY = 25;   // Ticks to wait before replanting
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
     private static final boolean MINING_JOBS_ENABLED = false;     // Flip on once MINE_RESOURCE breaks ores
 
@@ -119,7 +119,9 @@ public class JobManager {
         this.availableJobs = new ConcurrentHashMap<>();
         this.reservedJobs = new ConcurrentHashMap<>();
         this.chunkCaches = new ConcurrentHashMap<>();
-        this.consecutiveJobQueue = new LinkedList<>();
+        // Ordered by due time, since processConsecutiveJobs stops at the first request not yet due
+        // (a FIFO would only be correct while every request uses the same delay).
+        this.consecutiveJobQueue = new PriorityQueue<>(Comparator.comparingLong(r -> r.creationTime));
     }
 
     /**
@@ -813,6 +815,13 @@ public class JobManager {
             candidates.add(job);
         }
 
+        // Harvest everything first, then plant: while this worker has any harvest it could take,
+        // planting jobs wait. Unreachable harvests drop out of candidates (recentlyFailedJobs), so
+        // they can't hold planting back.
+        if (candidates.stream().anyMatch(j -> j.type == JobType.HARVEST_CROPS)) {
+            candidates.removeIf(j -> j.type == JobType.PLANT_SEEDS);
+        }
+
         if (candidates.isEmpty()) {
             return null;
         }
@@ -979,19 +988,11 @@ public class JobManager {
         if (completedReservation.getJobType() == JobType.HARVEST_CROPS) {
             long currentTime = level.getGameTime();
 
-            // Check if this is a berry bush - berries reset their age, don't need replanting
-            boolean isBerry = dev.palworks.crop.CropAdapter.isBerryBush(level, jobPos);
-
+            // No replant job: harvesting resets the crop in place (paid for with one of its seeds),
+            // and berries regrow on their own. See CropAdapter.harvestCrop.
             if (DEBUG) {
-                if (isBerry) {
-                    Palworks.LOGGER.info("Queuing pickup job for berry harvest at {} (no replanting needed)", jobPos);
-                    sendDebugMessage(serverLevel, jobPos,
-                        "  §7→ Queued §eCOLLECT_DROPS§7 (berry - no replanting)");
-                } else {
-                    Palworks.LOGGER.info("Queuing pickup + replant jobs for harvest at {}", jobPos);
-                    sendDebugMessage(serverLevel, jobPos,
-                        "  §7→ Queued §eCOLLECT_DROPS§7 and §ePLANT_SEEDS§7 jobs");
-                }
+                Palworks.LOGGER.info("Queuing pickup job for harvest at {}", jobPos);
+                sendDebugMessage(serverLevel, jobPos, "  §7→ Queued §eCOLLECT_DROPS§7");
             }
 
             // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
@@ -1003,19 +1004,6 @@ public class JobManager {
             pickupRequest.creationTime = currentTime + CONSECUTIVE_JOB_PICKUP_DELAY;
 
             consecutiveJobQueue.add(pickupRequest);
-
-            // Queue 2: Replant seeds (delay 25 ticks to allow pickup first)
-            // SKIP for berry bushes since they reset their age instead of being replanted
-            if (!isBerry) {
-                ConsecutiveJobRequest plantRequest = new ConsecutiveJobRequest();
-                plantRequest.sourceJobLocation = jobPos;
-                plantRequest.nextJobType = JobType.PLANT_SEEDS;
-                plantRequest.requiredSuitability = Suitability.PLANTING;
-                plantRequest.suggestedWorkerUUID = workerUUID;  // Prefer same worker
-                plantRequest.creationTime = currentTime + CONSECUTIVE_JOB_PLANT_DELAY;
-
-                consecutiveJobQueue.add(plantRequest);
-            }
         }
 
         // IMPORTANT: Remove completed job entirely (don't put back in available pool!)
@@ -1114,12 +1102,6 @@ public class JobManager {
             if (request.nextJobType == JobType.COLLECT_DROPS) {
                 // Create collect drops job for items at harvest location
                 createCollectDropsJob(level, request);
-            } else if (request.nextJobType == JobType.PLANT_SEEDS) {
-                // Create planting job at harvest location
-                createPlantJob(level, request);
-            } else if (request.nextJobType == JobType.PLANT_SAPLING) {
-                // Create sapling planting job at tree base
-                createPlantSaplingJob(level, request);
             }
         }
     }
@@ -1171,81 +1153,20 @@ public class JobManager {
     }
 
     /**
-     * Create a planting job at a harvested location.
+     * Called when a worker completes chopping a tree (which it also replants, as part of the chop).
+     * Queues a job to collect the drops.
      */
-    private void createPlantJob(ServerLevel level, ConsecutiveJobRequest request) {
-        BlockPos farmlandPos = request.sourceJobLocation.below();
-
-        // Verify the farmland still exists
-        if (!CropAdapter.isPlantableSurface(level, farmlandPos)) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Farmland no longer exists at {} for replant job", farmlandPos);
-            }
-            return;
-        }
-
-        // Verify the air above is still empty
-        if (!level.getBlockState(request.sourceJobLocation).isAir()) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Position {} is no longer air for replant job", request.sourceJobLocation);
-            }
-            return;
-        }
-
-        // Determine suitability based on farmland type
-        Suitability suitability = Suitability.PLANTING;
-        Block farmlandBlock = level.getBlockState(farmlandPos).getBlock();
-        if (farmlandBlock == Blocks.SOUL_SAND) {
-            suitability = Suitability.NETHER;
-        }
-
-        // Create planting job
-        JobRecord plantJob = new JobRecord();
-        plantJob.position = request.sourceJobLocation;
-        plantJob.type = JobType.PLANT_SEEDS;
-        plantJob.requiredSuitabilities = EnumSet.of(suitability);
-        plantJob.discoveryTime = System.currentTimeMillis();
-        plantJob.isConsecutiveJob = true;
-        plantJob.priority = HIGH_PRIORITY;
-        plantJob.reservedByWorker = request.suggestedWorkerUUID;  // Hint for assignment
-
-        // Try to assign to suggested worker first
-        WorkerInfo suggestedWorker = activeWorkers.get(request.suggestedWorkerUUID);
-        if (suggestedWorker != null && suggestedWorker.idle &&
-            suggestedWorker.suitabilities.contains(suitability)) {
-            assignJobToWorker(level, suggestedWorker, plantJob);
-
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Assigned consecutive plant job to original harvester at {}",
-                    request.sourceJobLocation);
-            }
-        } else {
-            // Otherwise add to available jobs
-            availableJobs.put(plantJob.position, plantJob);
-
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Added consecutive plant job to available pool at {}",
-                    request.sourceJobLocation);
-            }
-        }
-    }
-
-    /**
-     * Called when a worker completes chopping a tree.
-     * Queues consecutive jobs for item collection and sapling replanting.
-     */
-    public void onTreeChopped(Pokemon pokemon, BlockPos basePos, net.minecraft.world.item.Item saplingItem, Level level) {
+    public void onTreeChopped(Pokemon pokemon, BlockPos basePos, Level level) {
         if (!(level instanceof ServerLevel serverLevel)) return;
 
         UUID workerUUID = pokemon.getUuid();
         long currentTime = level.getGameTime();
 
         if (DEBUG) {
-            Palworks.LOGGER.info("{} chopped tree at base {}, will replant {} sapling",
-                pokemon.getSpecies().getName(), basePos, saplingItem);
+            Palworks.LOGGER.info("{} chopped tree at base {}", pokemon.getSpecies().getName(), basePos);
 
             sendDebugMessage(serverLevel, basePos,
-                String.format("§a%s§f chopped tree, queuing §eCOLLECT_DROPS§f and §ePLANT_SAPLING§f",
+                String.format("§a%s§f chopped tree, queuing §eCOLLECT_DROPS§f",
                     pokemon.getSpecies().getName()));
         }
 
@@ -1258,88 +1179,7 @@ public class JobManager {
         pickupRequest.creationTime = currentTime + CONSECUTIVE_JOB_PICKUP_DELAY;
 
         consecutiveJobQueue.add(pickupRequest);
-
-        // Queue 2: Plant sapling at base position (delay to allow pickup first)
-        if (saplingItem != null) {
-            ConsecutiveJobRequest saplingRequest = new ConsecutiveJobRequest();
-            saplingRequest.sourceJobLocation = basePos;
-            saplingRequest.nextJobType = JobType.PLANT_SAPLING;
-            saplingRequest.requiredSuitability = Suitability.LUMBERING;
-            saplingRequest.suggestedWorkerUUID = workerUUID;
-            saplingRequest.saplingItem = saplingItem;
-            saplingRequest.creationTime = currentTime + CONSECUTIVE_JOB_PLANT_DELAY;
-
-            consecutiveJobQueue.add(saplingRequest);
-        }
     }
-
-    /**
-     * Create a sapling planting job at a tree base location.
-     */
-    private void createPlantSaplingJob(ServerLevel level, ConsecutiveJobRequest request) {
-        BlockPos plantPos = request.sourceJobLocation;
-
-        if (request.saplingItem == null) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug("No sapling item specified for plant job at {}", plantPos);
-            }
-            return;
-        }
-
-        // Verify position is valid for planting (depends on the sapling: propagules can go in water)
-        if (!dev.palworks.tree.TreeDetector.canPlantSaplingAt(level, plantPos, request.saplingItem)) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Cannot plant sapling at {} - position not valid", plantPos);
-            }
-            return;
-        }
-
-        // Create sapling planting job
-        JobRecord saplingJob = new JobRecord();
-        saplingJob.position = plantPos;
-        saplingJob.type = JobType.PLANT_SAPLING;
-        saplingJob.requiredSuitabilities = EnumSet.of(Suitability.LUMBERING);
-        if (TreeDetector.isNetherSapling(request.saplingItem)) {
-            saplingJob.requiredSuitabilities.add(Suitability.NETHER); // fungi, like nether trees, need both
-        }
-        saplingJob.discoveryTime = System.currentTimeMillis();
-        saplingJob.isConsecutiveJob = true;
-        saplingJob.priority = HIGH_PRIORITY;
-        saplingJob.reservedByWorker = request.suggestedWorkerUUID;
-
-        // Store sapling item in a way the worker can access it
-        // We'll use a temporary map to track pending sapling plants
-        pendingSaplingPlants.put(plantPos, request.saplingItem);
-
-        // Try to assign to suggested worker first
-        WorkerInfo suggestedWorker = activeWorkers.get(request.suggestedWorkerUUID);
-        if (suggestedWorker != null && suggestedWorker.idle && canDoJob(suggestedWorker, saplingJob)) {
-            assignJobToWorker(level, suggestedWorker, saplingJob);
-
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Assigned consecutive plant sapling job to original lumberjack at {}",
-                    plantPos);
-            }
-        } else {
-            // Otherwise add to available jobs
-            availableJobs.put(saplingJob.position, saplingJob);
-
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Added consecutive plant sapling job to available pool at {}",
-                    plantPos);
-            }
-        }
-    }
-
-    /**
-     * Get and remove the sapling item for a pending plant job.
-     */
-    public net.minecraft.world.item.Item consumePendingSapling(BlockPos pos) {
-        return pendingSaplingPlants.remove(pos);
-    }
-
-    // Temporary storage for sapling types at plant positions
-    private final Map<BlockPos, net.minecraft.world.item.Item> pendingSaplingPlants = new ConcurrentHashMap<>();
 
     // ============================================
     // Cache Management
@@ -1667,7 +1507,6 @@ public class JobManager {
         public Suitability requiredSuitability;
         public UUID suggestedWorkerUUID;
         public long creationTime;  // Game time when this job should be created
-        public net.minecraft.world.item.Item saplingItem;  // For PLANT_SAPLING jobs
 
         public ConsecutiveJobRequest() {
             this.creationTime = 0;

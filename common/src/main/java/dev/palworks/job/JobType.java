@@ -31,7 +31,6 @@ public enum JobType {
 
     // Lumbering jobs
     CHOP_TREE(Suitability.LUMBERING),
-    PLANT_SAPLING(Suitability.LUMBERING),
 
     // Mining jobs
     MINE_RESOURCE(Suitability.MINING),

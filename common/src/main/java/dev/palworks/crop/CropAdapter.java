@@ -206,6 +206,17 @@ public class CropAdapter {
     }
 
     /**
+     * The item that plants the crop at {@code pos}: its pick-block item (wheat seeds for wheat, a
+     * carrot for carrots, cocoa beans for cocoa, nether wart for nether wart; modded crops' own
+     * seeds). Null if the block has none.
+     */
+    @Nullable
+    private static Item seedOf(Level level, BlockPos pos, BlockState state) {
+        ItemStack clone = state.getBlock().getCloneItemStack(level, pos, state);
+        return clone.isEmpty() ? null : clone.getItem();
+    }
+
+    /**
      * Check if a seed item can be planted on this surface.
      */
     public static boolean canPlantSeed(Item seed, Level level, BlockPos surfacePos) {
@@ -434,15 +445,34 @@ public class CropAdapter {
 
             // Only harvest if at max age
             if (currentAge >= maxAge) {
-                Item cropItem = block.asItem();
-                int dropCount = 1 + level.random.nextInt(3);
-                Block.popResource(level, pos, new ItemStack(cropItem, dropCount));
+                // Harvest in place, like right-click-harvest mods: drop the crop's real loot (what
+                // breaking it by hand gives, e.g. wheat + 1-4 seeds), minus one seed that pays for
+                // replanting, and reset it to age 0. This used to drop block.asItem() instead, which
+                // for wheat and beetroot is the seed, so those fields never produced any crop.
+                List<ItemStack> drops = level instanceof ServerLevel serverLevel
+                    ? Block.getDrops(state, serverLevel, pos, level.getBlockEntity(pos))
+                    : new ArrayList<>();
+                if (drops.isEmpty()) {
+                    // No loot table result (some modded crops): keep the old behaviour
+                    drops = new ArrayList<>(List.of(new ItemStack(block.asItem(), 1 + level.random.nextInt(3))));
+                }
 
-                // Reset to age 0
+                // Every vanilla crop drops at least one of its seed when mature, so there's always
+                // one to take (wheat/beetroot 1-4 seeds, cocoa 3 beans, carrots, potatoes, wart)
+                Item seed = seedOf(level, pos, state);
+                if (seed != null) {
+                    takeOne(drops, seed);
+                }
+                for (ItemStack drop : drops) {
+                    if (!drop.isEmpty()) {
+                        Block.popResource(level, pos, drop);
+                    }
+                }
+
                 level.setBlock(pos, state.setValue(ageProperty, 0), 3);
 
-                dev.palworks.Palworks.LOGGER.info("Harvested aged crop at {}: was age {}, dropped {} x{}, reset to age 0",
-                    pos, currentAge, cropItem, dropCount);
+                dev.palworks.Palworks.LOGGER.debug("Harvested crop at {}: was age {}, dropped {}, reset to age 0",
+                    pos, currentAge, drops);
                 return true;
             }
         }
@@ -450,6 +480,16 @@ public class CropAdapter {
         // Default: break the block completely (for crops like wheat, carrots, etc.)
         level.destroyBlock(pos, true);
         return true;
+    }
+
+    /** Remove one of {@code item} from a list of drops, if there is one. */
+    private static void takeOne(List<ItemStack> drops, Item item) {
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty() && drop.is(item)) {
+                drop.shrink(1);
+                return;
+            }
+        }
     }
 
     /**

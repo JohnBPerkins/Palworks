@@ -439,13 +439,6 @@ public class TreeDetector {
     }
 
     /**
-     * Whether a sapling item is a nether fungus (planting it needs the Nether suitability too).
-     */
-    public static boolean isNetherSapling(@Nullable Item saplingItem) {
-        return saplingItem == Items.CRIMSON_FUNGUS || saplingItem == Items.WARPED_FUNGUS;
-    }
-
-    /**
      * Check if a block state is a vine.
      */
     public static boolean isVine(BlockState state) {
