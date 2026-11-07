@@ -447,7 +447,6 @@ public class WorkerAI {
                 ItemStack extracted = extractSeedsFromChest(ctx.level(), targetPos);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
-                    syncInventoryToHeldItem(ctx.pokemon(), inventory);
                     if (DEBUG) {
                         Palworks.LOGGER.info("{} got {} {} seeds from chest at {} ({} leftover)",
                             ctx.name(), extracted.getCount() - leftover, extracted.getItem().toString(), targetPos, leftover);
@@ -461,7 +460,6 @@ public class WorkerAI {
                     ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
-                    syncInventoryToHeldItem(ctx.pokemon(), inventory);
                     if (DEBUG) {
                         Palworks.LOGGER.info("{} got {} nether wart from chest at {} ({} leftover)",
                             ctx.name(), extracted.getCount() - leftover, targetPos, leftover);
@@ -503,7 +501,6 @@ public class WorkerAI {
             }
 
             if (pickedUp > 0) {
-                syncInventoryToHeldItem(ctx.pokemon(), inventory);
                 if (DEBUG) {
                     Palworks.LOGGER.info("{} collected {} dropped items from ground at {}",
                         ctx.name(), pickedUp, targetPos);
@@ -534,8 +531,6 @@ public class WorkerAI {
                 }
             }
 
-            syncInventoryToHeldItem(ctx.pokemon(), inventory);
-
             if (DEBUG) {
                 if (totalDelivered > 0) {
                     Palworks.LOGGER.info("{} delivered {} items to chest at {}", ctx.name(), totalDelivered, chestPos);
@@ -565,7 +560,6 @@ public class WorkerAI {
             if (planted) {
                 seedStack.shrink(1);
                 inventory.setChanged();
-                syncInventoryToHeldItem(ctx.pokemon(), inventory);
                 if (DEBUG) {
                     Palworks.LOGGER.info("{} planted {} at {} ({} items remaining)",
                         ctx.name(), seed.toString(), plantPos, inventory.getTotalItemCount());
@@ -761,18 +755,6 @@ public class WorkerAI {
             }
             Palworks.LOGGER.warn("Failed to play Cobblemon action effect {} on {}: {}",
                 actionEffectId, ctx.name(), e.toString());
-        }
-    }
-
-    /**
-     * Sync the worker's inventory to their held item for visual display.
-     */
-    private static void syncInventoryToHeldItem(Pokemon pokemon, WorkerInventory inventory) {
-        ItemStack firstItem = inventory.getFirstItem();
-        if (!firstItem.isEmpty()) {
-            pokemon.swapHeldItem(firstItem.copy(), false, false);
-        } else {
-            pokemon.swapHeldItem(ItemStack.EMPTY, false, false);
         }
     }
 

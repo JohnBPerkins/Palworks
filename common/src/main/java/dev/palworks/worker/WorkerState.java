@@ -247,21 +247,6 @@ public class WorkerState {
         workInventory = ItemStack.EMPTY;
     }
 
-    /**
-     * Sync work inventory to the Pokemon's held item for visual display.
-     * This allows players to see what the worker is carrying.
-     */
-    public void syncWorkInventoryToHeldItem(com.cobblemon.mod.common.pokemon.Pokemon pokemon) {
-        if (!workInventory.isEmpty()) {
-            // Set the Pokemon's held item to match work inventory
-            // Parameters: itemStack, sendUpdate, playSoundEffect
-            pokemon.swapHeldItem(workInventory.copy(), false, false);
-        } else {
-            // Clear the held item
-            pokemon.swapHeldItem(ItemStack.EMPTY, false, false);
-        }
-    }
-
     // NBT Serialization
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
