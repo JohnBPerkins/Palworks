@@ -1,17 +1,17 @@
 modLoader = "javafml"
 loaderVersion = "[4,)"
-#issueTrackerURL = ""
-license = "Insert License Here"
+issueTrackerURL = "https://github.com/JohnBPerkins/Palworks/issues"
+license = "MIT"
 
 [[mods]]
 modId = "palworks"
 version = "${version}"
 displayName = "Palworks"
-authors = "Me!"
+displayURL = "https://github.com/JohnBPerkins/Palworks"
+authors = "JohnBPerkins"
 description = '''
-This is an example description! Tell everyone what your mod is about!
+Turns your Cobblemon Pokémon into workers. Send one out and it finds jobs nearby on its own: lighting furnaces, planting and harvesting crops, chopping trees, and carrying items to your chests.
 '''
-#logoFile = ""
 
 [[dependencies.palworks]]
 modId = "neoforge"
@@ -30,7 +30,7 @@ side = "BOTH"
 [[dependencies.palworks]]
 modId = "cobblemon"
 type = "required"
-versionRange = "[1.5.0,)"
+versionRange = "[1.7.1,)"
 ordering = "AFTER"
 side = "BOTH"
 
