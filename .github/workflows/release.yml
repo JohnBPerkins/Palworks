@@ -162,22 +162,34 @@ jobs:
           fi
           git log --first-parent --format='%s' "$range" > subjects.txt
 
-          # Prints one "## Title" section of titles whose conventional-commit type matches $2,
-          # with the "type(scope): " prefix removed. Prints nothing when there are none.
+          # Only player-facing changes go in the notes (see "PR titles" in CONTRIBUTING.md):
+          # feat, fix and perf, plus any type marked breaking with "!". ci/build/docs/test/
+          # refactor/chore titles are left out; the full changelog link still lists them.
+          #
+          # section TITLE PATTERN [-v]: prints "## TITLE" and the titles matching the extended regex
+          # PATTERN (or NOT matching it, with -v), with the "type(scope)!: " prefix removed.
+          # Prints nothing if no titles qualify.
           section() {
             local items
-            items=$(grep -iE "^($2)(\([^)]*\))?!?: " subjects.txt | sed -E 's/^[A-Za-z]+(\([^)]*\))?!?: */- /' || true)
+            items=$(grep -iE ${3:-} "$2" subjects.txt | sed -E 's/^([A-Za-z]+(\([^)]*\))?!?: *)?/- /' || true)
             if [ -n "$items" ]; then
               printf '## %s\n\n%s\n\n' "$1" "$items"
             fi
           }
+          scope='(\([^)]*\))?'
+          sections=$(
+            section "Breaking changes" "^[A-Za-z]+$scope!: "
+            section "Features" "^feat$scope: "
+            section "Fixes" "^fix$scope: "
+            section "Performance" "^perf$scope: "
+            # Titles that don't follow the format at all are shown rather than silently dropped.
+            section "Other changes" "^[A-Za-z]+$scope!?: " -v
+          )
           {
-            section "Features" "feat"
-            section "Fixes" "fix"
-            # Everything else, including titles without a type prefix.
-            other=$(grep -viE '^(feat|fix)(\([^)]*\))?!?: ' subjects.txt | sed -E 's/^([A-Za-z]+(\([^)]*\))?!?: *)?/- /' || true)
-            if [ -n "$other" ]; then
-              printf '## Other changes\n\n%s\n\n' "$other"
+            if [ -n "$sections" ]; then
+              printf '%s\n\n' "$sections"
+            else
+              printf '_No player-facing changes in this release._\n\n'
             fi
             echo "**Full changelog:** $full_changelog"
           } > release-notes.md
