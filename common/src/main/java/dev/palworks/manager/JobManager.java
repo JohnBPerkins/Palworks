@@ -60,6 +60,8 @@ public class JobManager {
     private static final int WORKER_SCAN_RADIUS = 32;            // Block radius to scan around workers
     private static final int VERTICAL_SCAN_RADIUS = 32;          // Y range above/below a worker to scan
     private static final int MAX_PATH_CHECKS_PER_WORKER = 8;     // Cap expensive createPath() calls per assignment
+    private static final int DELIVERY_SEARCH_RADIUS = 32;        // Horizontal reach for picking a delivery chest
+    private static final int DELIVERY_SEARCH_VERTICAL = 4;       // Y reach for picking a delivery chest
     private static final int JOB_FAILURE_BLACKLIST_TICKS = 1200; // 60s a worker won't retry a job it couldn't reach
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2;   // Ticks to wait for items to spawn
     private static final int CONSECUTIVE_JOB_PLANT_DELAY = 25;   // Ticks to wait before replanting
@@ -344,8 +346,15 @@ public class JobManager {
                     pos.set(worldX, y, worldZ);
                     blocksScanned++;
 
+                    BlockState state = level.getBlockState(pos);
+
+                    // Remember chests so delivery can pick one without its own block search
+                    if (isChest(state.getBlock())) {
+                        cache.chests.add(pos.immutable());
+                    }
+
                     // Check for job opportunities at this position
-                    JobRecord job = scanPositionForJob(level, pos);
+                    JobRecord job = scanPositionForJob(level, pos, state);
                     if (job != null && !isJobReserved(job.position)) {
                         if (DEBUG) {
                             Palworks.LOGGER.info("Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
@@ -367,8 +376,7 @@ public class JobManager {
      * Detects the job opportunity (if any) at a single world position.
      */
     @Nullable
-    private JobRecord scanPositionForJob(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
+    private JobRecord scanPositionForJob(Level level, BlockPos pos, BlockState state) {
         Block block = state.getBlock();
 
         // Check for station-based jobs (furnaces, etc.)
@@ -615,30 +623,53 @@ public class JobManager {
      */
     @Nullable
     private JobRecord createDeliveryJobForWorker(ServerLevel level, WorkerInfo worker, Pokemon pokemon) {
-        // Scan for nearby chests
         BlockPos workerPos = worker.position;
-        int searchRadius = 32; // Same as work radius
 
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         net.minecraft.world.item.ItemStack firstItem = inventory.getFirstItem();
 
-        for (int x = -searchRadius; x <= searchRadius; x++) {
-            for (int y = -4; y <= 4; y++) {
-                for (int z = -searchRadius; z <= searchRadius; z++) {
-                    BlockPos checkPos = workerPos.offset(x, y, z);
-                    Block block = level.getBlockState(checkPos).getBlock();
+        // Pick the nearest chest that has room, from the chests the chunk scan already found.
+        // (This used to scan ~38k blocks itself, every tick while no chest was in range.)
+        BlockPos nearest = null;
+        double nearestDistSq = Double.MAX_VALUE;
+        int chunkRadius = (DELIVERY_SEARCH_RADIUS >> 4) + 1;
+        int baseChunkX = workerPos.getX() >> 4;
+        int baseChunkZ = workerPos.getZ() >> 4;
 
-                    if (isChest(block) && ChestHelper.canAcceptItems(level, checkPos, firstItem)) {
-                        JobRecord job = new JobRecord();
-                        job.position = checkPos.immutable();
-                        job.type = JobType.DELIVER_ITEMS;
-                        job.requiredSuitability = Suitability.TRANSPORTING;
-                        job.discoveryTime = System.currentTimeMillis();
-                        job.priority = 10; // Highest priority - must deliver before doing anything else
-                        return job;
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                ChunkJobCache cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
+                if (cache == null) {
+                    continue;
+                }
+                for (BlockPos chestPos : cache.chests) {
+                    if (Math.abs(chestPos.getX() - workerPos.getX()) > DELIVERY_SEARCH_RADIUS
+                            || Math.abs(chestPos.getZ() - workerPos.getZ()) > DELIVERY_SEARCH_RADIUS
+                            || Math.abs(chestPos.getY() - workerPos.getY()) > DELIVERY_SEARCH_VERTICAL) {
+                        continue;
+                    }
+                    double distSq = workerPos.distSqr(chestPos);
+                    if (distSq >= nearestDistSq) {
+                        continue;
+                    }
+                    // The cached position may be up to one scan old, so re-check it's still a chest
+                    if (isChest(level.getBlockState(chestPos).getBlock())
+                            && ChestHelper.canAcceptItems(level, chestPos, firstItem)) {
+                        nearest = chestPos;
+                        nearestDistSq = distSq;
                     }
                 }
             }
+        }
+
+        if (nearest != null) {
+            JobRecord job = new JobRecord();
+            job.position = nearest;
+            job.type = JobType.DELIVER_ITEMS;
+            job.requiredSuitability = Suitability.TRANSPORTING;
+            job.discoveryTime = System.currentTimeMillis();
+            job.priority = 10; // Highest priority - must deliver before doing anything else
+            return job;
         }
 
         if (DEBUG) {
@@ -1521,6 +1552,7 @@ public class JobManager {
     public static class ChunkJobCache {
         public ChunkPos chunk;
         public Map<JobType, List<BlockPos>> cachedJobs;
+        public List<BlockPos> chests = new ArrayList<>(); // Chests seen in the last scan (delivery targets)
         public long lastScanTime;
         public boolean isDirty;
 
