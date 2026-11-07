@@ -75,24 +75,34 @@ docs: explain nether wart farming on the wiki
 ```
 
 This isn't just style. Each PR is squash-merged as a single commit **titled with the PR title**,
-and those titles become the [release notes](#releasing), sorted by type:
+and the [release notes](#releasing) are built from those titles. **Only player-facing types
+appear in the release notes**; the rest are only in the full changelog:
 
-| Type | Use for | Release notes section |
+| Type | Use for | Release notes |
 |---|---|---|
-| `feat` | Something new players or modpacks can use | Features |
-| `fix` | A bug fix | Fixes |
-| `perf` | Faster or lighter, with no behaviour change | Other changes |
-| `refactor` | Code restructuring with no behaviour change | Other changes |
-| `test` | Adding or fixing tests only | Other changes |
-| `docs` | Documentation only | Other changes |
-| `build` | Gradle, dependencies, metadata | Other changes |
-| `ci` | GitHub Actions workflows | Other changes |
-| `chore` | Anything else that doesn't touch the mod's behaviour | Other changes |
+| `feat` | Something new players or modpacks can use | **Features** |
+| `fix` | A bug players could hit in the mod | **Fixes** |
+| `perf` | Faster or lighter, with no behaviour change | **Performance** |
+| `refactor` | Code restructuring with no behaviour change | not shown |
+| `test` | Adding or fixing tests only | not shown |
+| `docs` | README, wiki or contributor docs | not shown |
+| `build` | Gradle, dependencies, mod metadata | not shown |
+| `ci` | GitHub Actions workflows | not shown |
+| `chore` | Anything else that doesn't change the mod for players | not shown |
 
-An optional scope is fine, such as `fix(furnace): ...`. Pick the type by what players will notice:
-a change that fixes a bug is `fix` even if it also refactors. Maintainers rename PRs that don't
-follow the format before merging. Commit messages inside a PR aren't affected, but conventional
-ones are still appreciated.
+**Pick the type by what players notice, not by what the diff touches:**
+
+- `fix` and `feat` are only for changes to the mod itself. Fixing a broken workflow is `ci:`,
+  fixing a typo in the docs is `docs:`, and fixing the Gradle build is `build:`.
+- A change that fixes an in-game bug is `fix`, even if most of the diff is a refactor.
+- **Breaking changes** get a `!` after the type, and then always appear under "Breaking changes"
+  whatever the type. Use it whenever players have to act: raising the minimum Cobblemon or
+  Minecraft version, changing save data, renaming a datapack tag. For example,
+  `build!: require Cobblemon 1.8 or newer`.
+
+An optional scope is fine, such as `fix(furnace): ...` (lowercase). A required **PR title** check
+fails until the title follows the format; editing the title re-runs it. Commit messages inside a
+PR aren't checked, but conventional ones are still appreciated.
 
 ## Releasing
 
@@ -107,8 +117,9 @@ development builds.
    summary, then run it again with it unticked to release.
 
 The workflow builds and tests both loaders, creates the `vX.Y.Z` tag and a GitHub Release with
-both jars, then uploads to Modrinth and CurseForge. The release notes list the titles of the PRs
-merged since the previous release, grouped by type (see [PR titles](#pr-titles)). The
+both jars, then uploads to Modrinth and CurseForge. The release notes list the player-facing PRs
+merged since the previous release, grouped by type (see [PR titles](#pr-titles)), and link to the
+full changelog for everything else. The
 "Full changelog" link in a dry run's preview points at a tag that doesn't exist yet, so it shows
 nothing until the release is made.
 

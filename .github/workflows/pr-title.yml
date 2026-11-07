@@ -1,0 +1,53 @@
+name: PR title
+
+# PR titles become the squash-merge commit title and, from there, the release notes, so they must
+# follow Conventional Commits. See "PR titles" in .github/CONTRIBUTING.md.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+# Only the latest title matters; cancel checks for titles that have since been edited.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check title format
+        env:
+          # Passed through env, never interpolated into the script: the title is user input.
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          types='feat|fix|perf|refactor|test|docs|build|ci|chore'
+          pattern="^($types)(\([a-z0-9._/-]+\))?!?: [^ ]"
+          problems=()
+          if ! [[ "$TITLE" =~ $pattern ]]; then
+            problems+=("must start with 'type: ' or 'type(scope): ', where type is one of: ${types//|/, }")
+          fi
+          if [[ "$TITLE" == *. ]]; then
+            problems+=("must not end with a period")
+          fi
+
+          if [ ${#problems[@]} -eq 0 ]; then
+            echo "PR title OK: $TITLE"
+            exit 0
+          fi
+
+          {
+            echo "## PR title needs fixing"
+            echo
+            echo "\`$TITLE\`"
+            echo
+            for p in "${problems[@]}"; do echo "- The title $p."; done
+            echo
+            echo "Examples: \`feat: let Water-type workers water crops\`, \`fix(furnace): stop relighting empty furnaces\`, \`ci: cache Gradle\`."
+            echo "Add \`!\` after the type for a breaking change, e.g. \`build!: require Cobblemon 1.8\`."
+            echo "See **PR titles** in \`.github/CONTRIBUTING.md\`. Editing the title re-runs this check."
+          } >> "$GITHUB_STEP_SUMMARY"
+          for p in "${problems[@]}"; do echo "::error title=PR title::The title $p."; done
+          exit 1

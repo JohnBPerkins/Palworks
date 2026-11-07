@@ -60,13 +60,22 @@ public class JobManager {
     private static final int WORKER_SCAN_RADIUS = 32;            // Block radius to scan around workers
     private static final int VERTICAL_SCAN_RADIUS = 32;          // Y range above/below a worker to scan
     private static final int MAX_PATH_CHECKS_PER_WORKER = 8;     // Cap expensive createPath() calls per assignment
-    private static final int JOB_FAILURE_BLACKLIST_TICKS = 1200; // 60s a worker won't retry a job it couldn't reach
+    private static final int DELIVERY_SEARCH_RADIUS = 32;        // Horizontal reach for picking a delivery chest
+    private static final int DELIVERY_SEARCH_VERTICAL = 4;       // Y reach for picking a delivery chest
+    // A worker won't retry a job it couldn't reach until terrain near it changes, it moves
+    // UNREACHABLE_FORGET_MOVE_DIST blocks, or this backstop runs out (see recentlyFailedJobs).
+    private static final int JOB_FAILURE_BLACKLIST_TICKS = 600;  // 30s backstop
+    private static final int UNREACHABLE_FORGET_MOVE_DIST = 8;   // Blocks a worker moves before retrying jobs
+    private static final int WORKER_STALE_TICKS = 5;             // Unregister a worker this long after it stops ticking
+                                                                 // (a little slack so a skipped tick isn't a despawn)
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2;   // Ticks to wait for items to spawn
     private static final int CONSECUTIVE_JOB_PLANT_DELAY = 25;   // Ticks to wait before replanting
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
 
     // Singleton instances (one per ServerLevel)
     private static final Map<String, JobManager> instances = new ConcurrentHashMap<>();
+    // Same instances keyed by the level itself, for the per-block-change hook (no string building).
+    private static final Map<ServerLevel, JobManager> byLevel = new ConcurrentHashMap<>();
 
     // Core registries
     private final Map<UUID, WorkerInfo> activeWorkers;           // All active workers
@@ -80,10 +89,15 @@ public class JobManager {
     // updateWorkerRegistry() so UUID lookups are O(1) instead of scanning all entities.
     private final Map<UUID, PokemonEntity> entityCache = new HashMap<>();
 
-    // Per-worker blacklist of job positions the worker recently failed to reach
-    // (Pokemon UUID -> job position -> game-tick the entry expires). Stops a worker from
-    // being repeatedly reassigned a job it keeps getting stuck trying to walk to.
+    // Per-worker memory of job positions the worker couldn't reach, either because the path check
+    // failed at assignment or it got stuck walking there (Pokemon UUID -> job position -> game tick
+    // the entry expires). Stops idle workers re-pathfinding the same unreachable jobs every tick.
+    // Cleared early when collision changes near the worker (onBlockStateChange: a gate opened, a
+    // block broken) or when the worker moves away from failureAnchors, so it reacts right away
+    // when a player clears the way.
     private final Map<UUID, Map<BlockPos, Long>> recentlyFailedJobs = new ConcurrentHashMap<>();
+    // Where each worker was when its current failures were recorded (reachability is from there).
+    private final Map<UUID, BlockPos> failureAnchors = new ConcurrentHashMap<>();
 
     // Consecutive job queue (harvest → pickup + replant)
     private final Queue<ConsecutiveJobRequest> consecutiveJobQueue;
@@ -108,7 +122,57 @@ public class JobManager {
      */
     public static JobManager getInstance(ServerLevel level) {
         String dimensionKey = level.dimension().location().toString();
-        return instances.computeIfAbsent(dimensionKey, k -> new JobManager(level));
+        return instances.computeIfAbsent(dimensionKey, k -> {
+            JobManager manager = new JobManager(level);
+            byLevel.put(level, manager);
+            return manager;
+        });
+    }
+
+    /**
+     * Called for every block change on the server (see the ServerLevel mixins). If the block's
+     * collision changed (something became passable or blocked: a gate or door toggled, a block
+     * broken or placed), workers nearby forget which jobs they couldn't reach, so they re-check
+     * on their next assignment. Must stay cheap: returns early unless some worker has failures.
+     */
+    public static void onBlockStateChange(ServerLevel level, BlockPos pos, BlockState oldState, BlockState newState) {
+        JobManager manager = byLevel.get(level);
+        if (manager == null || manager.recentlyFailedJobs.isEmpty()) {
+            return;
+        }
+        // Collision shapes are cached and shared per state (e.g. every full block, every crop), so
+        // identity is a cheap "did passability change" test. A false positive only costs a re-check.
+        if (oldState.getCollisionShape(level, pos) == newState.getCollisionShape(level, pos)) {
+            return;
+        }
+        manager.forgetUnreachableNear(pos);
+    }
+
+    private void forgetUnreachableNear(BlockPos pos) {
+        for (WorkerInfo worker : activeWorkers.values()) {
+            BlockPos w = worker.position;
+            if (w == null
+                    || Math.abs(w.getX() - pos.getX()) > WORKER_SCAN_RADIUS
+                    || Math.abs(w.getZ() - pos.getZ()) > WORKER_SCAN_RADIUS
+                    || Math.abs(w.getY() - pos.getY()) > VERTICAL_SCAN_RADIUS) {
+                continue;
+            }
+            forgetUnreachable(worker.pokemonUUID);
+        }
+    }
+
+    private void forgetUnreachable(UUID workerUUID) {
+        recentlyFailedJobs.remove(workerUUID);
+        failureAnchors.remove(workerUUID);
+    }
+
+    private void rememberUnreachable(UUID workerUUID, @Nullable BlockPos workerPos, BlockPos jobPos, long now) {
+        recentlyFailedJobs
+            .computeIfAbsent(workerUUID, k -> new ConcurrentHashMap<>())
+            .put(jobPos, now + JOB_FAILURE_BLACKLIST_TICKS);
+        if (workerPos != null) {
+            failureAnchors.putIfAbsent(workerUUID, workerPos);
+        }
     }
 
     /**
@@ -118,6 +182,7 @@ public class JobManager {
      */
     public static void clearAll() {
         instances.clear();
+        byLevel.clear();
     }
 
     /**
@@ -196,6 +261,13 @@ public class JobManager {
         info.suitabilities = state.getSuitabilities();
         info.currentReservation = stateReservation;
         info.idle = (stateReservation == null);
+
+        // Every live worker reports in here on its own tick; updateWorkerRegistry() drops the ones
+        // that stop reporting (despawned, recalled, disabled, in a non-ticking chunk, changed dimension).
+        info.lastSeenTick = level.getGameTime();
+        if (entity instanceof PokemonEntity pokemonEntity) {
+            entityCache.put(uuid, pokemonEntity);
+        }
     }
 
     /**
@@ -215,35 +287,22 @@ public class JobManager {
             }
         }
         // Drop per-worker caches so they don't leak after the worker is gone.
-        recentlyFailedJobs.remove(pokemonUUID);
+        entityCache.remove(pokemonUUID);
+        forgetUnreachable(pokemonUUID);
         WorkerInventoryManager.unload(pokemonUUID);
         WorkerStateManager.unload(pokemonUUID);
     }
 
     /**
-     * Update worker registry by detecting dead/unloaded workers.
+     * Unregister workers that have stopped reporting in through {@link #registerWorker}.
+     * Costs O(workers), not O(entities in the level).
      */
     private void updateWorkerRegistry(ServerLevel level) {
-        // Build set of currently active Pokemon UUIDs and refresh the per-tick entity cache.
-        Set<UUID> activePokemonUUIDs = new HashSet<>();
-        entityCache.clear();
-
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof PokemonEntity pokemonEntity) {
-                Pokemon pokemon = pokemonEntity.getPokemon();
-                if (pokemon != null && pokemon.getOwnerUUID() != null) {
-                    UUID pokemonUUID = pokemon.getUuid();
-                    activePokemonUUIDs.add(pokemonUUID);
-                    entityCache.put(pokemonUUID, pokemonEntity);
-                }
-            }
-        }
-
-        // Remove workers that are no longer active
+        long now = level.getGameTime();
         List<UUID> toRemove = new ArrayList<>();
-        for (UUID uuid : activeWorkers.keySet()) {
-            if (!activePokemonUUIDs.contains(uuid)) {
-                toRemove.add(uuid);
+        for (Map.Entry<UUID, WorkerInfo> entry : activeWorkers.entrySet()) {
+            if (now - entry.getValue().lastSeenTick > WORKER_STALE_TICKS) {
+                toRemove.add(entry.getKey());
             }
         }
 
@@ -355,8 +414,15 @@ public class JobManager {
                     pos.set(worldX, y, worldZ);
                     blocksScanned++;
 
+                    BlockState state = level.getBlockState(pos);
+
+                    // Remember chests so delivery can pick one without its own block search
+                    if (isChest(state.getBlock())) {
+                        cache.chests.add(pos.immutable());
+                    }
+
                     // Check for job opportunities at this position
-                    JobRecord job = scanPositionForJob(level, pos);
+                    JobRecord job = scanPositionForJob(level, pos, state);
                     if (job != null && !isJobReserved(job.position)) {
                         if (DEBUG) {
                             Palworks.LOGGER.info("Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
@@ -378,8 +444,7 @@ public class JobManager {
      * Detects the job opportunity (if any) at a single world position.
      */
     @Nullable
-    private JobRecord scanPositionForJob(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
+    private JobRecord scanPositionForJob(Level level, BlockPos pos, BlockState state) {
         Block block = state.getBlock();
 
         // Check for station-based jobs (furnaces, etc.)
@@ -480,9 +545,14 @@ public class JobManager {
             }
         }
 
-        // Check for lumbering jobs (trees). Uses the same log test as the tree validator
-        // (#minecraft:logs, minus apricorns); validateTree() gates it again at chop time.
-        if (TreeDetector.isLog(state)) {
+        // Check for lumbering jobs (trees). One job per tree, at its base log (a log standing on
+        // valid ground), and only if it's a valid natural tree. Validating here instead of only at
+        // chop time stops workers repeatedly walking to builds they'll refuse to chop, and checking
+        // the base first keeps the tree search to once per tree rather than once per log.
+        // validateTree() still runs again at chop time.
+        if (TreeDetector.isLog(state)
+                && TreeDetector.isValidGroundBlock(level.getBlockState(pos.below()))
+                && TreeDetector.isValidTree(level, pos)) {
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.CHOP_TREE;
@@ -626,30 +696,53 @@ public class JobManager {
      */
     @Nullable
     private JobRecord createDeliveryJobForWorker(ServerLevel level, WorkerInfo worker, Pokemon pokemon) {
-        // Scan for nearby chests
         BlockPos workerPos = worker.position;
-        int searchRadius = 32; // Same as work radius
 
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         net.minecraft.world.item.ItemStack firstItem = inventory.getFirstItem();
 
-        for (int x = -searchRadius; x <= searchRadius; x++) {
-            for (int y = -4; y <= 4; y++) {
-                for (int z = -searchRadius; z <= searchRadius; z++) {
-                    BlockPos checkPos = workerPos.offset(x, y, z);
-                    Block block = level.getBlockState(checkPos).getBlock();
+        // Pick the nearest chest that has room, from the chests the chunk scan already found.
+        // (This used to scan ~38k blocks itself, every tick while no chest was in range.)
+        BlockPos nearest = null;
+        double nearestDistSq = Double.MAX_VALUE;
+        int chunkRadius = (DELIVERY_SEARCH_RADIUS >> 4) + 1;
+        int baseChunkX = workerPos.getX() >> 4;
+        int baseChunkZ = workerPos.getZ() >> 4;
 
-                    if (isChest(block) && ChestHelper.canAcceptItems(level, checkPos, firstItem)) {
-                        JobRecord job = new JobRecord();
-                        job.position = checkPos.immutable();
-                        job.type = JobType.DELIVER_ITEMS;
-                        job.requiredSuitability = Suitability.TRANSPORTING;
-                        job.discoveryTime = System.currentTimeMillis();
-                        job.priority = 10; // Highest priority - must deliver before doing anything else
-                        return job;
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                ChunkJobCache cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
+                if (cache == null) {
+                    continue;
+                }
+                for (BlockPos chestPos : cache.chests) {
+                    if (Math.abs(chestPos.getX() - workerPos.getX()) > DELIVERY_SEARCH_RADIUS
+                            || Math.abs(chestPos.getZ() - workerPos.getZ()) > DELIVERY_SEARCH_RADIUS
+                            || Math.abs(chestPos.getY() - workerPos.getY()) > DELIVERY_SEARCH_VERTICAL) {
+                        continue;
+                    }
+                    double distSq = workerPos.distSqr(chestPos);
+                    if (distSq >= nearestDistSq) {
+                        continue;
+                    }
+                    // The cached position may be up to one scan old, so re-check it's still a chest
+                    if (isChest(level.getBlockState(chestPos).getBlock())
+                            && ChestHelper.canAcceptItems(level, chestPos, firstItem)) {
+                        nearest = chestPos;
+                        nearestDistSq = distSq;
                     }
                 }
             }
+        }
+
+        if (nearest != null) {
+            JobRecord job = new JobRecord();
+            job.position = nearest;
+            job.type = JobType.DELIVER_ITEMS;
+            job.requiredSuitability = Suitability.TRANSPORTING;
+            job.discoveryTime = System.currentTimeMillis();
+            job.priority = 10; // Highest priority - must deliver before doing anything else
+            return job;
         }
 
         if (DEBUG) {
@@ -670,6 +763,13 @@ public class JobManager {
         PokemonEntity entity = getEntityByUUID(level, worker.pokemonUUID);
         WorkerInventory inventory = pokemon != null ? WorkerInventoryManager.getOrCreate(pokemon) : null;
 
+        // Reachability was judged from where the worker stood; once it has moved, judge again.
+        BlockPos anchor = failureAnchors.get(worker.pokemonUUID);
+        if (anchor != null && anchor.distSqr(worker.position)
+                > UNREACHABLE_FORGET_MOVE_DIST * UNREACHABLE_FORGET_MOVE_DIST) {
+            forgetUnreachable(worker.pokemonUUID);
+        }
+
         Map<BlockPos, Long> failed = recentlyFailedJobs.get(worker.pokemonUUID);
         long now = level.getGameTime();
 
@@ -686,7 +786,7 @@ public class JobManager {
                 continue;
             }
 
-            // Skip jobs this worker recently got stuck trying to reach
+            // Skip jobs this worker couldn't reach (until terrain changes or it moves)
             if (failed != null) {
                 Long expiry = failed.get(job.position);
                 if (expiry != null && expiry > now) {
@@ -714,6 +814,9 @@ public class JobManager {
             if (standPos != null && canPathTo(entity, standPos)) {
                 return job;
             }
+            // Remember it, so next tick this worker checks its next candidates instead of
+            // pathfinding to the same unreachable ones again.
+            rememberUnreachable(worker.pokemonUUID, worker.position, job.position, now);
             if (++pathChecks >= MAX_PATH_CHECKS_PER_WORKER) {
                 break;
             }
@@ -796,26 +899,13 @@ public class JobManager {
     }
 
     /**
-     * Get a PokemonEntity (Mob) by Pokemon UUID for navigation checks.
-     * Uses the per-tick entityCache for O(1) lookup, falling back to a scan on a miss.
+     * Get a registered worker's PokemonEntity (Mob) by Pokemon UUID for navigation checks.
+     * Only workers are looked up, and registerWorker() keeps entityCache current for them.
      */
     @Nullable
     private PokemonEntity getEntityByUUID(ServerLevel level, UUID uuid) {
         PokemonEntity cached = entityCache.get(uuid);
-        if (cached != null && cached.isAlive()) {
-            return cached;
-        }
-        // Cache miss (e.g. a lookup before the first registry update this tick): scan once.
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof PokemonEntity pokemonEntity) {
-                Pokemon pokemon = pokemonEntity.getPokemon();
-                if (pokemon != null && pokemon.getUuid().equals(uuid)) {
-                    entityCache.put(uuid, pokemonEntity);
-                    return pokemonEntity;
-                }
-            }
-        }
-        return null;
+        return cached != null && cached.isAlive() ? cached : null;
     }
 
     /**
@@ -927,14 +1017,12 @@ public class JobManager {
 
         UUID workerUUID = pokemon.getUuid();
         BlockPos pos = reservation.getStationPos();
-        long expiry = serverLevel.getGameTime() + JOB_FAILURE_BLACKLIST_TICKS;
+        WorkerInfo info = activeWorkers.get(workerUUID);
 
-        recentlyFailedJobs
-            .computeIfAbsent(workerUUID, k -> new ConcurrentHashMap<>())
-            .put(pos, expiry);
+        rememberUnreachable(workerUUID, info != null ? info.position : null, pos, serverLevel.getGameTime());
 
         if (DEBUG) {
-            Palworks.LOGGER.debug("{} abandoned {} at {}; won't be reassigned it for {} ticks",
+            Palworks.LOGGER.debug("{} abandoned {} at {}; won't retry it until terrain changes or it moves (max {} ticks)",
                 pokemon.getSpecies().getName(), reservation.getJobType(), pos, JOB_FAILURE_BLACKLIST_TICKS);
         }
     }
@@ -1300,6 +1388,7 @@ public class JobManager {
         recentlyFailedJobs.values().forEach(failed ->
             failed.entrySet().removeIf(e -> e.getValue() <= currentTime));
         recentlyFailedJobs.entrySet().removeIf(e -> e.getValue().isEmpty());
+        failureAnchors.keySet().retainAll(recentlyFailedJobs.keySet());
 
         // Release orphaned reservations (jobs reserved by workers that no longer exist)
         List<BlockPos> orphanedJobs = new ArrayList<>();
@@ -1500,6 +1589,7 @@ public class JobManager {
         public ReservationId currentReservation;
         public boolean idle;
         public long lastAssignmentTime;
+        public long lastSeenTick;      // Game tick of the worker's last registerWorker() call
 
         public WorkerInfo() {
             this.suitabilities = new HashSet<>();
@@ -1532,6 +1622,7 @@ public class JobManager {
     public static class ChunkJobCache {
         public ChunkPos chunk;
         public Map<JobType, List<BlockPos>> cachedJobs;
+        public List<BlockPos> chests = new ArrayList<>(); // Chests seen in the last scan (delivery targets)
         public long lastScanTime;
         public boolean isDirty;
 

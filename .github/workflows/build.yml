@@ -7,18 +7,32 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# A new push to a PR cancels that PR's still-running build, since its result is already outdated.
+# Runs on main are never cancelled, so every main commit gets a result and saves the caches.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
+
+# Supported Cobblemon range (currently 1.7.0 to 1.8.x):
+#   oldest: cobblemon_version in gradle.properties (what `build` compiles and releases against)
+#   newest: the last version in the compile/boot matrices below
+#   players: the Cobblemon range in fabric.mod.json and neoforge.mods.toml
+# To support a newer Cobblemon, update the matrices and widen both metadata ranges.
+env:
+  FABRIC_INSTALLER_VERSION: "1.1.2"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -26,12 +40,12 @@ jobs:
       # Caches the Gradle distribution, dependencies, and Loom's shared files. Only runs on main
       # save this cache; PR runs restore it read-only.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Loom keeps project-specific Minecraft jars (remapped, with our access widener/transformer
       # applied) in .gradle/loom-cache inside the repo, which setup-gradle doesn't cache.
       - name: Cache Loom project files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .gradle/loom-cache
@@ -47,14 +61,155 @@ jobs:
         run: ./gradlew assemble
 
       - name: Test
+        id: test
         run: ./gradlew check
+
+      # Runs whether the tests passed or failed (but not if the build itself failed), and puts a
+      # results table plus each failure's message in the run summary and as PR annotations.
+      - name: Test results
+        if: ${{ !cancelled() && steps.test.conclusion != 'skipped' }}
+        run: python3 -I .github/scripts/test_summary.py '*/build/test-results/test'
+
+      - name: Upload test reports
+        if: ${{ failure() && steps.test.conclusion == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            */build/reports/tests/test/
+            */build/test-results/test/
+          retention-days: 14
 
       - name: Upload artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: palworks-jars
           path: |
             fabric/build/libs/*.jar
             neoforge/build/libs/*.jar
           if-no-files-found: ignore
+
+  # Compiles against the newest supported Cobblemon, catching API that was removed or changed after
+  # the oldest supported version (which `build` compiles against).
+  compile-newest:
+    name: compile (Cobblemon ${{ matrix.cobblemon }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cobblemon: ["1.8.4"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile
+        env:
+          COBBLEMON: ${{ matrix.cobblemon }}
+        run: ./gradlew assemble -Pcobblemon_version="$COBBLEMON"
+
+  # Starts a real dedicated server with the jars `build` produced plus real Cobblemon releases from
+  # Modrinth, on both loaders and at both ends of the supported Cobblemon range. Catches what
+  # compiling can't: mixins that no longer match Cobblemon, broken access wideners/transformers,
+  # bad mod metadata and missing runtime dependencies.
+  boot:
+    name: boot (${{ matrix.loader }}, Cobblemon ${{ matrix.cobblemon }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        loader: [fabric, neoforge]
+        cobblemon: ["1.7.0", "1.8.4"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Read versions
+        id: versions
+        run: |
+          prop() { sed -n "s/^$1 *= *//p" gradle.properties; }
+          {
+            echo "minecraft=$(prop minecraft_version)"
+            echo "fabric_loader=$(prop fabric_loader_version)"
+            echo "fabric_api=$(prop fabric_api_version)"
+            echo "neoforge=$(prop neoforge_version)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download Palworks jars
+        uses: actions/download-artifact@v4
+        with:
+          name: palworks-jars
+          path: artifacts
+
+      # The installed server (loader, libraries, vanilla server jar) only depends on these versions.
+      - name: Cache server install
+        uses: actions/cache@v4
+        with:
+          path: |
+            server
+            !server/mods
+            !server/world
+            !server/logs
+            !server/crash-reports
+          key: server-${{ matrix.loader }}-${{ steps.versions.outputs.minecraft }}-${{ matrix.loader == 'fabric' && steps.versions.outputs.fabric_loader || steps.versions.outputs.neoforge }}-${{ env.FABRIC_INSTALLER_VERSION }}
+
+      - name: Install mods
+        env:
+          LOADER: ${{ matrix.loader }}
+          COBBLEMON: ${{ matrix.cobblemon }}
+          MINECRAFT: ${{ steps.versions.outputs.minecraft }}
+          FABRIC_API: ${{ steps.versions.outputs.fabric_api }}
+        run: |
+          rm -rf server/mods && mkdir -p server/mods
+          mapfile -t jars < <(find "artifacts/$LOADER/build/libs" -name "palworks-$LOADER-*.jar" \
+            ! -name '*-sources.jar' ! -name '*-dev-shadow.jar')
+          if [ "${#jars[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one Palworks $LOADER jar, found: ${jars[*]:-none}"
+            exit 1
+          fi
+          cp "${jars[0]}" server/mods/
+          echo "Palworks: $(basename "${jars[0]}")"
+          pins=()
+          if [ "$LOADER" = fabric ]; then
+            pins+=(--pin "fabric-api=$FABRIC_API")
+          fi
+          python3 -I .github/scripts/fetch_server_mods.py --loader "$LOADER" --minecraft "$MINECRAFT" \
+            --cobblemon "$COBBLEMON" "${pins[@]}" --dest server/mods
+
+      - name: Boot server
+        env:
+          MINECRAFT_VERSION: ${{ steps.versions.outputs.minecraft }}
+          FABRIC_LOADER_VERSION: ${{ steps.versions.outputs.fabric_loader }}
+          NEOFORGE_VERSION: ${{ steps.versions.outputs.neoforge }}
+          LOADER: ${{ matrix.loader }}
+        run: .github/scripts/boot_server.sh "$LOADER" server
+
+      - name: Upload server logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs-${{ matrix.loader }}-cobblemon-${{ matrix.cobblemon }}
+          path: |
+            server/server.log
+            server/logs/
+            server/crash-reports/
+            server/installer.log
+          if-no-files-found: ignore
+          retention-days: 14

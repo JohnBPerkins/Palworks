@@ -44,7 +44,9 @@ dependencies {
 
     // Cobblemon: Available for compilation, but not loaded in dev environment
     // To test with Cobblemon: build your mod and install in a real Minecraft instance
-    modCompileOnly("com.cobblemon:fabric:1.7.1+1.21.1")
+    // Version comes from gradle.properties (cobblemon_version); CI also builds against the newest
+    // supported Cobblemon. Non-transitive: Cobblemon's runtime libraries aren't needed to compile.
+    modCompileOnly("com.cobblemon:fabric:${rootProject.cobblemon_version}+${rootProject.minecraft_version}") { transitive = false }
 
     modImplementation("net.fabricmc:fabric-language-kotlin:1.13.8+kotlin.2.3.0")
 }
