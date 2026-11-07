@@ -100,6 +100,10 @@ public class JobManager {
     // Where each worker was when its current failures were recorded (reachability is from there).
     private final Map<UUID, BlockPos> failureAnchors = new ConcurrentHashMap<>();
 
+    // Blocks of trees already validated during the current chunk scan, so a tree with several base
+    // blocks only gets one tree search and one job. Cleared at the start of each chunk scan.
+    private final Set<BlockPos> treeBlocksSeenThisScan = new HashSet<>();
+
     // Consecutive job queue (harvest → pickup + replant)
     private final Queue<ConsecutiveJobRequest> consecutiveJobQueue;
 
@@ -392,6 +396,7 @@ public class JobManager {
      */
     private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int scanMinY, int scanMaxY) {
         ChunkJobCache cache = new ChunkJobCache();
+        treeBlocksSeenThisScan.clear();
         cache.chunk = chunkPos;
         cache.lastScanTime = level.getGameTime();
         cache.isDirty = false;
@@ -546,14 +551,20 @@ public class JobManager {
             }
         }
 
-        // Check for lumbering jobs (trees). One job per tree, at its base log (a log standing on
-        // valid ground), and only if it's a valid natural tree. Validating here instead of only at
-        // chop time stops workers repeatedly walking to builds they'll refuse to chop, and checking
-        // the base first keeps the tree search to once per tree rather than once per log.
+        // Check for lumbering jobs (trees). One job per tree, at a base block (a log, or a mangrove
+        // root, standing on valid ground), and only if it's a valid natural tree. Validating here
+        // instead of only at chop time stops workers repeatedly walking to builds they'll refuse to
+        // chop. Checking for a base first, and skipping bases of a tree already validated this scan
+        // (2x2 trunks, a mangrove's many root columns), keeps it to one tree search per tree.
         // validateTree() still runs again at chop time.
-        if (TreeDetector.isLog(state)
+        if (TreeDetector.isTreeBlock(state)
                 && TreeDetector.isValidGroundBlock(level.getBlockState(pos.below()))
-                && TreeDetector.isValidTree(level, pos)) {
+                && !treeBlocksSeenThisScan.contains(pos)) {
+            TreeDetector.TreeValidationResult tree = TreeDetector.validateTree(level, pos);
+            if (!tree.isValid()) {
+                return null;
+            }
+            treeBlocksSeenThisScan.addAll(tree.getLogPositions());
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.CHOP_TREE;
@@ -1257,17 +1268,17 @@ public class JobManager {
     private void createPlantSaplingJob(ServerLevel level, ConsecutiveJobRequest request) {
         BlockPos plantPos = request.sourceJobLocation;
 
-        // Verify position is valid for planting
-        if (!dev.palworks.tree.TreeDetector.canPlantSaplingAt(level, plantPos)) {
+        if (request.saplingItem == null) {
             if (DEBUG) {
-                Palworks.LOGGER.debug("Cannot plant sapling at {} - position not valid", plantPos);
+                Palworks.LOGGER.debug("No sapling item specified for plant job at {}", plantPos);
             }
             return;
         }
 
-        if (request.saplingItem == null) {
+        // Verify position is valid for planting (depends on the sapling: propagules can go in water)
+        if (!dev.palworks.tree.TreeDetector.canPlantSaplingAt(level, plantPos, request.saplingItem)) {
             if (DEBUG) {
-                Palworks.LOGGER.debug("No sapling item specified for plant job at {}", plantPos);
+                Palworks.LOGGER.debug("Cannot plant sapling at {} - position not valid", plantPos);
             }
             return;
         }

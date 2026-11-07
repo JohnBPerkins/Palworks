@@ -15,6 +15,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -24,7 +26,7 @@ import java.util.*;
  *
  * A valid tree must:
  * - Have its base log touching grass, dirt, podzol, mud, or similar ground blocks
- * - Consist of blocks tagged as #minecraft:logs
+ * - Consist of blocks tagged as #minecraft:logs, plus mangrove roots (which aren't in that tag)
  * - Have a minimum number of leaves (#minecraft:leaves) within the tree area
  * - Not exceed the maximum block search limit
  * - Not be connected to invalid blocks (only logs, leaves, air, and vines are allowed)
@@ -106,8 +108,8 @@ public class TreeDetector {
     public static TreeValidationResult validateTree(Level level, BlockPos startPos) {
         BlockState startState = level.getBlockState(startPos);
 
-        // First check: is this even a log?
-        if (!isLog(startState)) {
+        // First check: is this even part of a tree?
+        if (!isTreeBlock(startState)) {
             return TreeValidationResult.invalid("Starting position is not a log");
         }
 
@@ -151,8 +153,8 @@ public class TreeDetector {
                 BlockState neighborState = level.getBlockState(neighbor);
 
                 // Check what type of block this is
-                if (isLog(neighborState)) {
-                    // Connected log - add to BFS if not visited
+                if (isTreeBlock(neighborState)) {
+                    // Connected log (or mangrove root) - add to BFS if not visited
                     if (!visitedLogs.contains(neighbor)) {
                         visitedLogs.add(neighbor);
                         queue.add(neighbor);
@@ -170,6 +172,8 @@ public class TreeDetector {
                     // Air is fine
                 } else if (isVine(neighborState)) {
                     // Vines are allowed (swamp trees have vines)
+                } else if (isAllowedTreeNeighbor(neighborState)) {
+                    // Water, moss carpet, hanging propagules: what mangroves grow among
                 } else {
                     // Invalid block touching the tree!
                     Block invalidBlock = neighborState.getBlock();
@@ -182,8 +186,12 @@ public class TreeDetector {
             }
         }
 
-        // Also search for leaves in a radius around the logs (leaves might not be directly adjacent)
+        // Also search for leaves in a radius around the logs (leaves might not be directly adjacent).
+        // Mangrove roots are skipped: they're at the bottom of the tree, away from the canopy.
         for (BlockPos logPos : visitedLogs) {
+            if (isMangroveRoots(level.getBlockState(logPos))) {
+                continue;
+            }
             for (int dx = -LEAF_SEARCH_RADIUS; dx <= LEAF_SEARCH_RADIUS; dx++) {
                 for (int dy = -LEAF_SEARCH_RADIUS; dy <= LEAF_SEARCH_RADIUS; dy++) {
                     for (int dz = -LEAF_SEARCH_RADIUS; dz <= LEAF_SEARCH_RADIUS; dz++) {
@@ -243,6 +251,32 @@ public class TreeDetector {
      */
     public static boolean isLog(BlockState state) {
         return state.is(BlockTags.LOGS) && !state.is(APRICORN_LOGS);
+    }
+
+    /**
+     * Mangrove roots: part of a mangrove (chopped with it, and how it reaches the ground), but not
+     * in #minecraft:logs. Muddy mangrove roots count as ground instead (they're in #minecraft:dirt).
+     */
+    public static boolean isMangroveRoots(BlockState state) {
+        return state.is(Blocks.MANGROVE_ROOTS);
+    }
+
+    /**
+     * A block that makes up a tree and is chopped with it: a log, or a mangrove root.
+     */
+    public static boolean isTreeBlock(BlockState state) {
+        return isLog(state) || isMangroveRoots(state);
+    }
+
+    /**
+     * Blocks that may touch a tree without disqualifying it, besides air, leaves, vines and ground:
+     * water (mangrove roots stand in it), moss carpet (grows on mangrove roots) and mangrove
+     * propagules (hang under mangrove leaves).
+     */
+    private static boolean isAllowedTreeNeighbor(BlockState state) {
+        return state.is(Blocks.WATER)
+            || state.is(Blocks.MOSS_CARPET)
+            || state.is(Blocks.MANGROVE_PROPAGULE);
     }
 
     /**
@@ -352,6 +386,9 @@ public class TreeDetector {
     @Nullable
     public static Item getSaplingForTree(Level level, BlockPos logPos) {
         BlockState state = level.getBlockState(logPos);
+        if (isMangroveRoots(state)) {
+            return Items.MANGROVE_PROPAGULE;
+        }
         if (!isLog(state)) {
             return null;
         }
@@ -378,11 +415,14 @@ public class TreeDetector {
 
     /**
      * Check if a sapling can be planted at this position.
-     * Saplings need air above and valid ground below.
+     * Saplings need air (or, for a mangrove propagule, still water) and valid ground below.
      */
-    public static boolean canPlantSaplingAt(Level level, BlockPos pos) {
-        // Position must be air
-        if (!level.getBlockState(pos).isAir()) {
+    public static boolean canPlantSaplingAt(Level level, BlockPos pos, Item saplingItem) {
+        // Position must be air. A mangrove's base is often in water once its roots are chopped, and
+        // propagules can be planted underwater (waterlogged), so they also accept a water source.
+        BlockState here = level.getBlockState(pos);
+        boolean underwater = saplingItem == Items.MANGROVE_PROPAGULE && isWaterSource(here);
+        if (!here.isAir() && !underwater) {
             return false;
         }
 
@@ -410,7 +450,7 @@ public class TreeDetector {
      * Returns true if successful.
      */
     public static boolean plantSapling(Level level, BlockPos pos, Item saplingItem) {
-        if (!canPlantSaplingAt(level, pos)) {
+        if (!canPlantSaplingAt(level, pos, saplingItem)) {
             return false;
         }
 
@@ -419,7 +459,16 @@ public class TreeDetector {
             return false;
         }
 
-        level.setBlock(pos, saplingBlock.defaultBlockState(), 3);
+        BlockState saplingState = saplingBlock.defaultBlockState();
+        if (isWaterSource(level.getBlockState(pos))
+                && saplingState.hasProperty(BlockStateProperties.WATERLOGGED)) {
+            saplingState = saplingState.setValue(BlockStateProperties.WATERLOGGED, true);
+        }
+        level.setBlock(pos, saplingState, 3);
         return true;
+    }
+
+    private static boolean isWaterSource(BlockState state) {
+        return state.is(Blocks.WATER) && state.getFluidState().isSourceOfType(Fluids.WATER);
     }
 }
