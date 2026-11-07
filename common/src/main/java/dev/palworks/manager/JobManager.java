@@ -718,9 +718,8 @@ public class JobManager {
                             pokemon.getSpecies().getName(), WorkerInventoryManager.getTotalItemCount(pokemon));
                     }
 
-                    JobRecord deliverJob = createDeliveryJobForWorker(level, worker, pokemon);
-                    if (deliverJob != null) {
-                        assignJobToWorker(level, worker, deliverJob);
+                    // Nearest chests with room first; the first one it can actually reach wins
+                    if (assignFirstReachable(worker, deliveryCandidates(level, worker, pokemon)) != null) {
                         assignedCount++;
                         continue; // Skip normal job assignment
                     }
@@ -730,14 +729,8 @@ public class JobManager {
                 }
             }
 
-            // Find best job for this worker
-            JobRecord bestJob = findBestJobForWorker(worker);
-
-            if (bestJob != null) {
-                // IMPORTANT: Remove from available IMMEDIATELY to prevent double-assignment
-                availableJobs.remove(bestJob.position);
-
-                assignJobToWorker(level, worker, bestJob);
+            // Best pool jobs first; the first one it can actually reach wins
+            if (assignFirstReachable(worker, poolCandidates(worker)) != null) {
                 assignedCount++;
             }
         }
@@ -782,19 +775,18 @@ public class JobManager {
     }
 
     /**
-     * Create a DELIVER_ITEMS job for a worker with items in inventory.
+     * DELIVER_ITEMS candidates for a worker with items to store: the chests (that the chunk scan
+     * already found) in range with room for them, nearest first. Assignment then picks the first
+     * one the worker can reach, so an unreachable nearest chest no longer traps it in a loop.
      */
-    @Nullable
-    private JobRecord createDeliveryJobForWorker(ServerLevel level, WorkerInfo worker, Pokemon pokemon) {
+    private List<JobRecord> deliveryCandidates(ServerLevel level, WorkerInfo worker, Pokemon pokemon) {
         BlockPos workerPos = worker.position;
 
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         net.minecraft.world.item.ItemStack firstItem = inventory.getFirstItem();
 
-        // Pick the nearest chest that has room, from the chests the chunk scan already found.
-        // (This used to scan ~38k blocks itself, every tick while no chest was in range.)
-        BlockPos nearest = null;
-        double nearestDistSq = Double.MAX_VALUE;
+        // From the chests the chunk scan already found (this used to scan ~38k blocks itself)
+        List<BlockPos> chests = new ArrayList<>();
         int chunkRadius = (DELIVERY_SEARCH_RADIUS >> 4) + 1;
         int baseChunkX = workerPos.getX() >> 4;
         int baseChunkZ = workerPos.getZ() >> 4;
@@ -811,64 +803,50 @@ public class JobManager {
                             || Math.abs(chestPos.getY() - workerPos.getY()) > DELIVERY_SEARCH_VERTICAL) {
                         continue;
                     }
-                    double distSq = workerPos.distSqr(chestPos);
-                    if (distSq >= nearestDistSq) {
-                        continue;
-                    }
                     // The cached position may be up to one scan old, so re-check it's still a chest
                     if (isChest(level.getBlockState(chestPos).getBlock())
                             && ChestHelper.canAcceptItems(level, chestPos, firstItem)) {
-                        nearest = chestPos;
-                        nearestDistSq = distSq;
+                        chests.add(chestPos);
                     }
                 }
             }
         }
+        chests.sort(Comparator.comparingDouble(workerPos::distSqr));
 
-        if (nearest != null) {
+        List<JobRecord> candidates = new ArrayList<>(chests.size());
+        for (BlockPos chestPos : chests) {
             JobRecord job = new JobRecord();
-            job.position = nearest;
+            job.position = chestPos;
             job.type = JobType.DELIVER_ITEMS;
             job.requiredSuitabilities = EnumSet.of(Suitability.TRANSPORTING);
             job.discoveryTime = System.currentTimeMillis();
             job.priority = 10; // Highest priority - must deliver before doing anything else
-            return job;
+            candidates.add(job);
         }
 
-        if (DEBUG) {
+        if (DEBUG && candidates.isEmpty()) {
             Palworks.LOGGER.warn("No chest found for {} to deliver {} items!",
                 pokemon.getSpecies().getName(),
                 WorkerInventoryManager.getTotalItemCount(pokemon));
         }
-
-        return null;
+        return candidates;
     }
 
     /**
-     * Find the best job for a given worker.
+     * Pool jobs this worker could take, best first (scored by distance and priority). Only the
+     * job-specific filters live here; the checks every job gets (suitability, unreachable memory,
+     * stand position, path) are in {@link #assignFirstReachable}.
      */
-    @Nullable
-    private JobRecord findBestJobForWorker(WorkerInfo worker) {
+    private List<JobRecord> poolCandidates(WorkerInfo worker) {
         Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
-        PokemonEntity entity = getEntityByUUID(level, worker.pokemonUUID);
         WorkerInventory inventory = pokemon != null ? WorkerInventoryManager.getOrCreate(pokemon) : null;
-
-        // Reachability was judged from where the worker stood; once it has moved, judge again.
-        BlockPos anchor = failureAnchors.get(worker.pokemonUUID);
-        if (anchor != null && anchor.distSqr(worker.position)
-                > UNREACHABLE_FORGET_MOVE_DIST * UNREACHABLE_FORGET_MOVE_DIST) {
-            forgetUnreachable(worker.pokemonUUID);
-        }
-
-        Map<BlockPos, Long> failed = recentlyFailedJobs.get(worker.pokemonUUID);
-        long now = level.getGameTime();
         boolean carriesSeeds = inventory != null && inventory.hasAnySeed();
 
         // Collect viable candidates and score them cheaply (NO pathfinding in this pass).
         List<JobRecord> candidates = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
-            // Skip if worker lacks suitability
-            if (!canDoJob(worker, job)) {
+            // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
+            if (!canDoJob(worker, job) || isRecentlyUnreachable(worker, job.position)) {
                 continue;
             }
 
@@ -887,14 +865,6 @@ public class JobManager {
                 continue;
             }
 
-            // Skip jobs this worker couldn't reach (until terrain changes or it moves)
-            if (failed != null) {
-                Long expiry = failed.get(job.position);
-                if (expiry != null && expiry > now) {
-                    continue;
-                }
-            }
-
             candidates.add(job);
         }
 
@@ -905,32 +875,82 @@ public class JobManager {
             candidates.removeIf(j -> j.type == JobType.PLANT_SEEDS);
         }
 
+        // Sort by score (lower is better) so only the most promising jobs get path-checked.
+        candidates.sort(Comparator.comparingDouble(j -> scoreJob(worker, j)));
+        return candidates;
+    }
+
+    // ============================================
+    // Assignment pipeline: every job reaches a worker through here
+    // ============================================
+
+    /**
+     * Assign the worker the first job in {@code candidates} (best first) that it can actually do
+     * and reach. This is the only way a job is handed to a worker: pool jobs, deliveries and
+     * follow-up jobs all come through here, so they all get the same checks, in this order:
+     * <ol>
+     *   <li>the worker has every suitability the job needs;</li>
+     *   <li>it hasn't recently failed to reach that spot (see recentlyFailedJobs);</li>
+     *   <li>there's somewhere to stand to do it (WorkPositions);</li>
+     *   <li>there's a real path to that spot.</li>
+     * </ol>
+     * Candidates that fail 3 or 4 are remembered as unreachable, so the next call moves on to
+     * others. Path checks are expensive, so at most MAX_PATH_CHECKS_PER_WORKER run per call.
+     *
+     * @return the job assigned, or null if none of the candidates worked out
+     */
+    @Nullable
+    private JobRecord assignFirstReachable(WorkerInfo worker, List<JobRecord> candidates) {
         if (candidates.isEmpty()) {
             return null;
         }
+        PokemonEntity entity = getEntityByUUID(level, worker.pokemonUUID);
+        if (entity == null) {
+            return null; // can't check reachability without the entity; try again next tick
+        }
+        refreshUnreachableMemory(worker);
+        long now = level.getGameTime();
 
-        // Sort by score (lower is better) so we only pathfind the most promising jobs.
-        candidates.sort(java.util.Comparator.comparingDouble(j -> scoreJob(worker, j)));
-
-        // Pathfinding (createPath) is expensive - only path-check the best few candidates.
         int pathChecks = 0;
         for (JobRecord job : candidates) {
-            if (entity == null) {
-                return job; // can't path-check; take the best by score
+            if (!canDoJob(worker, job) || isRecentlyUnreachable(worker, job.position)) {
+                continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position, job.type, entity);
             if (standPos != null && canPathTo(entity, standPos)) {
+                // Take it out of the pool first so no other worker gets it too. Only if the pool
+                // holds this job: a delivery shares its chest's position with a GET_SEEDS job.
+                availableJobs.remove(job.position, job);
+                assignJobToWorker(level, worker, job);
                 return job;
             }
-            // Remember it, so next tick this worker checks its next candidates instead of
+            // Remember it, so next time this worker checks other candidates instead of
             // pathfinding to the same unreachable ones again.
             rememberUnreachable(worker.pokemonUUID, worker.position, job.position, now);
             if (++pathChecks >= MAX_PATH_CHECKS_PER_WORKER) {
                 break;
             }
         }
-
         return null;
+    }
+
+    /** Whether the worker recently failed to reach this spot (and nothing has changed since). */
+    private boolean isRecentlyUnreachable(WorkerInfo worker, BlockPos pos) {
+        Map<BlockPos, Long> failed = recentlyFailedJobs.get(worker.pokemonUUID);
+        if (failed == null) {
+            return false;
+        }
+        Long expiry = failed.get(pos);
+        return expiry != null && expiry > level.getGameTime();
+    }
+
+    /** Reachability was judged from where the worker stood; once it has moved away, judge again. */
+    private void refreshUnreachableMemory(WorkerInfo worker) {
+        BlockPos anchor = failureAnchors.get(worker.pokemonUUID);
+        if (anchor != null && anchor.distSqr(worker.position)
+                > UNREACHABLE_FORGET_MOVE_DIST * UNREACHABLE_FORGET_MOVE_DIST) {
+            forgetUnreachable(worker.pokemonUUID);
+        }
     }
 
     /** Whether the worker carries a seed that can be planted at {@code plantPos}. */
@@ -971,8 +991,9 @@ public class JobManager {
     }
 
     /**
-     * Assign a specific job to a worker.
-     * NOTE: Job should already be removed from availableJobs before calling this.
+     * Record that a worker has a job (its reservation). Low-level: only
+     * {@link #assignFirstReachable} calls this, after the checks every job gets. Don't call it
+     * directly, or the job skips those checks.
      */
     private void assignJobToWorker(ServerLevel level, WorkerInfo worker, JobRecord job) {
         Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
@@ -1228,12 +1249,11 @@ public class JobManager {
         collectJob.priority = HIGH_PRIORITY;
         collectJob.reservedByWorker = request.suggestedWorkerUUID;  // Hint for assignment
 
-        // Try to assign to suggested worker first
+        // Offer it to the suggested worker first (same checks as any job: suitability, reachable);
+        // otherwise it goes to the pool for anyone
         WorkerInfo suggestedWorker = activeWorkers.get(request.suggestedWorkerUUID);
-        if (suggestedWorker != null && suggestedWorker.idle &&
-            suggestedWorker.suitabilities.contains(Suitability.TRANSPORTING)) {
-            assignJobToWorker(level, suggestedWorker, collectJob);
-
+        if (suggestedWorker != null && suggestedWorker.idle
+                && assignFirstReachable(suggestedWorker, List.of(collectJob)) != null) {
             if (DEBUG) {
                 Palworks.LOGGER.debug("Assigned consecutive collect drops job to original harvester at {}",
                     request.sourceJobLocation);
