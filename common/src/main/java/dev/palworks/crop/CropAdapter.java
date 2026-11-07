@@ -1,6 +1,7 @@
 package dev.palworks.crop;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
@@ -109,9 +110,10 @@ public class CropAdapter {
             return crop.isMaxAge(state);
         }
 
-        // Stems (pumpkin/melon stems)
+        // Pumpkin/melon stems are never harvested themselves, even fully grown: their fruit is (see
+        // attachedFruitPos / isAttachedFruit)
         if (block instanceof StemBlock) {
-            return state.getValue(StemBlock.AGE) >= StemBlock.MAX_AGE;
+            return false;
         }
 
         // Nether wart
@@ -165,6 +167,31 @@ public class CropAdapter {
     }
 
     /**
+     * For an attached stem (a pumpkin or melon stem, or a modded gourd's, that has grown its fruit),
+     * the position of that fruit; otherwise null. Harvest jobs for gourds are found from the stem so
+     * the chunk scan doesn't have to check every block's neighbours.
+     */
+    @Nullable
+    public static BlockPos attachedFruitPos(BlockState state, BlockPos stemPos) {
+        if (state.getBlock() instanceof AttachedStemBlock) {
+            return stemPos.relative(state.getValue(AttachedStemBlock.FACING));
+        }
+        return null;
+    }
+
+    /** Whether the block at {@code pos} is the fruit of an attached stem next to it. */
+    public static boolean isAttachedFruit(Level level, BlockPos pos) {
+        for (Direction dir : Direction.Plane.HORIZONTAL) {
+            BlockState neighbor = level.getBlockState(pos.relative(dir));
+            if (neighbor.getBlock() instanceof AttachedStemBlock
+                    && neighbor.getValue(AttachedStemBlock.FACING) == dir.getOpposite()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Check if a block is a crop (not necessarily fully grown).
      */
     public static boolean isCrop(Level level, BlockPos pos) {
@@ -203,6 +230,17 @@ public class CropAdapter {
         }
 
         return null;
+    }
+
+    /**
+     * The item that plants the crop at {@code pos}: its pick-block item (wheat seeds for wheat, a
+     * carrot for carrots, cocoa beans for cocoa, nether wart for nether wart; modded crops' own
+     * seeds). Null if the block has none.
+     */
+    @Nullable
+    private static Item seedOf(Level level, BlockPos pos, BlockState state) {
+        ItemStack clone = state.getBlock().getCloneItemStack(level, pos, state);
+        return clone.isEmpty() ? null : clone.getItem();
     }
 
     /**
@@ -290,6 +328,13 @@ public class CropAdapter {
      * Returns true if successfully harvested.
      */
     public static boolean harvestCrop(Level level, BlockPos pos) {
+        // A pumpkin, melon (or modded gourd) grown by a stem next to it: break it like a player
+        // would, with its normal drops. The stem detaches by itself and grows another.
+        if (isAttachedFruit(level, pos)) {
+            level.destroyBlock(pos, true);
+            return true;
+        }
+
         if (!isFullyGrown(level, pos)) {
             return false;
         }
@@ -434,15 +479,34 @@ public class CropAdapter {
 
             // Only harvest if at max age
             if (currentAge >= maxAge) {
-                Item cropItem = block.asItem();
-                int dropCount = 1 + level.random.nextInt(3);
-                Block.popResource(level, pos, new ItemStack(cropItem, dropCount));
+                // Harvest in place, like right-click-harvest mods: drop the crop's real loot (what
+                // breaking it by hand gives, e.g. wheat + 1-4 seeds), minus one seed that pays for
+                // replanting, and reset it to age 0. This used to drop block.asItem() instead, which
+                // for wheat and beetroot is the seed, so those fields never produced any crop.
+                List<ItemStack> drops = level instanceof ServerLevel serverLevel
+                    ? Block.getDrops(state, serverLevel, pos, level.getBlockEntity(pos))
+                    : new ArrayList<>();
+                if (drops.isEmpty()) {
+                    // No loot table result (some modded crops): keep the old behaviour
+                    drops = new ArrayList<>(List.of(new ItemStack(block.asItem(), 1 + level.random.nextInt(3))));
+                }
 
-                // Reset to age 0
+                // Every vanilla crop drops at least one of its seed when mature, so there's always
+                // one to take (wheat/beetroot 1-4 seeds, cocoa 3 beans, carrots, potatoes, wart)
+                Item seed = seedOf(level, pos, state);
+                if (seed != null) {
+                    takeOne(drops, seed);
+                }
+                for (ItemStack drop : drops) {
+                    if (!drop.isEmpty()) {
+                        Block.popResource(level, pos, drop);
+                    }
+                }
+
                 level.setBlock(pos, state.setValue(ageProperty, 0), 3);
 
-                dev.palworks.Palworks.LOGGER.info("Harvested aged crop at {}: was age {}, dropped {} x{}, reset to age 0",
-                    pos, currentAge, cropItem, dropCount);
+                dev.palworks.Palworks.LOGGER.debug("Harvested crop at {}: was age {}, dropped {}, reset to age 0",
+                    pos, currentAge, drops);
                 return true;
             }
         }
@@ -450,6 +514,16 @@ public class CropAdapter {
         // Default: break the block completely (for crops like wheat, carrots, etc.)
         level.destroyBlock(pos, true);
         return true;
+    }
+
+    /** Remove one of {@code item} from a list of drops, if there is one. */
+    private static void takeOne(List<ItemStack> drops, Item item) {
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty() && drop.is(item)) {
+                drop.shrink(1);
+                return;
+            }
+        }
     }
 
     /**

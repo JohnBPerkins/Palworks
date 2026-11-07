@@ -377,7 +377,6 @@ public class WorkerAI {
         HANDLERS.put(JobType.PLANT_SEEDS, new PlantSeedsHandler());
         HANDLERS.put(JobType.HARVEST_CROPS, new HarvestCropsHandler());
         HANDLERS.put(JobType.CHOP_TREE, new ChopTreeHandler());
-        HANDLERS.put(JobType.PLANT_SAPLING, new PlantSaplingHandler());
         // MINE_RESOURCE: worker stands 4s but does not yet break the ore (pre-existing TODO).
         HANDLERS.put(JobType.MINE_RESOURCE, () -> 80);
     }
@@ -546,7 +545,18 @@ public class WorkerAI {
         @Override public void onStart(JobContext ctx) {
             BlockPos plantPos = ctx.pos();
             WorkerInventory inventory = ctx.inventory();
-            ItemStack seedStack = inventory.getFirstItem();
+
+            // Plant a carried seed: the first held item that can be planted on this block (not just
+            // the first item, which may be something else, like a harvested crop).
+            ItemStack seedStack = ItemStack.EMPTY;
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                ItemStack stack = inventory.getItem(i);
+                if (!stack.isEmpty()
+                        && dev.palworks.crop.CropAdapter.canPlantSeed(stack.getItem(), ctx.level(), plantPos.below())) {
+                    seedStack = stack;
+                    break;
+                }
+            }
             if (seedStack.isEmpty()) {
                 if (DEBUG) {
                     Palworks.LOGGER.warn("{} has no seeds to plant at {}", ctx.name(), plantPos);
@@ -594,9 +604,16 @@ public class WorkerAI {
             TreeDetector.TreeValidationResult treeResult = TreeDetector.validateTree(level, treePos);
 
             if (treeResult.isValid() && !treeResult.getLogPositions().isEmpty()) {
-                // Get sapling type BEFORE destroying the tree
-                net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treePos);
+                // Get sapling type BEFORE destroying the tree (found by name from its logs or leaves;
+                // null for a tree with no recognisable sapling, which is chopped but not replanted)
+                net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treeResult);
                 BlockPos basePos = treeResult.getBasePosition();
+
+                // Where to replant: a 2x2 trunk (dark oak, giant spruce/jungle) gets a 2x2 of saplings
+                // in the same spots, anything else one at its base. Worked out while the trunk is
+                // still there to look at.
+                java.util.List<BlockPos> saplingSpots =
+                    TreeDetector.saplingPositions(level, treeResult.getLogPositions(), basePos);
 
                 // Huge fungus canopies never decay, so they come down with the stem (found before
                 // anything is broken, while the tree is still intact)
@@ -619,42 +636,30 @@ public class WorkerAI {
                         ctx.name(), treePos, logsChopped, canopy.size(), basePos, saplingItem);
                 }
 
-                // Queue consecutive jobs: collect drops + replant sapling
+                // Replant right away, as part of the chop. The sapling is free: the leaves still drop
+                // their usual saplings as they decay, and nothing has dropped yet to pay with.
+                int replanted = 0;
+                if (saplingItem != null) {
+                    for (BlockPos spot : saplingSpots) {
+                        if (TreeDetector.plantSapling(level, spot, saplingItem)) {
+                            replanted++;
+                        }
+                    }
+                }
+                if (DEBUG) {
+                    Palworks.LOGGER.info("{} replanted {} of {} {} at {}", ctx.name(),
+                        replanted, saplingSpots.size(), saplingItem, saplingSpots);
+                }
+
+                // Queue a job to collect the drops
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                    JobManager.getInstance(serverLevel).onTreeChopped(ctx.pokemon(), basePos, saplingItem, level);
+                    JobManager.getInstance(serverLevel).onTreeChopped(ctx.pokemon(), basePos, level);
                 }
             } else if (DEBUG) {
                 // Not a valid tree any more (partly chopped, or it's a player build). Leave it alone:
                 // breaking "just this log" is how builds that fail tree detection got griefed.
                 Palworks.LOGGER.warn("{} found no valid tree at {} ({}), leaving it alone",
                     ctx.name(), treePos, treeResult.getReason());
-            }
-        }
-    }
-
-    private static final class PlantSaplingHandler implements JobHandler {
-        @Override public int requiredTicks() { return 20; }
-
-        @Override public void onFinish(JobContext ctx) {
-            Level level = ctx.level();
-            BlockPos plantPos = ctx.pos();
-
-            net.minecraft.world.item.Item saplingItem = null;
-            if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                saplingItem = JobManager.getInstance(serverLevel).consumePendingSapling(plantPos);
-            }
-
-            if (saplingItem != null) {
-                boolean planted = TreeDetector.plantSapling(level, plantPos, saplingItem);
-                if (DEBUG) {
-                    if (planted) {
-                        Palworks.LOGGER.info("{} planted {} sapling at {}", ctx.name(), saplingItem, plantPos);
-                    } else {
-                        Palworks.LOGGER.warn("{} failed to plant {} sapling at {}", ctx.name(), saplingItem, plantPos);
-                    }
-                }
-            } else if (DEBUG) {
-                Palworks.LOGGER.warn("{} has no sapling to plant at {}", ctx.name(), plantPos);
             }
         }
     }
