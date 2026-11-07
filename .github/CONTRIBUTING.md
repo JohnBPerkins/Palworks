@@ -7,7 +7,7 @@ By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md
 
 ## Setup
 
-Clone and build as described in the [README](README.md#building-from-source) (JDK 21 + Git; the
+Clone and build as described in the [README](../README.md#building-from-source) (JDK 21 + Git; the
 Gradle wrapper provides the right Gradle version). The commands you'll use day to day:
 
 ```bash

@@ -54,7 +54,7 @@ The jars land in `fabric/build/libs/` and `neoforge/build/libs/`.
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout,
+Contributions are welcome! See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for the project layout,
 testing, and how to submit changes.
 
 ## License
