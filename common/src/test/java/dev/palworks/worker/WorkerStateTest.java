@@ -6,7 +6,14 @@ import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import dev.palworks.job.JobType;
+import dev.palworks.reservation.ReservationId;
+import net.minecraft.core.BlockPos;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -48,5 +55,81 @@ class WorkerStateTest {
     void stateWithoutEnabledKeyLoadsAsEnabled() {
         assertTrue(WorkerState.fromNBT(new CompoundTag()).isEnabled(),
             "data saved before the enabled key existed should default to enabled");
+    }
+
+    // ---- Job progress (steps) ----
+
+    @Test
+    void jobStepAndDataSurviveSaveAndLoad() {
+        WorkerState state = new WorkerState();
+        CompoundTag data = new CompoundTag();
+        data.putString("sapling", "minecraft:oak_sapling");
+        state.startJob(1, data);
+
+        WorkerState loaded = WorkerState.fromNBT(state.serializeNBT());
+
+        assertEquals(1, loaded.getJobStep(), "a reloaded job carries on from the step it reached");
+        assertEquals("minecraft:oak_sapling", loaded.getJobData().getString("sapling"));
+    }
+
+    @Test
+    void ticksWithinAStepAreNotSaved() {
+        // After a reload the step it was on starts over (with its animation), not mid-way
+        WorkerState state = new WorkerState();
+        state.startJob(1, null);
+        state.addStepTick();
+        state.addStepTick();
+
+        assertEquals(0, WorkerState.fromNBT(state.serializeNBT()).getStepTicks());
+    }
+
+    @Test
+    void stateSavedBeforeJobStepsLoadsAtTheStartOfTheJob() {
+        WorkerState loaded = WorkerState.fromNBT(new CompoundTag());
+
+        assertEquals(0, loaded.getJobStep());
+        assertNotNull(loaded.getJobData());
+    }
+
+    @Test
+    void startJobCopiesTheHandedOverData() {
+        CompoundTag data = new CompoundTag();
+        data.putInt("x", 1);
+        WorkerState state = new WorkerState();
+        state.startJob(1, data);
+
+        data.putInt("x", 2); // the job record the data came from changes later
+        assertEquals(1, state.getJobData().getInt("x"), "the worker has its own copy");
+    }
+
+    @Test
+    void clearingTheReservationClearsJobProgress() {
+        WorkerState state = new WorkerState();
+        state.setCurrentReservation(new ReservationId(BlockPos.ZERO, JobType.CHOP_TREE));
+        CompoundTag data = new CompoundTag();
+        data.putString("sapling", "minecraft:oak_sapling");
+        state.startJob(1, data);
+        state.addStepTick();
+
+        state.clearReservation();
+
+        assertNull(state.getCurrentReservation());
+        assertEquals(0, state.getJobStep());
+        assertEquals(0, state.getStepTicks());
+        assertTrue(state.getJobData().isEmpty());
+    }
+
+    @Test
+    void progressFlagsDistinguishStartedFromUnstartedJobs() {
+        WorkerState state = new WorkerState();
+        assertFalse(state.isWorking());
+        assertFalse(state.hasJobProgress());
+
+        state.addStepTick(); // partway through the first step: working, but nothing done yet
+        assertTrue(state.isWorking());
+        assertFalse(state.hasJobProgress());
+
+        state.nextStep(); // first step done
+        assertTrue(state.hasJobProgress());
     }
 }

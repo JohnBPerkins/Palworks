@@ -96,3 +96,21 @@ shadowJar {
 remapJar {
     inputFile.set shadowJar.archiveFile
 }
+
+// In-game tests (GameTests): src/gametest, a separate mod that's only loaded by this run and never
+// published. `./gradlew :fabric:runGameTest` boots a headless server with Palworks, Cobblemon and
+// the tests, runs them all, and fails the build if any fail. See "Testing" in CONTRIBUTING.
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "palworks-gametest"
+        enableGameTests = true
+        enableClientGameTests = false
+        eula = true
+    }
+}
+
+// JUnit-style report, next to the unit tests' results (CI's test summary reads both)
+loom.runs.matching { it.name == "gameTest" }.configureEach {
+    vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.file('test-results/gametest/TEST-gametest.xml').get().asFile}"
+}

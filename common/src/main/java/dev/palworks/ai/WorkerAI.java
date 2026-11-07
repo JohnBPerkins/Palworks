@@ -14,6 +14,7 @@ import dev.palworks.debug.DebugManager;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
+import dev.palworks.job.StepRunner;
 import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
@@ -373,41 +374,18 @@ public class WorkerAI {
     ) {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
         JobHandler handler = handlerFor(reservation.getJobType());
-        List<Step> steps = handler.steps();
 
-        if (state.getJobStep() >= steps.size()) {
-            // Saved progress beyond this job's steps (e.g. its steps changed in an update): done
-            state.resetJobProgress();
-            return true;
-        }
-
-        Step step = steps.get(state.getJobStep());
-        if (state.getStepTicks() == 0) {
-            step.start().run(ctx);
-        }
-        state.addStepTick();
-        if (state.getStepTicks() < step.ticks()) {
-            return false;
-        }
-
-        // The step is done: its effect happens now
-        boolean keepGoing = step.finish().run(ctx);
-        state.nextStep();
-        if (keepGoing && state.getJobStep() < steps.size()) {
-            return false;
-        }
-
-        // Last step done (or a step ended the job early)
-        if (keepGoing && handler.repeatAfterComplete(ctx)) {
-            // Some jobs (e.g. lighting a furnace that has more to smelt) go round again
-            state.resetJobProgress();
-            // Refresh the reservation with a new timestamp to prevent expiration
-            state.setCurrentReservation(new ReservationId(
-                reservation.getStationPos(), reservation.getJobType()));
-            return false;
-        }
-        state.resetJobProgress();
-        return true;
+        return switch (StepRunner.tick(handler.steps(), state, ctx, handler::repeatAfterComplete)) {
+            case WORKING -> false;
+            case REPEATING -> {
+                // Some jobs (e.g. lighting a furnace that has more to smelt) go round again.
+                // Refresh the reservation with a new timestamp to prevent expiration.
+                state.setCurrentReservation(new ReservationId(
+                    reservation.getStationPos(), reservation.getJobType()));
+                yield false;
+            }
+            case FINISHED -> true;
+        };
     }
 
     // ============================================================
@@ -432,7 +410,11 @@ public class WorkerAI {
      * worker leaves (pushed away, paused, the game reloads) the step simply restarts. The step
      * reached is saved, so the job carries on from it, even with a different worker (handed over).
      */
-    private record Step(String name, int ticks, StepStart start, StepFinish finish) {
+    private record Step(String name, int ticks, StepStart onStart, StepFinish onFinish)
+            implements StepRunner.TimedStep<JobContext> {
+        @Override public void start(JobContext ctx) { onStart.run(ctx); }
+        @Override public boolean finish(JobContext ctx) { return onFinish.run(ctx); }
+
         static Step of(String name, int ticks, StepFinish finish) {
             return new Step(name, ticks, ctx -> {}, finish);
         }
