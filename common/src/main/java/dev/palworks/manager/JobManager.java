@@ -573,7 +573,7 @@ public class JobManager {
         // (2x2 trunks, a mangrove's many root columns), keeps it to one tree search per tree.
         // validateTree() still runs again at chop time.
         if (TreeDetector.isTreeBlock(state)
-                && TreeDetector.isValidGroundBlock(level.getBlockState(pos.below()))
+                && TreeDetector.standsOnGround(level, pos, state)
                 && !treeBlocksSeenThisScan.contains(pos)) {
             TreeDetector.TreeValidationResult tree = TreeDetector.validateTree(level, pos);
             if (!tree.isValid()) {

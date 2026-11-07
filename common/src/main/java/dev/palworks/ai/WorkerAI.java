@@ -604,8 +604,9 @@ public class WorkerAI {
             TreeDetector.TreeValidationResult treeResult = TreeDetector.validateTree(level, treePos);
 
             if (treeResult.isValid() && !treeResult.getLogPositions().isEmpty()) {
-                // Get sapling type BEFORE destroying the tree
-                net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treePos);
+                // Get sapling type BEFORE destroying the tree (found by name from its logs or leaves;
+                // null for a tree with no recognisable sapling, which is chopped but not replanted)
+                net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treeResult);
                 BlockPos basePos = treeResult.getBasePosition();
 
                 // Where to replant: a 2x2 trunk (dark oak, giant spruce/jungle) gets a 2x2 of saplings
