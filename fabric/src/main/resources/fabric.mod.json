@@ -23,7 +23,8 @@
     ]
   },
   "mixins": [
-    "palworks.mixins.json"
+    "palworks-common.mixins.json",
+    "palworks-fabric.mixins.json"
   ],
   "accessWidener": "palworks.accesswidener",
   "depends": {

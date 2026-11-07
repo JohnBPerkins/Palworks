@@ -4,8 +4,7 @@
   "package": "dev.palworks.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "PokemonEntityMixin",
-    "ServerLevelMixin"
+    "PokemonEntityMixin"
   ],
   "client": [],
   "injectors": {

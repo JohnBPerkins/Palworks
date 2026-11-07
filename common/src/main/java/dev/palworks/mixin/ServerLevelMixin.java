@@ -11,10 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Tells JobManager about block changes, so workers re-check jobs they couldn't reach as soon as
- * the terrain changes (see {@link JobManager#onBlockStateChange}).
- *
- * <p>This config (common's palworks.mixins.json) is the one NeoForge loads. Fabric loads its own
- * palworks.mixins.json, so it has an identical copy in dev.palworks.fabric.mixin.
+ * the terrain changes (see {@link JobManager#onBlockStateChange}). Listed in
+ * palworks-common.mixins.json, which both loaders load.
  */
 @Mixin(ServerLevel.class)
 public abstract class ServerLevelMixin {
