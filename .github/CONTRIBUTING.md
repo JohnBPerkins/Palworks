@@ -56,14 +56,43 @@ Cobblemon is a **compile-only** dependency: the code compiles against its API, b
 1. **Open an issue first** for anything non-trivial so the approach can be discussed before you
    invest a lot of time.
 2. Branch from `main` and keep your branch focused on a single change.
-3. Use clear, conventional commit messages where practical (e.g. `feat:`, `fix:`, `docs:`,
-   `refactor:`), matching the existing history.
-4. Make sure `./gradlew build` and `./gradlew :common:test` pass before pushing.
-5. Open a PR against `main` and fill out the template, including how you tested (unit tests
-   and/or what you verified in-game) and any related issue.
+3. Make sure `./gradlew build` and `./gradlew :common:test` pass before pushing.
+4. Open a PR against `main` with a title in the format below, and fill out the template,
+   including how you tested (unit tests and/or what you verified in-game) and any related issue.
 
 PRs need a maintainer's approval and a passing CI build, and are squash-merged into `main`.
 Thanks for contributing!
+
+### PR titles
+
+**PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/):**
+`type: short description`, in lowercase and the imperative mood, with no trailing period.
+
+```
+feat: let Water-type workers water crops
+fix: stop workers pathing to furnaces that were broken
+docs: explain nether wart farming on the wiki
+```
+
+This isn't just style. Each PR is squash-merged as a single commit **titled with the PR title**,
+and those titles become the [release notes](#releasing), sorted by type:
+
+| Type | Use for | Release notes section |
+|---|---|---|
+| `feat` | Something new players or modpacks can use | Features |
+| `fix` | A bug fix | Fixes |
+| `perf` | Faster or lighter, with no behaviour change | Other changes |
+| `refactor` | Code restructuring with no behaviour change | Other changes |
+| `test` | Adding or fixing tests only | Other changes |
+| `docs` | Documentation only | Other changes |
+| `build` | Gradle, dependencies, metadata | Other changes |
+| `ci` | GitHub Actions workflows | Other changes |
+| `chore` | Anything else that doesn't touch the mod's behaviour | Other changes |
+
+An optional scope is fine, such as `fix(furnace): ...`. Pick the type by what players will notice:
+a change that fixes a bug is `fix` even if it also refactors. Maintainers rename PRs that don't
+follow the format before merging. Commit messages inside a PR aren't affected, but conventional
+ones are still appreciated.
 
 ## Releasing
 
@@ -78,7 +107,10 @@ development builds.
    summary, then run it again with it unticked to release.
 
 The workflow builds and tests both loaders, creates the `vX.Y.Z` tag and a GitHub Release with
-both jars and notes generated from merged PRs, then uploads to Modrinth and CurseForge.
+both jars, then uploads to Modrinth and CurseForge. The release notes list the titles of the PRs
+merged since the previous release, grouped by type (see [PR titles](#pr-titles)). The
+"Full changelog" link in a dry run's preview points at a tag that doesn't exist yet, so it shows
+nothing until the release is made.
 
 ### Publishing setup
 
