@@ -13,6 +13,7 @@ import dev.palworks.station.StationState;
 import dev.palworks.station.StationStateManager;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import dev.palworks.inventory.WorkerInventory;
@@ -221,6 +222,15 @@ public class JobManager {
      */
     public void registerWorker(Pokemon pokemon, Mob entity, Level level) {
         UUID uuid = pokemon.getUuid();
+
+        // Fainted (e.g. in a battle): it can't work until it's healed, so it isn't a worker until
+        // then. Unregistering hands its job over, with any progress, for another worker to finish.
+        if (WorkerEligibility.isFainted(pokemon)) {
+            if (activeWorkers.containsKey(uuid)) {
+                unregisterWorker(uuid);
+            }
+            return;
+        }
         boolean isNewWorker = !WorkerStateManager.hasWorkerState(pokemon);
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
 
@@ -266,7 +276,8 @@ public class JobManager {
         info.position = entityPos;
         info.suitabilities = state.getSuitabilities();
         info.currentReservation = stateReservation;
-        info.idle = (stateReservation == null);
+        // A busy worker (in a battle, evolving) gets no new jobs; WorkerAI drops the one it had.
+        info.idle = (stateReservation == null) && !WorkerEligibility.isBusy(entity);
 
         // Every live worker reports in here on its own tick; updateWorkerRegistry() drops the ones
         // that stop reporting (despawned, recalled, disabled, in a non-ticking chunk, changed dimension).

@@ -1,6 +1,7 @@
 package dev.palworks.worker;
 
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.Nullable;
@@ -22,6 +23,20 @@ public class WorkerEligibility {
      * @param pokemon The Pokémon to check
      * @return true if eligible to work
      */
+    /**
+     * Whether the Pokemon is busy with something that should pause its work: in a battle, or
+     * evolving. Uses Cobblemon's own busy flag (PokemonEntity.isBusy, set by its battle and
+     * evolution locks), so anything else Cobblemon marks as busy pauses work too.
+     */
+    public static boolean isBusy(Entity entity) {
+        return entity instanceof PokemonEntity pokemonEntity && pokemonEntity.isBusy();
+    }
+
+    /** Whether the Pokemon has fainted (0 HP): it can't work until it's healed. */
+    public static boolean isFainted(Pokemon pokemon) {
+        return pokemon.getCurrentHealth() <= 0;
+    }
+
     public static boolean isEligible(Pokemon pokemon) {
         // Must be owned
         if (!isOwned(pokemon)) {
