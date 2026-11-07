@@ -60,9 +60,11 @@ jobs:
       - name: Build
         run: ./gradlew assemble
 
+      # The in-game tests (which `check` also runs) have their own job, below, so the boot jobs
+      # waiting on this one aren't held up by them.
       - name: Test
         id: test
-        run: ./gradlew check
+        run: ./gradlew check -x :fabric:runGameTest
 
       # Runs whether the tests passed or failed (but not if the build itself failed), and puts a
       # results table plus each failure's message in the run summary and as PR annotations.
@@ -109,15 +111,21 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      # Its own Loom cache, without remapped mods: a remapped Cobblemon restored from another
+      # configuration's cache once crashed the dev server on startup (Kotlin metadata still naming
+      # intermediary classes), and Loom reused it because the folder name matched. Remapping the
+      # mods fresh costs about a minute; the remapped Minecraft is still cached.
       - name: Cache Loom project files
         uses: actions/cache@v6
         with:
           path: |
             .gradle/loom-cache
             */.gradle/loom-cache
-          key: loom-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+            !.gradle/loom-cache/remapped_mods
+            !*/.gradle/loom-cache/remapped_mods
+          key: loom-gametest-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
           restore-keys: |
-            loom-${{ runner.os }}-
+            loom-gametest-${{ runner.os }}-
 
       - name: Run GameTests
         id: gametest

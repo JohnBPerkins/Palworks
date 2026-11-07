@@ -11,7 +11,8 @@ Clone and build as described in the [README](../README.md#building-from-source) 
 Gradle wrapper provides the right Gradle version). The commands you'll use day to day:
 
 ```bash
-./gradlew build                # builds both loaders -> fabric/build/libs/, neoforge/build/libs/
+./gradlew build                # builds both loaders -> fabric/build/libs/, neoforge/build/libs/,
+                               # and runs both kinds of tests
 ./gradlew :common:test         # runs the unit tests (seconds)
 ./gradlew :fabric:runGameTest  # runs the in-game tests on a headless server (about 30 seconds)
 ./gradlew clean                # if you hit Minecraft mapping errors
