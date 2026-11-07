@@ -206,17 +206,12 @@ public class CropAdapter {
     }
 
     /**
-     * The seed to replant after harvesting the crop at {@code pos} (wheat seeds for wheat, a carrot
-     * for carrots, nether wart for nether wart). Call before harvesting, while the crop is still
-     * there. Returns null for berries (they regrow instead) and for anything that can't be planted
-     * back on the block below.
+     * The seed that plants the crop at {@code pos} (wheat seeds for wheat, a carrot for carrots,
+     * nether wart for nether wart), or null if it isn't something that can be planted back on the
+     * block below (e.g. most modded crops, which this doesn't know how to plant).
      */
     @Nullable
-    public static Item getReplantSeed(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        if (isBerry(state)) {
-            return null;
-        }
+    private static Item replantSeed(Level level, BlockPos pos, BlockState state) {
         // A crop's pick-block item is its seed (CropBlock returns its base seed)
         ItemStack clone = state.getBlock().getCloneItemStack(level, pos, state);
         if (clone.isEmpty()) {
@@ -455,15 +450,36 @@ public class CropAdapter {
 
             // Only harvest if at max age
             if (currentAge >= maxAge) {
-                Item cropItem = block.asItem();
-                int dropCount = 1 + level.random.nextInt(3);
-                Block.popResource(level, pos, new ItemStack(cropItem, dropCount));
+                // Harvest in place, like right-click-harvest mods: drop the crop's real loot (what
+                // breaking it by hand gives, e.g. wheat + seeds), minus one seed that pays for
+                // replanting, and reset it to age 0. This used to drop block.asItem() instead, which
+                // for wheat and beetroot is the seed, so those fields never produced any crop.
+                List<ItemStack> drops = level instanceof ServerLevel serverLevel
+                    ? Block.getDrops(state, serverLevel, pos, level.getBlockEntity(pos))
+                    : new ArrayList<>();
+                if (drops.isEmpty()) {
+                    // No loot table result (some modded crops): keep the old behaviour
+                    drops = new ArrayList<>(List.of(new ItemStack(block.asItem(), 1 + level.random.nextInt(3))));
+                }
 
-                // Reset to age 0
-                level.setBlock(pos, state.setValue(ageProperty, 0), 3);
+                Item seed = replantSeed(level, pos, state);
+                boolean paid = seed == null || takeOne(drops, seed); // unknown seed: replant free
+                for (ItemStack drop : drops) {
+                    if (!drop.isEmpty()) {
+                        Block.popResource(level, pos, drop);
+                    }
+                }
 
-                dev.palworks.Palworks.LOGGER.info("Harvested aged crop at {}: was age {}, dropped {} x{}, reset to age 0",
-                    pos, currentAge, cropItem, dropCount);
+                if (paid) {
+                    level.setBlock(pos, state.setValue(ageProperty, 0), 3);
+                } else {
+                    // No seed dropped this time (wheat and beetroot can drop none): nothing to
+                    // replant with, so the tile is left empty for a planter with seeds
+                    level.removeBlock(pos, false);
+                }
+
+                dev.palworks.Palworks.LOGGER.debug("Harvested crop at {}: was age {}, dropped {}, {}",
+                    pos, currentAge, drops, paid ? "reset to age 0" : "no seed to replant, left empty");
                 return true;
             }
         }
@@ -471,6 +487,17 @@ public class CropAdapter {
         // Default: break the block completely (for crops like wheat, carrots, etc.)
         level.destroyBlock(pos, true);
         return true;
+    }
+
+    /** Remove one of {@code item} from a list of drops. Returns false if there wasn't one. */
+    private static boolean takeOne(List<ItemStack> drops, Item item) {
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty() && drop.is(item)) {
+                drop.shrink(1);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

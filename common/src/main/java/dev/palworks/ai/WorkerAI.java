@@ -547,18 +547,8 @@ public class WorkerAI {
             BlockPos plantPos = ctx.pos();
             WorkerInventory inventory = ctx.inventory();
 
-            // A tile that was just harvested gets the same crop back for free (like saplings).
-            net.minecraft.world.item.Item replant = ctx.level() instanceof ServerLevel serverLevel
-                ? JobManager.getInstance(serverLevel).consumePendingReplantSeed(plantPos) : null;
-            if (replant != null && dev.palworks.crop.CropAdapter.plantSeed(replant, ctx.level(), plantPos.below())) {
-                if (DEBUG) {
-                    Palworks.LOGGER.info("{} replanted {} at {}", ctx.name(), replant, plantPos);
-                }
-                return;
-            }
-
-            // New farmland: plant a carried seed (any held item that can be planted on this block,
-            // not just the first item, which may be something else).
+            // Plant a carried seed: the first held item that can be planted on this block (not just
+            // the first item, which may be something else, like a harvested crop).
             ItemStack seedStack = ItemStack.EMPTY;
             for (int i = 0; i < inventory.getContainerSize(); i++) {
                 ItemStack stack = inventory.getItem(i);
@@ -595,11 +585,6 @@ public class WorkerAI {
 
         @Override public void onFinish(JobContext ctx) {
             BlockPos harvestPos = ctx.pos();
-            // Note what to replant here before the crop is gone (see JobManager.onJobCompleted)
-            if (ctx.level() instanceof ServerLevel serverLevel) {
-                JobManager.getInstance(serverLevel).noteHarvestedCrop(harvestPos,
-                    dev.palworks.crop.CropAdapter.getReplantSeed(ctx.level(), harvestPos));
-            }
             boolean harvested = dev.palworks.crop.CropAdapter.harvestCrop(ctx.level(), harvestPos);
             if (DEBUG) {
                 if (harvested) {

@@ -73,7 +73,6 @@ public class JobManager {
     private static final int CONSECUTIVE_JOB_PLANT_DELAY = 25;   // Ticks to wait before replanting
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
     private static final boolean MINING_JOBS_ENABLED = false;     // Flip on once MINE_RESOURCE breaks ores
-    private static final int REPLANT_PRIORITY = 7;                // Below harvests (8), above other planting (5)
 
     // Singleton instances (one per ServerLevel)
     private static final Map<String, JobManager> instances = new ConcurrentHashMap<>();
@@ -990,19 +989,11 @@ public class JobManager {
         if (completedReservation.getJobType() == JobType.HARVEST_CROPS) {
             long currentTime = level.getGameTime();
 
-            // Check if this is a berry bush - berries reset their age, don't need replanting
-            boolean isBerry = dev.palworks.crop.CropAdapter.isBerryBush(level, jobPos);
-
+            // No replant job: harvesting resets the crop in place (paid for with one of its seeds),
+            // and berries regrow on their own. See CropAdapter.harvestCrop.
             if (DEBUG) {
-                if (isBerry) {
-                    Palworks.LOGGER.info("Queuing pickup job for berry harvest at {} (no replanting needed)", jobPos);
-                    sendDebugMessage(serverLevel, jobPos,
-                        "  §7→ Queued §eCOLLECT_DROPS§7 (berry - no replanting)");
-                } else {
-                    Palworks.LOGGER.info("Queuing pickup + replant jobs for harvest at {}", jobPos);
-                    sendDebugMessage(serverLevel, jobPos,
-                        "  §7→ Queued §eCOLLECT_DROPS§7 and §ePLANT_SEEDS§7 jobs");
-                }
+                Palworks.LOGGER.info("Queuing pickup job for harvest at {}", jobPos);
+                sendDebugMessage(serverLevel, jobPos, "  §7→ Queued §eCOLLECT_DROPS§7");
             }
 
             // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
@@ -1014,25 +1005,6 @@ public class JobManager {
             pickupRequest.creationTime = currentTime + CONSECUTIVE_JOB_PICKUP_DELAY;
 
             consecutiveJobQueue.add(pickupRequest);
-
-            // Queue 2: Replant seeds
-            // SKIP for berry bushes since they reset their age instead of being replanted
-            if (!isBerry) {
-                // Replanting is free (like saplings): the same crop goes back in without using a
-                // seed, so the harvest's seeds all go to storage. It's due now, so the harvester is
-                // handed it this same tick, before assignment can give it something else, and then
-                // moves on to the next harvest.
-                ConsecutiveJobRequest plantRequest = new ConsecutiveJobRequest();
-                plantRequest.sourceJobLocation = jobPos;
-                plantRequest.nextJobType = JobType.PLANT_SEEDS;
-                plantRequest.requiredSuitability = Suitability.PLANTING;
-                plantRequest.suggestedWorkerUUID = workerUUID;  // Prefer same worker
-                plantRequest.creationTime = currentTime;
-
-                consecutiveJobQueue.add(plantRequest);
-            } else {
-                pendingReplantSeeds.remove(jobPos);
-            }
         }
 
         // IMPORTANT: Remove completed job entirely (don't put back in available pool!)
@@ -1131,9 +1103,6 @@ public class JobManager {
             if (request.nextJobType == JobType.COLLECT_DROPS) {
                 // Create collect drops job for items at harvest location
                 createCollectDropsJob(level, request);
-            } else if (request.nextJobType == JobType.PLANT_SEEDS) {
-                // Create planting job at harvest location
-                createPlantJob(level, request);
             } else if (request.nextJobType == JobType.PLANT_SAPLING) {
                 // Create sapling planting job at tree base
                 createPlantSaplingJob(level, request);
@@ -1184,69 +1153,6 @@ public class JobManager {
                 Palworks.LOGGER.debug("Added consecutive collect drops job to available pool at {} ({} items)",
                     request.sourceJobLocation, items.size());
             }
-        }
-    }
-
-    /**
-     * Create a planting job at a harvested location.
-     */
-    private void createPlantJob(ServerLevel level, ConsecutiveJobRequest request) {
-        BlockPos farmlandPos = request.sourceJobLocation.below();
-
-        // Verify the farmland still exists
-        if (!CropAdapter.isPlantableSurface(level, farmlandPos)) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Farmland no longer exists at {} for replant job", farmlandPos);
-            }
-            pendingReplantSeeds.remove(request.sourceJobLocation);
-            return;
-        }
-
-        // Verify the air above is still empty (crops that reset their age instead of breaking,
-        // like hearty grains, never need replanting and stop here)
-        if (!level.getBlockState(request.sourceJobLocation).isAir()) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Position {} is no longer air for replant job", request.sourceJobLocation);
-            }
-            pendingReplantSeeds.remove(request.sourceJobLocation);
-            return;
-        }
-
-        // Determine suitability based on farmland type
-        Suitability suitability = Suitability.PLANTING;
-        Block farmlandBlock = level.getBlockState(farmlandPos).getBlock();
-        if (farmlandBlock == Blocks.SOUL_SAND) {
-            suitability = Suitability.NETHER;
-        }
-
-        // Create planting job
-        JobRecord plantJob = new JobRecord();
-        plantJob.position = request.sourceJobLocation;
-        plantJob.type = JobType.PLANT_SEEDS;
-        plantJob.requiredSuitabilities = EnumSet.of(suitability);
-        plantJob.discoveryTime = System.currentTimeMillis();
-        plantJob.isConsecutiveJob = true;
-        plantJob.priority = REPLANT_PRIORITY;
-        plantJob.reservedByWorker = request.suggestedWorkerUUID;  // Hint for assignment
-
-        // The harvester replants its own tile right away if it can plant (and is still free).
-        // Otherwise the job goes to the pool, where findBestJobForWorker holds planting back until
-        // the worker has no harvests left. Either way the replant is free (pendingReplantSeeds).
-        WorkerInfo harvester = activeWorkers.get(request.suggestedWorkerUUID);
-        if (harvester != null && harvester.idle && harvester.suitabilities.contains(suitability)) {
-            assignJobToWorker(level, harvester, plantJob);
-            if (DEBUG) {
-                Palworks.LOGGER.debug("Harvester replanting its own tile at {} right away",
-                    request.sourceJobLocation);
-            }
-            return;
-        }
-
-        availableJobs.put(plantJob.position, plantJob);
-
-        if (DEBUG) {
-            Palworks.LOGGER.debug("Added consecutive plant job to available pool at {}",
-                request.sourceJobLocation);
         }
     }
 
@@ -1356,26 +1262,6 @@ public class JobManager {
      */
     public net.minecraft.world.item.Item consumePendingSapling(BlockPos pos) {
         return pendingSaplingPlants.remove(pos);
-    }
-
-    // Crop to replant, for free, at each recently harvested position (noted by the harvest handler
-    // before the crop is broken; taken by the planter). Entries are removed when planted or when
-    // the tile can no longer be replanted.
-    private final Map<BlockPos, Item> pendingReplantSeeds = new ConcurrentHashMap<>();
-
-    /** Record the seed that should be replanted where a crop is about to be harvested. */
-    public void noteHarvestedCrop(BlockPos pos, @Nullable Item seed) {
-        if (seed != null) {
-            pendingReplantSeeds.put(pos.immutable(), seed);
-        } else {
-            pendingReplantSeeds.remove(pos);
-        }
-    }
-
-    /** Get and remove the seed to replant (for free) at a position, or null if none was noted. */
-    @Nullable
-    public Item consumePendingReplantSeed(BlockPos pos) {
-        return pendingReplantSeeds.remove(pos);
     }
 
     // Temporary storage for sapling types at plant positions
