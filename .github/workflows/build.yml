@@ -29,10 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -40,12 +40,12 @@ jobs:
       # Caches the Gradle distribution, dependencies, and Loom's shared files. Only runs on main
       # save this cache; PR runs restore it read-only.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Loom keeps project-specific Minecraft jars (remapped, with our access widener/transformer
       # applied) in .gradle/loom-cache inside the repo, which setup-gradle doesn't cache.
       - name: Cache Loom project files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             .gradle/loom-cache
@@ -72,7 +72,7 @@ jobs:
 
       - name: Upload test reports
         if: ${{ failure() && steps.test.conclusion == 'failure' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
@@ -82,7 +82,7 @@ jobs:
 
       - name: Upload artifacts
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: palworks-jars
           path: |
