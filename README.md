@@ -42,31 +42,20 @@ smelting, farming, lumbering, mining, and hauling. What a Pokémon is good at de
 
 ## Building from source
 
-Prerequisites: **JDK 21** and Git. The Gradle wrapper handles the rest.
+With **JDK 21** and Git installed:
 
 ```bash
 git clone https://github.com/JohnBPerkins/Palworks.git
 cd Palworks
-
-./gradlew build          # builds both loaders
-./gradlew :common:test   # runs the pure-logic unit tests
+./gradlew build
 ```
 
-Build outputs land in `fabric/build/libs/` and `neoforge/build/libs/`. If you hit Minecraft
-mapping errors, try `./gradlew clean` and rebuild.
-
-## Project layout
-
-| Module      | Contents                                                                 |
-|-------------|--------------------------------------------------------------------------|
-| `common/`   | Loader-agnostic core: worker AI, job system, suitability, world helpers. |
-| `fabric/`   | Fabric entry point, mixins, and registration.                            |
-| `neoforge/` | NeoForge entry point and registration.                                   |
+The jars land in `fabric/build/libs/` and `neoforge/build/libs/`.
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for how to build,
-test, and submit changes, and our [Code of Conduct](CODE_OF_CONDUCT.md).
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout,
+testing, and how to submit changes.
 
 ## License
 

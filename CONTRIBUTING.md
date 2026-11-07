@@ -5,29 +5,10 @@ conventions the project follows, and how to get your changes merged.
 
 By participating, you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Getting started
+## Setup
 
-Prerequisites: **JDK 21** and Git. The Gradle wrapper provides the correct Gradle version.
-
-```bash
-git clone https://github.com/JohnBPerkins/Palworks.git
-cd Palworks
-./gradlew build
-```
-
-### Project layout
-
-Palworks is a multi-loader mod built with [Architectury](https://architectury.dev):
-
-- `common/` — loader-agnostic core (worker AI, job system, suitability, world-interaction
-  helpers). Most logic lives here.
-- `fabric/` — Fabric entry point, mixins, registration.
-- `neoforge/` — NeoForge entry point, registration.
-
-Prefer adding new logic to `common/` and exposing only the loader-specific seams (tick hooks,
-registration, menus) in `fabric/` and `neoforge/`.
-
-## Building and testing
+Clone and build as described in the [README](README.md#building-from-source) (JDK 21 + Git; the
+Gradle wrapper provides the right Gradle version). The commands you'll use day to day:
 
 ```bash
 ./gradlew build          # builds both loaders -> fabric/build/libs/, neoforge/build/libs/
@@ -35,7 +16,20 @@ registration, menus) in `fabric/` and `neoforge/`.
 ./gradlew clean          # if you hit Minecraft mapping errors
 ```
 
-### About Cobblemon in the dev environment
+## Project layout
+
+Palworks is a multi-loader mod built with [Architectury](https://architectury.dev):
+
+| Module      | Contents                                                                   |
+|-------------|----------------------------------------------------------------------------|
+| `common/`   | Loader-agnostic core: worker AI, job system, suitability, world helpers.   |
+| `fabric/`   | Fabric entry point, mixins, and registration.                              |
+| `neoforge/` | NeoForge entry point and registration.                                     |
+
+Most logic lives in `common/`. Put new logic there and keep `fabric/` and `neoforge/` limited to
+the loader-specific seams (tick hooks, registration, menus).
+
+## Testing and Cobblemon
 
 Cobblemon is a **compile-only** dependency: the code compiles against its API, but Cobblemon
 **cannot load in the dev environment**. This means:
@@ -44,8 +38,6 @@ Cobblemon is a **compile-only** dependency: the code compiles against its API, b
   must pass `./gradlew :common:test`. New logic that doesn't need a running game belongs here.
 - Behavior that touches Cobblemon or live world state must be tested **in an actual Minecraft
   instance** (Fabric+Cobblemon or NeoForge+Cobblemon), verified in-game.
-
-When you open a PR, please say how you tested: which unit tests, and/or what you verified in-game.
 
 ## Conventions
 
@@ -59,7 +51,7 @@ When you open a PR, please say how you tested: which unit tests, and/or what you
 - **Data-driven where possible.** Things like which blocks count as work are controlled by
   datapack tags — prefer editing tags over hard-coding in Java.
 
-## Commit and pull-request process
+## Pull-request process
 
 1. **Open an issue first** for anything non-trivial so the approach can be discussed before you
    invest a lot of time.
@@ -67,6 +59,8 @@ When you open a PR, please say how you tested: which unit tests, and/or what you
 3. Use clear, conventional commit messages where practical (e.g. `feat:`, `fix:`, `docs:`,
    `refactor:`), matching the existing history.
 4. Make sure `./gradlew build` and `./gradlew :common:test` pass before pushing.
-5. Open a PR against `main`, fill out the template, and link any related issue.
+5. Open a PR against `main` and fill out the template, including how you tested (unit tests
+   and/or what you verified in-game) and any related issue.
 
-A maintainer will review as soon as they can. Thanks for contributing!
+PRs need a maintainer's approval and a passing CI build, and are squash-merged into `main`.
+Thanks for contributing!
