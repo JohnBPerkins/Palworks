@@ -39,6 +39,11 @@ public class TreeDetector {
     private static final int MAX_TREE_BLOCKS = 256;      // Max logs to search before considering tree too big
     private static final int MIN_LEAF_COUNT = 4;         // Minimum leaves required for a valid tree
     private static final int LEAF_SEARCH_RADIUS = 2;     // Radius around logs to search for leaves
+    // Huge fungus canopies don't decay like leaves, so they're broken with the stem. Same rule as the
+    // FallingTree mod: warts connected to the tree, within this x/z distance of the chopped block, and
+    // no higher than one above the top stem.
+    private static final int WART_BREAK_RADIUS = 4;
+    private static final int MAX_WART_BLOCKS = 512;      // Safety cap on canopy blocks broken per tree
 
     // Ground blocks that a tree base can touch
     private static final Set<Block> VALID_GROUND_BLOCKS = Set.of(
@@ -307,9 +312,53 @@ public class TreeDetector {
      * shroomlights. These play the part leaves do for overworld trees.
      */
     public static boolean isNetherCanopy(BlockState state) {
-        return state.is(Blocks.NETHER_WART_BLOCK)
-            || state.is(Blocks.WARPED_WART_BLOCK)
-            || state.is(Blocks.SHROOMLIGHT);
+        return state.is(BlockTags.WART_BLOCKS) || state.is(Blocks.SHROOMLIGHT);
+    }
+
+    /**
+     * The huge fungus canopy to break along with a chopped nether tree, since wart blocks and
+     * shroomlights never decay the way leaves do. Copies the FallingTree mod's rule: canopy blocks
+     * reachable from the tree's stems through other canopy blocks (diagonals included), within
+     * {@link #WART_BREAK_RADIUS} blocks of {@code origin} on x and z, and at most one block above the
+     * top stem. Like FallingTree, it doesn't check which tree a block "belongs" to, so a neighbouring
+     * fungus whose canopy touches this one within that box loses that part.
+     *
+     * @param treeBlocks the tree's stems (from {@link TreeValidationResult#getLogPositions()})
+     * @param origin the block the chop started from (the job position)
+     */
+    public static Set<BlockPos> findNetherCanopyToBreak(Level level, Set<BlockPos> treeBlocks, BlockPos origin) {
+        int topY = Integer.MIN_VALUE;
+        for (BlockPos pos : treeBlocks) {
+            topY = Math.max(topY, pos.getY());
+        }
+
+        Set<BlockPos> canopy = new HashSet<>();
+        Set<BlockPos> visited = new HashSet<>(treeBlocks);
+        Queue<BlockPos> queue = new ArrayDeque<>(treeBlocks);
+        while (!queue.isEmpty() && canopy.size() < MAX_WART_BLOCKS) {
+            BlockPos current = queue.poll();
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dy == 0 && dz == 0) {
+                            continue;
+                        }
+                        BlockPos neighbor = current.offset(dx, dy, dz);
+                        if (!visited.add(neighbor)
+                                || Math.abs(neighbor.getX() - origin.getX()) > WART_BREAK_RADIUS
+                                || Math.abs(neighbor.getZ() - origin.getZ()) > WART_BREAK_RADIUS
+                                || neighbor.getY() > topY + 1) {
+                            continue;
+                        }
+                        if (isNetherCanopy(level.getBlockState(neighbor))) {
+                            canopy.add(neighbor);
+                            queue.add(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+        return canopy;
     }
 
     /**
