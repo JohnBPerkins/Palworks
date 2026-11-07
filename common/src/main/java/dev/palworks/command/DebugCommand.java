@@ -106,7 +106,6 @@ public class DebugCommand {
 
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         inventory.clearContent();
-        pokemon.swapHeldItem(ItemStack.EMPTY, false, false);
 
         player.sendSystemMessage(Component.literal("Cleared " + pokemon.getSpecies().getName() + "'s inventory"));
     }

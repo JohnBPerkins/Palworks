@@ -1,4 +1,5 @@
 {
   "palworks.ui.interact.inventory": "Inventory",
-  "palworks.message.inventory.not_found": "Pokemon not found in your party"
+  "palworks.message.inventory.not_found": "Pokemon not found in your party",
+  "palworks.message.inventory.not_owner": "You can only open your own Pokemon's inventory"
 }

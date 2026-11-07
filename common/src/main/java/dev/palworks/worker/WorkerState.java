@@ -39,7 +39,7 @@ public class WorkerState {
     private ItemStack workInventory;
 
     public WorkerState() {
-        this.enabled = false;
+        this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
         this.currentReservation = null;
         this.cachedSuitabilities = null;
@@ -247,21 +247,6 @@ public class WorkerState {
         workInventory = ItemStack.EMPTY;
     }
 
-    /**
-     * Sync work inventory to the Pokemon's held item for visual display.
-     * This allows players to see what the worker is carrying.
-     */
-    public void syncWorkInventoryToHeldItem(com.cobblemon.mod.common.pokemon.Pokemon pokemon) {
-        if (!workInventory.isEmpty()) {
-            // Set the Pokemon's held item to match work inventory
-            // Parameters: itemStack, sendUpdate, playSoundEffect
-            pokemon.swapHeldItem(workInventory.copy(), false, false);
-        } else {
-            // Clear the held item
-            pokemon.swapHeldItem(ItemStack.EMPTY, false, false);
-        }
-    }
-
     // NBT Serialization
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
@@ -318,7 +303,8 @@ public class WorkerState {
     }
 
     public void deserializeNBT(CompoundTag tag) {
-        enabled = tag.getBoolean("enabled");
+        // Missing key means the state predates this field: treat as enabled (the default).
+        enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
 
         if (tag.contains("assignedJob")) {
             String jobId = tag.getString("assignedJob");

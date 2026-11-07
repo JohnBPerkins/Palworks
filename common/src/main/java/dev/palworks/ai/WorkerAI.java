@@ -23,6 +23,7 @@ import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -79,15 +80,13 @@ public class WorkerAI {
 
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
 
-        // Auto-enable if not already enabled
-        if (!state.isEnabled()) {
-            state.setEnabled(true);
-            WorkerStateManager.save(pokemon, state);
+        // Before the enabled check: a disabled worker still shows what it's carrying.
+        showCarriedItem(entity, WorkerInventoryManager.getOrCreate(pokemon));
 
-            // Opt-in activity message (only players who ran /palworks debug see it)
-            if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                DebugManager.broadcastActivity(serverLevel, pokemon.getSpecies().getName() + " is now a worker");
-            }
+        // New workers start enabled (see WorkerState), so a disabled state means it was turned off
+        // on purpose (/palworks worker disable). Respect that instead of re-enabling it.
+        if (!state.isEnabled()) {
+            return false;
         }
 
         // Check if suitabilities need recalculation
@@ -447,7 +446,6 @@ public class WorkerAI {
                 ItemStack extracted = extractSeedsFromChest(ctx.level(), targetPos);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
-                    syncInventoryToHeldItem(ctx.pokemon(), inventory);
                     if (DEBUG) {
                         Palworks.LOGGER.info("{} got {} {} seeds from chest at {} ({} leftover)",
                             ctx.name(), extracted.getCount() - leftover, extracted.getItem().toString(), targetPos, leftover);
@@ -461,7 +459,6 @@ public class WorkerAI {
                     ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
-                    syncInventoryToHeldItem(ctx.pokemon(), inventory);
                     if (DEBUG) {
                         Palworks.LOGGER.info("{} got {} nether wart from chest at {} ({} leftover)",
                             ctx.name(), extracted.getCount() - leftover, targetPos, leftover);
@@ -503,7 +500,6 @@ public class WorkerAI {
             }
 
             if (pickedUp > 0) {
-                syncInventoryToHeldItem(ctx.pokemon(), inventory);
                 if (DEBUG) {
                     Palworks.LOGGER.info("{} collected {} dropped items from ground at {}",
                         ctx.name(), pickedUp, targetPos);
@@ -534,8 +530,6 @@ public class WorkerAI {
                 }
             }
 
-            syncInventoryToHeldItem(ctx.pokemon(), inventory);
-
             if (DEBUG) {
                 if (totalDelivered > 0) {
                     Palworks.LOGGER.info("{} delivered {} items to chest at {}", ctx.name(), totalDelivered, chestPos);
@@ -565,7 +559,6 @@ public class WorkerAI {
             if (planted) {
                 seedStack.shrink(1);
                 inventory.setChanged();
-                syncInventoryToHeldItem(ctx.pokemon(), inventory);
                 if (DEBUG) {
                     Palworks.LOGGER.info("{} planted {} at {} ({} items remaining)",
                         ctx.name(), seed.toString(), plantPos, inventory.getTotalItemCount());
@@ -764,15 +757,23 @@ public class WorkerAI {
     }
 
     /**
-     * Sync the worker's inventory to their held item for visual display.
+     * Show the first item the worker is carrying, without touching its real Cobblemon held item.
+     *
+     * <p>Cobblemon renders a Pokemon's held item if it has one (and it isn't hidden), and otherwise
+     * whatever is in the entity's main hand, which Cobblemon itself never uses. So a display copy
+     * goes in the main hand. Covers every way the inventory changes (jobs, the inventory screen,
+     * debug commands) because it runs every tick; the comparison keeps it from resending.
      */
-    private static void syncInventoryToHeldItem(Pokemon pokemon, WorkerInventory inventory) {
-        ItemStack firstItem = inventory.getFirstItem();
-        if (!firstItem.isEmpty()) {
-            pokemon.swapHeldItem(firstItem.copy(), false, false);
-        } else {
-            pokemon.swapHeldItem(ItemStack.EMPTY, false, false);
+    private static void showCarriedItem(Mob entity, WorkerInventory inventory) {
+        ItemStack carried = inventory.getFirstItem();
+        if (ItemStack.isSameItemSameComponents(entity.getMainHandItem(), carried)) {
+            return;
         }
+        // Count doesn't matter for display, and one item keeps the copy obviously cosmetic.
+        entity.setItemSlot(EquipmentSlot.MAINHAND, carried.copyWithCount(1));
+        // The copy is purely visual: it must never drop (on death, or when vanilla swaps a mob's
+        // equipment), or it would duplicate the item that's still in the worker's inventory.
+        entity.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
     }
 
     /**

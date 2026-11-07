@@ -51,6 +51,20 @@ public class OpenInventoryHandler implements ServerNetworkPacketHandler<OpenInve
             return;
         }
 
+        // The packet comes from the client, so the server must check ownership itself: otherwise a
+        // modified client could send any nearby Pokemon's UUID and take items from another player's
+        // worker. Wild Pokemon (no owner) are rejected too.
+        UUID ownerUUID = pokemon.getOwnerUUID();
+        if (ownerUUID == null || !ownerUUID.equals(player.getUUID())) {
+            Palworks.LOGGER.warn("Player {} tried to open the inventory of {} ({}), which they don't own",
+                    player.getName().getString(), pokemon.getSpecies().getName(), entityUUID);
+            player.displayClientMessage(
+                    Component.translatable("palworks.message.inventory.not_owner"),
+                    true
+            );
+            return;
+        }
+
         // Open the inventory GUI
         ModMenuTypes.openWorkerInventory(player, pokemon);
         Palworks.LOGGER.debug("Opened worker inventory for Pokemon {} for player {}",
