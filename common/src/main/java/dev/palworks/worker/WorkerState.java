@@ -317,8 +317,6 @@ public class WorkerState {
 
         tag.putInt("pathFailCount", pathFailCount);
         tag.putLong("lastPathFailTime", lastPathFailTime);
-        tag.putLong("lastWorkTime", lastWorkTime);
-        tag.putInt("consecutiveWorkTicks", consecutiveWorkTicks);
 
         // Serialize current reservation
         if (currentReservation != null) {
@@ -383,8 +381,6 @@ public class WorkerState {
 
         pathFailCount = tag.getInt("pathFailCount");
         lastPathFailTime = tag.getLong("lastPathFailTime");
-        lastWorkTime = tag.getLong("lastWorkTime");
-        consecutiveWorkTicks = tag.getInt("consecutiveWorkTicks");
 
         // Deserialize current reservation
         if (tag.contains("currentReservation")) {
