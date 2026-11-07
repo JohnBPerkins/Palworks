@@ -65,6 +65,9 @@ public class WorkerAI {
     // lives in the WorkerStateManager cache; staggered per-entity to avoid a save spike.
     private static final int WORK_SAVE_INTERVAL = 20;
 
+    // How often (ticks) a walking worker re-checks that its job still exists (staggered per entity).
+    private static final int JOB_RECHECK_INTERVAL = 10;
+
     /**
      * Main tick method for worker AI.
      * Call this from the Pokémon entity's tick method.
@@ -169,6 +172,16 @@ public class WorkerAI {
         // Resolve the exact tile to stand on (e.g. in front of a furnace's face), sized to this mon.
         BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, reservation.getJobType(), entity);
         if (standPos == null) {
+            // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by):
+            // drop it as gone, not as unreachable, which would wrongly remember the spot.
+            if (level instanceof ServerLevel goneLevel
+                    && !JobManager.isJobStillThere(level, reservation.getJobType(), targetPos)) {
+                JobManager.getInstance(goneLevel).onJobInvalidated(pokemon, reservation, level);
+                state.clearReservation();
+                state.resetPathFailures();
+                WorkerStateManager.save(pokemon, state);
+                return false;
+            }
             // No valid place to stand to do this job (front blocked / no standable tile). Give up.
             if (DEBUG) {
                 Palworks.LOGGER.warn("{} found no valid stand position for {} at {} - abandoning",
@@ -186,13 +199,15 @@ public class WorkerAI {
         BlockPos entityPos = entity.blockPosition();
         double distanceSq = entityPos.distSqr(standPos);
 
-        // En route, make sure the job still exists. A station can be broken, replaced, or emptied
-        // while the worker walks to it; without this the worker keeps pathing to a dead job until
-        // the 30s expiry. Only checked before arrival, so it can't disturb an in-progress job (e.g.
-        // a repeating furnace, which we light ourselves and would otherwise read as "not needing fuel").
+        // En route, make sure the job still exists, for every job type: a crop can be harvested, a
+        // tree chopped, a chest emptied, a station broken while the worker walks there; without this
+        // it finishes the walk for nothing. Checked every JOB_RECHECK_INTERVAL ticks (staggered), and
+        // only before arrival, so it can't disturb an in-progress job (e.g. a repeating furnace,
+        // which we light ourselves and would otherwise read as "not needing fuel").
         if (distanceSq > ARRIVAL_DISTSQ
                 && level instanceof ServerLevel validationLevel
-                && !isReservedJobStillValid(level, reservation)) {
+                && (level.getGameTime() + entity.getId()) % JOB_RECHECK_INTERVAL == 0
+                && !JobManager.isJobStillThere(level, reservation.getJobType(), targetPos)) {
             if (DEBUG) {
                 Palworks.LOGGER.info("{}'s {} job at {} no longer valid (station removed/emptied) - dropping",
                     pokemon.getSpecies().getName(), reservation.getJobType(), targetPos);
@@ -683,19 +698,6 @@ public class WorkerAI {
         entity.setYRot(yaw);
         entity.setYBodyRot(yaw);
         entity.setYHeadRot(yaw);
-    }
-
-    /**
-     * Whether the reserved job still exists in the world, used to drop a reservation when its
-     * station is broken/replaced/emptied while the worker is en route. Only FUEL_FURNACE is
-     * validated, reusing the same predicate scanning uses ({@link dev.palworks.station.FurnaceHelper#needsFuel});
-     * other job types are treated as still valid (unchanged behavior).
-     */
-    private static boolean isReservedJobStillValid(Level level, ReservationId reservation) {
-        if (reservation.getJobType() == JobType.FUEL_FURNACE) {
-            return dev.palworks.station.FurnaceHelper.needsFuel(level, reservation.getStationPos());
-        }
-        return true;
     }
 
     /** Which Cobblemon move's action effect a Kindling worker performs to light a furnace. Swap this

@@ -397,6 +397,7 @@ public class JobManager {
      * Scan a single chunk for job opportunities.
      */
     private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int scanMinY, int scanMaxY) {
+        ChunkJobCache previous = chunkCaches.get(chunkPos);
         ChunkJobCache cache = new ChunkJobCache();
         treeBlocksSeenThisScan.clear();
         cache.chunk = chunkPos;
@@ -444,8 +445,64 @@ public class JobManager {
             }
         }
 
+        // Jobs the last scan of this chunk found but this one didn't are gone (a player harvested the
+        // crop, chopped the tree, planted the farmland, emptied the chest...). Without this they
+        // stayed up to 5 minutes and workers kept walking to them.
+        if (previous != null) {
+            removeJobsNotFoundAgain(previous, cache);
+        }
+
         chunkCaches.put(chunkPos, cache);
         return blocksScanned;
+    }
+
+    /** Remove the available jobs an earlier scan found that a newer scan of the same chunk didn't. */
+    private void removeJobsNotFoundAgain(ChunkJobCache previous, ChunkJobCache current) {
+        Set<BlockPos> stillThere = new HashSet<>();
+        current.cachedJobs.values().forEach(stillThere::addAll);
+        previous.cachedJobs.values().forEach(positions -> {
+            for (BlockPos pos : positions) {
+                if (!stillThere.contains(pos)) {
+                    removeScannedJob(pos);
+                }
+            }
+        });
+    }
+
+    /** Remove all of a chunk cache's available jobs (when the cache itself is dropped). */
+    private void removeJobsOf(ChunkJobCache cache) {
+        cache.cachedJobs.values().forEach(positions -> positions.forEach(this::removeScannedJob));
+    }
+
+    /**
+     * Remove an available job that came from a chunk scan. Reserved jobs are left to their worker,
+     * and follow-up jobs (e.g. picking up drops after a harvest) don't come from the scan, so a
+     * rescan not finding them says nothing about them.
+     */
+    private void removeScannedJob(BlockPos pos) {
+        JobRecord job = availableJobs.get(pos);
+        if (job != null && !job.isConsecutiveJob) {
+            availableJobs.remove(pos);
+        }
+    }
+
+    /**
+     * Whether a job still exists in the world: the same checks the chunk scan uses to find it.
+     * Workers re-check their reserved job with this while walking to it, so they drop it instead of
+     * finishing the walk when it's gone (crop already harvested, tree chopped, chest emptied...).
+     */
+    public static boolean isJobStillThere(Level level, JobType type, BlockPos pos) {
+        return switch (type) {
+            case FUEL_FURNACE -> FurnaceHelper.needsFuel(level, pos);
+            case HARVEST_CROPS -> CropAdapter.isFullyGrown(level, pos) || CropAdapter.isAttachedFruit(level, pos);
+            case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
+            case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
+            case GET_SEEDS -> isChest(level.getBlockState(pos).getBlock())
+                && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));
+            case DELIVER_ITEMS -> level.getBlockEntity(pos) instanceof net.minecraft.world.Container;
+            case COLLECT_DROPS -> !level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(3.0)).isEmpty();
+            default -> true;
+        };
     }
 
     /**
@@ -608,11 +665,11 @@ public class JobManager {
     }
 
     // Helper methods for job detection
-    private boolean isChest(Block block) {
+    private static boolean isChest(Block block) {
         return block == Blocks.CHEST || block == Blocks.TRAPPED_CHEST;
     }
 
-    private boolean hasPlantableSeeds(Level level, BlockPos pos) {
+    private static boolean hasPlantableSeeds(Level level, BlockPos pos) {
         return ChestHelper.hasItem(level, pos, Items.WHEAT_SEEDS) ||
                ChestHelper.hasItem(level, pos, Items.CARROT) ||
                ChestHelper.hasItem(level, pos, Items.POTATO) ||
@@ -1250,10 +1307,15 @@ public class JobManager {
     private void cleanupExpiredData(ServerLevel level) {
         long currentTime = level.getGameTime();
 
-        // Remove stale chunk caches (older than cache lifetime)
+        // Remove stale chunk caches (older than cache lifetime), and their jobs: no worker is near
+        // enough to rescan them, so nothing would ever notice those jobs disappearing.
         chunkCaches.entrySet().removeIf(entry -> {
             ChunkJobCache cache = entry.getValue();
-            return !cache.isDirty && (currentTime - cache.lastScanTime) > JOB_CACHE_LIFETIME_TICKS * 2;
+            boolean stale = !cache.isDirty && (currentTime - cache.lastScanTime) > JOB_CACHE_LIFETIME_TICKS * 2;
+            if (stale) {
+                removeJobsOf(cache);
+            }
+            return stale;
         });
 
         // Remove jobs that have been available too long. discoveryTime is wall-clock ms,
