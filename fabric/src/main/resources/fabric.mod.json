@@ -3,16 +3,16 @@
   "id": "palworks",
   "version": "${version}",
   "name": "Palworks",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "description": "Turns your Cobblemon Pokémon into workers. Send one out and it finds jobs nearby on its own: lighting furnaces, planting and harvesting crops, chopping trees, and carrying items to your chests.",
   "authors": [
-    "Me!"
+    "JohnBPerkins"
   ],
   "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "homepage": "https://github.com/JohnBPerkins/Palworks",
+    "sources": "https://github.com/JohnBPerkins/Palworks",
+    "issues": "https://github.com/JohnBPerkins/Palworks/issues"
   },
-  "license": "CC0-1.0",
-  "icon": "assets/palworks/icon.png",
+  "license": "MIT",
   "environment": "*",
   "entrypoints": {
     "main": [
@@ -31,9 +31,6 @@
     "minecraft": "~1.21.1",
     "java": ">=21",
     "fabric-api": "*",
-    "cobblemon": ">=1.5.0"
-  },
-  "suggests": {
-    "another-mod": "*"
+    "cobblemon": ">=1.7.1"
   }
 }
