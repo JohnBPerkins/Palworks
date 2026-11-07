@@ -84,7 +84,7 @@ public class DebugCommand {
 
         if (state.getCurrentReservation() != null) {
             player.sendSystemMessage(Component.literal("Current Job: " + state.getCurrentReservation().getJobType()));
-            player.sendSystemMessage(Component.literal("Work Ticks: " + state.getConsecutiveWorkTicks()));
+            player.sendSystemMessage(Component.literal("Job Step: " + state.getJobStep() + " (" + state.getStepTicks() + " ticks in)"));
         } else {
             player.sendSystemMessage(Component.literal("Current Job: IDLE"));
         }
