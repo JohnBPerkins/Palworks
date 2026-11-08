@@ -13,6 +13,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -303,12 +304,14 @@ public class TreeDetector {
      * Blocks that may touch a tree without disqualifying it, besides air, leaves, vines and ground.
      * Anything you can walk through: short grass, ferns and flowers next to a trunk, snow layers,
      * water around mangrove roots, hanging mangrove propagules. Plus moss carpet, which grows on
-     * mangrove roots but has a thin collision box. Player builds are still kept out by solid blocks
-     * and the natural-leaves check.
+     * mangrove roots but has a thin collision box, and cocoa pods, which grow on jungle trunks (and
+     * pop off when it's chopped). Player builds are still kept out by solid blocks and the
+     * natural-leaves check. (Bee nests still get a tree skipped; they're rare.)
      */
     private static boolean isAllowedTreeNeighbor(Level level, BlockPos pos, BlockState state) {
         return state.getCollisionShape(level, pos).isEmpty()
-            || state.is(Blocks.MOSS_CARPET);
+            || state.is(Blocks.MOSS_CARPET)
+            || state.getBlock() instanceof CocoaBlock;
     }
 
     /**
