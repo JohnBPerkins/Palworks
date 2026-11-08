@@ -13,6 +13,7 @@ import dev.palworks.station.StationState;
 import dev.palworks.station.StationStateManager;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
@@ -254,12 +255,6 @@ public class JobManager {
             return;
         }
 
-        // Ensure suitabilities are initialized
-        if (state.areSuitabilitiesDirty() || state.getSuitabilities().isEmpty()) {
-            state.initializeSuitabilities(pokemon);
-            WorkerStateManager.save(pokemon, state);
-        }
-
         // Create or update worker info
         WorkerInfo info = activeWorkers.computeIfAbsent(uuid, k -> new WorkerInfo());
 
@@ -279,7 +274,8 @@ public class JobManager {
         info.pokemonUUID = uuid;
         BlockPos entityPos = entity.blockPosition();
         info.position = entityPos;
-        info.suitabilities = state.getSuitabilities();
+        // From its species and types as they are now, so an evolution or form change counts at once
+        info.suitabilities = SuitabilityDetector.getSuitabilities(pokemon);
         info.currentReservation = stateReservation;
         // A busy worker (in a battle, evolving) gets no new jobs; WorkerAI drops the one it had.
         info.idle = (stateReservation == null) && !WorkerEligibility.isBusy(entity);

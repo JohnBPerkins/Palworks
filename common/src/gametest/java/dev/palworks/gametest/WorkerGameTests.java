@@ -1,5 +1,6 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -233,6 +234,24 @@ public class WorkerGameTests {
             worker.getBusyLocks().remove("palworks-test");
         });
         helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's free")));
+    }
+
+    // ---- Evolving ----
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_evolve_gain", timeoutTicks = 800)
+    public void anEvolvedWorkerTakesTheJobsOfItsNewType(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // Eevee (Normal) can't harvest; Leafeon (Grass) can. Its jobs used to be worked out once
+        // and saved, so it kept Eevee's forever. (setSpecies stands in for a real evolution.)
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, "eevee level=20", START);
+
+        helper.runAfterDelay(100, () -> {
+            assertWheatRow(helper, 7, "left alone by an Eevee");
+            worker.getPokemon().setSpecies(PokemonSpecies.INSTANCE.getByName("leafeon"));
+        });
+        helper.runAfterDelay(101, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's a Leafeon")));
     }
 
     // ---- Reachability ----

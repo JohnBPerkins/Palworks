@@ -19,10 +19,6 @@ public class WorkerState {
     private JobType assignedJob;
     private ReservationId currentReservation;
 
-    // Cached suitabilities (calculated once, stored for performance)
-    private Set<Suitability> cachedSuitabilities;
-    private boolean suitabilitiesDirty;
-
     // Cooldowns per suitability type
     private final Map<Suitability, Long> cooldowns;
 
@@ -50,8 +46,6 @@ public class WorkerState {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
         this.currentReservation = null;
-        this.cachedSuitabilities = null;
-        this.suitabilitiesDirty = true;
         this.cooldowns = new HashMap<>();
         this.pathFailCount = 0;
         this.lastPathFailTime = 0;
@@ -98,31 +92,6 @@ public class WorkerState {
     public void clearReservation() {
         this.currentReservation = null;
         resetJobProgress();
-    }
-
-    // Suitability caching (call this ONCE when worker is initialized)
-    public void initializeSuitabilities(com.cobblemon.mod.common.pokemon.Pokemon pokemon) {
-        this.cachedSuitabilities = dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon);
-        this.suitabilitiesDirty = false;
-    }
-
-    public Set<Suitability> getSuitabilities() {
-        if (cachedSuitabilities == null) {
-            return Collections.emptySet();
-        }
-        return Collections.unmodifiableSet(cachedSuitabilities);
-    }
-
-    public boolean hasSuitability(Suitability suitability) {
-        return cachedSuitabilities != null && cachedSuitabilities.contains(suitability);
-    }
-
-    public void markSuitabilitiesDirty() {
-        this.suitabilitiesDirty = true;
-    }
-
-    public boolean areSuitabilitiesDirty() {
-        return suitabilitiesDirty;
     }
 
     // Cooldowns
@@ -324,17 +293,6 @@ public class WorkerState {
         tag.putInt("jobStep", jobStep);
         tag.put("jobData", jobData.copy());
 
-        // Serialize cached suitabilities
-        if (cachedSuitabilities != null && !cachedSuitabilities.isEmpty()) {
-            CompoundTag suitsTag = new CompoundTag();
-            int i = 0;
-            for (Suitability suit : cachedSuitabilities) {
-                suitsTag.putString("suit_" + i, suit.getId());
-                i++;
-            }
-            tag.put("suitabilities", suitsTag);
-        }
-
         // Serialize cooldowns
         CompoundTag cooldownsTag = new CompoundTag();
         for (Map.Entry<Suitability, Long> entry : cooldowns.entrySet()) {
@@ -381,18 +339,9 @@ public class WorkerState {
             }
         }
 
-        // Deserialize cached suitabilities
-        if (tag.contains("suitabilities")) {
-            cachedSuitabilities = new HashSet<>();
-            CompoundTag suitsTag = tag.getCompound("suitabilities");
-            for (String key : suitsTag.getAllKeys()) {
-                Suitability suit = Suitability.fromId(suitsTag.getString(key));
-                if (suit != null) {
-                    cachedSuitabilities.add(suit);
-                }
-            }
-            suitabilitiesDirty = false;
-        }
+        // Older versions also saved the worker's suitabilities ("suitabilities"). They're ignored:
+        // suitabilities come from the Pokémon's species and types (SuitabilityDetector), so they
+        // follow it through evolution and form changes.
 
         // Deserialize cooldowns
         cooldowns.clear();
