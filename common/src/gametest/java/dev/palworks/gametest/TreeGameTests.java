@@ -2,7 +2,6 @@ package dev.palworks.gametest;
 
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.tree.TreeDetector.TreeValidationResult;
-import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
@@ -22,7 +21,7 @@ import java.util.Set;
 import static dev.palworks.gametest.Scenes.abs;
 
 /** Tree detection (what counts as a tree), canopy breaking, and where and what gets replanted. */
-public class TreeGameTests implements FabricGameTest {
+public class TreeGameTests {
 
     private static TreeValidationResult validate(GameTestHelper helper, int x, int y, int z) {
         return TreeDetector.validateTree(helper.getLevel(), abs(helper, x, y, z));
@@ -30,7 +29,7 @@ public class TreeGameTests implements FabricGameTest {
 
     // ---- What counts as a tree ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void naturalOakIsATree(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
@@ -42,7 +41,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void detectionWorksFromAnyLog(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
@@ -53,7 +52,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void playerPlacedLeavesDontMakeATree(GameTestHelper helper) {
         // A log pillar dressed with placed leaves is a build, not a tree
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
@@ -63,7 +62,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void logsTouchingABuildAreNotATree(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
@@ -73,7 +72,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void plantsBesideTheTrunkDontMatter(GameTestHelper helper) {
         // Short grass and flowers often grow right next to a trunk in plains and forests
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
@@ -87,7 +86,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void aTrunkStandingOnStoneIsNotATree(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.STONE);
         Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
@@ -96,7 +95,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void soilTheSaplingGrowsOnCountsAsGround(GameTestHelper helper) {
         // Not in the ground tags, but an oak sapling can grow on farmland, so the tree is rooted
         Scenes.floor(helper, Blocks.FARMLAND);
@@ -108,7 +107,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void tooFewLeavesIsNotATree(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         for (int y = 1; y <= 4; y++) {
@@ -122,7 +121,7 @@ public class TreeGameTests implements FabricGameTest {
 
     // ---- Block checks that need the world's tags ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void logLeafAndGroundChecks(GameTestHelper helper) {
         helper.assertTrue(TreeDetector.isLog(Blocks.OAK_LOG.defaultBlockState()), "oak log is a log");
         helper.assertTrue(TreeDetector.isLog(Blocks.CRIMSON_STEM.defaultBlockState()), "stems are logs");
@@ -140,7 +139,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void apricornTreesAreNotLumbered(GameTestHelper helper) {
         // Cobblemon's apricorn trees are harvested for apricorns, not chopped
         Block apricornLog = block(helper, "cobblemon:apricorn_log");
@@ -150,7 +149,7 @@ public class TreeGameTests implements FabricGameTest {
 
     // ---- Mangroves ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void mangroveStandingInWaterIsATree(GameTestHelper helper) {
         // Roots arch from the mud up to the trunk, with water around them
         Scenes.floor(helper, Blocks.MUD);
@@ -195,7 +194,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.setBlock(x + 1, height - 1, z + 1, Blocks.SHROOMLIGHT);
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void hugeFungusIsATreeAndItsCanopyComesDownWithIt(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.CRIMSON_NYLIUM);
         crimsonFungus(helper, 3, 3, 4);
@@ -214,7 +213,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void aNeighbouringFungusKeepsItsCanopy(GameTestHelper helper) {
         // Two fungi 3 apart: their canopies touch. Chopping one must leave the other's canopy
         Scenes.floor(helper, Blocks.CRIMSON_NYLIUM);
@@ -232,7 +231,7 @@ public class TreeGameTests implements FabricGameTest {
 
     // ---- Where to replant ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void aTwoByTwoTrunkIsReplantedInAllFourSpots(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         BlockState leaves = Scenes.naturalLeaves(Blocks.DARK_OAK_LEAVES);
@@ -259,7 +258,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void aOneByOneTrunkIsReplantedOnce(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
@@ -272,7 +271,7 @@ public class TreeGameTests implements FabricGameTest {
 
     // ---- Planting saplings ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void saplingsOnlyGoWhereTheyCanGrow(GameTestHelper helper) {
         helper.setBlock(1, 0, 1, Blocks.GRASS_BLOCK);
         helper.setBlock(2, 0, 2, Blocks.STONE);
@@ -293,7 +292,7 @@ public class TreeGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void propagulesCanBePlantedUnderwater(GameTestHelper helper) {
         // A chopped mangrove's base is often underwater once its roots are gone
         helper.setBlock(3, 0, 3, Blocks.MUD);
@@ -311,7 +310,7 @@ public class TreeGameTests implements FabricGameTest {
 
     // ---- Cobblemon's trees ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void saccharineTreesFindTheirSapling(GameTestHelper helper) {
         // Found by name like any modded tree: cobblemon:saccharine_log -> cobblemon:saccharine_sapling
         Block log = block(helper, "cobblemon:saccharine_log");

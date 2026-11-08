@@ -2,7 +2,6 @@ package dev.palworks.gametest;
 
 import dev.palworks.job.JobType;
 import dev.palworks.manager.JobManager;
-import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -18,13 +17,13 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
  * Whether each kind of job still exists in the world (JobManager.isJobStillThere): what workers
  * re-check while walking to a job, so they turn back from jobs that disappeared.
  */
-public class JobGameTests implements FabricGameTest {
+public class JobGameTests {
 
     private static boolean there(GameTestHelper helper, JobType type, BlockPos rel) {
         return JobManager.isJobStillThere(helper.getLevel(), type, helper.absolutePos(rel));
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void harvestJobsAreThereWhileTheCropIsRipe(GameTestHelper helper) {
         BlockPos crop = new BlockPos(3, 1, 3);
         helper.setBlock(crop.below(), Blocks.FARMLAND);
@@ -39,7 +38,7 @@ public class JobGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void plantingJobsAreThereWhileTheFarmlandIsEmpty(GameTestHelper helper) {
         BlockPos spot = new BlockPos(3, 1, 3);
         helper.setBlock(spot.below(), Blocks.FARMLAND);
@@ -53,7 +52,7 @@ public class JobGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void chopJobsAreThereWhileTheLogIs(GameTestHelper helper) {
         BlockPos log = new BlockPos(3, 1, 3);
         helper.setBlock(log, Blocks.OAK_LOG);
@@ -63,7 +62,7 @@ public class JobGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void furnaceJobsAreThereWhileItHasSomethingToSmeltAndNoFuel(GameTestHelper helper) {
         BlockPos pos = new BlockPos(3, 1, 3);
         helper.setBlock(pos, Blocks.FURNACE);
@@ -80,7 +79,7 @@ public class JobGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void seedJobsAreThereWhileTheChestHasSeeds(GameTestHelper helper) {
         BlockPos pos = new BlockPos(3, 1, 3);
         helper.setBlock(pos, Blocks.CHEST);
@@ -95,7 +94,7 @@ public class JobGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void deliveryJobsAreThereWhileTheChestIs(GameTestHelper helper) {
         BlockPos pos = new BlockPos(3, 1, 3);
         helper.setBlock(pos, Blocks.CHEST);
@@ -105,7 +104,7 @@ public class JobGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void pickupJobsAreThereWhileItemsAreOnTheGround(GameTestHelper helper) {
         BlockPos pos = new BlockPos(3, 1, 3);
         helper.setBlock(pos.below(), Blocks.STONE);

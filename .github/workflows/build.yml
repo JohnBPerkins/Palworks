@@ -93,11 +93,16 @@ jobs:
           if-no-files-found: ignore
 
   # In-game tests: boots a headless dev server with Palworks, Cobblemon and the GameTests
-  # (fabric/src/gametest), and runs them: real worlds, real blocks, real Pokémon doing jobs.
-  # Fabric only; the code under test is the shared common code, the same on both loaders.
+  # (common/src/gametest), and runs them: real worlds, real blocks, real Pokémon doing jobs. The
+  # same tests on both loaders, so loader-specific behaviour (networking, events, mixins) is covered.
   gametest:
+    name: gametest (${{ matrix.loader }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        loader: [fabric, neoforge]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -123,26 +128,30 @@ jobs:
             */.gradle/loom-cache
             !.gradle/loom-cache/remapped_mods
             !*/.gradle/loom-cache/remapped_mods
-          key: loom-gametest-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+          key: loom-gametest-${{ matrix.loader }}-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
           restore-keys: |
-            loom-gametest-${{ runner.os }}-
+            loom-gametest-${{ matrix.loader }}-${{ runner.os }}-
 
       - name: Run GameTests
         id: gametest
-        run: ./gradlew :fabric:runGameTest
+        env:
+          LOADER: ${{ matrix.loader }}
+        run: ./gradlew ":$LOADER:runGameTest"
 
       - name: GameTest results
         if: ${{ !cancelled() && steps.gametest.conclusion != 'skipped' }}
-        run: python3 -I .github/scripts/test_summary.py --title "In-game tests" 'fabric/build/test-results/gametest'
+        env:
+          LOADER: ${{ matrix.loader }}
+        run: python3 -I .github/scripts/test_summary.py --title "In-game tests ($LOADER)" "$LOADER/build/test-results/gametest"
 
       - name: Upload GameTest logs
         if: ${{ failure() && steps.gametest.conclusion == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
-          name: gametest-logs
+          name: gametest-logs-${{ matrix.loader }}
           path: |
-            fabric/build/run/gameTest/logs/
-            fabric/build/test-results/gametest/
+            ${{ matrix.loader }}/build/run/gameTest/logs/
+            ${{ matrix.loader }}/build/test-results/gametest/
           retention-days: 14
 
   # Compiles against the newest supported Cobblemon, catching API that was removed or changed after

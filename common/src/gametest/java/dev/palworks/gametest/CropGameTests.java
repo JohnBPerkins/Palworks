@@ -1,7 +1,6 @@
 package dev.palworks.gametest;
 
 import dev.palworks.crop.CropAdapter;
-import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -21,7 +20,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import static dev.palworks.gametest.Scenes.abs;
 
 /** Harvesting (real loot, minus one seed, reset in place), gourds, berries, and planting. */
-public class CropGameTests implements FabricGameTest {
+public class CropGameTests {
 
     private static final BlockPos CROP = new BlockPos(3, 1, 3);
 
@@ -48,7 +47,7 @@ public class CropGameTests implements FabricGameTest {
 
     // ---- Harvesting ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void wheatDropsWheatAndResets(GameTestHelper helper) {
         // Wheat used to drop only seeds (block.asItem() of wheat is wheat seeds)
         CropBlock wheat = (CropBlock) Blocks.WHEAT;
@@ -56,21 +55,21 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void carrotsResetAndDropCarrots(GameTestHelper helper) {
         CropBlock carrots = (CropBlock) Blocks.CARROTS;
         assertHarvestsInPlace(helper, Blocks.FARMLAND, carrots.getStateForAge(7), Items.CARROT, carrots.getStateForAge(0));
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void potatoesResetAndDropPotatoes(GameTestHelper helper) {
         CropBlock potatoes = (CropBlock) Blocks.POTATOES;
         assertHarvestsInPlace(helper, Blocks.FARMLAND, potatoes.getStateForAge(7), Items.POTATO, potatoes.getStateForAge(0));
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void beetrootDropsBeetrootAndResets(GameTestHelper helper) {
         CropBlock beetroot = (CropBlock) Blocks.BEETROOTS;
         assertHarvestsInPlace(helper, Blocks.FARMLAND, beetroot.getStateForAge(beetroot.getMaxAge()),
@@ -78,7 +77,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void netherWartResetsOnSoulSand(GameTestHelper helper) {
         BlockState wart = Blocks.NETHER_WART.defaultBlockState();
         assertHarvestsInPlace(helper, Blocks.SOUL_SAND, wart.setValue(NetherWartBlock.AGE, 3),
@@ -86,7 +85,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void cocoaResetsOnItsLog(GameTestHelper helper) {
         // Cocoa hangs on the side of a jungle log
         helper.setBlock(3, 1, 4, Blocks.JUNGLE_LOG);
@@ -100,7 +99,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void unripeCropsAreLeftAlone(GameTestHelper helper) {
         CropBlock wheat = (CropBlock) Blocks.WHEAT;
         crop(helper, Blocks.FARMLAND, wheat.getStateForAge(3));
@@ -111,7 +110,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void eachHarvestPaysOneSeedForTheReplant(GameTestHelper helper) {
         // Mature wheat drops 1 wheat and 1-4 seeds (avg ~2.71) by hand. Harvesting in place takes one
         // seed to pay for the replant, so it averages ~1.71 seeds. Over 200 harvests the totals are
@@ -134,7 +133,7 @@ public class CropGameTests implements FabricGameTest {
 
     // ---- Gourds ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void pumpkinsAreHarvestedNotTheirStems(GameTestHelper helper) {
         // A stem that has grown its pumpkin is "attached" to it
         helper.setBlock(3, 0, 3, Blocks.FARMLAND);
@@ -157,7 +156,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void melonsDropSlices(GameTestHelper helper) {
         helper.setBlock(3, 0, 3, Blocks.FARMLAND);
         helper.setBlock(3, 0, 4, Blocks.DIRT);
@@ -171,7 +170,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void aFullyGrownStemWithNoFruitIsLeftAlone(GameTestHelper helper) {
         crop(helper, Blocks.FARMLAND, Blocks.PUMPKIN_STEM.defaultBlockState().setValue(StemBlock.AGE, StemBlock.MAX_AGE));
 
@@ -181,7 +180,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void aPumpkinWithNoStemIsNotACrop(GameTestHelper helper) {
         helper.setBlock(CROP, Blocks.PUMPKIN);
         helper.assertFalse(CropAdapter.isAttachedFruit(helper.getLevel(), helper.absolutePos(CROP)), "a placed pumpkin");
@@ -190,7 +189,7 @@ public class CropGameTests implements FabricGameTest {
 
     // ---- Berries ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void sweetBerryBushesGoBackToAgeOne(GameTestHelper helper) {
         BlockState bush = Blocks.SWEET_BERRY_BUSH.defaultBlockState();
         crop(helper, Blocks.GRASS_BLOCK, bush.setValue(SweetBerryBushBlock.AGE, 3));
@@ -203,7 +202,7 @@ public class CropGameTests implements FabricGameTest {
 
     // ---- Planting ----
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void seedsOnlyGoOnTheRightSoil(GameTestHelper helper) {
         helper.setBlock(1, 0, 1, Blocks.FARMLAND);
         helper.setBlock(2, 0, 2, Blocks.DIRT);
@@ -219,7 +218,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void plantingPutsAYoungCropOnTheFarmland(GameTestHelper helper) {
         helper.setBlock(CROP.below(), Blocks.FARMLAND);
 
@@ -231,7 +230,7 @@ public class CropGameTests implements FabricGameTest {
         helper.succeed();
     }
 
-    @GameTest(template = EMPTY_STRUCTURE)
+    @GameTest(template = Templates.EMPTY)
     public void farmlandIsAPlantingSurface(GameTestHelper helper) {
         helper.setBlock(1, 0, 1, Blocks.FARMLAND);
         helper.setBlock(2, 0, 2, Blocks.SOUL_SAND);

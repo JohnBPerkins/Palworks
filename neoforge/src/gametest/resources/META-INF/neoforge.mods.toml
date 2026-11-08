@@ -1,0 +1,20 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+# In-game tests for Palworks, shared with Fabric (common/src/gametest).
+# Dev runs only (./gradlew :neoforge:runGameTest); never published.
+[[mods]]
+modId = "palworks_gametest"
+version = "1.0.0"
+displayName = "Palworks GameTests"
+
+[[dependencies.palworks_gametest]]
+modId = "palworks"
+type = "required"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+[[mixins]]
+config = "palworks_gametest.mixins.json"
