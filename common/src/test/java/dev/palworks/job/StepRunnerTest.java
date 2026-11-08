@@ -30,11 +30,17 @@ class StepRunnerTest {
         final String name;
         final int ticks;
         final boolean keepGoing;
+        boolean needed = true;
 
         FakeStep(String name, int ticks, boolean keepGoing) {
             this.name = name;
             this.ticks = ticks;
             this.keepGoing = keepGoing;
+        }
+
+        FakeStep notNeeded() {
+            needed = false;
+            return this;
         }
 
         FakeStep(String name, int ticks) {
@@ -47,6 +53,7 @@ class StepRunnerTest {
             log.add("finish " + name);
             return keepGoing;
         }
+        @Override public boolean needed(List<String> log) { return needed; }
     }
 
     private WorkerState state;
@@ -155,5 +162,37 @@ class StepRunnerTest {
         assertEquals(Outcome.FINISHED, tick(steps));
         assertTrue(log.isEmpty(), "no step runs");
         assertEquals(0, state.getJobStep());
+    }
+
+    @Test
+    void aStepWithNothingToDoIsSkippedWithoutTakingTime() {
+        // e.g. no leaves in the way: the lumberjack goes straight to chopping
+        List<FakeStep> steps = List.of(new FakeStep("clear", 20).notNeeded(), new FakeStep("chop", 2));
+
+        assertEquals(Outcome.WORKING, tick(steps));
+        assertEquals(List.of("start chop"), log, "the chop starts on the first tick; clear never runs");
+        assertEquals(Outcome.FINISHED, tick(steps));
+        assertEquals(List.of("start chop", "finish chop"), log);
+    }
+
+    @Test
+    void aStepIsOnlyAskedWhetherItsNeededWhenReached() {
+        // Once it has started it runs to its end, even if there's nothing left for it by then
+        FakeStep clear = new FakeStep("clear", 2);
+        List<FakeStep> steps = List.of(clear, new FakeStep("chop", 1));
+        tick(steps); // clear started
+        clear.needed = false;
+
+        assertEquals(Outcome.WORKING, tick(steps));
+        assertEquals(List.of("start clear", "finish clear"), log);
+    }
+
+    @Test
+    void skippingEveryRemainingStepFinishesTheJob() {
+        List<FakeStep> steps = List.of(new FakeStep("chop", 1), new FakeStep("tidy", 5).notNeeded());
+
+        assertEquals(Outcome.FINISHED, tick(steps), "chop done; tidy has nothing to do");
+        assertEquals(List.of("start chop", "finish chop"), log);
+        assertEquals(0, state.getJobStep(), "progress reset for the next job");
     }
 }

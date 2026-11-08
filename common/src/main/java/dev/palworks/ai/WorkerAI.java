@@ -54,10 +54,17 @@ public class WorkerAI {
     // side tiles (front-only) while keeping arrival prompt — no fidgeting to hit an exact tile.
     private static final double ARRIVAL_DISTSQ = 1.5;
 
-    // Only count a path failure when the pathfinder stops MORE than this far short of the stand
-    // tile. Closer-but-not-arrived keeps approaching instead of failing (the 30s reservation expiry
-    // is the backstop), which avoids spurious "stuck" right next to the target.
-    private static final double APPROACH_GIVEUP_DISTSQ = 6.25;
+    // Also arrived when its walk has finished within this squared distance of the stand tile: a
+    // diagonal neighbour, or one a block up or down. A path counts as reaching a tile when it ends
+    // within a block of it, so a worker that can't fit on the tile itself (a big Pokémon, a tight
+    // spot under leaves) stops next to it. That used to be "not arrived" but also "not stuck", so it
+    // stood there until the 30s reservation expiry.
+    private static final double SETTLED_DISTSQ = 3.0;
+    // Most ticks a lumberjack spends stepping from where its walk ended onto its tile by the trunk
+    // before it settles for chopping from where it is (something's in the way: another mob, say).
+    private static final int STEP_IN_TICKS = 40;
+    // How near the middle of its tile counts as on it, for a lumberjack (crossing its edge doesn't)
+    private static final double ON_TILE_DIST = 0.35;
 
     // Work radius around the worker (no base required)
     private static final int WORK_RADIUS = 32;
@@ -133,6 +140,7 @@ public class WorkerAI {
             if (distanceSq > 100 * 100) { // 100 block radius check
                 Palworks.LOGGER.warn("{} has impossible reservation distance {} blocks (entity at {}, job at {}) - clearing corrupted reservation!",
                     pokemon.getSpecies().getName(), Math.sqrt(distanceSq), entityPos, reservation.getStationPos());
+                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
                 return false;
@@ -164,6 +172,7 @@ public class WorkerAI {
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                     JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                 }
+                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
                 return false;
@@ -221,6 +230,7 @@ public class WorkerAI {
                     && !state.hasJobProgress()
                     && !JobManager.isJobStillThere(level, reservation.getJobType(), targetPos)) {
                 JobManager.getInstance(goneLevel).onJobInvalidated(pokemon, reservation, level);
+                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                 state.clearReservation();
                 state.resetPathFailures();
                 WorkerStateManager.save(pokemon, state);
@@ -234,6 +244,7 @@ public class WorkerAI {
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                 JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
             }
+            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
             state.clearReservation();
             state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
             WorkerStateManager.save(pokemon, state);
@@ -260,15 +271,41 @@ public class WorkerAI {
                     pokemon.getSpecies().getName(), reservation.getJobType(), targetPos);
             }
             JobManager.getInstance(validationLevel).onJobInvalidated(pokemon, reservation, level);
+            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
             state.clearReservation();
             state.resetPathFailures();
             WorkerStateManager.save(pokemon, state);
             return false;
         }
 
-        // Arrived when within ARRIVAL_DISTSQ of the stand tile. Prompt (no exact-tile fidgeting); the
-        // stand tile is a block back from the station so this still excludes the station's sides.
-        if (distanceSq <= ARRIVAL_DISTSQ) {
+        // Arrived when within ARRIVAL_DISTSQ of the stand tile (prompt, no fidgeting to hit the exact
+        // tile), or when its walk has ended right next to the tile (SETTLED_DISTSQ), or, for a job
+        // that doesn't need a particular side (a crop), anywhere within reach of it.
+        boolean navDone = entity.getNavigation().isDone();
+        boolean arrived;
+        if (reservation.getJobType() == JobType.CHOP_TREE) {
+            // A tree is chopped right up against the trunk, so it has to be on the tile itself: one
+            // tile off is where it stands to clear leaves out of the way. Cobblemon's navigation
+            // calls a walk done a little short of the tile, so from there it steps the last bit
+            // straight in, and settles where it is if something stops it.
+            double offX = entity.getX() - (standPos.getX() + 0.5);
+            double offZ = entity.getZ() - (standPos.getZ() + 0.5);
+            boolean onTile = distanceSq == 0 && offX * offX + offZ * offZ <= ON_TILE_DIST * ON_TILE_DIST;
+            boolean walkEndedNextToIt = navDone && state.hasWalkedToJob() && distanceSq <= SETTLED_DISTSQ;
+            if (!onTile && walkEndedNextToIt && state.getStepInTicks() < STEP_IN_TICKS) {
+                state.addStepInTick();
+                entity.getMoveControl().setWantedPosition(
+                    standPos.getX() + 0.5, standPos.getY(), standPos.getZ() + 0.5, 0.6);
+                return true;
+            }
+            arrived = onTile || walkEndedNextToIt
+                || (navDone && state.hasWalkedToJob() && WorkPositions.withinChoppingReach(level, entity, targetPos));
+        } else {
+            boolean closeEnough = navDone && state.hasWalkedToJob()
+                && !WorkPositions.isDirectional(level, targetPos) && WorkPositions.withinWorkReach(entity, targetPos);
+            arrived = distanceSq <= ARRIVAL_DISTSQ || (navDone && distanceSq <= SETTLED_DISTSQ) || closeEnough;
+        }
+        if (arrived) {
             // Only log on first tick of work
             if (DEBUG && !state.isWorking()) {
                 WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
@@ -279,9 +316,11 @@ public class WorkerAI {
                     pokemon.getSpecies().getName(), reservation.getJobType(), inventoryInfo);
             }
 
-            // Keep worker stationary while working (for animations)
+            // Keep worker stationary while working (for animations). Only horizontally: zeroing its
+            // vertical motion too stops gravity registering it as on the ground, and ground
+            // navigation won't plan a path for a mob that isn't on the ground.
             entity.getNavigation().stop();
-            entity.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+            entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
 
             // Face the worked block so animations/effects line up (groundwork for furnace fx, etc.)
             faceTarget(entity, targetPos);
@@ -328,12 +367,14 @@ public class WorkerAI {
             if (state.getStepTicks() > 0) {
                 state.restartStep();
             }
-            navigateToJob(entity, standPos);
+            navigateToJob(entity, standPos, reservation.getJobType());
+            state.setWalkedToJob(true);
+            state.resetStepIn();
 
-            // Track path failures for stuck detection. Only count a failure when the pathfinder has
-            // stopped WELL SHORT of the stand tile; if it's close but not yet on the front tile,
-            // keep approaching (avoids spurious "stuck" right next to the furnace).
-            if (entity.getNavigation().isDone() && distanceSq > APPROACH_GIVEUP_DISTSQ) {
+            // Track path failures for stuck detection: its walk has ended (on the ground, so not just
+            // falling or knocked about) without getting next to the stand tile, so the path can't
+            // get it there. A few in a row and it gives up the job instead of standing around.
+            if (entity.getNavigation().isDone() && entity.onGround() && distanceSq > SETTLED_DISTSQ) {
                 state.recordPathFailure();
 
                 if (state.isStuck()) {
@@ -343,6 +384,7 @@ public class WorkerAI {
                     if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                         JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                     }
+                    entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                     state.clearReservation();
                     state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
                     state.resetPathFailures();
@@ -409,11 +451,19 @@ public class WorkerAI {
      * step's effect. Effects only happen in {@code finish}, so a step is all-or-nothing: if the
      * worker leaves (pushed away, paused, the game reloads) the step simply restarts. The step
      * reached is saved, so the job carries on from it, even with a different worker (handed over).
+     * A step that isn't {@code isNeeded} when it's reached (nothing for it to do) is skipped.
      */
-    private record Step(String name, int ticks, StepStart onStart, StepFinish onFinish)
+    private record Step(String name, int ticks, StepStart onStart, StepFinish onFinish,
+                        java.util.function.Predicate<JobContext> isNeeded)
             implements StepRunner.TimedStep<JobContext> {
         @Override public void start(JobContext ctx) { onStart.run(ctx); }
         @Override public boolean finish(JobContext ctx) { return onFinish.run(ctx); }
+        @Override public boolean needed(JobContext ctx) { return isNeeded.test(ctx); }
+
+        /** A step that always runs (most do). */
+        Step(String name, int ticks, StepStart onStart, StepFinish onFinish) {
+            this(name, ticks, onStart, onFinish, ctx -> true);
+        }
 
         static Step of(String name, int ticks, StepFinish finish) {
             return new Step(name, ticks, ctx -> {}, finish);
@@ -687,12 +737,37 @@ public class WorkerAI {
     }
 
     private static final class ChopTreeHandler implements JobHandler {
-        // Chop (3s), then replant (1s later). The replant spots and sapling are saved in the job's
-        // data at the chop, so a paused job, or one another lumberjack takes over, still replants.
+        // Clear the leaves in the way to the trunk (1s, skipped if there are none), chop (3s), then
+        // replant (1s later). The replant spots and sapling are saved in the job's data at the
+        // chop, so a paused job, or one another lumberjack takes over, still replants.
         private final List<Step> steps = List.of(
+            new Step("clear leaves", 20, ctx -> {}, effect(ChopTreeHandler::clearLeaves), ChopTreeHandler::leavesInTheWay),
             Step.of("chop", 60, ChopTreeHandler::chop),
             Step.of("replant", 20, effect(ChopTreeHandler::replant)));
         @Override public List<Step> steps() { return steps; }
+
+        /** Whether leaves stand between the worker and the trunk (see WorkPositions.treeStandFor). */
+        private static boolean leavesInTheWay(JobContext ctx) {
+            WorkPositions.TreeStand stand = WorkPositions.treeStandFor(ctx.level(), ctx.pos(), ctx.entity());
+            return stand != null && stand.needsClearing();
+        }
+
+        /**
+         * Break the leaves between the worker and the trunk (with their usual drops, as when they
+         * decay), so it can walk in and chop right up against it. Its stand spot then moves in to the
+         * trunk, and it walks there before the chop starts.
+         */
+        private static void clearLeaves(JobContext ctx) {
+            WorkPositions.TreeStand stand = WorkPositions.treeStandFor(ctx.level(), ctx.pos(), ctx.entity());
+            if (stand == null) {
+                return;
+            }
+            for (BlockPos leaf : stand.leavesToClear()) {
+                ctx.level().destroyBlock(leaf, true, ctx.entity());
+            }
+            // It hasn't walked to its new spot yet: don't let "close enough" chop from out here
+            ctx.state().setWalkedToJob(false);
+        }
 
         /** Bring the tree down and note where to replant. Ends the job if there's no valid tree. */
         private static boolean chop(JobContext ctx) {
@@ -794,8 +869,17 @@ public class WorkerAI {
     /**
      * Navigate the entity to a target position using built-in pathfinding.
      */
-    private static void navigateToJob(Mob entity, BlockPos standPos) {
+    private static void navigateToJob(Mob entity, BlockPos standPos, JobType jobType) {
         // Normal walking speed; the worker arrives when within ARRIVAL_DISTSQ of the stand tile.
+        if (jobType == JobType.CHOP_TREE) {
+            // To the tile itself: moveTo(x, y, z) plans to within a block of it, which from just
+            // outside a tree's cleared leaves is "there already", so it never stepped in to the trunk
+            var path = entity.getNavigation().createPath(standPos, 0);
+            if (path != null) {
+                entity.getNavigation().moveTo(path, 0.6);
+            }
+            return;
+        }
         entity.getNavigation().moveTo(standPos.getX(), standPos.getY(), standPos.getZ(), 0.6);
     }
 

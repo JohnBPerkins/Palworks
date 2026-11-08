@@ -145,6 +145,25 @@ public class TreeDetector {
                 lowestLog = current;
             }
 
+            // Logs touching only at an edge or corner are part of the tree too: big oaks' branches
+            // and acacias' bent trunks are joined diagonally. (Only face neighbours are checked for
+            // what the tree may touch, below.)
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        int faces = (dx != 0 ? 1 : 0) + (dy != 0 ? 1 : 0) + (dz != 0 ? 1 : 0);
+                        if (faces < 2) {
+                            continue; // itself, or a face neighbour (handled below)
+                        }
+                        BlockPos diagonal = current.offset(dx, dy, dz);
+                        if (!visitedLogs.contains(diagonal) && isTreeBlock(level.getBlockState(diagonal))) {
+                            visitedLogs.add(diagonal);
+                            queue.add(diagonal);
+                        }
+                    }
+                }
+            }
+
             // Check all 6 directions for connected blocks
             for (Direction dir : DIRECTIONS) {
                 BlockPos neighbor = current.relative(dir);
