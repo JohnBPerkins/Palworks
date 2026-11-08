@@ -75,8 +75,11 @@ public class WorkerAI {
     // lives in the WorkerStateManager cache; staggered per-entity to avoid a save spike.
     private static final int WORK_SAVE_INTERVAL = 20;
 
-    // How stale a paused job's reservation may get before it's refreshed (well under the 30s expiry).
-    private static final long PAUSED_RESERVATION_REFRESH_MS = 10_000;
+    // How long (game ticks) a worker may hold a job without starting it before it gives it up.
+    // Game time, so pausing the game doesn't count towards it.
+    private static final long RESERVATION_TIMEOUT_TICKS = 30 * 20;
+    // How stale a paused job's reservation may get before it's refreshed (well under the timeout).
+    private static final long PAUSED_RESERVATION_REFRESH_TICKS = 10 * 20;
 
     // How often (ticks) a walking worker re-checks that its job still exists (staggered per entity).
     private static final int JOB_RECHECK_INTERVAL = 10;
@@ -146,23 +149,18 @@ public class WorkerAI {
             // Don't expire if worker is actively working, or has already done part of the job
             boolean isActivelyWorking = state.isWorking();
 
-            // Safeguard: If timestamp is 0 or very old (before 2020), the data is corrupted
-            // Refresh the reservation with a new timestamp instead of expiring it
-            long timestamp = reservation.getTimestamp();
-            if (timestamp < 1577836800000L) { // Jan 1, 2020 in milliseconds
-                Palworks.LOGGER.warn("{} has corrupted reservation timestamp ({}) for {} - refreshing",
-                    pokemon.getSpecies().getName(), timestamp, reservation.getJobType());
-                // Create a new reservation with fresh timestamp
+            // Saved by an older version, which timed reservations by the clock: start its time now
+            // instead of reading a clock time as game time (it would never expire)
+            long now = level.getGameTime();
+            if (reservation.isFromTheFuture(now)) {
                 ReservationId refreshedReservation = new ReservationId(
-                    reservation.getStationPos(),
-                    reservation.getJobType()
-                );
+                    reservation.getStationPos(), reservation.getJobType(), now);
                 state.setCurrentReservation(refreshedReservation);
                 WorkerStateManager.save(pokemon, state);
                 reservation = refreshedReservation;
             }
 
-            if (!isActivelyWorking && reservation.isExpired(30000)) { // 30 second timeout
+            if (!isActivelyWorking && reservation.isExpired(now, RESERVATION_TIMEOUT_TICKS)) {
                 Palworks.LOGGER.info("{} reservation expired for {}",
                     pokemon.getSpecies().getName(), reservation.getJobType());
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
@@ -192,8 +190,9 @@ public class WorkerAI {
         if (state.getStepTicks() > 0) {
             state.restartStep();
         }
-        if (reservation.isExpired(PAUSED_RESERVATION_REFRESH_MS)) {
-            state.setCurrentReservation(new ReservationId(reservation.getStationPos(), reservation.getJobType()));
+        long now = level.getGameTime();
+        if (reservation.isExpired(now, PAUSED_RESERVATION_REFRESH_TICKS)) {
+            state.setCurrentReservation(new ReservationId(reservation.getStationPos(), reservation.getJobType(), now));
         }
         BlockPos heading = entity.getNavigation().getTargetPos();
         if (heading != null) {
@@ -419,7 +418,7 @@ public class WorkerAI {
                 // Some jobs (e.g. lighting a furnace that has more to smelt) go round again.
                 // Refresh the reservation with a new timestamp to prevent expiration.
                 state.setCurrentReservation(new ReservationId(
-                    reservation.getStationPos(), reservation.getJobType()));
+                    reservation.getStationPos(), reservation.getJobType(), level.getGameTime()));
                 yield false;
             }
             case FINISHED -> true;
