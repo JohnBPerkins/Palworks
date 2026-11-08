@@ -64,9 +64,9 @@ public class WorkerInventoryManager {
         return inventory;
     }
 
-    /** What this Pokemon may carry, from its (cached) worker suitabilities. */
+    /** What this Pokemon may carry, from its suitabilities (its species and types as they are now). */
     public static CarryMode carryModeFor(Pokemon pokemon) {
-        return CarryMode.forSuitabilities(WorkerStateManager.getOrCreate(pokemon).getSuitabilities());
+        return CarryMode.forSuitabilities(dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon));
     }
 
     /**

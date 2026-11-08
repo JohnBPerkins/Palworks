@@ -56,7 +56,7 @@ public class DebugInfo {
             }
 
             this.suitabilities = new ArrayList<>();
-            Set<Suitability> suits = state.getSuitabilities();
+            Set<Suitability> suits = dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon);
             for (Suitability suit : suits) {
                 String cooldownInfo = state.isOnCooldown(suit) ?
                         String.format(" (CD: %ds)", state.getRemainingCooldown(suit) / 20) :

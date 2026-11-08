@@ -18,6 +18,7 @@ import dev.palworks.job.StepRunner;
 import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
@@ -34,6 +35,7 @@ import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Main AI controller for Pokémon workers.
@@ -570,7 +572,8 @@ public class WorkerAI {
                 return;
             }
 
-            if (ctx.state().getSuitabilities().contains(Suitability.PLANTING)) {
+            Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
+            if (suitabilities.contains(Suitability.PLANTING)) {
                 ItemStack extracted = extractSeedsFromChest(ctx.level(), targetPos);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
@@ -583,7 +586,7 @@ public class WorkerAI {
                     Palworks.LOGGER.warn("{} FAILED to get seeds from chest at {} - chest might be empty, treating as complete",
                         ctx.name(), targetPos);
                 }
-            } else if (ctx.state().getSuitabilities().contains(Suitability.NETHER)) {
+            } else if (suitabilities.contains(Suitability.NETHER)) {
                 ItemStack extracted = dev.palworks.station.ChestHelper.extractItems(
                     ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
                 if (!extracted.isEmpty()) {
@@ -599,7 +602,7 @@ public class WorkerAI {
                 }
             } else if (DEBUG) {
                 Palworks.LOGGER.warn("{} has GET_SEEDS job but lacks PLANTING/NETHER suitability! Suitabilities: {}",
-                    ctx.name(), ctx.state().getSuitabilities());
+                    ctx.name(), suitabilities);
             }
         }
     }

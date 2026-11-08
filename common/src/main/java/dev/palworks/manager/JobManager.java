@@ -13,6 +13,7 @@ import dev.palworks.station.StationState;
 import dev.palworks.station.StationStateManager;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
@@ -253,24 +254,6 @@ public class JobManager {
             return;
         }
 
-        // Work out its suitabilities if it has none yet, or it evolved or changed form since. If it
-        // can no longer do the job it has (an evolution lost the type it needed), hand that over,
-        // with any progress, for a worker that can.
-        if (state.suitabilitiesOutOfDate(pokemon)) {
-            state.initializeSuitabilities(pokemon);
-            ReservationId held = state.getCurrentReservation();
-            if (held != null && !canStillDo(state.getSuitabilities(), held)) {
-                captureProgress(state, JobKey.of(held));
-                state.clearReservation();
-                entity.getNavigation().stop();
-                if (DEBUG) {
-                    Palworks.LOGGER.debug("{} can no longer do {} at {}; handed it over",
-                        pokemon.getSpecies().getName(), held.getJobType(), held.getStationPos());
-                }
-            }
-            WorkerStateManager.save(pokemon, state);
-        }
-
         // Create or update worker info
         WorkerInfo info = activeWorkers.computeIfAbsent(uuid, k -> new WorkerInfo());
 
@@ -290,7 +273,8 @@ public class JobManager {
         info.pokemonUUID = uuid;
         BlockPos entityPos = entity.blockPosition();
         info.position = entityPos;
-        info.suitabilities = state.getSuitabilities();
+        // From its species and types as they are now, so an evolution or form change counts at once
+        info.suitabilities = SuitabilityDetector.getSuitabilities(pokemon);
         info.currentReservation = stateReservation;
         // A busy worker (in a battle, evolving) gets no new jobs; WorkerAI drops the one it had.
         info.idle = (stateReservation == null) && !WorkerEligibility.isBusy(entity);
@@ -1404,14 +1388,6 @@ public class JobManager {
      * so whoever takes it next carries on from there instead of starting over. Call before the
      * worker's reservation (and with it, its progress) is cleared.
      */
-    /** Whether a worker with these suitabilities may still do a job it holds. */
-    private boolean canStillDo(Set<Suitability> suitabilities, ReservationId reservation) {
-        JobRecord job = reservedJobs.get(JobKey.of(reservation));
-        return job != null
-            ? suitabilities.containsAll(job.requiredSuitabilities)
-            : suitabilities.contains(reservation.getJobType().getRequiredSuitability());
-    }
-
     private void captureProgress(WorkerState state, JobKey key) {
         JobRecord job = reservedJobs.get(key);
         if (job != null && state.hasJobProgress()) {
