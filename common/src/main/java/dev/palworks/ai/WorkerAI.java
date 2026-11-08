@@ -60,6 +60,11 @@ public class WorkerAI {
     // spot under leaves) stops next to it. That used to be "not arrived" but also "not stuck", so it
     // stood there until the 30s reservation expiry.
     private static final double SETTLED_DISTSQ = 3.0;
+    // Most ticks a lumberjack spends stepping from where its walk ended onto its tile by the trunk
+    // before it settles for chopping from where it is (something's in the way: another mob, say).
+    private static final int STEP_IN_TICKS = 40;
+    // How near the middle of its tile counts as on it, for a lumberjack (crossing its edge doesn't)
+    private static final double ON_TILE_DIST = 0.35;
 
     // Work radius around the worker (no base required)
     private static final int WORK_RADIUS = 32;
@@ -275,11 +280,32 @@ public class WorkerAI {
 
         // Arrived when within ARRIVAL_DISTSQ of the stand tile (prompt, no fidgeting to hit the exact
         // tile), or when its walk has ended right next to the tile (SETTLED_DISTSQ), or, for a job
-        // that doesn't need a particular side (a tree, a crop), anywhere within reach of it.
+        // that doesn't need a particular side (a crop), anywhere within reach of it.
         boolean navDone = entity.getNavigation().isDone();
-        boolean closeEnough = navDone && state.hasWalkedToJob()
-            && !WorkPositions.isDirectional(level, targetPos) && WorkPositions.withinWorkReach(entity, targetPos);
-        if (distanceSq <= ARRIVAL_DISTSQ || (navDone && distanceSq <= SETTLED_DISTSQ) || closeEnough) {
+        boolean arrived;
+        if (reservation.getJobType() == JobType.CHOP_TREE) {
+            // A tree is chopped right up against the trunk, so it has to be on the tile itself: one
+            // tile off is where it stands to clear leaves out of the way. Cobblemon's navigation
+            // calls a walk done a little short of the tile, so from there it steps the last bit
+            // straight in, and settles where it is if something stops it.
+            double offX = entity.getX() - (standPos.getX() + 0.5);
+            double offZ = entity.getZ() - (standPos.getZ() + 0.5);
+            boolean onTile = distanceSq == 0 && offX * offX + offZ * offZ <= ON_TILE_DIST * ON_TILE_DIST;
+            boolean walkEndedNextToIt = navDone && state.hasWalkedToJob() && distanceSq <= SETTLED_DISTSQ;
+            if (!onTile && walkEndedNextToIt && state.getStepInTicks() < STEP_IN_TICKS) {
+                state.addStepInTick();
+                entity.getMoveControl().setWantedPosition(
+                    standPos.getX() + 0.5, standPos.getY(), standPos.getZ() + 0.5, 0.6);
+                return true;
+            }
+            arrived = onTile || walkEndedNextToIt
+                || (navDone && state.hasWalkedToJob() && WorkPositions.withinChoppingReach(level, entity, targetPos));
+        } else {
+            boolean closeEnough = navDone && state.hasWalkedToJob()
+                && !WorkPositions.isDirectional(level, targetPos) && WorkPositions.withinWorkReach(entity, targetPos);
+            arrived = distanceSq <= ARRIVAL_DISTSQ || (navDone && distanceSq <= SETTLED_DISTSQ) || closeEnough;
+        }
+        if (arrived) {
             // Only log on first tick of work
             if (DEBUG && !state.isWorking()) {
                 WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
@@ -341,8 +367,9 @@ public class WorkerAI {
             if (state.getStepTicks() > 0) {
                 state.restartStep();
             }
-            navigateToJob(entity, standPos);
+            navigateToJob(entity, standPos, reservation.getJobType());
             state.setWalkedToJob(true);
+            state.resetStepIn();
 
             // Track path failures for stuck detection: its walk has ended (on the ground, so not just
             // falling or knocked about) without getting next to the stand tile, so the path can't
@@ -424,11 +451,19 @@ public class WorkerAI {
      * step's effect. Effects only happen in {@code finish}, so a step is all-or-nothing: if the
      * worker leaves (pushed away, paused, the game reloads) the step simply restarts. The step
      * reached is saved, so the job carries on from it, even with a different worker (handed over).
+     * A step that isn't {@code isNeeded} when it's reached (nothing for it to do) is skipped.
      */
-    private record Step(String name, int ticks, StepStart onStart, StepFinish onFinish)
+    private record Step(String name, int ticks, StepStart onStart, StepFinish onFinish,
+                        java.util.function.Predicate<JobContext> isNeeded)
             implements StepRunner.TimedStep<JobContext> {
         @Override public void start(JobContext ctx) { onStart.run(ctx); }
         @Override public boolean finish(JobContext ctx) { return onFinish.run(ctx); }
+        @Override public boolean needed(JobContext ctx) { return isNeeded.test(ctx); }
+
+        /** A step that always runs (most do). */
+        Step(String name, int ticks, StepStart onStart, StepFinish onFinish) {
+            this(name, ticks, onStart, onFinish, ctx -> true);
+        }
 
         static Step of(String name, int ticks, StepFinish finish) {
             return new Step(name, ticks, ctx -> {}, finish);
@@ -702,12 +737,37 @@ public class WorkerAI {
     }
 
     private static final class ChopTreeHandler implements JobHandler {
-        // Chop (3s), then replant (1s later). The replant spots and sapling are saved in the job's
-        // data at the chop, so a paused job, or one another lumberjack takes over, still replants.
+        // Clear the leaves in the way to the trunk (1s, skipped if there are none), chop (3s), then
+        // replant (1s later). The replant spots and sapling are saved in the job's data at the
+        // chop, so a paused job, or one another lumberjack takes over, still replants.
         private final List<Step> steps = List.of(
+            new Step("clear leaves", 20, ctx -> {}, effect(ChopTreeHandler::clearLeaves), ChopTreeHandler::leavesInTheWay),
             Step.of("chop", 60, ChopTreeHandler::chop),
             Step.of("replant", 20, effect(ChopTreeHandler::replant)));
         @Override public List<Step> steps() { return steps; }
+
+        /** Whether leaves stand between the worker and the trunk (see WorkPositions.treeStandFor). */
+        private static boolean leavesInTheWay(JobContext ctx) {
+            WorkPositions.TreeStand stand = WorkPositions.treeStandFor(ctx.level(), ctx.pos(), ctx.entity());
+            return stand != null && stand.needsClearing();
+        }
+
+        /**
+         * Break the leaves between the worker and the trunk (with their usual drops, as when they
+         * decay), so it can walk in and chop right up against it. Its stand spot then moves in to the
+         * trunk, and it walks there before the chop starts.
+         */
+        private static void clearLeaves(JobContext ctx) {
+            WorkPositions.TreeStand stand = WorkPositions.treeStandFor(ctx.level(), ctx.pos(), ctx.entity());
+            if (stand == null) {
+                return;
+            }
+            for (BlockPos leaf : stand.leavesToClear()) {
+                ctx.level().destroyBlock(leaf, true, ctx.entity());
+            }
+            // It hasn't walked to its new spot yet: don't let "close enough" chop from out here
+            ctx.state().setWalkedToJob(false);
+        }
 
         /** Bring the tree down and note where to replant. Ends the job if there's no valid tree. */
         private static boolean chop(JobContext ctx) {
@@ -809,8 +869,17 @@ public class WorkerAI {
     /**
      * Navigate the entity to a target position using built-in pathfinding.
      */
-    private static void navigateToJob(Mob entity, BlockPos standPos) {
+    private static void navigateToJob(Mob entity, BlockPos standPos, JobType jobType) {
         // Normal walking speed; the worker arrives when within ARRIVAL_DISTSQ of the stand tile.
+        if (jobType == JobType.CHOP_TREE) {
+            // To the tile itself: moveTo(x, y, z) plans to within a block of it, which from just
+            // outside a tree's cleared leaves is "there already", so it never stepped in to the trunk
+            var path = entity.getNavigation().createPath(standPos, 0);
+            if (path != null) {
+                entity.getNavigation().moveTo(path, 0.6);
+            }
+            return;
+        }
         entity.getNavigation().moveTo(standPos.getX(), standPos.getY(), standPos.getZ(), 0.6);
     }
 
