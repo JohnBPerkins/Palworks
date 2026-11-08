@@ -185,6 +185,40 @@ public class WorkerGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "worker_paused", timeoutTicks = 600)
+    public void pausingTheGameDoesntCostAWorkerItsJob(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // A paused single-player game stops ticking but the clock runs on. Reservations used to be
+        // timed by the clock, so a pause of over 30 seconds made every walking worker give up its
+        // job on resume. Blocking the server thread is that pause.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        long[] pausedAt = {-1};
+        long[] heldSince = {0};
+
+        helper.onEachTick(() -> {
+            WorkerState state = WorkerStateManager.get(worker.getPokemon());
+            var held = state == null ? null : state.getCurrentReservation();
+            if (pausedAt[0] < 0 && held != null && !state.isWorking()) {
+                pausedAt[0] = helper.getTick();
+                heldSince[0] = held.getTimestamp();
+                try {
+                    Thread.sleep(31_000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            } else if (pausedAt[0] >= 0 && helper.getTick() <= pausedAt[0] + 5) {
+                helper.assertTrue(held != null && held.getTimestamp() == heldSince[0],
+                    "it should still have the job it had before the pause, has " + held);
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(pausedAt[0] >= 0, "it took a job");
+            assertWheatRow(helper, 0, "harvested after the pause");
+        });
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "worker_busy", timeoutTicks = 1000)
     public void aBusyWorkerPausesThenCarriesOn(GameTestHelper helper) {
         Workers.isolate(helper);
