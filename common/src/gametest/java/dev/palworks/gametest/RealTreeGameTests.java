@@ -1,5 +1,7 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import dev.palworks.ai.WorkPositions;
 import dev.palworks.tree.TreeDetector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -10,6 +12,8 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
 import java.util.ArrayList;
@@ -60,10 +64,52 @@ public class RealTreeGameTests {
         }
     }
 
+    /** The trunk's columns at its base (relative): TREE, and the rest of a 2x2 trunk. */
+    static List<BlockPos> trunkAtBase(GameTestHelper helper) {
+        List<BlockPos> trunk = new ArrayList<>();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos pos = TREE.offset(dx, 0, dz);
+                if (TreeDetector.isLog(helper.getBlockState(pos))) {
+                    trunk.add(pos);
+                }
+            }
+        }
+        return trunk;
+    }
+
     /**
-     * Grow a real tree, send a lumberjack 6 blocks away, and expect the whole tree chopped and a
-     * sapling replanted well within the time a chop should take (walk + 60-tick swing + 20-tick
-     * replant). A lumberjack that reaches the tree but never starts chopping fails this.
+     * The gap between the worker's hitbox and the nearest trunk column, in blocks across (the
+     * larger of the x and z gaps): 0 when it's touching the trunk.
+     */
+    static double gapToTrunk(GameTestHelper helper, PokemonEntity worker, List<BlockPos> trunk) {
+        var at = helper.relativeVec(worker.position());
+        double half = worker.getBbWidth() / 2.0;
+        double best = Double.MAX_VALUE;
+        for (BlockPos column : trunk) {
+            double gapX = Math.max(0, Math.max(column.getX() - (at.x + half), (at.x - half) - (column.getX() + 1)));
+            double gapZ = Math.max(0, Math.max(column.getZ() - (at.z + half), (at.z - half) - (column.getZ() + 1)));
+            best = Math.min(best, Math.max(gapX, gapZ));
+        }
+        return best;
+    }
+
+    /**
+     * How far from the trunk a lumberjack may chop: from the nearest tile round the trunk its
+     * hitbox fits on (the tile touching the trunk for most; one further out for Pokémon over a
+     * block wide), within 0.35 of that tile's middle, give or take a little. A tile further out
+     * than that is a whole block more.
+     */
+    static double maxChopGap(PokemonEntity worker) {
+        double half = worker.getBbWidth() / 2.0;
+        return Math.max(0, WorkPositions.closestChopRing(worker) - 0.5 - half) + 0.35 + 0.05;
+    }
+
+    /**
+     * Grow a real tree, send a lumberjack 6 blocks away, and expect the whole tree chopped from
+     * right by the trunk (clearing low leaves to get there) and a sapling replanted, well within the
+     * time a chop should take (walk + clearing + 60-tick swing + 20-tick replant). A lumberjack
+     * that reaches the tree but never starts chopping, or chops from a few blocks away, fails this.
      */
     private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
                                      long seed, String lumberjack, Block sapling) {
@@ -71,11 +117,27 @@ public class RealTreeGameTests {
         arenaFloor(helper, Blocks.GRASS_BLOCK);
         grow(helper, tree, seed);
         helper.assertTrue(!treeBlocks(helper).isEmpty(), "the tree grew");
-        Workers.sendOut(helper, lumberjack + " level=30", new BlockPos(8, 1, 3));
+        List<BlockPos> trunk = trunkAtBase(helper);
+        PokemonEntity worker = Workers.sendOut(helper, lumberjack + " level=30", new BlockPos(8, 1, 3));
+
+        // Where it was standing on the last tick the tree was still up: where it chopped from
+        double[] lastGap = {-1};
+        double[] chopGap = {-1};
+        helper.onEachTick(() -> {
+            if (!treeBlocks(helper).isEmpty()) {
+                lastGap[0] = gapToTrunk(helper, worker, trunk);
+            } else if (chopGap[0] < 0) {
+                chopGap[0] = lastGap[0];
+            }
+        });
 
         helper.succeedWhen(() -> {
             List<BlockPos> left = treeBlocks(helper);
             helper.assertTrue(left.isEmpty(), "tree should be fully chopped, " + left.size() + " logs left");
+            helper.assertTrue(chopGap[0] >= 0, "the chop was seen");
+            helper.assertTrue(chopGap[0] <= maxChopGap(worker), String.format(
+                "%s should chop right by the trunk (at most %.2f away), but chopped from %.2f blocks away",
+                lumberjack, maxChopGap(worker), chopGap[0]));
             helper.assertBlockPresent(sapling, TREE);
         });
     }
@@ -156,5 +218,55 @@ public class RealTreeGameTests {
     @GameTest(template = Templates.ARENA, batch = "real_dark_oak_conkeldurr", timeoutTicks = 300)
     public void conkeldurrChopsARealDarkOak(GameTestHelper helper) {
         chopRealTree(helper, TreeFeatures.DARK_OAK, 7, "conkeldurr", Blocks.DARK_OAK_SAPLING);
+    }
+
+    // ---- Too hemmed in to chop up close: left alone, not chopped from a distance ----
+
+    /**
+     * Grow an oak and fence it in 2 blocks out (so the fence doesn't touch the trunk, which would
+     * stop it counting as a tree), 2 high, with {@code fence}. The lumberjack can't get right up to
+     * the trunk, and can't clear its way in either (only natural leaves are cleared), so it must
+     * leave the tree alone. It used to chop it from outside the fence, 3 or more blocks away.
+     */
+    private static void fencedInTreeIsLeftAlone(GameTestHelper helper, BlockState fence) {
+        Workers.isolate(helper);
+        arenaFloor(helper, Blocks.GRASS_BLOCK);
+        grow(helper, TreeFeatures.OAK, 1);
+        List<BlockPos> fenceAt = new ArrayList<>();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                if (Math.max(Math.abs(dx), Math.abs(dz)) == 2) {
+                    for (int y = 0; y < 2; y++) {
+                        BlockPos pos = TREE.offset(dx, y, dz);
+                        helper.setBlock(pos, fence);
+                        fenceAt.add(pos);
+                    }
+                }
+            }
+        }
+        int logs = treeBlocks(helper).size();
+        Workers.sendOut(helper, "machop level=30", new BlockPos(8, 1, 3));
+
+        helper.runAfterDelay(250, () -> {
+            helper.assertTrue(treeBlocks(helper).size() == logs,
+                "the tree should be left alone, but " + (logs - treeBlocks(helper).size()) + " of " + logs + " logs are gone");
+            for (BlockPos pos : fenceAt) {
+                // (leaves work out their own distance property, so compare the block, and persistence)
+                BlockState now = helper.getBlockState(pos);
+                helper.assertTrue(now.is(fence.getBlock()) && (!now.hasProperty(LeavesBlock.PERSISTENT)
+                    || now.getValue(LeavesBlock.PERSISTENT)), "the fence at " + pos + " should be untouched, but it's " + now);
+            }
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "real_oak_walled", timeoutTicks = 300)
+    public void aTreeWalledInByStoneIsLeftAlone(GameTestHelper helper) {
+        fencedInTreeIsLeftAlone(helper, Blocks.COBBLESTONE.defaultBlockState());
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "real_oak_hedged", timeoutTicks = 300)
+    public void playerPlacedLeavesAreNeverClearedToGetToATree(GameTestHelper helper) {
+        fencedInTreeIsLeftAlone(helper, Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
     }
 }
