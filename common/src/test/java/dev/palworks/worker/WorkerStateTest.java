@@ -105,7 +105,7 @@ class WorkerStateTest {
     @Test
     void clearingTheReservationClearsJobProgress() {
         WorkerState state = new WorkerState();
-        state.setCurrentReservation(new ReservationId(BlockPos.ZERO, JobType.CHOP_TREE));
+        state.setCurrentReservation(new ReservationId(BlockPos.ZERO, JobType.CHOP_TREE, 0L));
         CompoundTag data = new CompoundTag();
         data.putString("sapling", "minecraft:oak_sapling");
         state.startJob(1, data);

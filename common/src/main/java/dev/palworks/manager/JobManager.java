@@ -73,6 +73,7 @@ public class JobManager {
     private static final int FOLLOW_UP_RECHECK_INTERVAL = 20;    // Ticks between checks that follow-up jobs still exist
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
     private static final boolean MINING_JOBS_ENABLED = false;     // Flip on once MINE_RESOURCE breaks ores
+    private static final long JOB_POOL_EXPIRY_TICKS = 5 * 60 * 20; // Drop jobs nobody has taken in 5 minutes
 
     // Singleton instances (one per ServerLevel)
     private static final Map<String, JobManager> instances = new ConcurrentHashMap<>();
@@ -548,7 +549,7 @@ public class JobManager {
                     job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                     job.type = JobType.FUEL_FURNACE;
                     job.requiredSuitabilities = EnumSet.of(Suitability.KINDLING);
-                    job.discoveryTime = System.currentTimeMillis();
+                    job.discoveryTime = level.getGameTime();
                     job.priority = 7;
                     return job;
                 }
@@ -561,7 +562,7 @@ public class JobManager {
                         job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                         job.type = stationJob;
                         job.requiredSuitabilities = EnumSet.of(stationJob.getRequiredSuitability());
-                        job.discoveryTime = System.currentTimeMillis();
+                        job.discoveryTime = level.getGameTime();
                         job.priority = 6;
                         return job;
                     }
@@ -577,7 +578,7 @@ public class JobManager {
             job.position = fruitPos.immutable();
             job.type = JobType.HARVEST_CROPS;
             job.requiredSuitabilities = EnumSet.of(Suitability.GATHERING);
-            job.discoveryTime = System.currentTimeMillis();
+            job.discoveryTime = level.getGameTime();
             job.priority = 8; // Same as ripe crops
             return job;
         }
@@ -588,7 +589,7 @@ public class JobManager {
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.HARVEST_CROPS;
             job.requiredSuitabilities = EnumSet.of(Suitability.GATHERING);
-            job.discoveryTime = System.currentTimeMillis();
+            job.discoveryTime = level.getGameTime();
             job.priority = 8; // High priority for ripe crops
             return job;
         }
@@ -606,7 +607,7 @@ public class JobManager {
                     job.position = abovePos;
                     job.type = JobType.PLANT_SEEDS;
                     job.requiredSuitabilities = EnumSet.of(Suitability.NETHER);
-                    job.discoveryTime = System.currentTimeMillis();
+                    job.discoveryTime = level.getGameTime();
                     job.priority = 5;
                     return job;
                 }
@@ -620,7 +621,7 @@ public class JobManager {
                     job.position = abovePos;
                     job.type = JobType.PLANT_SEEDS;
                     job.requiredSuitabilities = EnumSet.of(Suitability.PLANTING);
-                    job.discoveryTime = System.currentTimeMillis();
+                    job.discoveryTime = level.getGameTime();
                     job.priority = 5;
                     return job;
                 }
@@ -634,7 +635,7 @@ public class JobManager {
                 job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                 job.type = JobType.GET_SEEDS;
                 job.requiredSuitabilities = EnumSet.of(Suitability.PLANTING);
-                job.discoveryTime = System.currentTimeMillis();
+                job.discoveryTime = level.getGameTime();
                 job.priority = 6;
                 return job;
             }
@@ -643,7 +644,7 @@ public class JobManager {
                 job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
                 job.type = JobType.GET_SEEDS;
                 job.requiredSuitabilities = EnumSet.of(Suitability.NETHER);
-                job.discoveryTime = System.currentTimeMillis();
+                job.discoveryTime = level.getGameTime();
                 job.priority = 6;
                 return job;
             }
@@ -670,7 +671,7 @@ public class JobManager {
             if (TreeDetector.isNetherStem(state)) {
                 job.requiredSuitabilities.add(Suitability.NETHER); // nether trees need Lumbering + Nether
             }
-            job.discoveryTime = System.currentTimeMillis();
+            job.discoveryTime = level.getGameTime();
             job.priority = 4;
             return job;
         }
@@ -682,7 +683,7 @@ public class JobManager {
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.MINE_RESOURCE;
             job.requiredSuitabilities = EnumSet.of(Suitability.MINING);
-            job.discoveryTime = System.currentTimeMillis();
+            job.discoveryTime = level.getGameTime();
             job.priority = 7; // High priority for ores
             return job;
         }
@@ -846,7 +847,7 @@ public class JobManager {
             job.position = chestPos;
             job.type = JobType.DELIVER_ITEMS;
             job.requiredSuitabilities = EnumSet.of(Suitability.TRANSPORTING);
-            job.discoveryTime = System.currentTimeMillis();
+            job.discoveryTime = level.getGameTime();
             job.priority = 10; // Highest priority - must deliver before doing anything else
             candidates.add(job);
         }
@@ -1041,7 +1042,7 @@ public class JobManager {
             return;
         }
 
-        ReservationId reservation = new ReservationId(job.position, job.type);
+        ReservationId reservation = new ReservationId(job.position, job.type, level.getGameTime());
 
         // WorkerState (NBT) is the single source of truth for the reservation.
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
@@ -1291,7 +1292,7 @@ public class JobManager {
         collectJob.position = request.sourceJobLocation;
         collectJob.type = JobType.COLLECT_DROPS;
         collectJob.requiredSuitabilities = EnumSet.of(Suitability.TRANSPORTING);
-        collectJob.discoveryTime = System.currentTimeMillis();
+        collectJob.discoveryTime = level.getGameTime();
         collectJob.isConsecutiveJob = true;
         collectJob.priority = HIGH_PRIORITY;
         collectJob.reservedByWorker = request.suggestedWorkerUUID;  // Hint for assignment
@@ -1382,7 +1383,7 @@ public class JobManager {
         }
         job.reservedByWorker = null;
         if (job.isHandedOver()) {
-            job.discoveryTime = System.currentTimeMillis(); // don't let the pool's expiry drop it straight away
+            job.discoveryTime = level.getGameTime(); // don't let the pool's expiry drop it straight away
         }
         availableJobs.put(key, job);
     }
@@ -1429,12 +1430,10 @@ public class JobManager {
             return stale;
         });
 
-        // Remove jobs that have been available too long. discoveryTime is wall-clock ms,
-        // so it MUST be compared in ms (not game ticks) for this to ever fire.
-        long nowMs = System.currentTimeMillis();
-        long fiveMinutesMs = 5L * 60L * 1000L;
+        // Remove jobs that have been available too long (game time, so a paused game doesn't
+        // count: that used to drop every job, handed-over ones included, after a 5-minute pause)
         availableJobs.entrySet().removeIf(entry ->
-            (nowMs - entry.getValue().discoveryTime) > fiveMinutesMs);
+            (currentTime - entry.getValue().discoveryTime) > JOB_POOL_EXPIRY_TICKS);
 
         // Expire per-worker job-failure blacklist entries (stored as game ticks).
         recentlyFailedJobs.values().forEach(failed ->
@@ -1668,7 +1667,7 @@ public class JobManager {
         public BlockPos position;
         public JobType type;
         public Set<Suitability> requiredSuitabilities = EnumSet.noneOf(Suitability.class); // Worker needs all of them
-        public long discoveryTime;
+        public long discoveryTime;     // Game time it was found (or handed over)
         public UUID reservedByWorker;  // null if available
         public int priority;           // 0-10, higher = more important
         public boolean isConsecutiveJob;
