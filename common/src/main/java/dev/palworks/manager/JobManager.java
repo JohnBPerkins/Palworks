@@ -253,9 +253,21 @@ public class JobManager {
             return;
         }
 
-        // Ensure suitabilities are initialized
-        if (state.areSuitabilitiesDirty() || state.getSuitabilities().isEmpty()) {
+        // Work out its suitabilities if it has none yet, or it evolved or changed form since. If it
+        // can no longer do the job it has (an evolution lost the type it needed), hand that over,
+        // with any progress, for a worker that can.
+        if (state.suitabilitiesOutOfDate(pokemon)) {
             state.initializeSuitabilities(pokemon);
+            ReservationId held = state.getCurrentReservation();
+            if (held != null && !canStillDo(state.getSuitabilities(), held)) {
+                captureProgress(state, JobKey.of(held));
+                state.clearReservation();
+                entity.getNavigation().stop();
+                if (DEBUG) {
+                    Palworks.LOGGER.debug("{} can no longer do {} at {}; handed it over",
+                        pokemon.getSpecies().getName(), held.getJobType(), held.getStationPos());
+                }
+            }
             WorkerStateManager.save(pokemon, state);
         }
 
@@ -1392,6 +1404,14 @@ public class JobManager {
      * so whoever takes it next carries on from there instead of starting over. Call before the
      * worker's reservation (and with it, its progress) is cleared.
      */
+    /** Whether a worker with these suitabilities may still do a job it holds. */
+    private boolean canStillDo(Set<Suitability> suitabilities, ReservationId reservation) {
+        JobRecord job = reservedJobs.get(JobKey.of(reservation));
+        return job != null
+            ? suitabilities.containsAll(job.requiredSuitabilities)
+            : suitabilities.contains(reservation.getJobType().getRequiredSuitability());
+    }
+
     private void captureProgress(WorkerState state, JobKey key) {
         JobRecord job = reservedJobs.get(key);
         if (job != null && state.hasJobProgress()) {

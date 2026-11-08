@@ -1,5 +1,6 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -199,6 +200,54 @@ public class WorkerGameTests {
             worker.getBusyLocks().remove("palworks-test");
         });
         helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's free")));
+    }
+
+    // ---- Evolving ----
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_evolve_gain", timeoutTicks = 800)
+    public void anEvolvedWorkerTakesTheJobsOfItsNewType(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // Eevee (Normal) can't harvest; Leafeon (Grass) can. Its jobs used to be worked out once,
+        // so it kept Eevee's forever.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, "eevee level=20", START);
+
+        helper.runAfterDelay(100, () -> {
+            assertWheatRow(helper, 7, "left alone by an Eevee");
+            worker.getPokemon().setSpecies(PokemonSpecies.INSTANCE.getByName("leafeon"));
+        });
+        helper.runAfterDelay(101, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's a Leafeon")));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_evolve_lose", timeoutTicks = 800)
+    public void aWorkerThatLosesTheTypeItsJobNeedsGivesTheJobUp(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // Mid-way to a tree, the lumberjack becomes a Fire type (standing in for an evolution that
+        // changes type, e.g. Scyther to Scizor losing Flying). It mustn't go on and chop it.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        Scenes.tree(helper, 3, 5, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
+        PokemonEntity worker = Workers.sendOut(helper, "machop level=20", START);
+        long[] changedAt = {-1};
+
+        helper.onEachTick(() -> {
+            WorkerState state = WorkerStateManager.get(worker.getPokemon());
+            if (changedAt[0] < 0 && state != null && state.getCurrentReservation() != null) {
+                changedAt[0] = helper.getTick();
+                worker.getPokemon().setSpecies(PokemonSpecies.INSTANCE.getByName("charmander"));
+            }
+            if (changedAt[0] >= 0 && helper.getTick() == changedAt[0] + 5) {
+                WorkerState now = WorkerStateManager.get(worker.getPokemon());
+                helper.assertTrue(now.getCurrentReservation() == null,
+                    "a Fire type should have given up the chop, still has " + now.getCurrentReservation());
+            }
+            if (changedAt[0] >= 0 && helper.getTick() == changedAt[0] + 200) {
+                for (int y = 1; y <= 4; y++) {
+                    helper.assertBlockPresent(Blocks.OAK_LOG, new BlockPos(3, y, 5));
+                }
+                helper.succeed();
+            }
+        });
     }
 
     // ---- Reachability ----

@@ -19,9 +19,11 @@ public class WorkerState {
     private JobType assignedJob;
     private ReservationId currentReservation;
 
-    // Cached suitabilities (calculated once, stored for performance)
+    // Cached suitabilities, and the species form they were worked out for. The form isn't saved, so
+    // they're worked out once more after loading (cheap); after that, only when the form changes.
     private Set<Suitability> cachedSuitabilities;
     private boolean suitabilitiesDirty;
+    private Object suitabilitiesForm;
 
     // Cooldowns per suitability type
     private final Map<Suitability, Long> cooldowns;
@@ -100,10 +102,20 @@ public class WorkerState {
         resetJobProgress();
     }
 
-    // Suitability caching (call this ONCE when worker is initialized)
+    /** Work out (again) what jobs this Pokémon can do, from its current species and form. */
     public void initializeSuitabilities(com.cobblemon.mod.common.pokemon.Pokemon pokemon) {
         this.cachedSuitabilities = dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon);
         this.suitabilitiesDirty = false;
+        this.suitabilitiesForm = pokemon.getForm();
+    }
+
+    /**
+     * Whether the cached suitabilities need working out again: they were never worked out, or were
+     * for a different species or form than the Pokémon has now (it evolved, or changed form, and
+     * its types with it). Suitabilities come only from species and types, both set by the form.
+     */
+    public boolean suitabilitiesOutOfDate(com.cobblemon.mod.common.pokemon.Pokemon pokemon) {
+        return suitabilitiesDirty || cachedSuitabilities == null || suitabilitiesForm != pokemon.getForm();
     }
 
     public Set<Suitability> getSuitabilities() {

@@ -119,12 +119,6 @@ public class WorkerAI {
             return false;
         }
 
-        // Check if suitabilities need recalculation
-        if (state.areSuitabilitiesDirty()) {
-            state.initializeSuitabilities(pokemon);
-            WorkerStateManager.save(pokemon, state);
-        }
-
         // Handle current reservation
         ReservationId reservation = state.getCurrentReservation();
         if (reservation != null) {
