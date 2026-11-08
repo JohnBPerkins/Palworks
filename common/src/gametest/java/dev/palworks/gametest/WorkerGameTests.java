@@ -185,22 +185,6 @@ public class WorkerGameTests {
         });
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "worker_busy", timeoutTicks = 1000)
-    public void aBusyWorkerPausesThenCarriesOn(GameTestHelper helper) {
-        Workers.isolate(helper);
-        // Busy is what a battle (or evolving) sets on the Pokémon; it should stop working until free
-        Scenes.floor(helper, Blocks.GRASS_BLOCK);
-        ripeWheatRow(helper);
-        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
-        worker.getBusyLocks().add("palworks-test");
-
-        helper.runAfterDelay(200, () -> {
-            assertWheatRow(helper, 7, "left alone while the worker is busy");
-            worker.getBusyLocks().remove("palworks-test");
-        });
-        helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's free")));
-    }
-
     @GameTest(template = Templates.EMPTY, batch = "worker_paused", timeoutTicks = 600)
     public void pausingTheGameDoesntCostAWorkerItsJob(GameTestHelper helper) {
         Workers.isolate(helper);
@@ -233,6 +217,22 @@ public class WorkerGameTests {
             helper.assertTrue(pausedAt[0] >= 0, "it took a job");
             assertWheatRow(helper, 0, "harvested after the pause");
         });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_busy", timeoutTicks = 1000)
+    public void aBusyWorkerPausesThenCarriesOn(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // Busy is what a battle (or evolving) sets on the Pokémon; it should stop working until free
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        worker.getBusyLocks().add("palworks-test");
+
+        helper.runAfterDelay(200, () -> {
+            assertWheatRow(helper, 7, "left alone while the worker is busy");
+            worker.getBusyLocks().remove("palworks-test");
+        });
+        helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's free")));
     }
 
     // ---- Reachability ----
