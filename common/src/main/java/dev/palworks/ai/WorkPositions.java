@@ -1,6 +1,7 @@
 package dev.palworks.ai;
 
 import dev.palworks.job.JobType;
+import dev.palworks.tree.TreeDetector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Mob;
@@ -8,6 +9,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Resolves the exact tile a worker should stand on to perform a job, separate from the block the
@@ -27,6 +31,10 @@ public final class WorkPositions {
      */
     @Nullable
     public static BlockPos standingPosFor(Level level, BlockPos targetPos, JobType jobType, Mob entity) {
+        if (jobType == JobType.CHOP_TREE) {
+            TreeStand stand = treeStandFor(level, targetPos, entity);
+            return stand == null ? null : stand.stand();
+        }
         int distance = reachDistanceFor(entity);
 
         Direction facing = stationFacing(level, targetPos);
@@ -50,11 +58,10 @@ public final class WorkPositions {
             return targetPos.relative(facing, 1);
         }
 
-        // Non-directional (crops, ore, logs, brewing stand, ...): the nearest ring, from `distance`
-        // out, that has a tile the worker fits on; in that ring, the tile nearest the worker. Rings
-        // are square (cardinal and diagonal tiles), and each tile is also tried one block up and
-        // down so slopes work. Real trees need the outer rings: an oak's lowest leaves hang at head
-        // height out to 2 blocks from the trunk, so nothing at distance 2 has room to stand.
+        // Non-directional (crops, ore, brewing stand, ...; trees are handled above): the nearest
+        // ring, from `distance` out, that has a tile the worker fits on; in that ring, the tile
+        // nearest the worker. Rings are square (cardinal and diagonal tiles), and each tile is also
+        // tried one block up and down so slopes work.
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
@@ -79,6 +86,257 @@ public final class WorkPositions {
             }
         }
         return null;
+    }
+
+    // ============================================================
+    // Trees: chop right up against the trunk, clearing leaves to get there
+    // ============================================================
+
+    /**
+     * Where a lumberjack stands, and the leaves it has to clear first (none if it can go straight
+     * to the trunk).
+     *
+     * @param stand         where to walk to: a chopping spot by the trunk, or, when leaves are in
+     *                      the way, the spot it clears them from
+     * @param leavesToClear the natural leaves between that spot and the trunk, cleared before chopping
+     */
+    public record TreeStand(BlockPos stand, List<BlockPos> leavesToClear) {
+        public boolean needsClearing() {
+            return !leavesToClear.isEmpty();
+        }
+    }
+
+    /**
+     * Where a lumberjack should stand to chop the tree at {@code treePos}: right up against the
+     * trunk. Real trees' lowest leaves often hang at head height all around the trunk, so where
+     * they're in the way it clears them first: it stands just outside them and clears a way in. A
+     * tile one further out is the fallback when nothing right by the trunk works even with leaves
+     * cleared (a slope, a branch, a wall). Null when even that's blocked by more than leaves: the
+     * job isn't for this worker (it used to chop from 4 or 5 blocks away instead).
+     *
+     * <p>Only natural leaves are cleared, never ones a player placed. In each ring, as-is spots come
+     * before ones that need clearing, and the spot nearest the worker wins.
+     */
+    @Nullable
+    public static TreeStand treeStandFor(Level level, BlockPos treePos, Mob entity) {
+        List<BlockPos> trunk = trunkColumns(level, treePos);
+        int closest = closestChopRing(entity);
+        for (int d = closest; d <= closest + 1; d++) {
+            List<BlockPos> ring = ringAround(trunk, d);
+
+            // Somewhere it can go straight to
+            BlockPos best = null;
+            double bestDistSq = Double.MAX_VALUE;
+            for (BlockPos tile : ring) {
+                for (int dy : SLOPE_STEPS) {
+                    BlockPos spot = tile.above(dy);
+                    if (fits(level, spot, entity)) {
+                        double distSq = distSqTo(entity, spot);
+                        if (distSq < bestDistSq - 1e-6) {
+                            best = spot;
+                            bestDistSq = distSq;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (best != null) {
+                return new TreeStand(best, List.of());
+            }
+
+            // Somewhere it can get to by clearing leaves
+            TreeStand cleared = null;
+            bestDistSq = Double.MAX_VALUE;
+            for (BlockPos tile : ring) {
+                for (int dy : SLOPE_STEPS) {
+                    BlockPos spot = tile.above(dy);
+                    if (!fitsIfLeavesCleared(level, spot, entity)) {
+                        continue;
+                    }
+                    for (Direction out : outwardDirections(trunk, spot)) {
+                        TreeStand way = wayIn(level, spot, out, entity);
+                        if (way != null) {
+                            double distSq = distSqTo(entity, way.stand());
+                            if (distSq < bestDistSq - 1e-6) {
+                                cleared = way;
+                                bestDistSq = distSq;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            if (cleared != null) {
+                return cleared;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether the worker is right up against the tree, close enough to chop it from where it
+     * stands: in the nearest ring round the trunk its hitbox fits in, level with the base give or
+     * take a block.
+     */
+    public static boolean withinChoppingReach(Level level, Mob entity, BlockPos treePos) {
+        List<BlockPos> trunk = trunkColumns(level, treePos);
+        BlockPos at = entity.blockPosition();
+        return Math.abs(at.getY() - treePos.getY()) <= 1
+            && chebyshevToTrunk(trunk, at.getX(), at.getZ()) <= closestChopRing(entity);
+    }
+
+    /**
+     * The nearest ring around the trunk a worker's hitbox fits in without overlapping it: 1 (the
+     * tiles touching the trunk) for most, 2 for one wider than about a block (Conkeldurr, Hariyama).
+     */
+    public static int closestChopRing(Mob entity) {
+        return Math.max(1, (int) Math.ceil(entity.getBbWidth() / 2.0 + 0.5 - 1e-3));
+    }
+
+    /**
+     * The trunk's columns at its base: the tree block there and any next to it (a 2x2 trunk), so
+     * rings go round the whole trunk. Just {@code treePos} once it's been chopped (replanting).
+     */
+    private static List<BlockPos> trunkColumns(Level level, BlockPos treePos) {
+        List<BlockPos> trunk = new ArrayList<>(4);
+        trunk.add(treePos);
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos pos = treePos.offset(dx, 0, dz);
+                if ((dx != 0 || dz != 0) && TreeDetector.isLog(level.getBlockState(pos))) {
+                    trunk.add(pos);
+                }
+            }
+        }
+        return trunk;
+    }
+
+    /** The tiles exactly {@code d} away (Chebyshev) from the nearest trunk column, at the base's Y. */
+    private static List<BlockPos> ringAround(List<BlockPos> trunk, int d) {
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPos column : trunk) {
+            minX = Math.min(minX, column.getX());
+            maxX = Math.max(maxX, column.getX());
+            minZ = Math.min(minZ, column.getZ());
+            maxZ = Math.max(maxZ, column.getZ());
+        }
+        int y = trunk.get(0).getY();
+        List<BlockPos> tiles = new ArrayList<>();
+        for (int x = minX - d; x <= maxX + d; x++) {
+            for (int z = minZ - d; z <= maxZ + d; z++) {
+                if (chebyshevToTrunk(trunk, x, z) == d) {
+                    tiles.add(new BlockPos(x, y, z));
+                }
+            }
+        }
+        return tiles;
+    }
+
+    private static int chebyshevToTrunk(List<BlockPos> trunk, int x, int z) {
+        int best = Integer.MAX_VALUE;
+        for (BlockPos column : trunk) {
+            best = Math.min(best, Math.max(Math.abs(x - column.getX()), Math.abs(z - column.getZ())));
+        }
+        return best;
+    }
+
+    /**
+     * The straight (cardinal) ways out from a spot by the trunk, away from it: one for a spot
+     * beside the trunk, two for one at its corner. Cardinal only, so the cleared way is one the
+     * pathfinder can walk (it won't cut a diagonal corner past leaves).
+     */
+    private static List<Direction> outwardDirections(List<BlockPos> trunk, BlockPos spot) {
+        BlockPos nearest = trunk.get(0);
+        int nearestDist = Integer.MAX_VALUE;
+        for (BlockPos column : trunk) {
+            int dist = Math.max(Math.abs(spot.getX() - column.getX()), Math.abs(spot.getZ() - column.getZ()));
+            if (dist < nearestDist) {
+                nearest = column;
+                nearestDist = dist;
+            }
+        }
+        List<Direction> out = new ArrayList<>(2);
+        int dx = Integer.signum(spot.getX() - nearest.getX());
+        int dz = Integer.signum(spot.getZ() - nearest.getZ());
+        if (dx != 0) {
+            out.add(dx > 0 ? Direction.EAST : Direction.WEST);
+        }
+        if (dz != 0) {
+            out.add(dz > 0 ? Direction.SOUTH : Direction.NORTH);
+        }
+        return out;
+    }
+
+    /**
+     * A way in to {@code target} (a spot by the trunk that only leaves block) from outside the
+     * leaves, going out from it in {@code out}: the first tile along that line the worker can
+     * already stand on, with every tile between clearable. Null if there's more than leaves in the
+     * way, or no spot within {@link #EXTRA_RINGS} tiles.
+     */
+    @Nullable
+    private static TreeStand wayIn(Level level, BlockPos target, Direction out, Mob entity) {
+        List<BlockPos> way = new ArrayList<>();
+        way.add(target);
+        for (int k = 1; k <= EXTRA_RINGS; k++) {
+            BlockPos tile = target.relative(out, k);
+            for (int dy : SLOPE_STEPS) {
+                BlockPos spot = tile.above(dy);
+                if (fits(level, spot, entity)) {
+                    List<BlockPos> leaves = new ArrayList<>();
+                    for (BlockPos step : way) {
+                        leaves.addAll(leavesIn(level, step, entity));
+                    }
+                    return new TreeStand(spot, leaves);
+                }
+            }
+            if (!fitsIfLeavesCleared(level, tile, entity)) {
+                return null;
+            }
+            way.add(tile);
+        }
+        return null;
+    }
+
+    /** Whether the worker would fit on this tile once the natural leaves in its space are gone. */
+    private static boolean fitsIfLeavesCleared(Level level, BlockPos pos, Mob entity) {
+        if (!hasFloor(level, pos)) {
+            return false;
+        }
+        BlockPos.MutableBlockPos space = new BlockPos.MutableBlockPos();
+        int[] box = footprint(pos, entity);
+        for (int x = box[0]; x <= box[1]; x++) {
+            for (int z = box[2]; z <= box[3]; z++) {
+                for (int y = 0; y < headroomFor(entity); y++) {
+                    space.set(x, pos.getY() + y, z);
+                    BlockState state = level.getBlockState(space);
+                    if (!state.getCollisionShape(level, space).isEmpty() && !TreeDetector.isNaturalLeaf(state)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /** The natural leaves in the space the worker would take up on this tile. */
+    private static List<BlockPos> leavesIn(Level level, BlockPos pos, Mob entity) {
+        List<BlockPos> leaves = new ArrayList<>();
+        int[] box = footprint(pos, entity);
+        for (int x = box[0]; x <= box[1]; x++) {
+            for (int z = box[2]; z <= box[3]; z++) {
+                for (int y = 0; y < headroomFor(entity); y++) {
+                    BlockPos space = new BlockPos(x, pos.getY() + y, z);
+                    if (TreeDetector.isNaturalLeaf(level.getBlockState(space))) {
+                        leaves.add(space);
+                    }
+                }
+            }
+        }
+        return leaves;
+    }
+
+    private static double distSqTo(Mob entity, BlockPos spot) {
+        return entity.distanceToSqr(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
     }
 
     /** How many rings beyond the reach distance to look for a place to stand. */
@@ -116,18 +374,14 @@ public final class WorkPositions {
      * the tile; leaves or a trunk there used to leave it unable to stand where it was sent.
      */
     public static boolean fits(Level level, BlockPos pos, Mob entity) {
-        if (level.getBlockState(pos.below()).getCollisionShape(level, pos.below()).isEmpty()) {
+        if (!hasFloor(level, pos)) {
             return false;
         }
-        double half = entity.getBbWidth() / 2.0;
-        int minX = (int) Math.floor(pos.getX() + 0.5 - half);
-        int maxX = (int) Math.floor(pos.getX() + 0.5 + half - 1e-3);
-        int minZ = (int) Math.floor(pos.getZ() + 0.5 - half);
-        int maxZ = (int) Math.floor(pos.getZ() + 0.5 + half - 1e-3);
+        int[] box = footprint(pos, entity);
         int headroom = headroomFor(entity);
         BlockPos.MutableBlockPos space = new BlockPos.MutableBlockPos();
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
+        for (int x = box[0]; x <= box[1]; x++) {
+            for (int z = box[2]; z <= box[3]; z++) {
                 for (int y = 0; y < headroom; y++) {
                     space.set(x, pos.getY() + y, z);
                     if (!level.getBlockState(space).getCollisionShape(level, space).isEmpty()) {
@@ -137,6 +391,21 @@ public final class WorkPositions {
             }
         }
         return true;
+    }
+
+    private static boolean hasFloor(Level level, BlockPos pos) {
+        return !level.getBlockState(pos.below()).getCollisionShape(level, pos.below()).isEmpty();
+    }
+
+    /** The columns the worker's hitbox covers centred on this tile: {minX, maxX, minZ, maxZ}. */
+    private static int[] footprint(BlockPos pos, Mob entity) {
+        double half = entity.getBbWidth() / 2.0;
+        return new int[] {
+            (int) Math.floor(pos.getX() + 0.5 - half),
+            (int) Math.floor(pos.getX() + 0.5 + half - 1e-3),
+            (int) Math.floor(pos.getZ() + 0.5 - half),
+            (int) Math.floor(pos.getZ() + 0.5 + half - 1e-3)
+        };
     }
 
     /**
@@ -164,8 +433,8 @@ public final class WorkPositions {
     /**
      * Whether the worker is near enough to a non-directional job to do it from where it stands: its
      * reach distance plus two blocks across, and two blocks up or down. Used once its walk has ended
-     * short of its stand tile, which happens to wide Pokémon among trees: the pathfinder plans a
-     * route, but their body gets caught on the canopy before the tile.
+     * short of its stand tile (the pathfinder planned a route, but a wide body got caught on the
+     * way). Trees have their own, tighter rule: {@link #withinChoppingReach}.
      */
     public static boolean withinWorkReach(Mob entity, BlockPos targetPos) {
         double dx = entity.getX() - (targetPos.getX() + 0.5);

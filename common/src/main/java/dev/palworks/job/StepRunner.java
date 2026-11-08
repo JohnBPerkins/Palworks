@@ -10,6 +10,7 @@ import java.util.function.Predicate;
  * {@link WorkerState} (the step reached, ticks into it). Generic over the context the steps act on,
  * so the rules can be unit-tested without a world:
  * <ul>
+ *   <li>a step that isn't {@code needed} when it's reached is skipped, taking no time;</li>
  *   <li>a step's {@code start} runs on its first tick (where its animation goes);</li>
  *   <li>once it has lasted {@code ticks()} ticks, its {@code finish} runs (its effect), and the job
  *       moves on to the next step; a {@code finish} returning false ends the job there;</li>
@@ -28,6 +29,11 @@ public final class StepRunner {
         void start(C ctx);
         /** The step's effect, when it's over. Return false to end the job here. */
         boolean finish(C ctx);
+        /**
+         * Whether there's anything for this step to do, asked when it's reached (before its first
+         * tick). If not, it's skipped straight away, taking no time and having no effect.
+         */
+        default boolean needed(C ctx) { return true; }
     }
 
     public enum Outcome {
@@ -42,6 +48,7 @@ public final class StepRunner {
     /** Advance the job by one tick. */
     public static <C> Outcome tick(List<? extends TimedStep<C>> steps, WorkerState progress, C ctx,
                                    Predicate<C> repeat) {
+        skipUnneeded(steps, progress, ctx);
         if (progress.getJobStep() >= steps.size()) {
             progress.resetJobProgress();
             return Outcome.FINISHED;
@@ -59,6 +66,9 @@ public final class StepRunner {
         // The step is done: its effect happens now
         boolean keepGoing = step.finish(ctx);
         progress.nextStep();
+        if (keepGoing) {
+            skipUnneeded(steps, progress, ctx);
+        }
         if (keepGoing && progress.getJobStep() < steps.size()) {
             return Outcome.WORKING;
         }
@@ -66,5 +76,16 @@ public final class StepRunner {
         // Last step done (or a step ended the job early)
         progress.resetJobProgress();
         return keepGoing && repeat.test(ctx) ? Outcome.REPEATING : Outcome.FINISHED;
+    }
+
+    /**
+     * Move past the steps with nothing to do, from the one reached. Only a step that hasn't started
+     * is skipped: one already under way runs to its end.
+     */
+    private static <C> void skipUnneeded(List<? extends TimedStep<C>> steps, WorkerState progress, C ctx) {
+        while (progress.getJobStep() < steps.size() && progress.getStepTicks() == 0
+                && !steps.get(progress.getJobStep()).needed(ctx)) {
+            progress.nextStep();
+        }
     }
 }
