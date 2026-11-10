@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
+import dev.palworks.job.WorkRange;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.station.StationDetector;
@@ -61,8 +62,8 @@ public class JobManager {
     private static final int JOB_CACHE_LIFETIME_TICKS = 40;      // 2s: max staleness of a chunk's job scan
                                                                  // (also bounds furnace/crop discovery latency)
     private static final int ASSIGNMENT_BATCH_SIZE = 10;          // Workers assigned per tick
-    private static final int WORKER_SCAN_RADIUS = 32;            // Block radius to scan around workers
-    private static final int VERTICAL_SCAN_RADIUS = 32;          // Y range above/below a worker to scan
+    private static final int WORKER_SCAN_RADIUS = WorkRange.HORIZONTAL; // Block radius to scan around workers
+    private static final int VERTICAL_SCAN_RADIUS = WorkRange.VERTICAL;  // Y range above/below a worker to scan
     private static final int MAX_PATH_CHECKS_PER_WORKER = 8;     // Cap expensive createPath() calls per assignment
     private static final int DELIVERY_SEARCH_RADIUS = 32;        // Horizontal reach for picking a delivery chest
     private static final int DELIVERY_SEARCH_VERTICAL = 4;       // Y reach for picking a delivery chest
@@ -167,11 +168,7 @@ public class JobManager {
 
     private void forgetUnreachableNear(BlockPos pos) {
         for (WorkerInfo worker : activeWorkers.values()) {
-            BlockPos w = worker.position;
-            if (w == null
-                    || Math.abs(w.getX() - pos.getX()) > WORKER_SCAN_RADIUS
-                    || Math.abs(w.getZ() - pos.getZ()) > WORKER_SCAN_RADIUS
-                    || Math.abs(w.getY() - pos.getY()) > VERTICAL_SCAN_RADIUS) {
+            if (!WorkRange.contains(worker.position, pos)) {
                 continue;
             }
             forgetUnreachable(worker.pokemonUUID);
@@ -847,8 +844,8 @@ public class JobManager {
         List<JobRecord> candidates = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
             // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
-            if (!canDoJob(worker, job) || isRecentlyUnreachable(worker, job.position)
-                    || !canTakeFrom(worker, job)) {
+            if (!canDoJob(worker, job) || !WorkRange.contains(worker.position, job.position)
+                    || isRecentlyUnreachable(worker, job.position) || !canTakeFrom(worker, job)) {
                 continue;
             }
 
@@ -915,8 +912,11 @@ public class JobManager {
 
         int pathChecks = 0;
         for (JobRecord job : candidates) {
-            if (!canDoJob(worker, job) || isRecentlyUnreachable(worker, job.position)
-                    || !canTakeFrom(worker, job)) {
+            // Only jobs within its work range: a far one (found round some other worker, or left
+            // over from one) would send it off across the world, and checking a path to it loads
+            // chunks out there
+            if (!canDoJob(worker, job) || !WorkRange.contains(worker.position, job.position)
+                    || isRecentlyUnreachable(worker, job.position) || !canTakeFrom(worker, job)) {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position, job.type, entity);
