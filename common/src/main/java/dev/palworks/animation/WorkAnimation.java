@@ -3,22 +3,26 @@ package dev.palworks.animation;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * What a worker plays for one step of a job, as data: which animation, aimed where, and when it
- * lands. Played by {@link WorkAnimator}; a job's step declares one and the step's timing follows
- * from it (see {@link #stepTicks} and {@link #playAt}), so the effect lands on the tick the step's
- * work happens (the furnace lights as the flames reach it, the crop goes as the leaves hit it).
+ * What a worker plays for one step of a job, as data: which animation, aimed where, when it lands
+ * and how long it lasts. Played by {@link WorkAnimator}; a job's step declares one and the step's
+ * timing follows from it (see {@link #stepTicks} and {@link #playAt}), so the effect lands on the
+ * tick the step's work happens (the furnace lights as the flames reach it, the crop goes as the
+ * leaves hit it). After that the worker plays it out ({@link #playOutTicks}) before it walks off
+ * or starts another animation.
  *
  * <p>For now every animation is a placeholder: a Cobblemon move's action effect (its body
  * animation, particles and sounds, with the move's own timing), which every species can play.
- * Swapping the move only means changing it here and re-tuning {@code impactTicks}.
+ * Swapping the move only means changing it in {@link WorkAnimations} and re-tuning its timing.
  *
- * @param moveEffect  the Cobblemon action effect to play (e.g. {@code cobblemon:ember}), keyed by
- *                    move name in Cobblemon's {@code action_effects} data
- * @param impactTicks ticks from the start of the effect until it lands on the target: read off the
- *                    move's timeline (the pauses and delays before its target particles)
- * @param aimY        height within the target block the effect aims at (0 = bottom, 1 = top)
+ * @param moveEffect    the Cobblemon action effect to play (e.g. {@code cobblemon:ember}), keyed by
+ *                      move name in Cobblemon's {@code action_effects} data
+ * @param impactTicks   ticks from the start of the effect until it lands on the target: read off
+ *                      the move's timeline (the pauses and delays before its target particles)
+ * @param durationTicks ticks from the start until the worker's body animation is over, at least
+ *                      {@code impactTicks}
+ * @param aimY          height within the target block the effect aims at (0 = bottom, 1 = top)
  */
-public record WorkAnimation(ResourceLocation moveEffect, int impactTicks, double aimY) {
+public record WorkAnimation(ResourceLocation moveEffect, int impactTicks, int durationTicks, double aimY) {
 
     /**
      * Ticks a worker stands still before an animation starts. One started on the tick it stops
@@ -26,15 +30,38 @@ public record WorkAnimation(ResourceLocation moveEffect, int impactTicks, double
      */
     public static final int SETTLE_TICKS = 8;
 
+    /**
+     * How long a move's body animation lasts: 3s, the usual length of Cobblemon's
+     * {@code physical}, {@code special} and {@code status} animations (the median across species;
+     * they range from 1.75s to 4.5s). Moves play those unless the species has one of its own.
+     */
+    public static final int MOVE_DURATION_TICKS = 60;
+
     public WorkAnimation {
         if (impactTicks < 0) {
             throw new IllegalArgumentException("impactTicks must not be negative: " + impactTicks);
         }
+        if (durationTicks < impactTicks) {
+            throw new IllegalArgumentException(
+                    "durationTicks (" + durationTicks + ") must be at least impactTicks (" + impactTicks + ")");
+        }
     }
 
-    /** A Cobblemon move's action effect, by move name (e.g. {@code "ember"}). */
+    /**
+     * A Cobblemon move's action effect, by move name (e.g. {@code "ember"}), whose body animation
+     * lasts {@link #MOVE_DURATION_TICKS}.
+     */
     public static WorkAnimation move(String move, int impactTicks, double aimY) {
-        return new WorkAnimation(ResourceLocation.fromNamespaceAndPath("cobblemon", move), impactTicks, aimY);
+        return new WorkAnimation(
+                ResourceLocation.fromNamespaceAndPath("cobblemon", move), impactTicks, MOVE_DURATION_TICKS, aimY);
+    }
+
+    /**
+     * How long the animation goes on after it lands (after the step's work has happened): the
+     * worker stays put meanwhile, rather than walking off mid-animation.
+     */
+    public int playOutTicks() {
+        return durationTicks - impactTicks;
     }
 
     /**

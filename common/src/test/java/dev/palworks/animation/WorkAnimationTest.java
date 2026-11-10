@@ -39,4 +39,16 @@ class WorkAnimationTest {
     void anImpactCannotBeBeforeItStarts() {
         assertThrows(IllegalArgumentException.class, () -> WorkAnimation.move("ember", -1, 0));
     }
+
+    @Test
+    void afterItLandsItPlaysOutTheRestOfItsBodyAnimation() {
+        // Ember lands 35 ticks in; a move's body animation lasts 3s
+        assertEquals(WorkAnimation.MOVE_DURATION_TICKS, EMBER.durationTicks());
+        assertEquals(WorkAnimation.MOVE_DURATION_TICKS - 35, EMBER.playOutTicks());
+    }
+
+    @Test
+    void itCannotEndBeforeItLands() {
+        assertThrows(IllegalArgumentException.class, () -> new WorkAnimation(EMBER.moveEffect(), 35, 30, EMBER.aimY()));
+    }
 }

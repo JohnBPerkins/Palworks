@@ -184,8 +184,8 @@ public class WorkerAI {
             return executeJob(pokemon, entity, level, state, reservation);
         }
 
-        // No reservation - idle (JobManager will assign work)
-        return false;
+        // No reservation - idle (JobManager will assign work), once its last job's animation is over
+        return holdForAnimation(entity);
     }
 
     /**
@@ -321,6 +321,9 @@ public class WorkerAI {
             boolean onTile = distanceSq == 0 && offX * offX + offZ * offZ <= ON_TILE_DIST * ON_TILE_DIST;
             boolean walkEndedNextToIt = navDone && state.hasWalkedToJob() && distanceSq <= SETTLED_DISTSQ;
             if (!onTile && walkEndedNextToIt && state.getStepInTicks() < STEP_IN_TICKS) {
+                if (holdForAnimation(entity)) {
+                    return true;
+                }
                 state.addStepInTick();
                 entity.getMoveControl()
                         .setWantedPosition(standPos.getX() + 0.5, standPos.getY(), standPos.getZ() + 0.5, 0.6);
@@ -401,6 +404,11 @@ public class WorkerAI {
                         String.format("%.1f", distance));
             }
 
+            // Its last job's animation plays out where it is before it sets off for this one
+            if (holdForAnimation(entity)) {
+                return true;
+            }
+
             // A step only counts while standing at the job: if the worker was moved off it (pushed,
             // paused for a battle, handed a job mid-step), the step it was on starts over.
             if (state.getStepTicks() > 0) {
@@ -453,7 +461,18 @@ public class WorkerAI {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
         JobHandler handler = handlerFor(reservation.getJobType());
 
-        return switch (StepRunner.tick(handler.steps(), state, ctx, handler::repeatAfterComplete)) {
+        // A step's animation doesn't start while the last one is still playing out: it waits (just
+        // before starting) for it to end. Steps without one carry on, so a furnace keeps its time.
+        List<Step> steps = handler.steps();
+        int index = state.getJobStep();
+        if (index < steps.size()
+                && steps.get(index).animation() != null
+                && state.getStepTicks() == steps.get(index).startTick()
+                && WorkAnimator.playingOutAt(entity) != null) {
+            return false;
+        }
+
+        return switch (StepRunner.tick(steps, state, ctx, handler::repeatAfterComplete)) {
             case WORKING -> false;
             case REPEATING -> {
                 // Some jobs (e.g. lighting a furnace that has more to smelt) go round again.
@@ -1058,6 +1077,21 @@ public class WorkerAI {
             return;
         }
         entity.getNavigation().moveTo(standPos.getX(), standPos.getY(), standPos.getZ(), 0.6);
+    }
+
+    /**
+     * Keep the worker where it is, facing its work, while its last animation plays out after the
+     * work it was for is done. Returns whether it's holding (false once the animation is over).
+     */
+    private static boolean holdForAnimation(Mob entity) {
+        BlockPos target = WorkAnimator.playingOutAt(entity);
+        if (target == null) {
+            return false;
+        }
+        entity.getNavigation().stop();
+        entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
+        faceTarget(entity, target);
+        return true;
     }
 
     /**

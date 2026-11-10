@@ -19,12 +19,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Plays {@link WorkAnimation}s on workers, server-side, and keeps track of the one each worker is
- * playing so it can be cut short when the step it belongs to is (the worker is pushed off its spot,
- * pauses for a battle, drops the job). Jobs don't call it directly: a step that declares an
- * animation is played and released by WorkerAI's step plumbing.
+ * playing: it's cut short when the step it belongs to is (the worker is pushed off its spot, pauses
+ * for a battle, drops the job), and once the step's work has happened it plays out, with the worker
+ * staying put ({@link #playingOutAt}), before it walks off or starts another. Jobs don't call it
+ * directly: a step that declares an animation is played and released by WorkerAI's step plumbing.
  *
  * <p>A move's action effect is driven through Cobblemon's {@code ActionEffectTimeline} the way a
  * battle does, minus the battle: {@code run()} sends the animation, particle and sound packets to
@@ -43,12 +45,18 @@ public final class WorkAnimator {
     private static final class Playing {
         final ActionEffectContext context;
         final GenericBedrockEntity marker;
+        /** The block it's aimed at, which the worker keeps facing while it plays out. */
+        final BlockPos target;
+        /** The game time its body animation is over. */
+        final long endsAt;
         /** Its step finished (the work happened): it's left to play out, no longer cut short. */
         boolean released;
 
-        Playing(ActionEffectContext context, GenericBedrockEntity marker) {
+        Playing(ActionEffectContext context, GenericBedrockEntity marker, BlockPos target, long endsAt) {
             this.context = context;
             this.marker = marker;
+            this.target = target;
+            this.endsAt = endsAt;
         }
 
         /** Stop it: its target goes, so it no longer aims at, or lands on, the block. */
@@ -99,13 +107,17 @@ public final class WorkAnimator {
                     new ArrayList<>(),
                     level);
 
-            Playing playing = new Playing(context, marker);
+            Playing playing =
+                    new Playing(context, marker, target.immutable(), level.getGameTime() + animation.durationTicks());
             UUID id = worker.getUUID();
             PLAYING.put(id, playing);
-            // Only the cleanup matters; the completion future itself isn't needed
+            // Only the cleanup matters; the completion future itself isn't needed. Kept until its
+            // body animation is over too, if the effect's timeline ends first
             var unused = timeline.run(context).whenComplete((result, error) -> {
                 marker.discard();
-                PLAYING.remove(id, playing);
+                if (level.getGameTime() >= playing.endsAt) {
+                    PLAYING.remove(id, playing);
+                }
             });
         } catch (Exception e) { // NOPMD - Cobblemon's effect code can throw anything; it's only a visual
             marker.discard();
@@ -128,6 +140,25 @@ public final class WorkAnimator {
         }
     }
 
+    /**
+     * If the worker's last animation is playing out after its step's work (the work is done, the
+     * animation isn't), the block it's aimed at: the worker should stay put facing it, not walk off
+     * or start another animation. Null once it's over, or if it isn't playing one.
+     */
+    @Nullable
+    public static BlockPos playingOutAt(Mob worker) {
+        UUID id = worker.getUUID();
+        Playing playing = PLAYING.get(id);
+        if (playing == null || !playing.released) {
+            return null;
+        }
+        if (worker.level().getGameTime() >= playing.endsAt) {
+            PLAYING.remove(id, playing);
+            return null;
+        }
+        return playing.target;
+    }
+
     /** Cut short the worker's animation, unless its step already finished. */
     public static void interrupt(Mob worker) {
         Playing playing = PLAYING.get(worker.getUUID());
@@ -148,8 +179,8 @@ public final class WorkAnimator {
     }
 
     /**
-     * Drop everything (server stop). Otherwise an animation forgets itself when it's over, a few
-     * seconds at most, even if its worker has gone; the markers don't save, so none are left in
+     * Drop everything (server stop). Otherwise an animation is forgotten once it's over (at most
+     * one is kept per worker, until it plays another); the markers don't save, so none are left in
      * the world.
      */
     public static void clear() {
