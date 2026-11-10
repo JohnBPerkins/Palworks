@@ -2,9 +2,12 @@ package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import dev.palworks.ai.WorkStance;
+import dev.palworks.ai.WorkerAI;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobType;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.core.BlockPos;
@@ -111,6 +114,40 @@ public class WorkerGameTests {
                 helper.assertBlockNotPresent(Blocks.OAK_LOG, new BlockPos(3, y, 5));
             }
             helper.assertBlockPresent(Blocks.OAK_SAPLING, new BlockPos(3, 1, 5));
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_roster_stance", timeoutTicks = 800)
+    public void aSpeciesWithAStanceOfItsOwnWorksFromThere(GameTestHelper helper) {
+        // The test datapack gives Durant (Steel: Lumbering) a ranged chop: it stands back from the
+        // trunk, on the ring a ranged move stands on, instead of right up against it
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos trunk = new BlockPos(3, 1, 5);
+        Scenes.tree(helper, trunk.getX(), trunk.getZ(), 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
+        PokemonEntity worker = Workers.sendOut(helper, "durant level=20", START);
+        helper.assertTrue(
+                WorkerAI.stanceFor(JobType.CHOP_TREE, worker).equals(WorkStance.NEAR),
+                "the datapack's stance for Durant is loaded");
+
+        // Where it was on the last tick the tree was still up: where it chopped from
+        double[] lastGap = {-1};
+        double[] chopGap = {-1};
+        helper.onEachTick(() -> {
+            if (helper.getBlockState(trunk).is(Blocks.OAK_LOG)) {
+                lastGap[0] = RealTreeGameTests.gapToTrunk(helper, worker, java.util.List.of(trunk));
+            } else if (chopGap[0] < 0) {
+                chopGap[0] = lastGap[0];
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(chopGap[0] >= 0, "it chopped the tree");
+            double half = worker.getBbWidth() / 2.0;
+            helper.assertTrue(
+                    chopGap[0] > WorkStance.AGAINST.maxGap(half) + 0.05 && WorkStance.NEAR.reaches(half, chopGap[0]),
+                    String.format(
+                            "it should chop from a ranged move's distance (more than %.2f, at most %.2f), but chopped from %.2f",
+                            WorkStance.AGAINST.maxGap(half) + 0.05, WorkStance.NEAR.maxGap(half), chopGap[0]));
         });
     }
 

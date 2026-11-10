@@ -1,5 +1,6 @@
 package dev.palworks.ai;
 
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimation;
@@ -24,6 +25,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -43,21 +45,22 @@ public class WorkerAI {
     // Cooldown before finding new work after completing a job (in ticks)
     private static final int JOB_COMPLETE_COOLDOWN = 60; // 3 seconds
 
-    // Arrived when within this squared distance of the stand tile. The stand tile sits a block back
-    // from a directional station (see WorkPositions), so this radius stays clear of the station's
-    // side tiles (front-only) while keeping arrival prompt — no fidgeting to hit an exact tile.
+    // Arrived once in its stance (see WorkStance) within this squared distance of the stand tile,
+    // where it was headed (the tile, or one next to it): it doesn't fidget to hit the exact tile.
+    // Anywhere else in its stance only counts once its walk has ended, so it doesn't stop short on
+    // the wrong side of something (a fence round a crop) just because it's passing near enough.
     private static final double ARRIVAL_DISTSQ = 1.5;
 
-    // Also arrived when its walk has finished within this squared distance of the stand tile: a
-    // diagonal neighbour, or one a block up or down. A path counts as reaching a tile when it ends
-    // within a block of it, so a worker that can't fit on the tile itself (a big Pokémon, a tight
-    // spot under leaves) stops next to it. That used to be "not arrived" but also "not stuck", so it
-    // stood there until the 30s reservation expiry.
+    // Its walk has ended next to the stand tile: a diagonal neighbour, or one a block up or down. A
+    // path counts as reaching a tile when it ends within a block of it, so a worker that can't fit
+    // on the tile itself (a big Pokémon, a tight spot under leaves) stops next to it. If that isn't
+    // in its stance, it steps in (STEP_IN_TICKS), then settles for where it is: that used to be
+    // "not arrived" but also "not stuck", so it stood there until the 30s reservation expiry.
     private static final double SETTLED_DISTSQ = 3.0;
-    // Most ticks a lumberjack spends stepping from where its walk ended onto its tile by the trunk
-    // before it settles for chopping from where it is (something's in the way: another mob, say).
+    // Most ticks a worker spends stepping from where its walk ended onto its stand tile before it
+    // settles for working from where it is (something's in the way: another mob, say).
     public static final int STEP_IN_TICKS = 40;
-    // How near the middle of its tile counts as on it, for a lumberjack (crossing its edge doesn't)
+    // How near the middle of its stand tile counts as on it (crossing its edge doesn't)
     private static final double ON_TILE_DIST = 0.35;
 
     // How often (ticks) to flush in-progress worker state to NBT. Between flushes the state
@@ -219,8 +222,11 @@ public class WorkerAI {
             Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         BlockPos targetPos = reservation.getStationPos();
 
-        // Resolve the exact tile to stand on (e.g. in front of a furnace's face), sized to this mon.
-        BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, reservation.getJobType(), entity);
+        // Where it stands, from the job's stance (from its animation, which can be its species' own),
+        // sized to this mon: the exact tile (e.g. in front of a furnace's face)
+        JobType jobType = reservation.getJobType();
+        WorkStance stance = stanceFor(jobType, entity);
+        BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, jobType, entity, stance);
         if (standPos == null) {
             // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by):
             // drop it as gone, not as unreachable, which would wrongly remember the spot.
@@ -306,41 +312,27 @@ public class WorkerAI {
             return false;
         }
 
-        // Arrived when within ARRIVAL_DISTSQ of the stand tile (prompt, no fidgeting to hit the exact
-        // tile), or when its walk has ended right next to the tile (SETTLED_DISTSQ), or, for a job
-        // that doesn't need a particular side (a crop), anywhere within reach of it.
-        boolean navDone = entity.getNavigation().isDone();
-        boolean arrived;
-        if (reservation.getJobType() == JobType.CHOP_TREE) {
-            // A tree is chopped right up against the trunk, so it has to be on the tile itself: one
-            // tile off is where it stands to clear leaves out of the way. Cobblemon's navigation
-            // calls a walk done a little short of the tile, so from there it steps the last bit
-            // straight in, and settles where it is if something stops it.
-            double offX = entity.getX() - (standPos.getX() + 0.5);
-            double offZ = entity.getZ() - (standPos.getZ() + 0.5);
-            boolean onTile = distanceSq == 0 && offX * offX + offZ * offZ <= ON_TILE_DIST * ON_TILE_DIST;
-            boolean walkEndedNextToIt = navDone && state.hasWalkedToJob() && distanceSq <= SETTLED_DISTSQ;
-            if (!onTile && walkEndedNextToIt && state.getStepInTicks() < STEP_IN_TICKS) {
-                if (holdForAnimation(entity)) {
-                    return true;
-                }
-                state.addStepInTick();
-                entity.getMoveControl()
-                        .setWantedPosition(standPos.getX() + 0.5, standPos.getY(), standPos.getZ() + 0.5, 0.6);
+        // Arrived once it's in the job's stance (see WorkStance): near its stand tile, or wherever its
+        // walk ended. Cobblemon's navigation calls a walk done a little short of the tile, so if it
+        // isn't in its stance there, it steps the last bit straight in, and settles where it is if
+        // something stops it.
+        boolean walkEnded = entity.getNavigation().isDone() && state.hasWalkedToJob();
+        double offX = entity.getX() - (standPos.getX() + 0.5);
+        double offZ = entity.getZ() - (standPos.getZ() + 0.5);
+        boolean onStand = distanceSq == 0 && offX * offX + offZ * offZ <= ON_TILE_DIST * ON_TILE_DIST;
+        boolean inStance = WorkPositions.inStance(level, entity, targetPos, jobType, stance);
+        boolean nextToStand = distanceSq <= SETTLED_DISTSQ;
+        if (walkEnded && nextToStand && !onStand && !inStance && state.getStepInTicks() < STEP_IN_TICKS) {
+            if (holdForAnimation(entity)) {
                 return true;
             }
-            arrived = onTile
-                    || walkEndedNextToIt
-                    || (navDone
-                            && state.hasWalkedToJob()
-                            && WorkPositions.withinChoppingReach(level, entity, targetPos));
-        } else {
-            boolean closeEnough = navDone
-                    && state.hasWalkedToJob()
-                    && !WorkPositions.isDirectional(level, targetPos)
-                    && WorkPositions.withinWorkReach(entity, targetPos);
-            arrived = distanceSq <= ARRIVAL_DISTSQ || (navDone && distanceSq <= SETTLED_DISTSQ) || closeEnough;
+            state.addStepInTick();
+            entity.getMoveControl()
+                    .setWantedPosition(standPos.getX() + 0.5, standPos.getY(), standPos.getZ() + 0.5, 0.6);
+            return true;
         }
+        boolean arrived =
+                onStand || (inStance && (distanceSq <= ARRIVAL_DISTSQ || walkEnded)) || (walkEnded && nextToStand);
         if (arrived) {
             // Only log on first tick of work
             if (DEBUG && !state.isWorking()) {
@@ -359,14 +351,16 @@ public class WorkerAI {
             entity.getNavigation().stop();
             entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
 
-            // Face the worked block so animations/effects line up. While its last animation plays
-            // out, keep facing what that was aimed at: the next job may be one it can start on from
-            // where it stands (the next crop along), and it shouldn't turn to it mid-animation.
+            // Turn to face the worked block so animations/effects line up. While its last animation
+            // plays out, keep facing what that was aimed at: the next job may be one it can start
+            // on from where it stands (the next crop along), and it shouldn't turn to it
+            // mid-animation. Its next animation waits until that's over and it's facing its work.
             BlockPos playingOut = WorkAnimator.playingOutAt(entity);
-            faceTarget(entity, playingOut != null ? playingOut : targetPos);
+            boolean facing = turnTowards(entity, playingOut != null ? playingOut : targetPos);
 
             // At job location - perform work
-            boolean workComplete = performWork(pokemon, entity, level, state, reservation);
+            boolean workComplete =
+                    performWork(pokemon, entity, level, state, reservation, playingOut == null && facing);
 
             if (workComplete) {
                 // Notify JobManager of completion (for consecutive jobs)
@@ -417,7 +411,7 @@ public class WorkerAI {
             if (state.getStepTicks() > 0) {
                 state.restartStep();
             }
-            navigateToJob(entity, standPos, reservation.getJobType());
+            navigateToJob(entity, standPos, stance);
             state.setWalkedToJob(true);
             state.resetStepIn();
 
@@ -458,20 +452,29 @@ public class WorkerAI {
      * {@link JobHandler#steps()}. A step's animation, if it has one, plays timed to land on the
      * step's last tick, where its {@code finish} (its effect) runs; then the job moves on to the
      * next step. Returns true when the last step is done (and the job doesn't repeat).
+     *
+     * @param readyToAnimate whether the worker can start an animation now: it's facing its work,
+     *                       and its last animation is over
      */
     private static boolean performWork(
-            Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
+            Pokemon pokemon,
+            Mob entity,
+            Level level,
+            WorkerState state,
+            ReservationId reservation,
+            boolean readyToAnimate) {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
         JobHandler handler = handlerFor(reservation.getJobType());
 
-        // A step's animation doesn't start while the last one is still playing out: it waits (just
-        // before starting) for it to end. Steps without one carry on, so a furnace keeps its time.
+        // A step's animation waits (just before starting) until the worker is ready for it: turned
+        // to face its work, and done playing out the last one. Steps without one carry on, so a
+        // furnace keeps its time.
         List<Step> steps = handler.steps();
         int index = state.getJobStep();
-        if (index < steps.size()
+        if (!readyToAnimate
+                && index < steps.size()
                 && steps.get(index).animation() != null
-                && state.getStepTicks() == steps.get(index).startTick()
-                && WorkAnimator.playingOutAt(entity) != null) {
+                && state.getStepTicks() == steps.get(index).startTick(ctx)) {
             return false;
         }
 
@@ -504,6 +507,20 @@ public class WorkerAI {
         default boolean repeatAfterComplete(JobContext ctx) {
             return false;
         }
+        /**
+         * Where a worker of this species stands for the whole job: the stance its animation is
+         * played from (the first, if it has more than one), or {@link WorkStance#NEAR} if it has
+         * none.
+         */
+        default WorkStance stance(@Nullable String speciesId) {
+            for (Step step : steps()) {
+                WorkAnimation animation = step.animationFor(speciesId);
+                if (animation != null) {
+                    return animation.stance();
+                }
+            }
+            return WorkStance.NEAR;
+        }
     }
 
     /**
@@ -515,27 +532,48 @@ public class WorkerAI {
      * reached (nothing for it to do) is skipped.
      *
      * <p>A step with an {@code animation} plays it aimed at the job's block, timed so it lands as
-     * {@code finish} runs; its {@code ticks} are at least long enough for that (see
-     * {@link WorkAnimation#stepTicks}). Build one with {@link #animated}.
+     * {@code finish} runs; it takes at least long enough for that (see
+     * {@link WorkAnimation#stepTicks}). A species can have its own version of the animation, with
+     * its own timing (see {@link WorkAnimations#forSpecies}), so how long a step takes, its
+     * {@code length}, is by species. Build one with {@link #animated}.
      */
     private record Step(
             String name,
-            int ticks,
+            ToIntFunction<String> length,
             @Nullable WorkAnimation animation,
             StepFinish onFinish,
             java.util.function.Predicate<JobContext> isNeeded)
             implements StepRunner.TimedStep<JobContext> {
+
+        /** This step's animation as a worker of this species plays it, or null if it has none. */
+        @Nullable
+        WorkAnimation animationFor(@Nullable String speciesId) {
+            // Through the accessor: PMD's NonThreadSafeSingleton crashes on a null check of a
+            // record component read directly (PMD 7.28.0)
+            return animation() == null ? null : WorkAnimations.forSpecies(animation(), speciesId);
+        }
+
+        /** How long this step takes a worker of this species. */
+        int ticksFor(@Nullable String speciesId) {
+            return length.applyAsInt(speciesId);
+        }
+
         @Override
-        public int startTick() {
-            return animation() == null ? 0 : animation().playAt(ticks);
+        public int ticks(JobContext ctx) {
+            return ticksFor(ctx.species());
+        }
+
+        @Override
+        public int startTick(JobContext ctx) {
+            WorkAnimation played = animationFor(ctx.species());
+            return played == null ? 0 : played.playAt(ticks(ctx));
         }
 
         @Override
         public void start(JobContext ctx) {
-            // Through the accessor: PMD's NonThreadSafeSingleton crashes on a null check of a
-            // record component read directly (PMD 7.28.0)
-            if (animation() != null) {
-                WorkAnimator.play(ctx.entity(), animation(), ctx.pos());
+            WorkAnimation played = animationFor(ctx.species());
+            if (played != null) {
+                WorkAnimator.play(ctx.entity(), played, ctx.pos());
             }
         }
 
@@ -553,25 +591,30 @@ public class WorkerAI {
 
         /** A step that takes time and then has its effect, with no animation. */
         static Step of(String name, int ticks, StepFinish finish) {
-            return new Step(name, ticks, null, finish, ctx -> true);
+            return new Step(name, species -> ticks, null, finish, ctx -> true);
         }
 
         /**
          * A step that plays an animation and has its effect as it lands. It takes {@code minTicks},
-         * or longer if the worker needs it to settle and the animation to land.
+         * or longer if the worker needs it to settle and its animation to land.
          */
         static Step animated(String name, int minTicks, WorkAnimation animation, StepFinish finish) {
-            return new Step(name, animation.stepTicks(minTicks), animation, finish, ctx -> true);
+            return new Step(
+                    name,
+                    species -> WorkAnimations.forSpecies(animation, species).stepTicks(minTicks),
+                    animation,
+                    finish,
+                    ctx -> true);
         }
 
         /** A step that only takes time (e.g. a pause), with no effect. */
-        static Step pause(String name, int ticks) {
-            return of(name, ticks, ctx -> true);
+        static Step pause(String name, ToIntFunction<String> length) {
+            return new Step(name, length, null, ctx -> true, ctx -> true);
         }
 
         /** This step, skipped when it's reached if there's nothing for it to do. */
         Step onlyIf(java.util.function.Predicate<JobContext> needed) {
-            return new Step(name, ticks, animation, onFinish, needed);
+            return new Step(name, length, animation, onFinish, needed);
         }
     }
 
@@ -602,6 +645,11 @@ public class WorkerAI {
         String name() {
             return pokemon.getSpecies().getName();
         }
+
+        /** The worker's species id, which its animations can be particular to. */
+        String species() {
+            return speciesOf(pokemon);
+        }
         /** Data steps leave for later steps (saved, and handed over with the job). */
         net.minecraft.nbt.CompoundTag data() {
             return state.getJobData();
@@ -610,7 +658,7 @@ public class WorkerAI {
 
     private static final Map<JobType, JobHandler> HANDLERS = new EnumMap<>(JobType.class);
     // Unknown/unimplemented jobs: stand for 2s and do nothing.
-    private static final JobHandler DEFAULT_HANDLER = () -> List.of(Step.pause("wait", 40));
+    private static final JobHandler DEFAULT_HANDLER = () -> List.of(Step.pause("wait", species -> 40));
 
     static {
         HANDLERS.put(JobType.FUEL_FURNACE, new FuelFurnaceHandler());
@@ -621,7 +669,7 @@ public class WorkerAI {
         HANDLERS.put(JobType.HARVEST_CROPS, new HarvestCropsHandler());
         HANDLERS.put(JobType.CHOP_TREE, new ChopTreeHandler());
         // MINE_RESOURCE: worker stands 4s but does not yet break the ore (pre-existing TODO).
-        HANDLERS.put(JobType.MINE_RESOURCE, () -> List.of(Step.pause("wait", 80)));
+        HANDLERS.put(JobType.MINE_RESOURCE, () -> List.of(Step.pause("wait", species -> 80)));
     }
 
     private static JobHandler handlerFor(JobType type) {
@@ -631,27 +679,46 @@ public class WorkerAI {
     /** A job's step, for the debug overlay: its name, which of how many it is, and its length. */
     public record StepView(String name, int index, int count, int ticks) {}
 
-    /** The step at this index of a job's steps, or null if there's none there. */
+    /** The step at this index of a job's steps, as a worker of this species does it, or null if there's none there. */
     @Nullable
-    public static StepView stepView(JobType job, int index) {
+    public static StepView stepView(JobType job, int index, @Nullable String speciesId) {
         List<Step> steps = handlerFor(job).steps();
         if (index < 0 || index >= steps.size()) {
             return null;
         }
         Step step = steps.get(index);
-        return new StepView(step.name(), index, steps.size(), step.ticks());
+        return new StepView(step.name(), index, steps.size(), step.ticksFor(speciesId));
+    }
+
+    /**
+     * Where this worker stands to do this job: the stance its species plays the job's animation
+     * from (see {@link JobHandler#stance}). {@link WorkPositions} finds the tile from it.
+     */
+    public static WorkStance stanceFor(JobType job, Mob worker) {
+        return handlerFor(job).stance(speciesOf(worker));
+    }
+
+    /** A worker's species id ({@code cobblemon:scizor}), or null if it isn't a Pokémon. */
+    @Nullable
+    public static String speciesOf(Mob worker) {
+        return worker instanceof PokemonEntity pokemonEntity ? speciesOf(pokemonEntity.getPokemon()) : null;
+    }
+
+    private static String speciesOf(Pokemon pokemon) {
+        return pokemon.getSpecies().getResourceIdentifier().toString();
     }
 
     private static final class FuelFurnaceHandler implements JobHandler {
-        // One cycle matches one smelting operation (200 ticks): Ember, lighting the furnace as its
-        // flames reach it, then wait out the rest of the smelt.
+        // One cycle matches one smelting operation: Ember, lighting the furnace as its flames reach
+        // it, then wait out the rest of the smelt.
+        private static final int CYCLE_TICKS = 200;
         private final Step ember =
                 Step.animated("ember", 0, WorkAnimations.IGNITE_FURNACE, effect(FuelFurnaceHandler::ignite));
         private final List<Step> steps = List.of(
                 ember,
                 // Re-igniting once per cycle keeps it lit across repeats: the 201-tick burn covers the
-                // 200-tick gap to the next ignite.
-                Step.pause("smelt", 200 - ember.ticks()));
+                // 200-tick gap to the next ignite, however long the species' ember takes.
+                Step.pause("smelt", species -> Math.max(0, CYCLE_TICKS - ember.ticksFor(species))));
 
         @Override
         public List<Step> steps() {
@@ -928,9 +995,16 @@ public class WorkerAI {
             return steps;
         }
 
-        /** Whether leaves stand between the worker and the trunk (see WorkPositions.treeStandFor). */
+        /** Where the worker stands by this tree, and the leaves in its way (see WorkPositions.treeStandFor). */
+        @Nullable
+        private static WorkPositions.TreeStand treeStand(JobContext ctx) {
+            return WorkPositions.treeStandFor(
+                    ctx.level(), ctx.pos(), ctx.entity(), stanceFor(JobType.CHOP_TREE, ctx.entity()));
+        }
+
+        /** Whether leaves stand between the worker and the trunk. */
         private static boolean leavesInTheWay(JobContext ctx) {
-            WorkPositions.TreeStand stand = WorkPositions.treeStandFor(ctx.level(), ctx.pos(), ctx.entity());
+            WorkPositions.TreeStand stand = treeStand(ctx);
             return stand != null && stand.needsClearing();
         }
 
@@ -940,7 +1014,7 @@ public class WorkerAI {
          * trunk, and it walks there before the chop starts.
          */
         private static void clearLeaves(JobContext ctx) {
-            WorkPositions.TreeStand stand = WorkPositions.treeStandFor(ctx.level(), ctx.pos(), ctx.entity());
+            WorkPositions.TreeStand stand = treeStand(ctx);
             if (stand == null) {
                 return;
             }
@@ -1066,13 +1140,13 @@ public class WorkerAI {
     }
 
     /**
-     * Navigate the entity to a target position using built-in pathfinding.
+     * Walk the worker to its stand tile, using built-in pathfinding. Normal walking speed.
      */
-    private static void navigateToJob(Mob entity, BlockPos standPos, JobType jobType) {
-        // Normal walking speed; the worker arrives when within ARRIVAL_DISTSQ of the stand tile.
-        if (jobType == JobType.CHOP_TREE) {
-            // To the tile itself: moveTo(x, y, z) plans to within a block of it, which from just
-            // outside a tree's cleared leaves is "there already", so it never stepped in to the trunk
+    private static void navigateToJob(Mob entity, BlockPos standPos, WorkStance stance) {
+        if (stance.needsItsTile()) {
+            // A stance only just off its tile (right up against a trunk) needs the tile itself:
+            // moveTo(x, y, z) plans to within a block of it, which from just outside a tree's
+            // cleared leaves is "there already", so it never stepped in to the trunk
             var path = entity.getNavigation().createPath(standPos, 0);
             if (path != null) {
                 entity.getNavigation().moveTo(path, 0.6);
@@ -1093,21 +1167,23 @@ public class WorkerAI {
         }
         entity.getNavigation().stop();
         entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
-        faceTarget(entity, target);
+        turnTowards(entity, target);
         return true;
     }
 
     /**
-     * Turn the worker to face the worked block (body + head + yaw), so work animations and effects
-     * point the right way. Called once the worker has arrived at its stand position.
+     * Turn the worker a little towards the worked block (body, head and yaw together), so work
+     * animations and effects point the right way: {@link Facing#TURN_DEGREES_PER_TICK} a tick,
+     * rather than snapping round. Returns whether it's facing the block now.
      */
-    private static void faceTarget(Mob entity, BlockPos targetPos) {
-        double dx = (targetPos.getX() + 0.5) - entity.getX();
-        double dz = (targetPos.getZ() + 0.5) - entity.getZ();
-        float yaw = (float) (net.minecraft.util.Mth.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0f;
+    private static boolean turnTowards(Mob entity, BlockPos targetPos) {
+        float wanted =
+                Facing.yawTowards(targetPos.getX() + 0.5 - entity.getX(), targetPos.getZ() + 0.5 - entity.getZ());
+        float yaw = Facing.turn(entity.getYRot(), wanted, Facing.TURN_DEGREES_PER_TICK);
         entity.setYRot(yaw);
         entity.setYBodyRot(yaw);
         entity.setYHeadRot(yaw);
+        return Facing.faces(yaw, wanted);
     }
 
     /**

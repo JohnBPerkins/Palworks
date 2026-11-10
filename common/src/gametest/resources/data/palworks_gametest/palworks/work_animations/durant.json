@@ -1,0 +1,6 @@
+{
+  "species": ["durant"],
+  "animations": {
+    "chop": { "stance": "near" }
+  }
+}

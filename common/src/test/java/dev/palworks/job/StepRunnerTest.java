@@ -51,7 +51,7 @@ class StepRunnerTest {
         }
 
         @Override
-        public int startTick() {
+        public int startTick(List<String> log) {
             return startTick;
         }
 
@@ -60,7 +60,7 @@ class StepRunnerTest {
         }
 
         @Override
-        public int ticks() {
+        public int ticks(List<String> log) {
             return ticks;
         }
 

@@ -3,12 +3,14 @@ package dev.palworks.animation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.palworks.ai.WorkStance;
 import org.junit.jupiter.api.Test;
 
 /** How a step with an animation is timed: the worker settles, then it plays, landing at the end. */
 class WorkAnimationTest {
 
-    private static final WorkAnimation EMBER = WorkAnimation.move("ember", 35, 0.125);
+    private static final WorkAnimation EMBER =
+            WorkAnimation.move("ignite_furnace", "ember", 35, 0.125, WorkStance.NEAR);
 
     @Test
     void aStepIsLongEnoughToSettleAndForTheAnimationToLand() {
@@ -37,7 +39,9 @@ class WorkAnimationTest {
 
     @Test
     void anImpactCannotBeBeforeItStarts() {
-        assertThrows(IllegalArgumentException.class, () -> WorkAnimation.move("ember", -1, 0));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkAnimation.move("ignite_furnace", "ember", -1, 0, WorkStance.NEAR));
     }
 
     @Test
@@ -49,6 +53,8 @@ class WorkAnimationTest {
 
     @Test
     void itCannotEndBeforeItLands() {
-        assertThrows(IllegalArgumentException.class, () -> new WorkAnimation(EMBER.moveEffect(), 35, 30, EMBER.aimY()));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new WorkAnimation(EMBER.id(), EMBER.moveEffect(), 35, 30, EMBER.aimY(), EMBER.stance()));
     }
 }

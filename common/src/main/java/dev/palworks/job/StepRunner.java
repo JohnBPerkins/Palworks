@@ -10,9 +10,9 @@ import java.util.function.Predicate;
  * so the rules can be unit-tested without a world:
  * <ul>
  *   <li>a step that isn't {@code needed} when it's reached is skipped, taking no time;</li>
- *   <li>a step's {@code start} runs on its {@code startTick()} (its first tick unless it says
+ *   <li>a step's {@code start} runs on its {@code startTick} (its first tick unless it says
  *       otherwise), which is where its animation goes;</li>
- *   <li>once it has lasted {@code ticks()} ticks, its {@code finish} runs (its effect), and the job
+ *   <li>once it has lasted {@code ticks} ticks, its {@code finish} runs (its effect), and the job
  *       moves on to the next step; a {@code finish} returning false ends the job there;</li>
  *   <li>after the last step, the job repeats if {@code repeat} says so, otherwise it's finished;</li>
  *   <li>progress beyond the job's steps (e.g. its steps changed in an update) counts as finished.</li>
@@ -21,17 +21,20 @@ import java.util.function.Predicate;
 public final class StepRunner {
     private StepRunner() {}
 
-    /** One timed step of a job. */
+    /**
+     * One timed step of a job. Its timing can depend on the context (a species with an animation of
+     * its own takes as long as that does), but should stay the same while the step goes on.
+     */
     public interface TimedStep<C> {
         /** How many ticks the worker spends on this step before its effect happens. */
-        int ticks();
-        /** Runs once the step has lasted {@link #startTick()} ticks (where its animation goes). */
+        int ticks(C ctx);
+        /** Runs once the step has lasted {@link #startTick} ticks (where its animation goes). */
         void start(C ctx);
         /**
          * How many ticks into the step {@code start} runs: 0, its first tick, unless it waits (an
-         * animation that has to land on the step's last tick). Less than {@link #ticks()}.
+         * animation that has to land on the step's last tick). Less than {@link #ticks}.
          */
-        default int startTick() {
+        default int startTick(C ctx) {
             return 0;
         }
         /** The step's effect, when it's over. Return false to end the job here. */
@@ -64,11 +67,11 @@ public final class StepRunner {
         }
 
         TimedStep<C> step = steps.get(progress.getJobStep());
-        if (progress.getStepTicks() == step.startTick()) {
+        if (progress.getStepTicks() == step.startTick(ctx)) {
             step.start(ctx);
         }
         progress.addStepTick();
-        if (progress.getStepTicks() < step.ticks()) {
+        if (progress.getStepTicks() < step.ticks(ctx)) {
             return Outcome.WORKING;
         }
 

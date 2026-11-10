@@ -119,7 +119,8 @@ public final class WorkerDebugSync {
         int stepCount = 0;
         int stepLength = 0;
         if (reservation != null && state.isWorking()) {
-            WorkerAI.StepView step = WorkerAI.stepView(reservation.getJobType(), state.getJobStep());
+            WorkerAI.StepView step =
+                    WorkerAI.stepView(reservation.getJobType(), state.getJobStep(), WorkerAI.speciesOf(entity));
             if (step != null) {
                 stepName = step.name();
                 stepIndex = step.index();

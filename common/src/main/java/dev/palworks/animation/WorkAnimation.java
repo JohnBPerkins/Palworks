@@ -1,5 +1,6 @@
 package dev.palworks.animation;
 
+import dev.palworks.ai.WorkStance;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -10,10 +11,16 @@ import net.minecraft.resources.ResourceLocation;
  * leaves hit it). After that the worker plays it out ({@link #playOutTicks}) before it walks off
  * or starts another animation.
  *
- * <p>For now every animation is a placeholder: a Cobblemon move's action effect (its body
- * animation, particles and sounds, with the move's own timing), which every species can play.
- * Swapping the move only means changing it in {@link WorkAnimations} and re-tuning its timing.
+ * <p>It also says where the worker stands to play it ({@link #stance}): right up against the
+ * block for a contact move, further back for a ranged one. The job's worker walks there first.
  *
+ * <p>The defaults are placeholders: a Cobblemon move's action effect (its body animation,
+ * particles and sounds, with the move's own timing), which every species can play. Swapping the
+ * move only means changing it in {@link WorkAnimations} and re-tuning its timing; a datapack can
+ * also swap it, or any of the rest, for particular species (see {@link WorkAnimationData}).
+ *
+ * @param id            which animation this is ({@code harvest}, {@code chop}, ...): what a
+ *                      datapack names to change it for a species
  * @param moveEffect    the Cobblemon action effect to play (e.g. {@code cobblemon:ember}), keyed by
  *                      move name in Cobblemon's {@code action_effects} data
  * @param impactTicks   ticks from the start of the effect until it lands on the target: read off
@@ -21,8 +28,10 @@ import net.minecraft.resources.ResourceLocation;
  * @param durationTicks ticks from the start until the worker's body animation is over, at least
  *                      {@code impactTicks}
  * @param aimY          height within the target block the effect aims at (0 = bottom, 1 = top)
+ * @param stance        where the worker stands to play it
  */
-public record WorkAnimation(ResourceLocation moveEffect, int impactTicks, int durationTicks, double aimY) {
+public record WorkAnimation(
+        String id, ResourceLocation moveEffect, int impactTicks, int durationTicks, double aimY, WorkStance stance) {
 
     /**
      * Ticks a worker stands still before an animation starts. One started on the tick it stops
@@ -38,6 +47,9 @@ public record WorkAnimation(ResourceLocation moveEffect, int impactTicks, int du
     public static final int MOVE_DURATION_TICKS = 60;
 
     public WorkAnimation {
+        if (id.isEmpty()) {
+            throw new IllegalArgumentException("an animation needs an id");
+        }
         if (impactTicks < 0) {
             throw new IllegalArgumentException("impactTicks must not be negative: " + impactTicks);
         }
@@ -51,9 +63,14 @@ public record WorkAnimation(ResourceLocation moveEffect, int impactTicks, int du
      * A Cobblemon move's action effect, by move name (e.g. {@code "ember"}), whose body animation
      * lasts {@link #MOVE_DURATION_TICKS}.
      */
-    public static WorkAnimation move(String move, int impactTicks, double aimY) {
+    public static WorkAnimation move(String id, String move, int impactTicks, double aimY, WorkStance stance) {
         return new WorkAnimation(
-                ResourceLocation.fromNamespaceAndPath("cobblemon", move), impactTicks, MOVE_DURATION_TICKS, aimY);
+                id,
+                ResourceLocation.fromNamespaceAndPath("cobblemon", move),
+                impactTicks,
+                MOVE_DURATION_TICKS,
+                aimY,
+                stance);
     }
 
     /**

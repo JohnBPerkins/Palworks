@@ -1,7 +1,9 @@
 package dev.palworks.ai;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +40,7 @@ class WorkStanceTest {
     @Test
     void itNeverStandsWhereItsBodyWouldOverlapTheBlock() {
         // Even with no gap allowed, a 2-block-wide body can't stand on ring 1 (it would be inside it)
-        WorkStance touching = new WorkStance(0.0, 1, 10);
+        WorkStance touching = new WorkStance(0.0, 1, 10, 0.0);
         assertEquals(2, touching.ringFor(1.0));
     }
 
@@ -49,9 +51,32 @@ class WorkStanceTest {
     }
 
     @Test
+    void againstReachesFromJustOffTheMiddleOfItsTile() {
+        // A lumberjack has always been on its tile within 0.35 of the middle: on ring 1, a
+        // Pikachu-sized body (0.3 half-width) has 0.2 clear in the middle of the tile
+        assertEquals(0.2 + 0.35, WorkStance.AGAINST.maxGap(0.3), 1e-9);
+        assertTrue(WorkStance.AGAINST.reaches(0.3, 0.5));
+        assertFalse(WorkStance.AGAINST.reaches(0.3, 0.6), "a tile further out is too far");
+    }
+
+    @Test
+    void aBodyThatFillsItsRingHasNoGapToSpare() {
+        // Exactly a block wide on ring 1: it touches the block, so only the slack is left
+        assertEquals(0.35, WorkStance.AGAINST.maxGap(0.5), 1e-9);
+    }
+
+    @Test
+    void nearReachesFromAnywhereAboutItsRing() {
+        // Ring 2 for a small body, 1.2 clear in the middle of its tile: up to two blocks more is fine
+        assertEquals(1.2 + 2.0, WorkStance.NEAR.maxGap(0.3), 1e-9);
+        assertTrue(WorkStance.NEAR.reaches(0.3, 0.0), "nearer than its ring is fine for a ranged move");
+    }
+
+    @Test
     void aStanceNeedsSensibleRings() {
-        assertThrows(IllegalArgumentException.class, () -> new WorkStance(-1, 1, 2));
-        assertThrows(IllegalArgumentException.class, () -> new WorkStance(1, 0, 2));
-        assertThrows(IllegalArgumentException.class, () -> new WorkStance(1, 3, 2));
+        assertThrows(IllegalArgumentException.class, () -> new WorkStance(-1, 1, 2, 0));
+        assertThrows(IllegalArgumentException.class, () -> new WorkStance(1, 0, 2, 0));
+        assertThrows(IllegalArgumentException.class, () -> new WorkStance(1, 3, 2, 0));
+        assertThrows(IllegalArgumentException.class, () -> new WorkStance(1, 1, 2, -1));
     }
 }
