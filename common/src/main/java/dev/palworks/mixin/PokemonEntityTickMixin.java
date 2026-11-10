@@ -1,4 +1,4 @@
-package dev.palworks.fabric.mixin;
+package dev.palworks.mixin;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.worker.WorkerTicking;
@@ -8,14 +8,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Mixin to inject worker AI ticking into Cobblemon's PokemonEntity.
+ * Runs each worker from its own entity tick (see {@link WorkerTicking#onPokemonTick}). A mixin
+ * because Architectury has no per-entity tick event. Listed in palworks-common.mixins.json.
  */
 @Mixin(PokemonEntity.class)
-public class PokemonEntityMixin {
+public abstract class PokemonEntityTickMixin {
 
     @Inject(method = "tick", at = @At("TAIL"))
-    private void onTick(CallbackInfo ci) {
-        PokemonEntity entity = (PokemonEntity) (Object) this;
-        WorkerTicking.onPokemonTick(entity);
+    private void palworks$tickWorker(CallbackInfo ci) {
+        WorkerTicking.onPokemonTick((PokemonEntity) (Object) this);
     }
 }

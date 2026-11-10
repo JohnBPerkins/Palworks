@@ -8,6 +8,7 @@
   "mixins": [
     "CobblemonNetworkMixin",
     "PokemonEntityInteractMixin",
+    "PokemonEntityTickMixin",
     "ServerLevelMixin"
   ],
   "injectors": {

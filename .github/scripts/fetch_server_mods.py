@@ -1,14 +1,17 @@
-"""Download Cobblemon and the mods it requires from Modrinth, for the CI server boot test.
+"""Download Cobblemon and the mods it requires, plus Palworks's own required mods (--require), from
+Modrinth, for the CI server boot test.
 
 These are the same jars players install, so the boot test runs Palworks against real releases.
 Every download is checked against the SHA-512 that Modrinth publishes for the file.
 
 Usage:
   python3 fetch_server_mods.py --loader fabric --minecraft 1.21.1 --cobblemon 1.8.4 \
-      --pin fabric-api=0.116.7+1.21.1 --dest server/mods
+      --pin fabric-api=0.116.7+1.21.1 --require architectury-api --dest server/mods
 
 --pin SLUG=VERSION picks an exact version of a dependency (matched against the Modrinth version
 number); other required dependencies use their newest version for the loader and game version.
+--require SLUG also downloads a mod Palworks itself requires (newest, unless pinned), if Cobblemon
+didn't already bring it.
 """
 
 import argparse
@@ -66,6 +69,7 @@ def main() -> None:
     parser.add_argument("--minecraft", required=True)
     parser.add_argument("--cobblemon", required=True, help="e.g. 1.8.4")
     parser.add_argument("--pin", action="append", default=[], metavar="SLUG=VERSION")
+    parser.add_argument("--require", action="append", default=[], metavar="SLUG")
     parser.add_argument("--dest", required=True)
     args = parser.parse_args()
     pins = dict(p.split("=", 1) for p in args.pin)
@@ -85,6 +89,7 @@ def main() -> None:
     print(f"Cobblemon {args.cobblemon} ({args.loader}, Minecraft {args.minecraft}):")
     download(cobblemon, args.dest)
 
+    fetched = set()
     for dependency in cobblemon["dependencies"]:
         if dependency["dependency_type"] != "required" or not dependency.get("project_id"):
             continue
@@ -92,16 +97,28 @@ def main() -> None:
         if dependency.get("version_id"):
             version = get_json(f"/version/{dependency['version_id']}")
         else:
-            candidates = versions_for(slug, args.loader, args.minecraft)
-            if slug in pins:
-                candidates = [v for v in candidates if v["version_number"] == pins[slug]]
-            if not candidates:
-                wanted = f" {pins[slug]}" if slug in pins else ""
-                sys.exit(f"No {slug}{wanted} for {args.loader} {args.minecraft} on Modrinth.")
-            version = candidates[0]  # Modrinth lists newest first
+            version = newest(slug, args.loader, args.minecraft, pins)
         print(f"Required by Cobblemon: {slug} {version['version_number']}")
         download(version, args.dest)
+        fetched.add(slug)
 
+    for slug in args.require:
+        if slug in fetched:
+            continue
+        version = newest(slug, args.loader, args.minecraft, pins)
+        print(f"Required by Palworks: {slug} {version['version_number']}")
+        download(version, args.dest)
+
+
+def newest(slug: str, loader: str, minecraft: str, pins: dict) -> dict:
+    """The newest version of a mod for this loader and game version, or its pinned one."""
+    candidates = versions_for(slug, loader, minecraft)
+    if slug in pins:
+        candidates = [v for v in candidates if v["version_number"] == pins[slug]]
+    if not candidates:
+        wanted = f" {pins[slug]}" if slug in pins else ""
+        sys.exit(f"No {slug}{wanted} for {loader} {minecraft} on Modrinth.")
+    return candidates[0]  # Modrinth lists newest first
 
 if __name__ == "__main__":
     main()

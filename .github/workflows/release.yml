@@ -274,6 +274,7 @@ jobs:
           java: 21
           dependencies: |
             fabric-api(required)
+            architectury-api(required)
             cobblemon(required)
 
       - name: Publish NeoForge jar to Modrinth and CurseForge
@@ -293,5 +294,6 @@ jobs:
           game-versions: ${{ steps.version.outputs.minecraft }}
           java: 21
           dependencies: |
+            architectury-api(required)
             cobblemon(required)
             kotlin-for-forge(required)

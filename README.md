@@ -36,13 +36,16 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - Minecraft **1.21.1**
 - [Cobblemon](https://cobblemon.com) **1.7.1**
 - **Fabric Loader + Fabric API**, _or_ **NeoForge**
+- [Architectury API](https://modrinth.com/mod/architectury-api) **13.0.8** or later (the shared
+  library Palworks uses to run on both loaders)
 - Java **21** (required to play 1.21.1; bundled with most modern launchers)
 
 ## Installation
 
 > Palworks is not yet published to a mod host. For now, build it from source (below).
 
-1. Install your loader (Fabric + Fabric API, or NeoForge) and Cobblemon for Minecraft 1.21.1.
+1. Install your loader (Fabric + Fabric API, or NeoForge), Architectury API and Cobblemon for
+   Minecraft 1.21.1.
 2. Drop the matching Palworks jar (`palworks-fabric-*.jar` or `palworks-neoforge-*.jar`) into
    your `mods/` folder.
 3. Launch the game.
