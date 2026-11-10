@@ -6,7 +6,6 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 
 final class HarvestCropsHandler implements JobHandler {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     private final List<Step> steps =
             List.of(Step.animated("harvest", 20, WorkAnimations.HARVEST, Step.effect(this::work)));
@@ -19,12 +18,10 @@ final class HarvestCropsHandler implements JobHandler {
     private void work(JobContext ctx) {
         BlockPos harvestPos = ctx.pos();
         boolean harvested = dev.palworks.crop.CropAdapter.harvestCrop(ctx.level(), harvestPos);
-        if (DEBUG) {
-            if (harvested) {
-                Palworks.LOGGER.info("{} harvested crop at {}", ctx.name(), harvestPos);
-            } else {
-                Palworks.LOGGER.warn("{} failed to harvest crop at {}", ctx.name(), harvestPos);
-            }
+        if (harvested) {
+            Palworks.LOGGER.debug("{} harvested crop at {}", ctx.name(), harvestPos);
+        } else {
+            Palworks.LOGGER.debug("{} failed to harvest crop at {}", ctx.name(), harvestPos);
         }
     }
 }

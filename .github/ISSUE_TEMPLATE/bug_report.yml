@@ -47,7 +47,7 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Relevant log output or a crash report. Running with `-Dpalworks.debug=true` enables verbose Palworks logging.
+      description: Relevant log output or a crash report. `logs/debug.log` has more detail than `latest.log` where your loader writes one.
       render: text
     validations:
       required: false

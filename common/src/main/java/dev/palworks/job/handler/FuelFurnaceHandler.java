@@ -5,7 +5,6 @@ import dev.palworks.animation.WorkAnimations;
 import java.util.List;
 
 final class FuelFurnaceHandler implements JobHandler {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     // One cycle matches one smelting operation: Ember, lighting the furnace as its flames reach
     // it, then wait out the rest of the smelt.
@@ -26,18 +25,14 @@ final class FuelFurnaceHandler implements JobHandler {
     private static void ignite(JobContext ctx) {
         int burnDuration = dev.palworks.station.FurnaceHelper.getBurnDuration();
         dev.palworks.station.FurnaceHelper.igniteFurnace(ctx.level(), ctx.pos(), burnDuration);
-        if (DEBUG) {
-            Palworks.LOGGER.info("{} ignited furnace at {} for {} ticks", ctx.name(), ctx.pos(), burnDuration);
-        }
+        Palworks.LOGGER.debug("{} ignited furnace at {} for {} ticks", ctx.name(), ctx.pos(), burnDuration);
     }
 
     @Override
     public boolean repeatAfterComplete(JobContext ctx) {
         // Keep going only if the furnace still has more than the item being smelted.
         if (dev.palworks.station.FurnaceHelper.hasQueuedItems(ctx.level(), ctx.pos())) {
-            if (DEBUG) {
-                Palworks.LOGGER.info("{} continuing - furnace still has items to smelt", ctx.name());
-            }
+            Palworks.LOGGER.debug("{} continuing - furnace still has items to smelt", ctx.name());
             return true;
         }
         return false;

@@ -36,7 +36,6 @@ import org.jetbrains.annotations.Nullable;
  * doesn't keep path-checking them.
  */
 final class JobAssigner {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     private static final int ASSIGNMENT_BATCH_SIZE = 10; // Workers assigned per tick
     private static final int MAX_PATH_CHECKS_PER_WORKER = 8; // Cap expensive createPath() calls per assignment
@@ -123,7 +122,7 @@ final class JobAssigner {
             }
         }
 
-        if (DEBUG && assignedCount > 0) {
+        if (assignedCount > 0) {
             Palworks.LOGGER.debug(
                     "Assigned {} jobs to idle workers ({} idle workers available)", assignedCount, idleWorkers.size());
         }
@@ -164,8 +163,8 @@ final class JobAssigner {
             candidates.add(JobRecord.of(JobType.DELIVER_ITEMS, chestPos, level.getGameTime()));
         }
 
-        if (DEBUG && candidates.isEmpty()) {
-            Palworks.LOGGER.warn(
+        if (Palworks.LOGGER.isTraceEnabled() && candidates.isEmpty()) {
+            Palworks.LOGGER.trace(
                     "No chest found for {} to deliver {} items!",
                     pokemon.getSpecies().getName(),
                     WorkerInventoryManager.getTotalItemCount(pokemon));
@@ -353,13 +352,11 @@ final class JobAssigner {
         Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
         if (pokemon == null) {
             // Pokemon entity not found - put job back in available pool
-            if (DEBUG) {
-                Palworks.LOGGER.warn(
-                        "Failed to assign {} job at {} - Pokemon entity not found for UUID {}",
-                        job.type(),
-                        job.position(),
-                        worker.pokemonUUID);
-            }
+            Palworks.LOGGER.debug(
+                    "Failed to assign {} job at {} - Pokemon entity not found for UUID {}",
+                    job.type(),
+                    job.position(),
+                    worker.pokemonUUID);
             pool.offer(job);
             return;
         }
@@ -381,27 +378,24 @@ final class JobAssigner {
         job.reserveFor(worker.pokemonUUID);
         pool.reserve(job);
 
-        if (DEBUG) {
-            String dist = String.format("%.1f", Math.sqrt(worker.position.distSqr(job.position())));
-            Palworks.LOGGER.debug(
-                    "Assigned {} job at {} to worker {} (distance: {})",
-                    job.type(),
-                    job.position(),
-                    pokemon.getSpecies().getName(),
-                    dist);
-
-            // Send chat message to nearby players
-            DebugManager.broadcastActivity(
-                    level,
-                    String.format(
-                            "§a%s§f assigned §e%s§f at [%d, %d, %d] (dist: %s)",
-                            pokemon.getSpecies().getName(),
-                            job.type().name(),
-                            job.position().getX(),
-                            job.position().getY(),
-                            job.position().getZ(),
-                            dist));
-        }
+        String dist = String.format("%.1f", Math.sqrt(worker.position.distSqr(job.position())));
+        Palworks.LOGGER.debug(
+                "Assigned {} job at {} to worker {} (distance: {})",
+                job.type(),
+                job.position(),
+                pokemon.getSpecies().getName(),
+                dist);
+        // Send chat message to nearby players
+        DebugManager.broadcastActivity(
+                level,
+                String.format(
+                        "§a%s§f assigned §e%s§f at [%d, %d, %d] (dist: %s)",
+                        pokemon.getSpecies().getName(),
+                        job.type().name(),
+                        job.position().getX(),
+                        job.position().getY(),
+                        job.position().getZ(),
+                        dist));
     }
 
     /**

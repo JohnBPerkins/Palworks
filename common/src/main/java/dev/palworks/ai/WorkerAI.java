@@ -33,8 +33,6 @@ import net.minecraft.world.level.Level;
  * Handles job scanning, navigation, and work execution.
  */
 public class WorkerAI {
-    // Debug mode - enable at launch with -Dpalworks.debug=true
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     // Cooldown before finding new work after completing a job (in ticks)
     private static final int JOB_COMPLETE_COOLDOWN = 60; // 3 seconds
@@ -125,8 +123,8 @@ public class WorkerAI {
         // Handle current reservation
         ReservationId reservation = state.getCurrentReservation();
         if (reservation != null) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug(
+            if (Palworks.LOGGER.isTraceEnabled()) {
+                Palworks.LOGGER.trace(
                         "{} has active reservation: {} at {}",
                         pokemon.getSpecies().getName(),
                         reservation.getJobType(),
@@ -216,13 +214,11 @@ public class WorkerAI {
                 return false;
             }
             // No valid place to stand to do this job (front blocked / no standable tile). Give up.
-            if (DEBUG) {
-                Palworks.LOGGER.warn(
-                        "{} found no valid stand position for {} at {} - abandoning",
-                        pokemon.getSpecies().getName(),
-                        reservation.getJobType(),
-                        targetPos);
-            }
+            Palworks.LOGGER.debug(
+                    "{} found no valid stand position for {} at {} - abandoning",
+                    pokemon.getSpecies().getName(),
+                    reservation.getJobType(),
+                    targetPos);
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                 JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
             }
@@ -255,13 +251,11 @@ public class WorkerAI {
                 && !state.hasJobProgress()
                 && (level.getGameTime() + entity.getId()) % JOB_RECHECK_INTERVAL == 0
                 && !dev.palworks.worker.WorkerEligibility.withinOwnerLeash(pokemon, level, targetPos)) {
-            if (DEBUG) {
-                Palworks.LOGGER.info(
-                        "{}'s owner moved away from its {} job at {} - dropping",
-                        pokemon.getSpecies().getName(),
-                        reservation.getJobType(),
-                        targetPos);
-            }
+            Palworks.LOGGER.debug(
+                    "{}'s owner moved away from its {} job at {} - dropping",
+                    pokemon.getSpecies().getName(),
+                    reservation.getJobType(),
+                    targetPos);
             state.resetPathFailures();
             dropJob(pokemon, entity, state);
             return false;
@@ -302,10 +296,10 @@ public class WorkerAI {
             Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         BlockPos targetPos = reservation.getStationPos();
         // Only log on first tick of work
-        if (DEBUG && !state.isWorking()) {
+        if (Palworks.LOGGER.isDebugEnabled() && !state.isWorking()) {
             WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
             String inventoryInfo = inventory.isEmpty() ? "empty" : inventory.getTotalItemCount() + " items";
-            Palworks.LOGGER.info(
+            Palworks.LOGGER.debug(
                     "{} arrived at {} job, starting work (inventory: {})",
                     pokemon.getSpecies().getName(),
                     reservation.getJobType(),
@@ -379,14 +373,15 @@ public class WorkerAI {
         BlockPos targetPos = reservation.getStationPos();
         // Need to navigate to job
         // Only log when starting navigation (not every tick)
-        if (DEBUG && !state.isWorking() && entity.getNavigation().isDone()) {
-            double distance = Math.sqrt(distanceSq);
-            Palworks.LOGGER.info(
+        if (Palworks.LOGGER.isTraceEnabled()
+                && !state.isWorking()
+                && entity.getNavigation().isDone()) {
+            Palworks.LOGGER.trace(
                     "{} navigating to {} job at {} (distance: {} blocks)",
                     pokemon.getSpecies().getName(),
                     reservation.getJobType(),
                     targetPos,
-                    String.format("%.1f", distance));
+                    String.format("%.1f", Math.sqrt(distanceSq)));
         }
 
         // Its last job's animation plays out where it is before it sets off for this one
@@ -510,15 +505,13 @@ public class WorkerAI {
             Level level,
             WorkerState state,
             ReservationId reservation) {
-        if (DEBUG) {
-            Palworks.LOGGER.info(
-                    "{}'s {} job at {} {} (step {}) - stopping",
-                    pokemon.getSpecies().getName(),
-                    reservation.getJobType(),
-                    reservation.getStationPos(),
-                    reason == StepRunner.Outcome.GONE ? "is gone" : "isn't one it can do any more",
-                    state.getJobStep());
-        }
+        Palworks.LOGGER.debug(
+                "{}'s {} job at {} {} (step {}) - stopping",
+                pokemon.getSpecies().getName(),
+                reservation.getJobType(),
+                reservation.getStationPos(),
+                reason == StepRunner.Outcome.GONE ? "is gone" : "isn't one it can do any more",
+                state.getJobStep());
         if (level instanceof ServerLevel serverLevel) {
             JobManager jobs = JobManager.getInstance(serverLevel);
             if (reason == StepRunner.Outcome.GONE) {

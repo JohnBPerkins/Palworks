@@ -57,14 +57,15 @@
         <exclude name="UnitTestContainsTooManyAsserts"/>
     </rule>
 
-    <!-- Debug logging must sit behind the DEBUG flag (see CONTRIBUTING), which compiles it out.
-         PMD only knows logger.isDebugEnabled() guards, so it's taught the flag. Info and above
-         are meant to always log. -->
+    <!-- Only TRACE logging needs a level guard: it's for per-tick detail on hot paths, and it's off
+         by default, so the guard skips building its arguments. DEBUG is for job-level events and
+         is on wherever it's wanted (dev runs on both loaders, NeoForge's debug.log), so a guard
+         would always pass and skip nothing; SLF4J's {} placeholders already defer formatting.
+         Info and above always log. -->
     <rule ref="category/java/bestpractices.xml/GuardLogStatement">
         <properties>
-            <property name="logLevels" value="trace,debug"/>
-            <property name="guardsMethods" value="isTraceEnabled,isDebugEnabled"/>
-            <property name="violationSuppressXPath" value="./ancestor::IfStatement[.//VariableAccess[@Name = 'DEBUG']]"/>
+            <property name="logLevels" value="trace"/>
+            <property name="guardsMethods" value="isTraceEnabled"/>
         </properties>
     </rule>
 

@@ -8,7 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 
 final class CollectDropsHandler implements JobHandler {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     private final List<Step> steps = List.of(Step.of("pick up", 20, Step.effect(this::work)));
 
@@ -39,8 +38,8 @@ final class CollectDropsHandler implements JobHandler {
             }
         }
 
-        if (DEBUG && pickedUp > 0) {
-            Palworks.LOGGER.info("{} collected {} dropped items from ground at {}", ctx.name(), pickedUp, targetPos);
+        if (pickedUp > 0) {
+            Palworks.LOGGER.debug("{} collected {} dropped items from ground at {}", ctx.name(), pickedUp, targetPos);
         }
     }
 }

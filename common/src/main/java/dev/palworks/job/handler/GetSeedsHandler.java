@@ -13,7 +13,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 
 final class GetSeedsHandler implements JobHandler {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     private final List<Step> steps = List.of(Step.of("take seeds", 20, Step.effect(this::work)));
 
@@ -26,20 +25,16 @@ final class GetSeedsHandler implements JobHandler {
         BlockPos targetPos = ctx.pos();
         WorkerInventory inventory = ctx.inventory();
 
-        if (DEBUG) {
-            Palworks.LOGGER.info(
-                    "{} starting GET_SEEDS at {} (inventory: {} items, has space: {})",
-                    ctx.name(),
-                    targetPos,
-                    inventory.getTotalItemCount(),
-                    inventory.hasSpace());
-        }
+        Palworks.LOGGER.debug(
+                "{} starting GET_SEEDS at {} (inventory: {} items, has space: {})",
+                ctx.name(),
+                targetPos,
+                inventory.getTotalItemCount(),
+                inventory.hasSpace());
 
         // Skip extraction if inventory is full, but still complete the job
         if (!inventory.hasSpace()) {
-            if (DEBUG) {
-                Palworks.LOGGER.info("{} skipping GET_SEEDS extraction - inventory already full", ctx.name());
-            }
+            Palworks.LOGGER.debug("{} skipping GET_SEEDS extraction - inventory already full", ctx.name());
             return;
         }
 
@@ -56,17 +51,15 @@ final class GetSeedsHandler implements JobHandler {
             if (!extracted.isEmpty()) {
                 int leftover = inventory.addItem(extracted);
                 ChestHelper.returnLeftover(ctx.level(), targetPos, extracted, leftover);
-                if (DEBUG) {
-                    Palworks.LOGGER.info(
-                            "{} got {} {} seeds from chest at {} ({} leftover)",
-                            ctx.name(),
-                            extracted.getCount() - leftover,
-                            extracted.getItem().toString(),
-                            targetPos,
-                            leftover);
-                }
-            } else if (DEBUG) {
-                Palworks.LOGGER.warn(
+                Palworks.LOGGER.debug(
+                        "{} got {} {} seeds from chest at {} ({} leftover)",
+                        ctx.name(),
+                        extracted.getCount() - leftover,
+                        extracted.getItem().toString(),
+                        targetPos,
+                        leftover);
+            } else {
+                Palworks.LOGGER.debug(
                         "{} FAILED to get seeds from chest at {} - chest might be empty, treating as complete",
                         ctx.name(),
                         targetPos);
@@ -77,22 +70,20 @@ final class GetSeedsHandler implements JobHandler {
             if (!extracted.isEmpty()) {
                 int leftover = inventory.addItem(extracted);
                 ChestHelper.returnLeftover(ctx.level(), targetPos, extracted, leftover);
-                if (DEBUG) {
-                    Palworks.LOGGER.info(
-                            "{} got {} nether wart from chest at {} ({} leftover)",
-                            ctx.name(),
-                            extracted.getCount() - leftover,
-                            targetPos,
-                            leftover);
-                }
-            } else if (DEBUG) {
-                Palworks.LOGGER.warn(
+                Palworks.LOGGER.debug(
+                        "{} got {} nether wart from chest at {} ({} leftover)",
+                        ctx.name(),
+                        extracted.getCount() - leftover,
+                        targetPos,
+                        leftover);
+            } else {
+                Palworks.LOGGER.debug(
                         "{} FAILED to get nether wart from chest at {} - chest might be empty, treating as complete",
                         ctx.name(),
                         targetPos);
             }
-        } else if (DEBUG) {
-            Palworks.LOGGER.warn(
+        } else {
+            Palworks.LOGGER.debug(
                     "{} has GET_SEEDS job but lacks PLANTING/NETHER suitability! Suitabilities: {}",
                     ctx.name(),
                     suitabilities);

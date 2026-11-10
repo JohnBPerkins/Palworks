@@ -18,7 +18,6 @@ import org.jetbrains.annotations.Nullable;
  * made the drops, then goes to the pool for any transporter.
  */
 final class PickupQueue {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     /** Ticks to wait after a harvest or chop for its items to spawn. */
     static final int DROPS_SPAWN_DELAY = 2;
@@ -52,8 +51,8 @@ final class PickupQueue {
     void process(ServerLevel level) {
         long currentTime = level.getGameTime();
 
-        if (DEBUG && !queue.isEmpty()) {
-            Palworks.LOGGER.info(
+        if (Palworks.LOGGER.isTraceEnabled() && !queue.isEmpty()) {
+            Palworks.LOGGER.trace(
                     "Processing consecutive job queue ({} jobs queued, current time: {})", queue.size(), currentTime);
         }
 
@@ -63,8 +62,8 @@ final class PickupQueue {
 
             // Check if ready to process (delay elapsed)
             if (currentTime < request.dueTime()) {
-                if (DEBUG) {
-                    Palworks.LOGGER.info(
+                if (Palworks.LOGGER.isTraceEnabled()) {
+                    Palworks.LOGGER.trace(
                             "Next pickup not ready yet - {} ticks remaining", request.dueTime() - currentTime);
                 }
                 break; // Not ready yet, and queue is ordered
@@ -72,9 +71,7 @@ final class PickupQueue {
 
             queue.poll();
 
-            if (DEBUG) {
-                Palworks.LOGGER.info("Creating pickup job at {}", request.pos());
-            }
+            Palworks.LOGGER.debug("Creating pickup job at {}", request.pos());
             createCollectDropsJob(level, request);
         }
     }
@@ -87,9 +84,7 @@ final class PickupQueue {
         List<ItemEntity> items = JobChecks.itemsToPickUp(level, request.pos());
 
         if (items.isEmpty()) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug("No items found at {} for collect drops job", request.pos());
-            }
+            Palworks.LOGGER.debug("No items found at {} for collect drops job", request.pos());
             return;
         }
 
@@ -103,20 +98,15 @@ final class PickupQueue {
         if (suggestedWorker != null
                 && suggestedWorker.idle
                 && assigner.assignFirstReachable(suggestedWorker, List.of(collectJob)) != null) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug(
-                        "Assigned consecutive collect drops job to original harvester at {}", request.pos());
-            }
+            Palworks.LOGGER.debug("Assigned consecutive collect drops job to original harvester at {}", request.pos());
         } else {
             // Otherwise add to available jobs
             pool.offer(collectJob);
 
-            if (DEBUG) {
-                Palworks.LOGGER.debug(
-                        "Added consecutive collect drops job to available pool at {} ({} items)",
-                        request.pos(),
-                        items.size());
-            }
+            Palworks.LOGGER.debug(
+                    "Added consecutive collect drops job to available pool at {} ({} items)",
+                    request.pos(),
+                    items.size());
         }
     }
 

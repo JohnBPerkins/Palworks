@@ -13,7 +13,6 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 final class ChopTreeHandler implements JobHandler {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     // Clear the leaves in the way to the trunk (1s, skipped if there are none), chop (3s), then
     // replant (1s later). The replant spots and sapling are saved in the job's data at the
@@ -69,13 +68,8 @@ final class ChopTreeHandler implements JobHandler {
         if (!treeResult.isValid() || treeResult.getLogPositions().isEmpty()) {
             // Not a valid tree any more (partly chopped, or it's a player build). Leave it alone:
             // breaking "just this log" is how builds that fail tree detection got griefed.
-            if (DEBUG) {
-                Palworks.LOGGER.warn(
-                        "{} found no valid tree at {} ({}), leaving it alone",
-                        ctx.name(),
-                        treePos,
-                        treeResult.getReason());
-            }
+            Palworks.LOGGER.debug(
+                    "{} found no valid tree at {} ({}), leaving it alone", ctx.name(), treePos, treeResult.getReason());
             return false;
         }
 
@@ -106,16 +100,14 @@ final class ChopTreeHandler implements JobHandler {
             level.destroyBlock(canopyPos, true);
         }
 
-        if (DEBUG) {
-            Palworks.LOGGER.info(
-                    "{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
-                    ctx.name(),
-                    treePos,
-                    logsChopped,
-                    canopy.size(),
-                    basePos,
-                    saplingItem);
-        }
+        Palworks.LOGGER.debug(
+                "{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
+                ctx.name(),
+                treePos,
+                logsChopped,
+                canopy.size(),
+                basePos,
+                saplingItem);
 
         // For the replant step (saved with the job, so it survives a pause or a handover)
         if (saplingItem != null) {
@@ -165,9 +157,7 @@ final class ChopTreeHandler implements JobHandler {
                 replanted++;
             }
         }
-        if (DEBUG) {
-            Palworks.LOGGER.info("{} replanted {} of {} {}", ctx.name(), replanted, spots.length / 3, saplingItem);
-        }
+        Palworks.LOGGER.debug("{} replanted {} of {} {}", ctx.name(), replanted, spots.length / 3, saplingItem);
     }
 
     private static final String DATA_SAPLING = "sapling";

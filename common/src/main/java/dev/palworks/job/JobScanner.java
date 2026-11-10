@@ -33,7 +33,6 @@ import org.jetbrains.annotations.Nullable;
  * ({@link ChunkJobCache}) until it's stale or something in it changes.
  */
 final class JobScanner {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     // Soft cap on blocks scanned per tick. Checked between chunks (a started chunk always
     // finishes), so a tick may overshoot by up to one chunk's band. ~2 chunk-bands at 32 vertical.
@@ -84,8 +83,8 @@ final class JobScanner {
             blocksScannedThisTick += scanChunkForJobs(level, chunk, range[0], range[1]);
         }
 
-        if (DEBUG && blocksScannedThisTick > 0) {
-            Palworks.LOGGER.debug(
+        if (Palworks.LOGGER.isTraceEnabled() && blocksScannedThisTick > 0) {
+            Palworks.LOGGER.trace(
                     "Scanned {} blocks across {} chunks ({} jobs available)",
                     blocksScannedThisTick,
                     scanRanges.size(),
@@ -142,8 +141,8 @@ final class JobScanner {
         // Scan every block in the worker-height band (16x16 x-z, every Y layer - no gaps).
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 
-        if (DEBUG) {
-            Palworks.LOGGER.info(
+        if (Palworks.LOGGER.isTraceEnabled()) {
+            Palworks.LOGGER.trace(
                     "Scanning chunk {} - Y band: {} to {}, chunk coords: {} to {}, {} to {}",
                     chunkPos,
                     scanMinY,
@@ -172,8 +171,8 @@ final class JobScanner {
                     // Check for job opportunities at this position
                     JobRecord job = scanPositionForJob(level, pos, state);
                     if (job != null && !pool.isReserved(JobKey.of(job))) {
-                        if (DEBUG) {
-                            Palworks.LOGGER.info(
+                        if (Palworks.LOGGER.isTraceEnabled()) {
+                            Palworks.LOGGER.trace(
                                     "Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
                                     job.type(),
                                     job.position(),
@@ -248,8 +247,8 @@ final class JobScanner {
             BlockPos abovePos = pos.above();
             if (level.getBlockState(abovePos).isAir()) {
                 boolean nether = state.is(Blocks.SOUL_SAND);
-                if (DEBUG) {
-                    Palworks.LOGGER.info(
+                if (Palworks.LOGGER.isTraceEnabled()) {
+                    Palworks.LOGGER.trace(
                             "JobManager: Found {} planting job - farmland at {}, planting at {}",
                             nether ? "NETHER" : "PLANTING",
                             pos,

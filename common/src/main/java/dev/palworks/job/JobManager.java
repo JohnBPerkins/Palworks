@@ -38,7 +38,6 @@ import org.jetbrains.annotations.Nullable;
  * <p>Designed for 50+ workers with chunk-based caching and performance optimization.
  */
 public class JobManager {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     private static final int WORKER_STALE_TICKS = 5; // Unregister a worker this long after it stops ticking
     // (a little slack so a skipped tick isn't a despawn)
@@ -184,12 +183,10 @@ public class JobManager {
         ReservationId stateReservation = state.getCurrentReservation();
         if (info.currentReservation != null && stateReservation == null) {
             pool.release(JobKey.of(info.currentReservation), level.getGameTime());
-            if (DEBUG) {
-                Palworks.LOGGER.debug(
-                        "{} dropped its reservation; released job at {} back to the pool",
-                        pokemon.getSpecies().getName(),
-                        info.currentReservation.getStationPos());
-            }
+            Palworks.LOGGER.debug(
+                    "{} dropped its reservation; released job at {} back to the pool",
+                    pokemon.getSpecies().getName(),
+                    info.currentReservation.getStationPos());
         }
 
         BlockPos entityPos = entity.blockPosition();
@@ -238,12 +235,10 @@ public class JobManager {
                 }
                 pool.release(JobKey.of(removed.currentReservation), level.getGameTime());
 
-                if (DEBUG) {
-                    Palworks.LOGGER.debug(
-                            "Unregistered worker {} and released job at {}",
-                            pokemonUUID,
-                            removed.currentReservation.getStationPos());
-                }
+                Palworks.LOGGER.debug(
+                        "Unregistered worker {} and released job at {}",
+                        pokemonUUID,
+                        removed.currentReservation.getStationPos());
             }
         }
         // Drop per-worker caches so they don't leak after the worker is gone.
@@ -286,24 +281,8 @@ public class JobManager {
         BlockPos jobPos = completedReservation.getStationPos();
         UUID workerUUID = pokemon.getUuid();
 
-        if (DEBUG) {
-            Palworks.LOGGER.info(
-                    "{} completed {} job at {}",
-                    pokemon.getSpecies().getName(),
-                    completedReservation.getJobType(),
-                    jobPos);
-
-            // Send chat message to nearby players
-            DebugManager.broadcastActivity(
-                    serverLevel,
-                    String.format(
-                            "§a%s§f completed §e%s§f at [%d, %d, %d]",
-                            pokemon.getSpecies().getName(),
-                            completedReservation.getJobType().name(),
-                            jobPos.getX(),
-                            jobPos.getY(),
-                            jobPos.getZ()));
-        }
+        Palworks.LOGGER.debug(
+                "{} completed {} job at {}", pokemon.getSpecies().getName(), completedReservation.getJobType(), jobPos);
 
         // Handle consecutive jobs for harvesting
         if (completedReservation.getJobType() == JobType.HARVEST_CROPS) {
@@ -311,10 +290,8 @@ public class JobManager {
 
             // No replant job: harvesting resets the crop in place (paid for with one of its seeds),
             // and berries regrow on their own. See CropAdapter.harvestCrop.
-            if (DEBUG) {
-                Palworks.LOGGER.info("Queuing pickup job for harvest at {}", jobPos);
-                DebugManager.broadcastActivity(serverLevel, "  §7→ Queued §eCOLLECT_DROPS§7");
-            }
+            Palworks.LOGGER.debug("Queuing pickup job for harvest at {}", jobPos);
+            DebugManager.broadcastActivity(serverLevel, "  §7→ Queued §eCOLLECT_DROPS§7");
 
             // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
             pickups.add(jobPos, workerUUID, currentTime + PickupQueue.DROPS_SPAWN_DELAY);
@@ -354,14 +331,12 @@ public class JobManager {
             pool.captureProgress(state, JobKey.of(reservation));
         }
 
-        if (DEBUG) {
-            Palworks.LOGGER.debug(
-                    "{} abandoned {} at {}; won't retry it until terrain changes or it moves (max {} ticks)",
-                    pokemon.getSpecies().getName(),
-                    reservation.getJobType(),
-                    pos,
-                    JobAssigner.JOB_FAILURE_BLACKLIST_TICKS);
-        }
+        Palworks.LOGGER.debug(
+                "{} abandoned {} at {}; won't retry it until terrain changes or it moves (max {} ticks)",
+                pokemon.getSpecies().getName(),
+                reservation.getJobType(),
+                pos,
+                JobAssigner.JOB_FAILURE_BLACKLIST_TICKS);
     }
 
     /**
@@ -380,13 +355,11 @@ public class JobManager {
         pool.remove(JobKey.of(reservation));
         workers.markIdle(pokemon.getUuid());
 
-        if (DEBUG) {
-            Palworks.LOGGER.info(
-                    "{}'s {} at {} no longer exists - removed from pool",
-                    pokemon.getSpecies().getName(),
-                    reservation.getJobType(),
-                    pos);
-        }
+        Palworks.LOGGER.debug(
+                "{}'s {} at {} no longer exists - removed from pool",
+                pokemon.getSpecies().getName(),
+                reservation.getJobType(),
+                pos);
     }
 
     /**
@@ -405,13 +378,11 @@ public class JobManager {
         pool.release(key, level.getGameTime());
         workers.markIdle(pokemon.getUuid());
 
-        if (DEBUG) {
-            Palworks.LOGGER.info(
-                    "{} can't do its {} at {} any more - given back to the pool",
-                    pokemon.getSpecies().getName(),
-                    reservation.getJobType(),
-                    reservation.getStationPos());
-        }
+        Palworks.LOGGER.debug(
+                "{} can't do its {} at {} any more - given back to the pool",
+                pokemon.getSpecies().getName(),
+                reservation.getJobType(),
+                reservation.getStationPos());
     }
 
     /**
@@ -424,16 +395,13 @@ public class JobManager {
         UUID workerUUID = pokemon.getUuid();
         long currentTime = level.getGameTime();
 
-        if (DEBUG) {
-            Palworks.LOGGER.info(
-                    "{} chopped tree at base {}", pokemon.getSpecies().getName(), basePos);
+        Palworks.LOGGER.debug("{} chopped tree at base {}", pokemon.getSpecies().getName(), basePos);
 
-            DebugManager.broadcastActivity(
-                    serverLevel,
-                    String.format(
-                            "§a%s§f chopped tree, queuing §eCOLLECT_DROPS§f",
-                            pokemon.getSpecies().getName()));
-        }
+        DebugManager.broadcastActivity(
+                serverLevel,
+                String.format(
+                        "§a%s§f chopped tree, queuing §eCOLLECT_DROPS§f",
+                        pokemon.getSpecies().getName()));
 
         // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
         pickups.add(basePos, workerUUID, currentTime + PickupQueue.DROPS_SPAWN_DELAY);
@@ -454,13 +422,11 @@ public class JobManager {
 
         // Release orphaned reservations (jobs reserved by workers that no longer exist)
         for (JobRecord job : pool.orphaned(workers)) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug(
-                        "Releasing orphaned {} job at {} - worker {} no longer exists",
-                        job.type(),
-                        job.position(),
-                        job.reservedBy());
-            }
+            Palworks.LOGGER.debug(
+                    "Releasing orphaned {} job at {} - worker {} no longer exists",
+                    job.type(),
+                    job.position(),
+                    job.reservedBy());
             pool.release(JobKey.of(job), currentTime);
         }
     }
