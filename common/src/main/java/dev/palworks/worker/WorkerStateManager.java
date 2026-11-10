@@ -84,6 +84,20 @@ public class WorkerStateManager {
     }
 
     /**
+     * Turn a Pokemon's work on or off and save it. Turning it off drops its current job (with any
+     * progress); JobManager then frees the job for other workers on its next registration pass.
+     * Used by both {@code /palworks worker enable|disable} and the interact wheel toggle.
+     */
+    public static void setEnabled(Pokemon pokemon, boolean enabled) {
+        WorkerState state = getOrCreate(pokemon);
+        state.setEnabled(enabled);
+        if (!enabled) {
+            state.clearReservation();
+        }
+        save(pokemon, state);
+    }
+
+    /**
      * Check if a Pokemon has WorkerState data (cached or persisted).
      */
     public static boolean hasWorkerState(Pokemon pokemon) {

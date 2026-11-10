@@ -3,7 +3,11 @@ package dev.palworks.mixin;
 import com.cobblemon.mod.common.CobblemonNetwork;
 import com.cobblemon.mod.common.net.PacketRegisterInfo;
 import dev.palworks.net.handlers.OpenInventoryHandler;
+import dev.palworks.net.handlers.ToggleWorkerHandler;
+import dev.palworks.net.handlers.WorkerStatusHandler;
 import dev.palworks.net.packets.OpenInventoryPacket;
+import dev.palworks.net.packets.ToggleWorkerPacket;
+import dev.palworks.net.packets.WorkerStatusPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -29,6 +33,26 @@ public abstract class CobblemonNetworkMixin {
                 OpenInventoryPacket.ID,
                 OpenInventoryPacket::decode,
                 new OpenInventoryHandler(),
+                null
+        ));
+
+        list.add(new PacketRegisterInfo<>(
+                ToggleWorkerPacket.ID,
+                ToggleWorkerPacket::decode,
+                new ToggleWorkerHandler(),
+                null
+        ));
+    }
+
+    /**
+     * Inject into the S2C (Server to Client) packet list to add our packets.
+     */
+    @Inject(method = "generateS2CPacketInfoList", at = @At("RETURN"))
+    private void addPalworksS2CPackets(CallbackInfoReturnable<List<PacketRegisterInfo<?>>> cir) {
+        cir.getReturnValue().add(new PacketRegisterInfo<>(
+                WorkerStatusPacket.ID,
+                WorkerStatusPacket::decode,
+                new WorkerStatusHandler(),
                 null
         ));
     }

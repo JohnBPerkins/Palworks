@@ -180,8 +180,7 @@ public class DebugCommand {
             return;
         }
 
-        state.setEnabled(true);
-        WorkerStateManager.save(pokemon, state);
+        WorkerStateManager.setEnabled(pokemon, true);
         player.sendSystemMessage(Component.literal("Enabled " + pokemon.getSpecies().getName() + " as a worker!"));
     }
 
@@ -199,9 +198,7 @@ public class DebugCommand {
             return;
         }
 
-        state.setEnabled(false);
-        state.clearReservation();
-        WorkerStateManager.save(pokemon, state);
+        WorkerStateManager.setEnabled(pokemon, false);
         player.sendSystemMessage(Component.literal("Disabled " + pokemon.getSpecies().getName() + " as a worker"));
     }
 
