@@ -3,7 +3,11 @@ package dev.palworks.worker;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.job.WorkRange;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
@@ -79,6 +83,25 @@ public class WorkerEligibility {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * Where the owner of a party Pokémon is, if they're in {@code level}: a party Pokémon only
+     * works near its owner. Null if they aren't (or it isn't from a party).
+     */
+    @Nullable
+    public static BlockPos partyOwnerPosition(Pokemon pokemon, Level level) {
+        ServerPlayer owner = pokemon.getOwnerPlayer();
+        return owner != null && owner.level() == level ? owner.blockPosition() : null;
+    }
+
+    /**
+     * Whether a worker should keep going to a job at {@code pos} as far as its owner goes: one from
+     * a party only while it's within {@link WorkRange#OWNER_LEASH} of its owner (past that, Cobblemon
+     * teleports it back to them), one from a pasture always (it works round its pasture).
+     */
+    public static boolean withinOwnerLeash(Pokemon pokemon, Level level, BlockPos pos) {
+        return !isFromParty(pokemon) || WorkRange.withinOwnerLeash(partyOwnerPosition(pokemon, level), pos);
     }
 
     /**

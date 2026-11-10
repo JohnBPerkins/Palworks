@@ -10,6 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
@@ -311,6 +312,27 @@ public class WorkerGameTests {
         });
         // Well under the 600-tick memory backstop, so this only passes if opening the box was noticed
         helper.runAfterDelay(151, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once reachable")));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_party_owner", timeoutTicks = 1000)
+    public void aPartyWorkerOnlyWorksNearItsOwner(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // A party Pokémon whose owner is too far from the jobs round it doesn't take them; once
+        // they're back, it does. The owner is out of range straight up: off to the side, it would
+        // follow them (Cobblemon) out of the test's loaded area. Within 32 blocks, so Cobblemon
+        // doesn't teleport it up to them either.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        ServerPlayer owner = worker.getPokemon().getOwnerPlayer();
+        BlockPos home = helper.absolutePos(START);
+        owner.moveTo(home.getX() + 0.5, home.getY() + 27, home.getZ() + 0.5);
+
+        helper.runAfterDelay(200, () -> {
+            assertWheatRow(helper, 7, "left alone while its owner is out of range");
+            owner.moveTo(home.getX() + 0.5, home.getY(), home.getZ() + 0.5);
+        });
+        helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once its owner is back")));
     }
 
     // ---- Nether trees need Lumbering and Nether ----
