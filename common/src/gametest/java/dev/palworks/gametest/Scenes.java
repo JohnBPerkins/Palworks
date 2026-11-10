@@ -62,13 +62,20 @@ final class Scenes {
         return helper.absolutePos(new BlockPos(x, y, z));
     }
 
+    /**
+     * Where a test's dropped items are looked for: its area and a few blocks round it. Dropped
+     * items scatter and slide (a crop at the edge has lost one past a 1-block margin), and tests
+     * are spaced far enough apart that this never reaches a neighbour's (see
+     * StructureGridSpawnerMixin).
+     */
+    private static AABB itemArea(GameTestHelper helper) {
+        return helper.getBounds().inflate(4);
+    }
+
     /** Total count of an item lying on the ground anywhere in the test area. */
     static int itemsOnGround(GameTestHelper helper, Item item) {
-        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO))
-                .expandTowards(8, 8, 8)
-                .inflate(1);
         int total = 0;
-        for (ItemEntity entity : helper.getLevel().getEntitiesOfClass(ItemEntity.class, area)) {
+        for (ItemEntity entity : helper.getLevel().getEntitiesOfClass(ItemEntity.class, itemArea(helper))) {
             if (entity.getItem().is(item)) {
                 total += entity.getItem().getCount();
             }
@@ -78,10 +85,7 @@ final class Scenes {
 
     /** Remove every item lying on the ground in the test area. */
     static void clearItems(GameTestHelper helper) {
-        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO))
-                .expandTowards(8, 8, 8)
-                .inflate(1);
-        helper.getLevel().getEntitiesOfClass(ItemEntity.class, area).forEach(ItemEntity::discard);
+        helper.getLevel().getEntitiesOfClass(ItemEntity.class, itemArea(helper)).forEach(ItemEntity::discard);
     }
 
     static void air(GameTestHelper helper, int x, int y, int z) {
