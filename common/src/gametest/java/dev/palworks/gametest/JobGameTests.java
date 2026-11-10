@@ -1,7 +1,11 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.inventory.WorkerInventory;
+import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.manager.JobManager;
+import dev.palworks.station.FurnaceHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -15,7 +19,7 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 /**
  * Whether each kind of job still exists in the world (JobManager.isJobStillThere): what workers
- * re-check while walking to a job, so they turn back from jobs that disappeared.
+ * re-check on their way to a job and as they work it, so they drop jobs that disappeared.
  */
 public class JobGameTests {
 
@@ -80,6 +84,25 @@ public class JobGameTests {
     }
 
     @GameTest(template = Templates.EMPTY)
+    public void aFurnaceAWorkerLitIsStillItsJobUntilItsEmptied(GameTestHelper helper) {
+        // The worker keeps it lit, smelt after smelt, checking it's still there as it goes: being
+        // lit (by it) mustn't count as the job having gone, but being emptied must
+        BlockPos pos = new BlockPos(3, 1, 3);
+        helper.setBlock(pos, Blocks.FURNACE);
+        var furnace = (AbstractFurnaceBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(pos));
+        furnace.setItem(0, new ItemStack(Items.RAW_IRON, 4));
+        FurnaceHelper.igniteFurnace(helper.getLevel(), helper.absolutePos(pos), FurnaceHelper.getBurnDuration());
+
+        helper.assertTrue(there(helper, JobType.FUEL_FURNACE, pos), "lit by a worker, raw iron left to smelt");
+        furnace.setItem(0, ItemStack.EMPTY);
+        helper.assertFalse(there(helper, JobType.FUEL_FURNACE, pos), "emptied: nothing left to smelt");
+        furnace.setItem(0, new ItemStack(Items.RAW_IRON, 4));
+        furnace.litTime = 1600; // burning a coal of its own
+        helper.assertFalse(there(helper, JobType.FUEL_FURNACE, pos), "burning its own fuel: no need for a worker");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
     public void seedJobsAreThereWhileTheChestHasSeeds(GameTestHelper helper) {
         BlockPos pos = new BlockPos(3, 1, 3);
         helper.setBlock(pos, Blocks.CHEST);
@@ -119,5 +142,47 @@ public class JobGameTests {
         item.discard();
         helper.assertFalse(there(helper, JobType.COLLECT_DROPS, pos), "someone picked it up");
         helper.succeed();
+    }
+
+    // ---- Whether a worker can do a job (JobManager.canWorkerDo) ----
+
+    @GameTest(template = Templates.EMPTY, batch = "can_worker_do")
+    public void aPlanterCanPlantWhereItCarriesASeedForTheSoil(GameTestHelper helper) {
+        Workers.isolate(helper);
+        BlockPos farmland = new BlockPos(3, 1, 3);
+        BlockPos soulSand = new BlockPos(5, 1, 3);
+        helper.setBlock(farmland, Blocks.FARMLAND);
+        helper.setBlock(soulSand, Blocks.SOUL_SAND);
+        Pokemon worker = Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(1, 1, 1))
+                .getPokemon();
+        WorkerInventory pouch = WorkerInventoryManager.getOrCreate(worker);
+
+        helper.assertFalse(canDo(helper, worker, JobType.PLANT_SEEDS, farmland.above()), "no seeds");
+        pouch.addItem(new ItemStack(Items.WHEAT_SEEDS, 4));
+        helper.assertTrue(canDo(helper, worker, JobType.PLANT_SEEDS, farmland.above()), "wheat seeds, farmland");
+        helper.assertFalse(
+                canDo(helper, worker, JobType.PLANT_SEEDS, soulSand.above()), "wheat doesn't grow on soul sand");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "can_worker_do")
+    public void aWorkerCanOnlyFetchSeedsWithRoomForThem(GameTestHelper helper) {
+        Workers.isolate(helper);
+        BlockPos chest = new BlockPos(3, 1, 3);
+        helper.setBlock(chest, Blocks.CHEST);
+        Pokemon worker = Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(1, 1, 1))
+                .getPokemon();
+        WorkerInventory pouch = WorkerInventoryManager.getOrCreate(worker);
+
+        helper.assertTrue(canDo(helper, worker, JobType.GET_SEEDS, chest), "an empty pouch");
+        for (int i = 0; i < 64 && pouch.addItem(new ItemStack(Items.WHEAT_SEEDS, 64)) == 0; i++) {
+            // fill it up
+        }
+        helper.assertFalse(canDo(helper, worker, JobType.GET_SEEDS, chest), "a full pouch");
+        helper.succeed();
+    }
+
+    private static boolean canDo(GameTestHelper helper, Pokemon worker, JobType type, BlockPos rel) {
+        return JobManager.canWorkerDo(helper.getLevel(), worker, type, helper.absolutePos(rel));
     }
 }

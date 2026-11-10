@@ -560,12 +560,16 @@ public class JobManager {
 
     /**
      * Whether a job still exists in the world: the same checks the chunk scan uses to find it.
-     * Workers re-check their reserved job with this while walking to it, so they drop it instead of
-     * finishing the walk when it's gone (crop already harvested, tree chopped, chest emptied...).
+     * Every step of a job checks it's still there with this, by default (see StepRunner): workers
+     * check it on their way to a job, so they drop it instead of finishing the walk when it's gone
+     * (crop already harvested, tree chopped, chest emptied...), and as they work, so they stop
+     * when it goes, and a step's effect never lands on a job that isn't there. A job changes some
+     * things itself as it goes, so a few checks are looser than the scan's: a furnace the worker
+     * has lit is still its job (see FurnaceHelper.canUseHeat).
      */
     public static boolean isJobStillThere(Level level, JobType type, BlockPos pos) {
         return switch (type) {
-            case FUEL_FURNACE -> FurnaceHelper.needsFuel(level, pos);
+            case FUEL_FURNACE -> FurnaceHelper.canUseHeat(level, pos);
             case HARVEST_CROPS -> CropAdapter.isFullyGrown(level, pos) || CropAdapter.isAttachedFruit(level, pos);
             case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
             case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
@@ -576,6 +580,47 @@ public class JobManager {
             case COLLECT_DROPS -> !itemsToPickUp(level, pos).isEmpty();
             default -> true;
         };
+    }
+
+    /**
+     * Whether this worker can do this job: it has what the job takes (a seed for the soil, room for
+     * the drops...). The worker's side of a job, as {@link #isJobStillThere} is the world's. The one
+     * check of it, so the two places it's asked agree: when jobs are handed out (a worker is only
+     * offered jobs it can do), and while a worker has one (on its way and as it works, see
+     * StepRunner), so a worker that can't do its job any more gives it back for one that can,
+     * instead of finishing it for nothing. A job type that needs something of its worker goes here.
+     *
+     * <p>Suitabilities aren't asked here: a job's (which can depend on its block: nether wart is
+     * Nether work) are on its record, checked as it's handed out (see {@link #canDoJob}).
+     */
+    public static boolean canWorkerDo(Level level, Pokemon pokemon, JobType type, BlockPos pos) {
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+        return switch (type) {
+            // A seed it carries that can be planted there (wart on soul sand, the rest on farmland)
+            case PLANT_SEEDS -> carriesSeedFor(level, inventory, pos);
+            // Room for some of what's lying there
+            case COLLECT_DROPS -> hasRoomForAny(inventory, itemsToPickUp(level, pos));
+            // Room for the seeds it fetches
+            case GET_SEEDS -> inventory.hasSpace();
+            // Something to deliver
+            case DELIVER_ITEMS -> inventory.hasCargo(SuitabilityDetector.getSuitabilities(pokemon));
+            default -> true;
+        };
+    }
+
+    private static boolean hasRoomForAny(WorkerInventory inventory, List<ItemEntity> items) {
+        for (ItemEntity item : items) {
+            if (inventory.roomFor(item.getItem()) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** {@link #canWorkerDo} for a worker being offered a job. One that isn't loaded can't do any. */
+    private boolean canWorkerDo(WorkerInfo worker, JobRecord job) {
+        Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
+        return pokemon != null && canWorkerDo(level, pokemon, job.type, job.position);
     }
 
     /**
@@ -1022,18 +1067,15 @@ public class JobManager {
             if (!canDoJob(worker, job)
                     || !inWorkRange(worker, job.position)
                     || isRecentlyUnreachable(worker, job.position)
-                    || !canTakeFrom(worker, job)) {
+                    || !canWorkerDo(worker, job)) {
                 continue;
             }
 
-            // Planters fetch seeds only once they've run out (then plant until the stack is gone),
-            // and only if there's room to carry them. For farmland, "run out" means of seeds the
+            // Planters fetch seeds only once they've run out (then plant until the stack is gone);
+            // room to carry them is canWorkerDo's. For farmland, "run out" means of seeds the
             // open farmland in range can take, and it only goes for a chest with some of those:
             // seeds that grow elsewhere (medicinal leek, cocoa beans) don't count either way.
             if (job.type == JobType.GET_SEEDS && inventory != null) {
-                if (!inventory.hasSpace()) {
-                    continue;
-                }
                 if (job.requiredSuitabilities.contains(Suitability.PLANTING)) {
                     if (openFarmland == null) {
                         openFarmland = openFarmlandSpots(worker.position);
@@ -1044,13 +1086,6 @@ public class JobManager {
                 } else if (carriesSeeds) {
                     continue;
                 }
-            }
-
-            // Planting needs a seed the worker carries that can be planted there (wart on soul
-            // sand, the rest on farmland). Harvested tiles don't come through here: they're reset in
-            // place by the harvest.
-            if (job.type == JobType.PLANT_SEEDS && !(carriesSeeds && carriesSeedFor(inventory, job.position))) {
-                continue;
             }
 
             candidates.add(job);
@@ -1107,7 +1142,7 @@ public class JobManager {
             if (!canDoJob(worker, job)
                     || !inWorkRange(worker, job.position)
                     || isRecentlyUnreachable(worker, job.position)
-                    || !canTakeFrom(worker, job)) {
+                    || !canWorkerDo(worker, job)) {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position, job.type, entity);
@@ -1171,10 +1206,7 @@ public class JobManager {
     }
 
     /** Whether the worker carries a seed that can be planted at {@code plantPos}. */
-    private boolean carriesSeedFor(@Nullable WorkerInventory inventory, BlockPos plantPos) {
-        if (inventory == null) {
-            return false;
-        }
+    private static boolean carriesSeedFor(Level level, WorkerInventory inventory, BlockPos plantPos) {
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
             if (!stack.isEmpty() && CropAdapter.canPlantSeed(stack.getItem(), level, plantPos.below())) {
@@ -1463,6 +1495,36 @@ public class JobManager {
     }
 
     /**
+     * Called when a worker gives its job back because it can't do it any more (see
+     * {@link #canWorkerDo}: its seeds were taken, its inventory filled up). The job goes back in the
+     * pool, with any progress (see {@link #captureProgress}), for a worker that can do it: this one
+     * isn't offered it again until it can, since jobs are handed out by the same check. Not
+     * remembered as unreachable: nothing's wrong with the spot.
+     */
+    public void onJobGivenBack(Pokemon pokemon, ReservationId reservation) {
+        JobKey key = JobKey.of(reservation);
+        WorkerState state = WorkerStateManager.get(pokemon);
+        if (state != null) {
+            captureProgress(state, key);
+        }
+        releaseJobReservation(key);
+
+        WorkerInfo workerInfo = activeWorkers.get(pokemon.getUuid());
+        if (workerInfo != null) {
+            workerInfo.idle = true;
+            workerInfo.currentReservation = null;
+        }
+
+        if (DEBUG) {
+            Palworks.LOGGER.info(
+                    "{} can't do its {} at {} any more - given back to the pool",
+                    pokemon.getSpecies().getName(),
+                    reservation.getJobType(),
+                    reservation.getStationPos());
+        }
+    }
+
+    /**
      * Process consecutive job queue (delayed job creation).
      */
     private void processConsecutiveJobs(ServerLevel level) {
@@ -1598,28 +1660,6 @@ public class JobManager {
                 ItemEntity.class,
                 new AABB(pos).inflate(PICKUP_RADIUS),
                 item -> item.isAlive() && !item.getItem().isEmpty());
-    }
-
-    /**
-     * Whether this worker could take anything from this job: for a pickup, whether its inventory
-     * has room for at least one of the items lying there (a free slot takes anything; with every
-     * slot used, only items matching a stack with room). Every other job: yes.
-     */
-    private boolean canTakeFrom(WorkerInfo worker, JobRecord job) {
-        if (job.type != JobType.COLLECT_DROPS) {
-            return true;
-        }
-        Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
-        if (pokemon == null) {
-            return false;
-        }
-        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
-        for (ItemEntity item : itemsToPickUp(level, job.position)) {
-            if (inventory.roomFor(item.getItem()) > 0) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // ============================================

@@ -228,16 +228,10 @@ public class WorkerAI {
         WorkStance stance = stanceFor(jobType, entity);
         BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, jobType, entity, stance);
         if (standPos == null) {
-            // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by):
-            // drop it as gone, not as unreachable, which would wrongly remember the spot.
-            if (level instanceof ServerLevel goneLevel
-                    && !state.hasJobProgress()
-                    && !JobManager.isJobStillThere(level, reservation.getJobType(), targetPos)) {
-                JobManager.getInstance(goneLevel).onJobInvalidated(pokemon, reservation, level);
-                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
-                state.clearReservation();
-                state.resetPathFailures();
-                WorkerStateManager.save(pokemon, state);
+            // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by),
+            // or not one it can do any more: drop it for that, not as unreachable, which would
+            // wrongly remember the spot.
+            if (stopIfItCantGoOn(pokemon, entity, level, state, reservation)) {
                 return false;
             }
             // No valid place to stand to do this job (front blocked / no standable tile). Give up.
@@ -261,30 +255,14 @@ public class WorkerAI {
         BlockPos entityPos = entity.blockPosition();
         double distanceSq = entityPos.distSqr(standPos);
 
-        // En route, make sure the job still exists, for every job type: a crop can be harvested, a
-        // tree chopped, a chest emptied, a station broken while the worker walks there; without this
-        // it finishes the walk for nothing. Checked every JOB_RECHECK_INTERVAL ticks (staggered), and
-        // only before arrival, so it can't disturb an in-progress job (e.g. a repeating furnace,
-        // which we light ourselves and would otherwise read as "not needing fuel").
+        // En route, make sure the job still exists, and that it can still do it, for every job type:
+        // a crop can be harvested, a tree chopped, a chest emptied, a station broken, its seeds
+        // taken while the worker walks there; without this it finishes the walk for nothing. The
+        // same checks as at work (see Step), for the step it's reached, every JOB_RECHECK_INTERVAL
+        // ticks (staggered). At work, StepRunner asks them.
         if (distanceSq > ARRIVAL_DISTSQ
-                && level instanceof ServerLevel validationLevel
                 && (level.getGameTime() + entity.getId()) % JOB_RECHECK_INTERVAL == 0
-                // Past its first step, the job's original target may be gone by design (a chopped
-                // tree still needs replanting), so only check jobs that haven't started
-                && !state.hasJobProgress()
-                && !JobManager.isJobStillThere(level, reservation.getJobType(), targetPos)) {
-            if (DEBUG) {
-                Palworks.LOGGER.info(
-                        "{}'s {} job at {} no longer valid (station removed/emptied) - dropping",
-                        pokemon.getSpecies().getName(),
-                        reservation.getJobType(),
-                        targetPos);
-            }
-            JobManager.getInstance(validationLevel).onJobInvalidated(pokemon, reservation, level);
-            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
-            state.clearReservation();
-            state.resetPathFailures();
-            WorkerStateManager.save(pokemon, state);
+                && stopIfItCantGoOn(pokemon, entity, level, state, reservation)) {
             return false;
         }
 
@@ -359,8 +337,15 @@ public class WorkerAI {
             boolean facing = turnTowards(entity, playingOut != null ? playingOut : targetPos);
 
             // At job location - perform work
-            boolean workComplete =
+            StepRunner.Outcome outcome =
                     performWork(pokemon, entity, level, state, reservation, playingOut == null && facing);
+            if (outcome == StepRunner.Outcome.GONE || outcome == StepRunner.Outcome.UNABLE) {
+                // Its job went while it worked (the furnace emptied, the crop harvested by someone
+                // else), or it can't do it any more: it stopped there, without the step's effect
+                stopJob(outcome, pokemon, entity, level, state, reservation);
+                return false;
+            }
+            boolean workComplete = outcome == StepRunner.Outcome.FINISHED;
 
             if (workComplete) {
                 // Notify JobManager of completion (for consecutive jobs)
@@ -451,12 +436,15 @@ public class WorkerAI {
      * Perform one tick of work at the job location: runs the current step of the job's
      * {@link JobHandler#steps()}. A step's animation, if it has one, plays timed to land on the
      * step's last tick, where its {@code finish} (its effect) runs; then the job moves on to the
-     * next step. Returns true when the last step is done (and the job doesn't repeat).
+     * next step. Returns {@link StepRunner.Outcome#FINISHED} when the last step is done (and the job
+     * doesn't repeat), {@link StepRunner.Outcome#GONE} if the job went away (see
+     * {@link Step#stillThere}), {@link StepRunner.Outcome#UNABLE} if the worker can't do it any more
+     * (see {@link Step#canDo}), otherwise {@link StepRunner.Outcome#WORKING}.
      *
      * @param readyToAnimate whether the worker can start an animation now: it's facing its work,
      *                       and its last animation is over
      */
-    private static boolean performWork(
+    private static StepRunner.Outcome performWork(
             Pokemon pokemon,
             Mob entity,
             Level level,
@@ -475,20 +463,74 @@ public class WorkerAI {
                 && index < steps.size()
                 && steps.get(index).animation() != null
                 && state.getStepTicks() == steps.get(index).startTick(ctx)) {
-            return false;
+            return StepRunner.Outcome.WORKING;
         }
 
-        return switch (StepRunner.tick(steps, state, ctx, handler::repeatAfterComplete)) {
-            case WORKING -> false;
-            case REPEATING -> {
-                // Some jobs (e.g. lighting a furnace that has more to smelt) go round again.
-                // Refresh the reservation with a new timestamp to prevent expiration.
-                state.setCurrentReservation(
-                        new ReservationId(reservation.getStationPos(), reservation.getJobType(), level.getGameTime()));
-                yield false;
+        StepRunner.Outcome outcome = StepRunner.tick(steps, state, ctx, handler::repeatAfterComplete);
+        if (outcome == StepRunner.Outcome.REPEATING) {
+            // Some jobs (e.g. lighting a furnace that has more to smelt) go round again.
+            // Refresh the reservation with a new timestamp to prevent expiration.
+            state.setCurrentReservation(
+                    new ReservationId(reservation.getStationPos(), reservation.getJobType(), level.getGameTime()));
+            return StepRunner.Outcome.WORKING;
+        }
+        return outcome;
+    }
+
+    /**
+     * If the worker's job can't go on at the step it's reached, stop it (see {@link #stopJob}), and
+     * return true. The checks every job goes through, on the way and at work (where StepRunner asks
+     * them): it's still there ({@link Step#stillThere}), and the worker can do it
+     * ({@link Step#canDo}).
+     */
+    private static boolean stopIfItCantGoOn(
+            Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
+        JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
+        StepRunner.Outcome reason =
+                StepRunner.stopReason(handlerFor(reservation.getJobType()).steps(), state, ctx);
+        if (reason == null) {
+            return false;
+        }
+        stopJob(reason, pokemon, entity, level, state, reservation);
+        return true;
+    }
+
+    /**
+     * Stop a job that can't go on, on the way to it or partway through. One that's gone
+     * ({@link StepRunner.Outcome#GONE}) is dropped from the pool (see
+     * {@link JobManager#onJobInvalidated}); one the worker can't do
+     * ({@link StepRunner.Outcome#UNABLE}) is given back to it, with any progress, for a worker that
+     * can (see {@link JobManager#onJobGivenBack}). Neither is remembered as unreachable: nothing's
+     * wrong with the spot.
+     */
+    private static void stopJob(
+            StepRunner.Outcome reason,
+            Pokemon pokemon,
+            Mob entity,
+            Level level,
+            WorkerState state,
+            ReservationId reservation) {
+        if (DEBUG) {
+            Palworks.LOGGER.info(
+                    "{}'s {} job at {} {} (step {}) - stopping",
+                    pokemon.getSpecies().getName(),
+                    reservation.getJobType(),
+                    reservation.getStationPos(),
+                    reason == StepRunner.Outcome.GONE ? "is gone" : "isn't one it can do any more",
+                    state.getJobStep());
+        }
+        if (level instanceof ServerLevel serverLevel) {
+            JobManager jobs = JobManager.getInstance(serverLevel);
+            if (reason == StepRunner.Outcome.GONE) {
+                jobs.onJobInvalidated(pokemon, reservation, level);
+            } else {
+                jobs.onJobGivenBack(pokemon, reservation); // before its progress is cleared
             }
-            case FINISHED -> true;
-        };
+        }
+        entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+        state.clearReservation();
+        state.resetPathFailures();
+        WorkerStateManager.save(pokemon, state);
     }
 
     // ============================================================
@@ -536,13 +578,21 @@ public class WorkerAI {
      * {@link WorkAnimation#stepTicks}). A species can have its own version of the animation, with
      * its own timing (see {@link WorkAnimations#forSpecies}), so how long a step takes, its
      * {@code length}, is by species. Build one with {@link #animated}.
+     *
+     * <p>Every step checks its job is still there ({@code isThere}): when it's reached, while it goes
+     * on, and right before its effect (see {@link StepRunner}); the worker also checks it on its way.
+     * By default that's {@link JobManager#isJobStillThere}, the same check that found the job. A step
+     * that comes after its job's target is gone by design (replanting a chopped tree) doesn't (see
+     * {@link #outlivesItsTarget}). At the same points it checks the worker can do it
+     * ({@link #canDo}): {@link JobManager#canWorkerDo}, the check jobs are handed out by.
      */
     private record Step(
             String name,
             ToIntFunction<String> length,
             @Nullable WorkAnimation animation,
             StepFinish onFinish,
-            java.util.function.Predicate<JobContext> isNeeded)
+            java.util.function.Predicate<JobContext> isNeeded,
+            java.util.function.Predicate<JobContext> isThere)
             implements StepRunner.TimedStep<JobContext> {
 
         /** This step's animation as a worker of this species plays it, or null if it has none. */
@@ -589,9 +639,30 @@ public class WorkerAI {
             return isNeeded.test(ctx);
         }
 
+        @Override
+        public boolean stillThere(JobContext ctx) {
+            return isThere.test(ctx);
+        }
+
+        /**
+         * The same check its job was handed out by, so a worker that gives a job back isn't handed
+         * it again until it can do it. A job type that needs something of its worker adds it to
+         * {@link JobManager#canWorkerDo}, not here.
+         */
+        @Override
+        public boolean canDo(JobContext ctx) {
+            return JobManager.canWorkerDo(
+                    ctx.level(), ctx.pokemon(), ctx.reservation().getJobType(), ctx.pos());
+        }
+
+        /** Whether the job a step is for is still there, as the scan that found it sees it. */
+        private static boolean jobInTheWorld(JobContext ctx) {
+            return JobManager.isJobStillThere(ctx.level(), ctx.reservation().getJobType(), ctx.pos());
+        }
+
         /** A step that takes time and then has its effect, with no animation. */
         static Step of(String name, int ticks, StepFinish finish) {
-            return new Step(name, species -> ticks, null, finish, ctx -> true);
+            return new Step(name, species -> ticks, null, finish, ctx -> true, Step::jobInTheWorld);
         }
 
         /**
@@ -604,17 +675,29 @@ public class WorkerAI {
                     species -> WorkAnimations.forSpecies(animation, species).stepTicks(minTicks),
                     animation,
                     finish,
-                    ctx -> true);
+                    ctx -> true,
+                    Step::jobInTheWorld);
         }
 
-        /** A step that only takes time (e.g. a pause), with no effect. */
+        /**
+         * A step that only takes time (e.g. a pause), with no effect. It still ends the job if that
+         * goes meanwhile: a furnace emptied during its smelt isn't waited out.
+         */
         static Step pause(String name, ToIntFunction<String> length) {
-            return new Step(name, length, null, ctx -> true, ctx -> true);
+            return new Step(name, length, null, ctx -> true, ctx -> true, Step::jobInTheWorld);
         }
 
         /** This step, skipped when it's reached if there's nothing for it to do. */
         Step onlyIf(java.util.function.Predicate<JobContext> needed) {
-            return new Step(name, length, animation, onFinish, needed);
+            return new Step(name, length, animation, onFinish, needed, isThere);
+        }
+
+        /**
+         * This step, done even though its job's target is gone: it comes after a step that does
+         * away with it (a chopped tree's replant). Its effect has to cope with what it finds.
+         */
+        Step outlivesItsTarget() {
+            return new Step(name, length, animation, onFinish, isNeeded, ctx -> true);
         }
     }
 
@@ -988,7 +1071,8 @@ public class WorkerAI {
                 Step.of("clear leaves", 20, effect(ChopTreeHandler::clearLeaves))
                         .onlyIf(ChopTreeHandler::leavesInTheWay),
                 Step.animated("chop", 60, WorkAnimations.CHOP, ChopTreeHandler::chop),
-                Step.of("replant", 20, effect(ChopTreeHandler::replant)));
+                // The tree's gone by now: it was just chopped
+                Step.of("replant", 20, effect(ChopTreeHandler::replant)).outlivesItsTarget());
 
         @Override
         public List<Step> steps() {

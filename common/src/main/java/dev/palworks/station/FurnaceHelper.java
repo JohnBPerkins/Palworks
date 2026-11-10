@@ -65,6 +65,20 @@ public class FurnaceHelper {
     }
 
     /**
+     * Whether a worker's heat is doing a furnace any good: it has something it can smelt, no fuel
+     * of its own, and isn't burning for longer than a worker's heat keeps it going (it's unlit, lit
+     * by a worker, or its own last fuel is about to burn out). Unlike {@link #needsFuel} it can be
+     * lit: a worker keeping it lit checks this while it does, and stops once it's emptied (or given
+     * fuel), instead of seeing out a smelt with nothing in it.
+     */
+    public static boolean canUseHeat(Level level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof AbstractFurnaceBlockEntity furnace
+                && hasSmeltableInput(level, furnace)
+                && !hasOwnFuel(furnace)
+                && furnace.litTime <= getBurnDuration();
+    }
+
+    /**
      * Check that the furnace's input can actually be smelted in this furnace type, so workers
      * don't waste heat igniting a furnace full of non-smeltable junk. Picks the recipe type from
      * the block entity (smelting / blasting / smoking).

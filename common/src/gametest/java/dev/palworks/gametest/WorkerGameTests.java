@@ -8,6 +8,7 @@ import dev.palworks.animation.WorkAnimator;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
+import dev.palworks.job.StepRunner;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.core.BlockPos;
@@ -194,6 +195,35 @@ public class WorkerGameTests {
                 helper.getBlockState(furnacePos).getValue(AbstractFurnaceBlock.LIT), "the furnace should be lit"));
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "worker_furnace_emptied", timeoutTicks = 800)
+    public void kindlerStopsAsSoonAsItsFurnaceIsEmptied(GameTestHelper helper) {
+        // Its items taken out mid-smelt: it used to see out the smelt (and start another) for nothing
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.STONE);
+        BlockPos furnacePos = new BlockPos(3, 1, 6);
+        helper.setBlock(
+                furnacePos, Blocks.FURNACE.defaultBlockState().setValue(AbstractFurnaceBlock.FACING, Direction.NORTH));
+        var furnace = (AbstractFurnaceBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(furnacePos));
+        furnace.setItem(0, new ItemStack(Items.RAW_IRON, 4));
+        PokemonEntity worker = Workers.sendOut(helper, "charmander level=20", START);
+
+        long[] emptiedAt = {-1};
+        helper.onEachTick(() -> {
+            if (emptiedAt[0] < 0 && helper.getBlockState(furnacePos).getValue(AbstractFurnaceBlock.LIT)) {
+                furnace.setItem(0, ItemStack.EMPTY); // lit by the worker: now take its items out
+                emptiedAt[0] = helper.getTick();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(emptiedAt[0] >= 0, "the worker hasn't lit the furnace yet");
+            WorkerState state = WorkerStateManager.get(worker.getPokemon());
+            helper.assertTrue(state == null || state.getCurrentReservation() == null, "still on its furnace job");
+            long took = helper.getTick() - emptiedAt[0];
+            helper.assertTrue(
+                    took <= StepRunner.RECHECK_TICKS + 1, "it should drop the job within a recheck, took " + took);
+        });
+    }
+
     // ---- Planting ----
 
     @GameTest(template = Templates.EMPTY, batch = "worker_plant_pouch", timeoutTicks = 800)
@@ -212,6 +242,44 @@ public class WorkerGameTests {
             assertWheatRow(helper, 0, "planted");
             helper.assertTrue(
                     pouch.getTotalItemCount() == 13, "one seed per tile, got " + pouch.getTotalItemCount() + " left");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_plant_seeds_taken", timeoutTicks = 1000)
+    public void planterGivesBackItsJobWhenItsSeedsAreTakenAndTakesItAgainOnceItHasSome(GameTestHelper helper) {
+        // Its seeds taken on its way: it used to walk there and plant nothing. Given back rather
+        // than dropped, and not remembered as unreachable, so it plants once it has seeds again.
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos farmland = new BlockPos(3, 0, 9);
+        helper.setBlock(farmland, Blocks.FARMLAND);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+        var pouch = WorkerInventoryManager.getOrCreate(worker.getPokemon());
+        pouch.addItem(new ItemStack(Items.WHEAT_SEEDS, 4));
+
+        long[] takenAt = {-1};
+        long[] gaveBackAt = {-1};
+        boolean[] plantedWithout = {false};
+        helper.onEachTick(() -> {
+            WorkerState state = WorkerStateManager.get(worker.getPokemon());
+            var job = state == null ? null : state.getCurrentReservation();
+            if (takenAt[0] < 0 && job != null && job.getJobType() == JobType.PLANT_SEEDS) {
+                pouch.clearContent();
+                takenAt[0] = helper.getTick();
+            } else if (takenAt[0] >= 0 && gaveBackAt[0] < 0 && job == null) {
+                gaveBackAt[0] = helper.getTick();
+                plantedWithout[0] = !helper.getBlockState(farmland.above()).isAir();
+                pouch.addItem(new ItemStack(Items.WHEAT_SEEDS, 4));
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(gaveBackAt[0] >= 0, "it hasn't given its planting job back");
+            helper.assertFalse(plantedWithout[0], "something got planted without a seed");
+            // On its way, and at work, it checks every 10 ticks
+            long took = gaveBackAt[0] - takenAt[0];
+            helper.assertTrue(took <= 12, "it should give the job back within a recheck, took " + took);
+            helper.assertTrue(
+                    helper.getBlockState(farmland.above()).is(Blocks.WHEAT), "it should plant once it has seeds again");
         });
     }
 
