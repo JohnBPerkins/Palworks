@@ -6,17 +6,41 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tracks which players have opted in (via {@code /palworks debug}) to seeing worker job activity
- * — assignments, completions, etc. — broadcast in chat. Off by default.
+ * Tracks which players have opted in to worker debugging, both off by default:
+ * <ul>
+ *   <li>{@code /palworks debug}: job activity (assignments, completions, etc.) in chat;</li>
+ *   <li>{@code /palworks debug overlay}: each nearby worker's job icon above its head and its path
+ *       (sent by {@link WorkerDebugSync}).</li>
+ * </ul>
  *
- * <p>This is the only live debug state. The old per-player render flags, the worker/station info
- * caches, and the geometry renderer were never wired to anything and have been removed.
  */
 public class DebugManager {
     private static final Map<UUID, Boolean> workerActivityChat = new HashMap<>();
+    private static final Set<UUID> workerOverlay = ConcurrentHashMap.newKeySet();
+
+    /** Whether this player sees the in-world worker overlay (job icons above heads, paths). */
+    public static boolean showsWorkerOverlay(UUID playerUUID) {
+        return workerOverlay.contains(playerUUID);
+    }
+
+    /** Toggle the in-world worker overlay for a player; returns the new state. */
+    public static boolean toggleWorkerOverlay(UUID playerUUID) {
+        if (workerOverlay.remove(playerUUID)) {
+            return false;
+        }
+        workerOverlay.add(playerUUID);
+        return true;
+    }
+
+    /** Players with the overlay on. */
+    public static Set<UUID> workerOverlayPlayers() {
+        return workerOverlay;
+    }
 
     /** Whether this player currently sees worker activity in chat. */
     public static boolean showsWorkerActivity(UUID playerUUID) {

@@ -48,7 +48,7 @@ public final class WorkStatusHud {
     private static final int ICON_SIZE = 8;
     private static final int ICON_TEXTURE_SIZE = 16;
 
-    private static final ResourceLocation OFF_ICON = icon("off");
+    public static final ResourceLocation OFF_ICON = icon("off");
 
     @Nullable
     private static ClientLevel lastLevel;
@@ -60,7 +60,7 @@ public final class WorkStatusHud {
     }
 
     /** The icon for a job, by its id (e.g. {@code work_chop_tree.png}); a generic one for jobs without their own. */
-    static ResourceLocation iconFor(@Nullable JobType job) {
+    public static ResourceLocation iconFor(@Nullable JobType job) {
         if (job == null) {
             return icon("generic");
         }

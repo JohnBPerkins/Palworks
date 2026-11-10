@@ -38,6 +38,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import dev.palworks.debug.DebugManager;
+import dev.palworks.debug.WorkerDebugSync;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -198,6 +199,7 @@ public class JobManager {
         instances.clear();
         byLevel.clear();
         WorkActivitySync.clear();
+        WorkerDebugSync.clear();
     }
 
     /**
@@ -216,6 +218,9 @@ public class JobManager {
 
         // Phase 4: Assign jobs to idle workers (proximity + suitability)
         assignJobsToWorkers(level);
+
+        // Debug overlay for players who asked for it (/palworks debug overlay)
+        WorkerDebugSync.tick(level);
 
         // Phase 5: Clean up expired reservations and stale cache
         cleanupExpiredData(level);

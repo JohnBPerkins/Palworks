@@ -31,6 +31,12 @@ public class DebugCommand {
         player.sendSystemMessage(Component.literal("Worker activity chat: " + (on ? "ON" : "OFF")));
     }
 
+    /** Toggle the in-world worker overlay (job icons above heads, paths) for this player. */
+    public static void toggleOverlay(ServerPlayer player) {
+        boolean on = DebugManager.toggleWorkerOverlay(player.getUUID());
+        player.sendSystemMessage(Component.literal("Worker overlay: " + (on ? "ON" : "OFF")));
+    }
+
     /** Clear all worker reservations (force fresh job assignments). */
     public static void clearAllReservations(ServerPlayer player) {
         int count = 0;

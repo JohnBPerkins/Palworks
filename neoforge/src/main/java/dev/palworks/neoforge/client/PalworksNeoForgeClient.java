@@ -1,5 +1,6 @@
 package dev.palworks.neoforge.client;
 
+import dev.palworks.client.debug.WorkerDebugRenderer;
 import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.inventory.WorkerInventoryScreen;
@@ -11,6 +12,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 @EventBusSubscriber(modid = "palworks", bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -32,5 +34,12 @@ public class PalworksNeoForgeClient {
         // priority; lowest runs after it, so the icons go on top.
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, RenderGuiEvent.Post.class,
                 renderEvent -> WorkStatusHud.render(renderEvent.getGuiGraphics()));
+        // /palworks debug overlay: job icons above workers' heads and their paths
+        NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, stageEvent -> {
+            if (stageEvent.getStage() == RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
+                WorkerDebugRenderer.render(stageEvent.getCamera(),
+                        stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false));
+            }
+        });
     }
 }
