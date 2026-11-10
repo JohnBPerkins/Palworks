@@ -122,6 +122,13 @@ public class WorkerState {
     // Path failure tracking
     public void recordPathFailure() {
         long now = System.currentTimeMillis();
+        // Walking workers re-check this every tick, so one hiccup (bumping into a vine, a path
+        // that briefly ends short) used to count as a failure on each of a few ticks in a row, and
+        // three ticks was enough to give the job up. Count at most one failure per second, so it
+        // takes a couple of seconds of really not getting anywhere.
+        if (lastPathFailTime != 0 && now - lastPathFailTime < PATH_FAILURE_SPACING_MS) {
+            return;
+        }
         if (now - lastPathFailTime > 5000) { // Reset if > 5 seconds since last failure
             pathFailCount = 0;
         }
@@ -148,6 +155,8 @@ public class WorkerState {
 
     /** Path failures within 5 seconds of each other after which a worker gives its job up. */
     public static final int STUCK_AFTER_PATH_FAILURES = 3;
+    /** Failures closer together than this count once (see recordPathFailure). */
+    static final long PATH_FAILURE_SPACING_MS = 1000;
 
     public boolean isStuck() {
         return pathFailCount >= STUCK_AFTER_PATH_FAILURES;

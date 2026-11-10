@@ -132,4 +132,15 @@ class WorkerStateTest {
         state.nextStep(); // first step done
         assertTrue(state.hasJobProgress());
     }
+
+    @Test
+    void pathFailuresOnTicksInARowCountOnce() {
+        // A walking worker checks every tick: a hiccup a few ticks long isn't being stuck
+        WorkerState state = new WorkerState();
+        for (int tick = 0; tick < 5; tick++) {
+            state.recordPathFailure();
+        }
+        assertEquals(1, state.getPathFailCount());
+        assertFalse(state.isStuck());
+    }
 }

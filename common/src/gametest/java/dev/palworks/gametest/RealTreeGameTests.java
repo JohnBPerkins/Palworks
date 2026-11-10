@@ -11,6 +11,8 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CocoaBlock;
@@ -121,8 +123,14 @@ public class RealTreeGameTests {
     /** {@link #chopRealTree}, with {@code dressTree} run once the tree has grown. */
     private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
                                      long seed, String lumberjack, Block sapling, Runnable dressTree) {
+        chopRealTree(helper, tree, seed, lumberjack, sapling, Blocks.GRASS_BLOCK, dressTree);
+    }
+
+    /** {@link #chopRealTree}, on a floor of {@code floor} (mud for mangroves). */
+    private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
+                                     long seed, String lumberjack, Block sapling, Block floor, Runnable dressTree) {
         Workers.isolate(helper);
-        arenaFloor(helper, Blocks.GRASS_BLOCK);
+        arenaFloor(helper, floor);
         grow(helper, tree, seed);
         dressTree.run();
         helper.assertTrue(!treeBlocks(helper).isEmpty(), "the tree grew");
@@ -144,7 +152,8 @@ public class RealTreeGameTests {
             List<BlockPos> left = treeBlocks(helper);
             helper.assertTrue(left.isEmpty(), "tree should be fully chopped, " + left.size() + " logs left");
             helper.assertTrue(chopGap[0] >= 0, "the chop was seen");
-            helper.assertTrue(chopGap[0] <= maxChopGap(worker), String.format(
+            // (A mangrove has only roots at its base, so no trunk there to measure from)
+            helper.assertTrue(trunk.isEmpty() || chopGap[0] <= maxChopGap(worker), String.format(
                 "%s should chop right by the trunk (at most %.2f away), but chopped from %.2f blocks away",
                 lumberjack, maxChopGap(worker), chopGap[0]));
             helper.assertBlockPresent(sapling, TREE);
@@ -202,6 +211,58 @@ public class RealTreeGameTests {
                 Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, Direction.WEST).setValue(CocoaBlock.AGE, 1));
             helper.assertBlockPresent(Blocks.COCOA, TREE.offset(0, 1, -1));
         });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "real_mangrove", timeoutTicks = 300)
+    public void machopChopsARealMangroveAndReplantsItUnderItsTrunk(GameTestHelper helper) {
+        // Its lowest block is a root off to one side; the propagule goes back under the trunk,
+        // where the tree grew from
+        chopRealTree(helper, TreeFeatures.MANGROVE, 9, "machop", Blocks.MANGROVE_PROPAGULE, Blocks.MUD, () -> {});
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "real_mangrove_detect")
+    public void aRealMangroveIsOneJobReplantedUnderItsTrunk(GameTestHelper helper) {
+        arenaFloor(helper, Blocks.MUD);
+        grow(helper, TreeFeatures.MANGROVE, 9);
+        var level = helper.getLevel();
+        BlockPos chopAt = null;
+        int bases = 0;
+        // From every block the scan could find it by (each root or log standing on ground), it's
+        // the same tree, with its job at the same spot
+        for (BlockPos rel : treeBlocks(helper)) {
+            BlockPos pos = helper.absolutePos(rel);
+            if (!TreeDetector.standsOnGround(level, pos, level.getBlockState(pos))) {
+                continue;
+            }
+            bases++;
+            TreeDetector.TreeValidationResult tree = TreeDetector.validateTree(level, pos);
+            helper.assertTrue(tree.isValid(), "a real mangrove is a tree: " + tree.getReason());
+            BlockPos at = TreeDetector.chopPosition(level, tree);
+            if (chopAt == null) {
+                chopAt = at;
+            }
+            helper.assertTrue(at.equals(chopAt), "one job spot whichever base it's found from: " + at + " and " + chopAt);
+            helper.assertTrue(TreeDetector.getSaplingForTree(level, tree) == Items.MANGROVE_PROPAGULE, "a propagule");
+            List<BlockPos> spots = TreeDetector.saplingPositions(level, tree.getLogPositions(), tree.getBasePosition());
+            helper.assertTrue(spots.equals(List.of(helper.absolutePos(TREE))),
+                "replanted where it grew from, " + helper.absolutePos(TREE) + ", got " + spots);
+        }
+        helper.assertTrue(bases > 1, "the test mangrove should stand on several roots, got " + bases);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "real_azalea")
+    public void aRealAzaleaIsReplantedWithAnAzalea(GameTestHelper helper) {
+        // Azalea trees have oak logs, which name an oak sapling
+        arenaFloor(helper, Blocks.GRASS_BLOCK);
+        grow(helper, TreeFeatures.AZALEA_TREE, 10);
+        var level = helper.getLevel();
+        TreeDetector.TreeValidationResult tree = TreeDetector.validateTree(level, helper.absolutePos(TREE));
+        helper.assertTrue(tree.isValid(), "a real azalea is a tree: " + tree.getReason());
+        Item sapling = TreeDetector.getSaplingForTree(level, tree);
+        helper.assertTrue(sapling == Items.AZALEA || sapling == Items.FLOWERING_AZALEA,
+            "an azalea is replanted with an azalea, got " + sapling);
+        helper.succeed();
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_oak_scyther", timeoutTicks = 300)

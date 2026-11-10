@@ -262,6 +262,7 @@ public class JobManager {
         }
 
         // Create or update worker info
+        boolean newlyActive = !activeWorkers.containsKey(uuid);
         WorkerInfo info = activeWorkers.computeIfAbsent(uuid, k -> new WorkerInfo());
 
         // WorkerState (NBT) is the single source of truth for a worker's reservation.
@@ -280,6 +281,11 @@ public class JobManager {
         info.pokemonUUID = uuid;
         BlockPos entityPos = entity.blockPosition();
         info.position = entityPos;
+        if (newlyActive) {
+            // Just sent out (or back in range): its first job comes from a fresh look round, not
+            // from chunk scans up to 2s old that may have missed what's there now
+            rescanAround(entityPos);
+        }
         // From its species and types as they are now, so an evolution or form change counts at once
         info.suitabilities = SuitabilityDetector.getSuitabilities(pokemon);
         info.currentReservation = stateReservation;
@@ -591,7 +597,11 @@ public class JobManager {
             JobRecord job = new JobRecord();
             job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
             job.type = JobType.HARVEST_CROPS;
-            job.requiredSuitabilities = EnumSet.of(Suitability.GATHERING);
+            // Nether wart is Nether work (Ghost types), like planting it and fetching it from
+            // chests: Gathering alone let any Grass type harvest it
+            job.requiredSuitabilities = block == Blocks.NETHER_WART
+                ? EnumSet.of(Suitability.NETHER)
+                : EnumSet.of(Suitability.GATHERING);
             job.discoveryTime = level.getGameTime();
             job.priority = 8; // High priority for ripe crops
             return job;
@@ -668,7 +678,9 @@ public class JobManager {
             }
             treeBlocksSeenThisScan.addAll(tree.getLogPositions());
             JobRecord job = new JobRecord();
-            job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
+            // The same spot for the tree whichever base this scan found it from, so a tree seen
+            // from two chunks (or by scans of different heights) is one job, not one per base
+            job.position = TreeDetector.chopPosition(level, tree).immutable();
             job.type = JobType.CHOP_TREE;
             job.requiredSuitabilities = EnumSet.of(Suitability.LUMBERING);
             if (TreeDetector.isNetherStem(state)) {
@@ -721,6 +733,7 @@ public class JobManager {
     private void assignJobsToWorkers(ServerLevel level) {
         List<WorkerInfo> idleWorkers = activeWorkers.values().stream()
             .filter(w -> w.idle && w.currentReservation == null)
+            .filter(this::hasScannedAround)
             .limit(ASSIGNMENT_BATCH_SIZE)
             .collect(Collectors.toList());
 
@@ -769,6 +782,54 @@ public class JobManager {
         if (DEBUG && assignedCount > 0) {
             Palworks.LOGGER.debug("Assigned {} jobs to idle workers ({} idle workers available)",
                 assignedCount, idleWorkers.size());
+        }
+    }
+
+    /**
+     * Whether every chunk in a worker's range has been scanned for jobs. The scan gets through a
+     * couple of chunks a tick, so a worker just sent out (or arrived somewhere new) waits the few
+     * ticks until it's done: assigning it straight away handed it the best of the jobs found so
+     * far, which could be the far side of its range with nearer ones not found yet.
+     */
+    private boolean hasScannedAround(WorkerInfo worker) {
+        int chunkRadius = WORKER_SCAN_RADIUS / 16; // same chunks as getChunkScanRangesNearWorkers
+        int baseChunkX = worker.position.getX() >> 4;
+        int baseChunkZ = worker.position.getZ() >> 4;
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                ChunkJobCache cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
+                if (cache == null || cache.isDirty) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** Have the chunks in a worker's range round {@code center} scanned again as soon as possible. */
+    private void rescanAround(BlockPos center) {
+        int chunkRadius = WORKER_SCAN_RADIUS / 16;
+        ChunkPos chunk = new ChunkPos(center);
+        markForRescan(chunk.x - chunkRadius, chunk.z - chunkRadius, chunk.x + chunkRadius, chunk.z + chunkRadius);
+    }
+
+    /**
+     * Have the chunks covering a box be scanned again as soon as possible, after lots of blocks in
+     * it changed at once (e.g. /palworks testarea). Until they have, no worker near them is given a
+     * job, so none takes a far one before the nearer ones are found.
+     */
+    public void rescanArea(BlockPos min, BlockPos max) {
+        markForRescan(min.getX() >> 4, min.getZ() >> 4, max.getX() >> 4, max.getZ() >> 4);
+    }
+
+    private void markForRescan(int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ) {
+        for (int x = minChunkX; x <= maxChunkX; x++) {
+            for (int z = minChunkZ; z <= maxChunkZ; z++) {
+                ChunkJobCache cache = chunkCaches.get(new ChunkPos(x, z));
+                if (cache != null) {
+                    cache.isDirty = true;
+                }
+            }
         }
     }
 

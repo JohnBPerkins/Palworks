@@ -97,6 +97,11 @@ public class CropAdapter {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
+        // Torchflowers and pitcher plants: harvested, but not replanted (see isPickedNotReplanted)
+        if (isPickedNotReplanted(level, pos, state)) {
+            return true;
+        }
+
         // Standard crops with age property
         if (block instanceof CropBlock crop) {
             return crop.isMaxAge(state);
@@ -155,6 +160,25 @@ public class CropAdapter {
             return false;
         }
 
+        return false;
+    }
+
+    /**
+     * A grown torchflower or pitcher plant on farmland. These are harvested by picking them (the
+     * flower, or the pitcher plant, is what they drop), leaving the farmland empty instead of
+     * replanting: they don't drop their seed back (torchflower seeds and pitcher pods come from
+     * sniffers), so there's no seed to pay for a replant. A torchflower crop turns into a plain
+     * torchflower when it's grown, so the flower counts only on farmland, not in a flower bed. A
+     * pitcher crop is two blocks tall; its lower half is the one harvested.
+     */
+    public static boolean isPickedNotReplanted(Level level, BlockPos pos, BlockState state) {
+        if (state.is(Blocks.TORCHFLOWER)) {
+            return level.getBlockState(pos.below()).is(Blocks.FARMLAND);
+        }
+        if (state.is(Blocks.PITCHER_CROP)) {
+            return state.getValue(PitcherCropBlock.HALF) == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
+                && state.getValue(PitcherCropBlock.AGE) >= PitcherCropBlock.MAX_AGE;
+        }
         return false;
     }
 
@@ -340,6 +364,13 @@ public class CropAdapter {
 
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
+
+        // Torchflowers and pitcher plants: picked with their normal drops, not replanted (breaking a
+        // pitcher's lower half takes the upper half with it)
+        if (isPickedNotReplanted(level, pos, state)) {
+            level.destroyBlock(pos, true);
+            return true;
+        }
 
         // Berries (vanilla and Cobblemon) are harvested and reset their age
         if (isBerry(state)) {

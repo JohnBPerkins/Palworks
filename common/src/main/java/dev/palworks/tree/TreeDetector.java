@@ -10,6 +10,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -71,23 +72,23 @@ public class TreeDetector {
         private final Set<BlockPos> logPositions;
         private final int leafCount;
         private final BlockPos basePosition;
-        private final Set<Block> leafBlocks;
+        private final Map<Block, Integer> leafBlocks;
 
         private TreeValidationResult(boolean valid, String reason, Set<BlockPos> logPositions,
-                                      int leafCount, BlockPos basePosition, Set<Block> leafBlocks) {
+                                      int leafCount, BlockPos basePosition, Map<Block, Integer> leafBlocks) {
             this.valid = valid;
             this.reason = reason;
             this.logPositions = logPositions != null ? logPositions : Collections.emptySet();
             this.leafCount = leafCount;
             this.basePosition = basePosition;
-            this.leafBlocks = leafBlocks != null ? leafBlocks : Collections.emptySet();
+            this.leafBlocks = leafBlocks != null ? leafBlocks : Collections.emptyMap();
         }
 
         public static TreeValidationResult invalid(String reason) {
             return new TreeValidationResult(false, reason, null, 0, null, null);
         }
 
-        public static TreeValidationResult valid(Set<BlockPos> logs, int leafCount, BlockPos base, Set<Block> leafBlocks) {
+        public static TreeValidationResult valid(Set<BlockPos> logs, int leafCount, BlockPos base, Map<Block, Integer> leafBlocks) {
             return new TreeValidationResult(true, "Valid tree", logs, leafCount, base, leafBlocks);
         }
 
@@ -97,7 +98,9 @@ public class TreeDetector {
         public int getLeafCount() { return leafCount; }
         public BlockPos getBasePosition() { return basePosition; }
         /** The kinds of leaf (canopy) block the tree has, for finding its sapling by name. */
-        public Set<Block> getLeafBlocks() { return leafBlocks; }
+        public Set<Block> getLeafBlocks() { return leafBlocks.keySet(); }
+        /** How many of the tree's natural leaves (canopy blocks) are of this kind. */
+        public int getLeafCount(Block leaf) { return leafBlocks.getOrDefault(leaf, 0); }
     }
 
     /**
@@ -119,8 +122,7 @@ public class TreeDetector {
         Set<BlockPos> visitedLogs = new HashSet<>();
         Set<BlockPos> visitedForValidation = new HashSet<>();
         Queue<BlockPos> queue = new LinkedList<>();
-        Set<BlockPos> leaves = new HashSet<>();
-        Set<Block> leafBlocks = new HashSet<>();
+        Map<BlockPos, Block> leaves = new HashMap<>();
         BlockPos lowestLog = startPos;
         boolean foundGroundConnection = false;
         // Anything this tree's sapling can grow on counts as ground (modded soils), as well as the
@@ -189,8 +191,7 @@ public class TreeDetector {
                     // ones count toward MIN_LEAF_COUNT, so a log pillar dressed with player-placed
                     // leaves isn't a tree.
                     if (isNaturalCanopy(neighborState)) {
-                        leaves.add(neighbor);
-                        leafBlocks.add(neighborState.getBlock());
+                        leaves.put(neighbor, neighborState.getBlock());
                     }
                 } else if (isValidGroundBlock(neighborState) || isSoilFor(sapling, level, neighbor)) {
                     // Ground block - valid connection point
@@ -223,13 +224,12 @@ public class TreeDetector {
                 for (int dy = -LEAF_SEARCH_RADIUS; dy <= LEAF_SEARCH_RADIUS; dy++) {
                     for (int dz = -LEAF_SEARCH_RADIUS; dz <= LEAF_SEARCH_RADIUS; dz++) {
                         BlockPos checkPos = logPos.offset(dx, dy, dz);
-                        if (leaves.contains(checkPos)) {
+                        if (leaves.containsKey(checkPos)) {
                             continue;
                         }
                         BlockState checkState = level.getBlockState(checkPos);
                         if (isNaturalCanopy(checkState)) {
-                            leaves.add(checkPos);
-                            leafBlocks.add(checkState.getBlock());
+                            leaves.put(checkPos, checkState.getBlock());
                         }
                     }
                 }
@@ -267,6 +267,10 @@ public class TreeDetector {
                 startPos, visitedLogs.size(), leaves.size(), lowestLog);
         }
 
+        Map<Block, Integer> leafBlocks = new HashMap<>();
+        for (Block leaf : leaves.values()) {
+            leafBlocks.merge(leaf, 1, Integer::sum);
+        }
         return TreeValidationResult.valid(visitedLogs, leaves.size(), lowestLog, leafBlocks);
     }
 
@@ -537,6 +541,15 @@ public class TreeDetector {
      */
     @Nullable
     public static Item getSaplingForTree(Level level, TreeValidationResult tree) {
+        // Azalea trees grow oak logs, so their logs would name an oak sapling: an azalea grows them.
+        // Only when most of the canopy is azalea leaves, so an oak whose leaves happen to reach an
+        // azalea's isn't replanted as one.
+        int azalea = tree.getLeafCount(Blocks.AZALEA_LEAVES);
+        int flowering = tree.getLeafCount(Blocks.FLOWERING_AZALEA_LEAVES);
+        if ((azalea + flowering) * 2 > tree.getLeafCount()) {
+            return azalea >= flowering ? Items.AZALEA : Items.FLOWERING_AZALEA;
+        }
+
         Set<Block> tried = new HashSet<>();
         for (BlockPos pos : tree.getLogPositions()) {
             Block block = level.getBlockState(pos).getBlock();
@@ -590,12 +603,17 @@ public class TreeDetector {
      * a 2x2 of logs (dark oak, which only grows from a 2x2 of saplings, and giant spruce and jungle)
      * is replanted as a 2x2 in the same four spots; any other tree gets one sapling at its base.
      * Based on the trunk's shape rather than a list of tree types, so it covers any 2x2 tree.
-     * Mangroves stand on roots, not logs, so they always get one propagule.
+     * Mangroves stand on roots, not logs, so they always get one propagule, under the trunk (see
+     * {@link #mangrovePropagulePos}).
      *
      * @param treeBlocks the tree's blocks (from {@link TreeValidationResult#getLogPositions()})
      * @param basePos the tree's lowest block (from {@link TreeValidationResult#getBasePosition()})
      */
     public static List<BlockPos> saplingPositions(Level level, Set<BlockPos> treeBlocks, BlockPos basePos) {
+        BlockPos propagule = mangrovePropagulePos(level, treeBlocks);
+        if (propagule != null) {
+            return List.of(propagule);
+        }
         int bottomY = Integer.MAX_VALUE;
         for (BlockPos pos : treeBlocks) {
             bottomY = Math.min(bottomY, pos.getY());
@@ -611,6 +629,74 @@ public class TreeDetector {
             return bottom;
         }
         return List.of(basePos);
+    }
+
+    /** How far below a mangrove's trunk to look for the ground its propagule grew on. */
+    private static final int MAX_PROPAGULE_DROP = 8;
+
+    /**
+     * Where a mangrove's propagule grew: under its trunk, on the ground. A mangrove's lowest block is
+     * one of its roots, which spread out a few blocks round the trunk, so replanting there put the
+     * new tree off to one side. Its trunk (its lowest log: branches only go up from it) stands on
+     * roots that go down to where the propagule was; the spot is the one above the first solid block
+     * below the trunk that isn't a root. Null for a tree with no roots (not a mangrove), or
+     * if no ground is found close under the trunk.
+     */
+    @Nullable
+    private static BlockPos mangrovePropagulePos(Level level, Set<BlockPos> treeBlocks) {
+        BlockPos trunkBottom = null;
+        boolean hasRoots = false;
+        for (BlockPos pos : treeBlocks) {
+            BlockState state = level.getBlockState(pos);
+            if (isMangroveRoots(state)) {
+                hasRoots = true;
+            } else if (isLog(state) && (trunkBottom == null || pos.getY() < trunkBottom.getY())) {
+                trunkBottom = pos;
+            }
+        }
+        if (!hasRoots || trunkBottom == null) {
+            return null;
+        }
+        BlockPos.MutableBlockPos below = trunkBottom.mutable();
+        for (int i = 0; i < MAX_PROPAGULE_DROP; i++) {
+            below.move(Direction.DOWN);
+            BlockState state = level.getBlockState(below);
+            // Roots, and anything the propagule could have stood in: air, water, seagrass...
+            if (!isMangroveRoots(state) && !state.getCollisionShape(level, below).isEmpty()) {
+                return below.above();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The position a tree's chop job goes at: its lowest block standing on ground (lowest, then by
+     * x, then by z, so it's the same whichever of the tree's blocks the scan found it from). A tree
+     * with several bases (a mangrove's roots, a 2x2 trunk) seen from more than one chunk, or from
+     * scans of different heights, used to get a job at each base found.
+     */
+    public static BlockPos chopPosition(Level level, TreeValidationResult tree) {
+        BlockPos best = null;
+        for (BlockPos pos : tree.getLogPositions()) {
+            if (best != null && !isBefore(pos, best)) {
+                continue;
+            }
+            if (standsOnGround(level, pos, level.getBlockState(pos))) {
+                best = pos;
+            }
+        }
+        return best != null ? best : tree.getBasePosition();
+    }
+
+    /** Lower first, then lower x, then lower z. */
+    private static boolean isBefore(BlockPos a, BlockPos b) {
+        if (a.getY() != b.getY()) {
+            return a.getY() < b.getY();
+        }
+        if (a.getX() != b.getX()) {
+            return a.getX() < b.getX();
+        }
+        return a.getZ() < b.getZ();
     }
 
     /** Whether four positions (on one Y level) form a 2x2 square. */
