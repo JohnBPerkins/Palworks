@@ -41,5 +41,8 @@ public final class PalworksCommon {
 
         // Show what workers are doing as aspects, for posers to animate from
         WorkAspectSync.register();
+
+        // CI's server boot test looks for this line (.github/scripts/boot_server.sh)
+        Palworks.LOGGER.info("Palworks initialized!");
     }
 }
