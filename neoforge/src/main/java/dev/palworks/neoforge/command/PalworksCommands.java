@@ -39,6 +39,10 @@ public class PalworksCommands {
                 .then(Commands.literal("openinv").executes(ctx -> run(ctx, DebugCommand::openWorkerInventoryGUI)))
                 .then(Commands.literal("clearinv").executes(ctx -> run(ctx, DebugCommand::clearWorkerInventory))))
 
+            // Build a test area (smelting, every crop and tree) from where the player stands
+            .then(Commands.literal("testarea")
+                .executes(ctx -> run(ctx, DebugCommand::buildTestArea)))
+
             // Dump current job state (available/reserved/workers + assignment analysis)
             .then(Commands.literal("jobs")
                 .executes(ctx -> run(ctx, DebugCommand::showJobsInfo)))

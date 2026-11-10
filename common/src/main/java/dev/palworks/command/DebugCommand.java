@@ -3,6 +3,7 @@ package dev.palworks.command;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.debug.DebugInfo;
 import dev.palworks.debug.DebugManager;
+import dev.palworks.debug.TestArea;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -31,6 +32,29 @@ public class DebugCommand {
         player.sendSystemMessage(Component.literal("Worker debug: " + (on
                 ? "ON (activity in chat; job icons, paths and job blocks shown in the world)"
                 : "OFF")));
+    }
+
+    /**
+     * Build the test area ({@link TestArea}) from where the player stands, east and south, and say
+     * where it is and anything that couldn't be placed.
+     */
+    public static void buildTestArea(ServerPlayer player) {
+        if (!(player.level() instanceof net.minecraft.server.level.ServerLevel level)) {
+            return;
+        }
+        player.sendSystemMessage(Component.literal("Building the Palworks test area..."));
+        TestArea.Result result = TestArea.build(level, player.blockPosition());
+        player.sendSystemMessage(Component.literal(String.format(
+                "Built the test area from %s to %s (%d plots). You're at its north-west corner.",
+                result.min().toShortString(), result.max().toShortString(), result.plots())));
+        if (result.problems().isEmpty()) {
+            player.sendSystemMessage(Component.literal("Everything was placed."));
+        } else {
+            player.sendSystemMessage(Component.literal("§eCouldn't place " + result.problems().size() + ":"));
+            for (String problem : result.problems()) {
+                player.sendSystemMessage(Component.literal("§e- " + problem));
+            }
+        }
     }
 
     /** Clear all worker reservations (force fresh job assignments). */
