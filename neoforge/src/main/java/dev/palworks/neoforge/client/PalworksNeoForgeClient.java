@@ -5,6 +5,7 @@ import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.inventory.WorkerInventoryScreen;
 import dev.palworks.neoforge.inventory.NeoForgeModMenuTypes;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
@@ -27,8 +28,9 @@ public class PalworksNeoForgeClient {
             // Register Pokemon interact wheel handler
             PokemonInteractHandler.init();
         });
-        // Work icons beside the party HUD (Cobblemon draws the HUD from the same event)
-        NeoForge.EVENT_BUS.addListener(RenderGuiEvent.Post.class,
+        // Work icons on the party HUD's cards. Cobblemon draws the HUD from the same event at normal
+        // priority; lowest runs after it, so the icons go on top.
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, RenderGuiEvent.Post.class,
                 renderEvent -> WorkStatusHud.render(renderEvent.getGuiGraphics()));
     }
 }

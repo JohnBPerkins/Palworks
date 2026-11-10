@@ -18,7 +18,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Draws a work icon just to the right of each sent-out party member on Cobblemon's party HUD:
+ * Draws a work icon on each sent-out party member's card on Cobblemon's party HUD, as a badge in
+ * the bottom-right corner of its portrait:
  * <ul>
  *   <li>the job's icon (axe, flame, wheat...) while it's working on it,</li>
  *   <li>the same icon faded while it's walking there,</li>
@@ -26,18 +27,23 @@ import java.util.List;
  *   <li>a red cross when its work is switched off,</li>
  *   <li>nothing while it has no job.</li>
  * </ul>
+ * The rest of the card is taken (state icon, level, held item, HP/EXP/status bars, ball, name).
  * Called by each loader's HUD event (Fabric HudRenderCallback, NeoForge RenderGuiEvent.Post), the
- * same events Cobblemon draws the HUD from. Its layout is copied from {@link PartyOverlay}; the
- * icons sit outside Cobblemon's slots, so the order the two are drawn in doesn't matter.
+ * same events Cobblemon draws the HUD from, registered to run after Cobblemon's so the badge is drawn
+ * over the portrait. Its layout is copied from {@link PartyOverlay}.
  */
 public final class WorkStatusHud {
     // PartyOverlay's layout (private constants there)
     private static final int SLOT_HEIGHT = 30;
-    private static final int SLOT_WIDTH = 62;
     private static final int SLOT_SPACING = 4;
     private static final int SELECTED_OFFSET_X = 6;
+    // The portrait spans x 22-43, y 2-23 of the card: the badge sits in its bottom-right corner
+    private static final int ICON_X = 34;
+    private static final int ICON_Y = 13;
+    // Above the portrait's 3D model, which is drawn with depth
+    private static final float ICON_Z = 300F;
 
-    private static final int ICON_SIZE = 10;
+    private static final int ICON_SIZE = 8;
     private static final int ICON_TEXTURE_SIZE = 16;
 
     private static final ResourceLocation OFF_ICON = icon("off");
@@ -95,8 +101,8 @@ public final class WorkStatusHud {
                 continue;
             }
 
-            int x = SLOT_WIDTH + 2 + (selectedSlot == index ? SELECTED_OFFSET_X : 0);
-            int y = startY + (SLOT_HEIGHT + SLOT_SPACING) * index + (SLOT_HEIGHT - ICON_SIZE) / 2;
+            int x = ICON_X + (selectedSlot == index ? SELECTED_OFFSET_X : 0);
+            int y = startY + (SLOT_HEIGHT + SLOT_SPACING) * index + ICON_Y;
             drawIcon(graphics, activity, x, y);
         }
     }
@@ -109,7 +115,7 @@ public final class WorkStatusHud {
             case OFF -> texture = OFF_ICON;
             case WALKING -> {
                 texture = iconFor(activity.job());
-                alpha = 0.5F;
+                alpha = 0.6F;
             }
             case PAUSED -> {
                 texture = iconFor(activity.job());
@@ -117,11 +123,14 @@ public final class WorkStatusHud {
             }
             default -> texture = iconFor(activity.job());
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0, 0, ICON_Z);
         RenderSystem.enableBlend();
         graphics.setColor(shade, shade, shade, alpha);
         graphics.blit(texture, x, y, ICON_SIZE, ICON_SIZE, 0, 0,
                 ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE);
         graphics.setColor(1F, 1F, 1F, 1F);
         RenderSystem.disableBlend();
+        graphics.pose().popPose();
     }
 }
