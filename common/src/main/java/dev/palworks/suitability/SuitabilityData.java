@@ -2,13 +2,13 @@ package dev.palworks.suitability;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -43,6 +43,10 @@ import java.util.function.Consumer;
  * reads it.
  */
 public final class SuitabilityData {
+    private static final String REPLACE = "replace";
+    // A suitability given by both of a dual-type Pokemon's types gets a level more
+    private static final int BOTH_TYPES = 2;
+
     public static final int MAX_LEVEL = 5;
     private static final String DEFAULT_SPECIES_NAMESPACE = "cobblemon";
 
@@ -54,10 +58,13 @@ public final class SuitabilityData {
     private final Map<String, Map<Suitability, Integer>> types;
     /** Species id ("cobblemon:scizor") -> job levels; 0 removes a job. */
     private final Map<String, Map<Suitability, Integer>> species;
+
     private final int jobCount;
 
-    private SuitabilityData(Map<String, Map<Suitability, Integer>> types,
-                            Map<String, Map<Suitability, Integer>> species, int jobCount) {
+    private SuitabilityData(
+            Map<String, Map<Suitability, Integer>> types,
+            Map<String, Map<Suitability, Integer>> species,
+            int jobCount) {
         this.types = types;
         this.species = species;
         this.jobCount = jobCount;
@@ -95,18 +102,20 @@ public final class SuitabilityData {
         Map<Suitability, Integer> result = new EnumMap<>(Suitability.class);
         Map<Suitability, Integer> typesGiving = new EnumMap<>(Suitability.class);
         for (String typeId : typeIds) {
-            for (Map.Entry<Suitability, Integer> e : types.getOrDefault(typeId, Map.of()).entrySet()) {
+            for (Map.Entry<Suitability, Integer> e :
+                    types.getOrDefault(typeId, Map.of()).entrySet()) {
                 result.merge(e.getKey(), e.getValue(), Math::max);
                 typesGiving.merge(e.getKey(), 1, Integer::sum);
             }
         }
         // Both types give it: a dual-type bonus.
         typesGiving.forEach((suitability, count) -> {
-            if (count >= 2) {
+            if (count >= BOTH_TYPES) {
                 result.computeIfPresent(suitability, (s, level) -> Math.min(MAX_LEVEL, level + 1));
             }
         });
-        for (Map.Entry<Suitability, Integer> e : species.getOrDefault(speciesId, Map.of()).entrySet()) {
+        for (Map.Entry<Suitability, Integer> e :
+                species.getOrDefault(speciesId, Map.of()).entrySet()) {
             if (e.getValue() == 0) {
                 result.remove(e.getKey());
             } else {
@@ -149,10 +158,11 @@ public final class SuitabilityData {
                     ? jobFiles.stream().filter(JobFile::replace).toList()
                     : jobFiles;
             for (JobFile jobFile : used) {
-                jobFile.types().forEach((type, level) ->
-                        types.computeIfAbsent(type, k -> new EnumMap<>(Suitability.class)).merge(job, level, Math::max));
-                jobFile.species().forEach((id, level) ->
-                        species.computeIfAbsent(id, k -> new EnumMap<>(Suitability.class))
+                jobFile.types()
+                        .forEach((type, level) -> types.computeIfAbsent(type, k -> new EnumMap<>(Suitability.class))
+                                .merge(job, level, Math::max));
+                jobFile.species()
+                        .forEach((id, level) -> species.computeIfAbsent(id, k -> new EnumMap<>(Suitability.class))
                                 .merge(job, level, (a, b) -> a == 0 || b == 0 ? 0 : Math.max(a, b)));
             }
         });
@@ -171,49 +181,60 @@ public final class SuitabilityData {
 
     private static JobFile parseJobFile(String fileId, JsonElement json, Consumer<String> warn) {
         if (!(json instanceof JsonObject object)) {
-            warn.accept("Ignoring suitability file " + fileId + ": expected an object like {\"types\": {...}, \"species\": {...}}");
+            warn.accept("Ignoring suitability file " + fileId
+                    + ": expected an object like {\"types\": {...}, \"species\": {...}}");
             return null;
         }
         for (String key : object.keySet()) {
-            if (!key.equals("types") && !key.equals("species") && !key.equals("replace")) {
-                warn.accept("Ignoring \"" + key + "\" in " + fileId + ": only \"types\", \"species\" and \"replace\" are read");
+            if (!"types".equals(key) && !"species".equals(key) && !REPLACE.equals(key)) {
+                warn.accept(
+                        "Ignoring " + quotedIn(key, fileId) + ": only \"types\", \"species\" and \"replace\" are read");
             }
         }
-        boolean replace = object.has("replace") && object.get("replace").isJsonPrimitive()
-                && object.get("replace").getAsJsonPrimitive().isBoolean() && object.get("replace").getAsBoolean();
+        boolean replace = object.has(REPLACE)
+                && object.get(REPLACE).isJsonPrimitive()
+                && object.get(REPLACE).getAsJsonPrimitive().isBoolean()
+                && object.get(REPLACE).getAsBoolean();
         Map<String, Integer> types = parseLevels(fileId, "types", object.get("types"), 1, warn);
         Map<String, Integer> species = new HashMap<>();
-        parseLevels(fileId, "species", object.get("species"), 0, warn).forEach((id, level) ->
-                species.put(id.contains(":") ? id : DEFAULT_SPECIES_NAMESPACE + ":" + id, level));
+        parseLevels(fileId, "species", object.get("species"), 0, warn)
+                .forEach((id, level) ->
+                        species.put(id.contains(":") ? id : DEFAULT_SPECIES_NAMESPACE + ":" + id, level));
         return new JobFile(replace, types, species);
     }
 
-    private static Map<String, Integer> parseLevels(String fileId, String section, JsonElement json, int min,
-                                                    Consumer<String> warn) {
+    private static Map<String, Integer> parseLevels(
+            String fileId, String section, JsonElement json, int min, Consumer<String> warn) {
         Map<String, Integer> levels = new HashMap<>();
         if (json == null) {
             return levels;
         }
         if (!(json instanceof JsonObject object)) {
-            warn.accept("Ignoring \"" + section + "\" in " + fileId + ": expected an object like {\"name\": 1}");
+            warn.accept("Ignoring " + quotedIn(section, fileId) + ": expected an object like {\"name\": 1}");
             return levels;
         }
         for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
-            String name = entry.getKey().toLowerCase();
+            String name = entry.getKey().toLowerCase(Locale.ROOT);
             JsonElement value = entry.getValue();
             if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
-                warn.accept("Ignoring \"" + entry.getKey() + "\" in " + fileId + " " + section + ": the level must be a number");
+                warn.accept("Ignoring " + quotedIn(entry.getKey(), fileId) + " " + section
+                        + ": the level must be a number");
                 continue;
             }
             int level = value.getAsInt();
             if (level < min || level > MAX_LEVEL) {
                 int clamped = Math.max(min, Math.min(MAX_LEVEL, level));
-                warn.accept("Level " + level + " for \"" + entry.getKey() + "\" in " + fileId + " " + section
+                warn.accept("Level " + level + " for " + quotedIn(entry.getKey(), fileId) + " " + section
                         + " is outside " + min + "-" + MAX_LEVEL + "; using " + clamped);
                 level = clamped;
             }
             levels.put(name, level);
         }
         return levels;
+    }
+
+    /** {@code "name" in fileId}, for warnings. */
+    private static String quotedIn(String name, String fileId) {
+        return "\"" + name + "\" in " + fileId;
     }
 }

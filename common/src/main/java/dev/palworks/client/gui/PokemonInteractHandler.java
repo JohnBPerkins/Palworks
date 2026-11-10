@@ -10,13 +10,12 @@ import dev.palworks.inventory.CarryMode;
 import dev.palworks.net.PalworksResource;
 import dev.palworks.net.packets.OpenInventoryPacket;
 import dev.palworks.net.packets.ToggleWorkerPacket;
+import java.util.function.Consumer;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Vector3f;
-
-import java.util.function.Consumer;
 
 /**
  * Handles adding custom options to the Cobblemon Pokemon interact wheel:
@@ -27,10 +26,13 @@ import java.util.function.Consumer;
  * </ul>
  */
 public class PokemonInteractHandler {
-    private static final ResourceLocation INVENTORY_ICON = PalworksResource.of("textures/gui/interact/interact_wheel_icon_inventory.png");
+    private static final ResourceLocation INVENTORY_ICON =
+            PalworksResource.of("textures/gui/interact/interact_wheel_icon_inventory.png");
     // White icons, tinted green or red by the option's colour
-    private static final ResourceLocation WORKING_ICON = PalworksResource.of("textures/gui/interact/interact_wheel_icon_working.png");
-    private static final ResourceLocation NOT_WORKING_ICON = PalworksResource.of("textures/gui/interact/interact_wheel_icon_not_working.png");
+    private static final ResourceLocation WORKING_ICON =
+            PalworksResource.of("textures/gui/interact/interact_wheel_icon_working.png");
+    private static final ResourceLocation NOT_WORKING_ICON =
+            PalworksResource.of("textures/gui/interact/interact_wheel_icon_not_working.png");
     private static final Vector3f GREEN = new Vector3f(0.33F, 0.85F, 0.33F);
     private static final Vector3f RED = new Vector3f(0.95F, 0.3F, 0.3F);
 
@@ -66,14 +68,15 @@ public class PokemonInteractHandler {
             return Unit.INSTANCE;
         };
 
-        event.addOption(Orientation.SOUTH, new InteractWheelOption(
-                enabled ? WORKING_ICON : NOT_WORKING_ICON,
-                null, // No secondary icon
-                true,
-                enabled ? "palworks.ui.interact.stop_work" : "palworks.ui.interact.start_work",
-                colourFunction,
-                onPressFunction
-        ));
+        event.addOption(
+                Orientation.SOUTH,
+                new InteractWheelOption(
+                        enabled ? WORKING_ICON : NOT_WORKING_ICON,
+                        null, // No secondary icon
+                        true,
+                        enabled ? "palworks.ui.interact.stop_work" : "palworks.ui.interact.start_work",
+                        colourFunction,
+                        onPressFunction));
     }
 
     /** Adds the inventory button on the right of the wheel. */
@@ -85,14 +88,15 @@ public class PokemonInteractHandler {
             return Unit.INSTANCE;
         };
 
-        event.addOption(Orientation.EAST, new InteractWheelOption(
-                INVENTORY_ICON,
-                null, // No secondary icon
-                true,
-                "palworks.ui.interact.inventory",
-                colourFunction,
-                onPressFunction
-        ));
+        event.addOption(
+                Orientation.EAST,
+                new InteractWheelOption(
+                        INVENTORY_ICON,
+                        null, // No secondary icon
+                        true,
+                        "palworks.ui.interact.inventory",
+                        colourFunction,
+                        onPressFunction));
     }
 
     private static void closeGUI() {

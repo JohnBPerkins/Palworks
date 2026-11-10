@@ -1,14 +1,13 @@
 package dev.palworks.station;
 
 import dev.palworks.job.JobType;
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Manages StationState storage and retrieval for work stations.
@@ -86,7 +85,8 @@ public class StationStateManager {
      * Handles loading, modification, and saving automatically.
      * Requires a JobType for station creation if it doesn't exist.
      */
-    public static void update(BlockEntity blockEntity, JobType jobType, java.util.function.Consumer<StationState> updater) {
+    public static void update(
+            BlockEntity blockEntity, JobType jobType, java.util.function.Consumer<StationState> updater) {
         StationState state = getOrCreate(blockEntity, jobType);
         updater.accept(state);
         save(blockEntity, state);

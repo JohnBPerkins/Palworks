@@ -7,7 +7,6 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.manager.JobManager;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Mob;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -20,14 +19,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  */
 @EventBusSubscriber(modid = "palworks")
 public class WorkerTickHandler {
-    private static final boolean DEBUG = false;  // Reduced debug spam
-    private static long lastDebugLog = 0;
-    private static int tickCounter = 0;
-
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        tickCounter++;
-
         // Get all server levels
         for (ServerLevel level : event.getServer().getAllLevels()) {
             // Scan jobs, assign work. Workers have already ticked this tick (see onEntityTick).
@@ -60,14 +53,11 @@ public class WorkerTickHandler {
             return; // Skip Pokemon not in world
         }
 
-        // Cast to Mob for navigation
-        if (pokemonEntity instanceof Mob mob) {
-            // Register worker with JobManager
-            JobManager.getInstance(level).registerWorker(pokemon, mob, level);
+        // Register worker with JobManager
+        JobManager.getInstance(level).registerWorker(pokemon, pokemonEntity, level);
 
-            // Execute assigned work
-            WorkerAI.tick(pokemon, mob, level);
-        }
+        // Execute assigned work
+        WorkerAI.tick(pokemon, pokemonEntity, level);
     }
 
     /**

@@ -1,9 +1,9 @@
 package dev.palworks.worker;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import dev.palworks.job.JobType;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** What a worker shows as doing, from its state (the party HUD's work icons). */
 class WorkActivityTest {
@@ -22,19 +22,23 @@ class WorkActivityTest {
 
     @Test
     void walksThenWorks() {
-        assertEquals(new WorkActivity(WorkActivity.Phase.WALKING, JobType.HARVEST_CROPS),
+        assertEquals(
+                new WorkActivity(WorkActivity.Phase.WALKING, JobType.HARVEST_CROPS),
                 WorkActivity.of(true, JobType.HARVEST_CROPS, false, false));
-        assertEquals(new WorkActivity(WorkActivity.Phase.WORKING, JobType.HARVEST_CROPS),
+        assertEquals(
+                new WorkActivity(WorkActivity.Phase.WORKING, JobType.HARVEST_CROPS),
                 WorkActivity.of(true, JobType.HARVEST_CROPS, false, true));
     }
 
     @Test
     void battleOrEvolutionPausesItsJob() {
-        assertEquals(new WorkActivity(WorkActivity.Phase.PAUSED, JobType.FUEL_FURNACE),
+        assertEquals(
+                new WorkActivity(WorkActivity.Phase.PAUSED, JobType.FUEL_FURNACE),
                 WorkActivity.of(true, JobType.FUEL_FURNACE, true, true));
     }
 
     @Test
+    @SuppressWarnings("EnumOrdinal") // tests the ordinal lookup itself
     void phaseOrdinalLookupIsSafe() {
         for (WorkActivity.Phase phase : WorkActivity.Phase.values()) {
             assertEquals(phase, WorkActivity.Phase.fromOrdinal(phase.ordinal()));

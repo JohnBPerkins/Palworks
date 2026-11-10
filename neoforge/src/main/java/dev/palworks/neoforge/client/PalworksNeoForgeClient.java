@@ -15,6 +15,8 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
+// Bus.MOD is deprecated for removal in later NeoForge versions, which infer the bus from the event.
+@SuppressWarnings("removal")
 @EventBusSubscriber(modid = "palworks", bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class PalworksNeoForgeClient {
 
@@ -26,19 +28,22 @@ public class PalworksNeoForgeClient {
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
+        var unused = event.enqueueWork(() -> {
             // Register Pokemon interact wheel handler
             PokemonInteractHandler.init();
         });
         // Work icons on the party HUD's cards. Cobblemon draws the HUD from the same event at normal
         // priority; lowest runs after it, so the icons go on top.
-        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, RenderGuiEvent.Post.class,
+        NeoForge.EVENT_BUS.addListener(
+                EventPriority.LOWEST,
+                false,
+                RenderGuiEvent.Post.class,
                 renderEvent -> WorkStatusHud.render(renderEvent.getGuiGraphics()));
         // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
         NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, stageEvent -> {
-            if (stageEvent.getStage() == RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
-                WorkerDebugRenderer.render(stageEvent.getCamera(),
-                        stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false));
+            if (RenderLevelStageEvent.Stage.AFTER_ENTITIES.equals(stageEvent.getStage())) {
+                WorkerDebugRenderer.render(
+                        stageEvent.getCamera(), stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false));
             }
         });
     }

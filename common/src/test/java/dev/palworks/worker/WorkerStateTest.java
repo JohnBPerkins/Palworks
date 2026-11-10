@@ -1,20 +1,19 @@
 package dev.palworks.worker;
 
-import net.minecraft.SharedConstants;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.Bootstrap;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-
-import dev.palworks.job.JobType;
-import dev.palworks.reservation.ReservationId;
-import net.minecraft.core.BlockPos;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import dev.palworks.job.JobType;
+import dev.palworks.reservation.ReservationId;
+import net.minecraft.SharedConstants;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.Bootstrap;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests the worker enabled flag: owned Pokemon work by default, and an explicit disable must
@@ -53,8 +52,9 @@ class WorkerStateTest {
 
     @Test
     void stateWithoutEnabledKeyLoadsAsEnabled() {
-        assertTrue(WorkerState.fromNBT(new CompoundTag()).isEnabled(),
-            "data saved before the enabled key existed should default to enabled");
+        assertTrue(
+                WorkerState.fromNBT(new CompoundTag()).isEnabled(),
+                "data saved before the enabled key existed should default to enabled");
     }
 
     // ---- Job progress (steps) ----

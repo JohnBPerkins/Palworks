@@ -1,21 +1,22 @@
 package dev.palworks.job;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import dev.palworks.job.StepRunner.Outcome;
 import dev.palworks.worker.WorkerState;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /** The rules every job's steps run by: timing, order, early end, repeat, resume. */
+// Test data reads better inline than as constants
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 class StepRunnerTest {
 
     @BeforeAll
@@ -47,13 +48,26 @@ class StepRunnerTest {
             this(name, ticks, true);
         }
 
-        @Override public int ticks() { return ticks; }
-        @Override public void start(List<String> log) { log.add("start " + name); }
-        @Override public boolean finish(List<String> log) {
+        @Override
+        public int ticks() {
+            return ticks;
+        }
+
+        @Override
+        public void start(List<String> log) {
+            log.add("start " + name);
+        }
+
+        @Override
+        public boolean finish(List<String> log) {
             log.add("finish " + name);
             return keepGoing;
         }
-        @Override public boolean needed(List<String> log) { return needed; }
+
+        @Override
+        public boolean needed(List<String> log) {
+            return needed;
+        }
     }
 
     private WorkerState state;
@@ -138,8 +152,10 @@ class StepRunnerTest {
         state.restartStep();
 
         tick(steps);
-        assertEquals(List.of("start chop", "finish chop", "start replant", "start replant"), log,
-            "replant starts over (its animation replays); the chop isn't redone");
+        assertEquals(
+                List.of("start chop", "finish chop", "start replant", "start replant"),
+                log,
+                "replant starts over (its animation replays); the chop isn't redone");
         assertEquals(1, state.getJobStep());
     }
 

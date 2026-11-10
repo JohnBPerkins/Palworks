@@ -1,13 +1,18 @@
 package dev.palworks.station;
 
 import dev.palworks.job.JobType;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-
 import org.jetbrains.annotations.Nullable;
-import java.util.*;
 
 /**
  * Persistent state for a work station.
@@ -226,7 +231,7 @@ public class StationState {
         BlockPos pos = BlockPos.of(tag.getLong("pos"));
         JobType jobType;
         try {
-            jobType = JobType.valueOf(tag.getString("jobType").toUpperCase());
+            jobType = JobType.valueOf(tag.getString("jobType").toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             jobType = JobType.CRAFT_ITEM; // Default fallback
         }
@@ -309,6 +314,7 @@ public class StationState {
                             case Tag.TAG_STRING -> parameters.put(key, paramsTag.getString(key));
                             case Tag.TAG_INT -> parameters.put(key, paramsTag.getInt(key));
                             case Tag.TAG_BYTE -> parameters.put(key, paramsTag.getBoolean(key));
+                            default -> {} // only strings, ints and booleans are ever saved
                         }
                     }
                 }

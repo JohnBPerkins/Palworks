@@ -9,13 +9,13 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import dev.palworks.job.JobType;
 import dev.palworks.net.PalworksResource;
 import dev.palworks.worker.WorkActivity;
+import java.util.List;
+import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.List;
 
 /**
  * Draws a work icon on each sent-out party member's card on Cobblemon's party HUD, in the top-left
@@ -65,8 +65,14 @@ public final class WorkStatusHud {
             return icon("generic");
         }
         return switch (job) {
-            case CHOP_TREE, HARVEST_CROPS, PLANT_SEEDS, GET_SEEDS, FUEL_FURNACE,
-                 COLLECT_DROPS, DELIVER_ITEMS, MINE_RESOURCE -> icon(job.getId());
+            case CHOP_TREE,
+                    HARVEST_CROPS,
+                    PLANT_SEEDS,
+                    GET_SEEDS,
+                    FUEL_FURNACE,
+                    COLLECT_DROPS,
+                    DELIVER_ITEMS,
+                    MINE_RESOURCE -> icon(job.getId());
             default -> icon("generic");
         };
     }
@@ -74,7 +80,7 @@ public final class WorkStatusHud {
     public static void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         // A new world or server: what we were told about the old one's workers no longer applies.
-        if (minecraft.level != lastLevel) {
+        if (!Objects.equals(minecraft.level, lastLevel)) {
             lastLevel = minecraft.level;
             WorkActivityCache.clear();
         }
@@ -134,8 +140,18 @@ public final class WorkStatusHud {
         }
         RenderSystem.enableBlend();
         graphics.setColor(shade, shade, shade, alpha);
-        graphics.blit(texture, x, y, ICON_SIZE, ICON_SIZE, 0, 0,
-                ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE);
+        graphics.blit(
+                texture,
+                x,
+                y,
+                ICON_SIZE,
+                ICON_SIZE,
+                0,
+                0,
+                ICON_TEXTURE_SIZE,
+                ICON_TEXTURE_SIZE,
+                ICON_TEXTURE_SIZE,
+                ICON_TEXTURE_SIZE);
         graphics.setColor(1F, 1F, 1F, 1F);
         RenderSystem.disableBlend();
     }

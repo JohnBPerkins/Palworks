@@ -1,13 +1,13 @@
 package dev.palworks.suitability;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
-
 import java.util.Set;
 
 /**
  * Interface for providing suitability detection logic.
  * Allows extensible detection based on types, species, forms, abilities, etc.
  */
+@FunctionalInterface
 public interface SuitabilityProvider {
     /**
      * Get all suitabilities this provider grants to the Pokémon.

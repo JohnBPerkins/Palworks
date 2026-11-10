@@ -1,10 +1,10 @@
 package dev.palworks.job;
 
-import net.minecraft.core.BlockPos;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import net.minecraft.core.BlockPos;
+import org.junit.jupiter.api.Test;
 
 /** Which jobs are within a worker's work range. */
 class WorkRangeTest {

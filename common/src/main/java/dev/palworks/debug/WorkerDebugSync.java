@@ -10,19 +10,18 @@ import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.pathfinder.Path;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Sends players with {@code /palworks debug} on what every worker near them is doing
@@ -86,7 +85,9 @@ public final class WorkerDebugSync {
             Path path = entity.getNavigation().getPath();
             boolean walking = path != null && !path.isDone();
 
-            entries.add(new WorkerDebugPacket.Entry(entity.getId(), activity,
+            entries.add(new WorkerDebugPacket.Entry(
+                    entity.getId(),
+                    activity,
                     reservation == null ? null : reservation.getStationPos(),
                     walking ? remainingPath(path) : List.of(),
                     details(entity, state, reservation, activity, path, walking, now),
@@ -95,9 +96,14 @@ public final class WorkerDebugSync {
         return entries;
     }
 
-    private static WorkerDebugPacket.Details details(PokemonEntity entity, WorkerState state,
-                                                     ReservationId reservation, WorkActivity activity,
-                                                     Path path, boolean walking, long now) {
+    private static WorkerDebugPacket.Details details(
+            PokemonEntity entity,
+            WorkerState state,
+            ReservationId reservation,
+            WorkActivity activity,
+            Path path,
+            boolean walking,
+            long now) {
         int jobAge = -1;
         int expiresIn = -1;
         if (reservation != null) {
@@ -122,12 +128,22 @@ public final class WorkerDebugSync {
             }
         }
 
-        WorkerDebugPacket.PathStatus pathStatus = !walking ? WorkerDebugPacket.PathStatus.NONE
+        WorkerDebugPacket.PathStatus pathStatus = !walking
+                ? WorkerDebugPacket.PathStatus.NONE
                 : path.canReach() ? WorkerDebugPacket.PathStatus.REACHES : WorkerDebugPacket.PathStatus.PARTIAL;
 
-        return new WorkerDebugPacket.Details(jobAge, expiresIn, stepName, stepIndex, stepCount,
-                state.getStepTicks(), stepLength, pathStatus, state.getRecentPathFailCount(),
-                state.getStepInTicks(), stillTicks(entity, activity, now));
+        return new WorkerDebugPacket.Details(
+                jobAge,
+                expiresIn,
+                stepName,
+                stepIndex,
+                stepCount,
+                state.getStepTicks(),
+                stepLength,
+                pathStatus,
+                state.getRecentPathFailCount(),
+                state.getStepInTicks(),
+                stillTicks(entity, activity, now));
     }
 
     /**

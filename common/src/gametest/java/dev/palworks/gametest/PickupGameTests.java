@@ -4,6 +4,8 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.manager.JobManager;
+import java.util.HashSet;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -15,9 +17,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.phys.AABB;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
  * How transporters pick items up: what fits is taken and the rest left on the ground, they fill
  * up before delivering, and once every slot is used they only take items matching what they carry.
@@ -28,17 +27,18 @@ public class PickupGameTests {
     /** Drop {@code count} of an item at a spot (not moving) and give it a pickup job. */
     private static void dropForPickup(GameTestHelper helper, BlockPos rel, Item item, int count) {
         BlockPos abs = helper.absolutePos(rel);
-        ItemEntity entity = new ItemEntity(helper.getLevel(), abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5,
-                new ItemStack(item, count), 0, 0, 0);
+        ItemEntity entity = new ItemEntity(
+                helper.getLevel(), abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, new ItemStack(item, count), 0, 0, 0);
         helper.getLevel().addFreshEntity(entity);
-        JobManager.getInstance(helper.getLevel()).queuePickup(abs, null, helper.getLevel().getGameTime());
+        JobManager.getInstance(helper.getLevel())
+                .queuePickup(abs, null, helper.getLevel().getGameTime());
     }
 
     /** How many of an item are lying on the ground round a spot. */
     private static int onGround(GameTestHelper helper, BlockPos rel, Item item) {
         int count = 0;
-        for (ItemEntity entity : helper.getLevel().getEntitiesOfClass(ItemEntity.class,
-                new AABB(helper.absolutePos(rel)).inflate(1.5))) {
+        for (ItemEntity entity : helper.getLevel()
+                .getEntitiesOfClass(ItemEntity.class, new AABB(helper.absolutePos(rel)).inflate(1.5))) {
             if (entity.isAlive() && entity.getItem().is(item)) {
                 count += entity.getItem().getCount();
             }
@@ -121,7 +121,9 @@ public class PickupGameTests {
             helper.assertValueEqual(inChest(helper, chestPos, Items.WHEAT), 5, "wheat in the chest");
             helper.assertValueEqual(inChest(helper, chestPos, Items.CARROT), 5, "carrots in the chest");
             helper.assertValueEqual(inChest(helper, chestPos, Items.POTATO), 5, "potatoes in the chest");
-            helper.assertValueEqual(firstDelivery.size(), 3,
+            helper.assertValueEqual(
+                    firstDelivery.size(),
+                    3,
                     "kinds of item in its first delivery (it should pick all three up before going to the chest)");
         });
     }

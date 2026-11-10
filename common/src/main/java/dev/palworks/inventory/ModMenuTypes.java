@@ -2,10 +2,9 @@ package dev.palworks.inventory;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import java.util.function.Supplier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.MenuType;
-
-import java.util.function.Supplier;
 
 /**
  * Registry for menu types used by Palworks.

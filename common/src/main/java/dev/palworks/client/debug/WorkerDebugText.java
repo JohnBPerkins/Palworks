@@ -3,7 +3,6 @@ package dev.palworks.client.debug;
 import dev.palworks.net.packets.WorkerDebugPacket.Details;
 import dev.palworks.net.packets.WorkerDebugPacket.PathStatus;
 import dev.palworks.worker.WorkActivity;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -21,6 +20,9 @@ import java.util.Locale;
  * so it's unit-tested.
  */
 public final class WorkerDebugText {
+    // Standing still for this long shows on the label (in red after STILL_WARNING_TICKS)
+    static final int STILL_SHOWN_TICKS = 20;
+
     /** Below this many ticks left, the "gives up in" countdown is a warning. */
     static final int EXPIRY_WARNING_TICKS = 10 * 20;
     /** Standing still while meant to be walking for this long is a warning. */
@@ -30,8 +32,8 @@ public final class WorkerDebugText {
 
     private WorkerDebugText() {}
 
-    public static List<Line> lines(WorkActivity activity, Details d, int unreachableSpots,
-                                   int stuckAfterPathFailures, int maxStepInTicks) {
+    public static List<Line> lines(
+            WorkActivity activity, Details d, int unreachableSpots, int stuckAfterPathFailures, int maxStepInTicks) {
         List<Line> lines = new ArrayList<>();
         String phase = activity.phase().name().toLowerCase(Locale.ROOT);
         lines.add(new Line(activity.job() == null ? phase : activity.job().getId() + " · " + phase, false));
@@ -47,8 +49,16 @@ public final class WorkerDebugText {
         }
 
         if (!d.stepName().isEmpty()) {
-            lines.add(new Line(String.format(Locale.ROOT, "step %d/%d %s · %d/%dt",
-                    d.stepIndex() + 1, d.stepCount(), d.stepName(), d.stepTicks(), d.stepLength()), false));
+            lines.add(new Line(
+                    String.format(
+                            Locale.ROOT,
+                            "step %d/%d %s · %d/%dt",
+                            d.stepIndex() + 1,
+                            d.stepCount(),
+                            d.stepName(),
+                            d.stepTicks(),
+                            d.stepLength()),
+                    false));
         }
 
         if (activity.phase() == WorkActivity.Phase.WALKING) {
@@ -69,7 +79,7 @@ public final class WorkerDebugText {
                 parts.add("fails " + d.pathFailures() + "/" + stuckAfterPathFailures);
                 warning = true;
             }
-            if (d.stillTicks() >= 20) {
+            if (d.stillTicks() >= STILL_SHOWN_TICKS) {
                 parts.add("still " + seconds(d.stillTicks()));
                 warning |= d.stillTicks() >= STILL_WARNING_TICKS;
             }
@@ -80,7 +90,8 @@ public final class WorkerDebugText {
         }
 
         if (unreachableSpots > 0) {
-            lines.add(new Line(unreachableSpots + (unreachableSpots == 1 ? " unreachable spot" : " unreachable spots"), true));
+            lines.add(new Line(
+                    unreachableSpots + (unreachableSpots == 1 ? " unreachable spot" : " unreachable spots"), true));
         }
         return lines;
     }

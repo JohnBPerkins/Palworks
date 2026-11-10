@@ -1,11 +1,10 @@
 package dev.palworks.client.hud;
 
 import dev.palworks.worker.WorkActivity;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Client-side copy of what the player's workers are doing, filled by {@code WorkActivityPacket}

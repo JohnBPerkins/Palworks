@@ -1,7 +1,12 @@
 package dev.palworks.gametest;
 
+import static dev.palworks.gametest.Scenes.abs;
+
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.tree.TreeDetector.TreeValidationResult;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
@@ -13,12 +18,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import static dev.palworks.gametest.Scenes.abs;
 
 /** Tree detection (what counts as a tree), canopy breaking, and where and what gets replanted. */
 public class TreeGameTests {
@@ -102,8 +101,10 @@ public class TreeGameTests {
         Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
 
         helper.assertTrue(validate(helper, 3, 1, 3).isValid(), "farmland is soil for an oak");
-        helper.assertTrue(TreeDetector.standsOnGround(helper.getLevel(), abs(helper, 3, 1, 3),
-            Blocks.OAK_LOG.defaultBlockState()), "so its bottom log can start a chop job");
+        helper.assertTrue(
+                TreeDetector.standsOnGround(
+                        helper.getLevel(), abs(helper, 3, 1, 3), Blocks.OAK_LOG.defaultBlockState()),
+                "so its bottom log can start a chop job");
         helper.succeed();
     }
 
@@ -131,8 +132,15 @@ public class TreeGameTests {
         helper.assertTrue(TreeDetector.isNaturalLeaf(Scenes.naturalLeaves(Blocks.OAK_LEAVES)), "natural leaves");
         helper.assertFalse(TreeDetector.isNaturalLeaf(Scenes.placedLeaves(Blocks.OAK_LEAVES)), "placed leaves");
 
-        for (Block ground : List.of(Blocks.GRASS_BLOCK, Blocks.DIRT, Blocks.PODZOL, Blocks.MUD,
-                Blocks.MUDDY_MANGROVE_ROOTS, Blocks.MOSS_BLOCK, Blocks.CRIMSON_NYLIUM, Blocks.NETHERRACK)) {
+        for (Block ground : List.of(
+                Blocks.GRASS_BLOCK,
+                Blocks.DIRT,
+                Blocks.PODZOL,
+                Blocks.MUD,
+                Blocks.MUDDY_MANGROVE_ROOTS,
+                Blocks.MOSS_BLOCK,
+                Blocks.CRIMSON_NYLIUM,
+                Blocks.NETHERRACK)) {
             helper.assertTrue(TreeDetector.isValidGroundBlock(ground.defaultBlockState()), ground + " is ground");
         }
         helper.assertFalse(TreeDetector.isValidGroundBlock(Blocks.STONE.defaultBlockState()), "stone isn't ground");
@@ -167,10 +175,15 @@ public class TreeGameTests {
         helper.assertTrue(tree.isValid(), "a mangrove in water is a tree: " + tree.getReason());
         helper.assertTrue(tree.getLogPositions().contains(abs(helper, 3, 1, 3)), "its roots are chopped with it");
         helper.assertTrue(tree.getBasePosition().equals(abs(helper, 3, 1, 3)), "its base is the bottom root");
-        helper.assertTrue(TreeDetector.getSaplingForTree(helper.getLevel(), tree) == Items.MANGROVE_PROPAGULE,
-            "it's replanted with a propagule");
-        helper.assertTrue(TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(),
-            tree.getBasePosition()).size() == 1, "one propagule");
+        helper.assertValueEqual(
+                TreeDetector.getSaplingForTree(helper.getLevel(), tree),
+                Items.MANGROVE_PROPAGULE,
+                "the sapling it's replanted with");
+        helper.assertTrue(
+                TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition())
+                                .size()
+                        == 1,
+                "one propagule");
         helper.succeed();
     }
 
@@ -200,16 +213,19 @@ public class TreeGameTests {
         crimsonFungus(helper, 3, 3, 4);
 
         TreeValidationResult tree = validate(helper, 3, 1, 3);
-        helper.assertTrue(tree.isValid(), "a huge fungus is a tree (its wart blocks are its canopy): " + tree.getReason());
+        helper.assertTrue(
+                tree.isValid(), "a huge fungus is a tree (its wart blocks are its canopy): " + tree.getReason());
         helper.assertTrue(TreeDetector.isNetherStem(Blocks.CRIMSON_STEM.defaultBlockState()), "needs Nether to chop");
 
-        Set<BlockPos> canopy = TreeDetector.findNetherCanopyToBreak(
-            helper.getLevel(), tree.getLogPositions(), abs(helper, 3, 1, 3));
+        Set<BlockPos> canopy =
+                TreeDetector.findNetherCanopyToBreak(helper.getLevel(), tree.getLogPositions(), abs(helper, 3, 1, 3));
         // Three 3x3 layers around the top, minus the two stem blocks inside them
         helper.assertTrue(canopy.size() == 27 - 2, "all 25 canopy blocks around it are broken, got " + canopy.size());
         helper.assertTrue(canopy.contains(abs(helper, 4, 3, 4)), "the shroomlight too");
-        helper.assertTrue(TreeDetector.getSaplingForTree(helper.getLevel(), tree) == Items.CRIMSON_FUNGUS,
-            "it's replanted with a crimson fungus");
+        helper.assertValueEqual(
+                TreeDetector.getSaplingForTree(helper.getLevel(), tree),
+                Items.CRIMSON_FUNGUS,
+                "the sapling it's replanted with");
         helper.succeed();
     }
 
@@ -221,8 +237,8 @@ public class TreeGameTests {
         crimsonFungus(helper, 5, 3, 4);
 
         TreeValidationResult tree = validate(helper, 2, 1, 3);
-        Set<BlockPos> canopy = TreeDetector.findNetherCanopyToBreak(
-            helper.getLevel(), tree.getLogPositions(), abs(helper, 2, 1, 3));
+        Set<BlockPos> canopy =
+                TreeDetector.findNetherCanopyToBreak(helper.getLevel(), tree.getLogPositions(), abs(helper, 2, 1, 3));
         helper.assertTrue(canopy.contains(abs(helper, 1, 3, 3)), "its own canopy is broken");
         helper.assertFalse(canopy.contains(abs(helper, 6, 3, 3)), "the far side of the neighbour's canopy isn't");
         helper.assertFalse(canopy.contains(abs(helper, 4, 3, 3)), "nor the side nearer the neighbour's stem");
@@ -251,9 +267,10 @@ public class TreeGameTests {
 
         TreeValidationResult tree = validate(helper, 3, 1, 3);
         helper.assertTrue(tree.isValid(), "a dark oak is a tree: " + tree.getReason());
-        Set<BlockPos> spots = new HashSet<>(TreeDetector.saplingPositions(
-            helper.getLevel(), tree.getLogPositions(), tree.getBasePosition()));
-        Set<BlockPos> trunk = Set.of(abs(helper, 3, 1, 3), abs(helper, 4, 1, 3), abs(helper, 3, 1, 4), abs(helper, 4, 1, 4));
+        Set<BlockPos> spots = new HashSet<>(
+                TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition()));
+        Set<BlockPos> trunk =
+                Set.of(abs(helper, 3, 1, 3), abs(helper, 4, 1, 3), abs(helper, 3, 1, 4), abs(helper, 4, 1, 4));
         helper.assertTrue(spots.equals(trunk), "dark oak needs 4 saplings where its trunk stood, got " + spots);
         helper.succeed();
     }
@@ -264,7 +281,8 @@ public class TreeGameTests {
         Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
 
         TreeValidationResult tree = validate(helper, 3, 1, 3);
-        List<BlockPos> spots = TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition());
+        List<BlockPos> spots =
+                TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition());
         helper.assertTrue(spots.equals(List.of(abs(helper, 3, 1, 3))), "one sapling at its base, got " + spots);
         helper.succeed();
     }
@@ -280,12 +298,18 @@ public class TreeGameTests {
         helper.setBlock(4, 0, 4, Blocks.CRIMSON_NYLIUM);
         var level = helper.getLevel();
 
-        helper.assertTrue(TreeDetector.canPlantSaplingAt(level, abs(helper, 1, 1, 1), Items.OAK_SAPLING), "oak on grass");
-        helper.assertFalse(TreeDetector.canPlantSaplingAt(level, abs(helper, 2, 1, 2), Items.OAK_SAPLING), "not on stone");
-        helper.assertFalse(TreeDetector.canPlantSaplingAt(level, abs(helper, 3, 1, 3), Items.OAK_SAPLING), "not in a block");
-        helper.assertTrue(TreeDetector.canPlantSaplingAt(level, abs(helper, 4, 1, 4), Items.CRIMSON_FUNGUS), "fungus on nylium");
-        helper.assertFalse(TreeDetector.canPlantSaplingAt(level, abs(helper, 4, 1, 4), Items.OAK_SAPLING), "oak not on nylium");
-        helper.assertFalse(TreeDetector.canPlantSaplingAt(level, abs(helper, 1, 1, 1), Items.STICK), "a stick isn't a sapling");
+        helper.assertTrue(
+                TreeDetector.canPlantSaplingAt(level, abs(helper, 1, 1, 1), Items.OAK_SAPLING), "oak on grass");
+        helper.assertFalse(
+                TreeDetector.canPlantSaplingAt(level, abs(helper, 2, 1, 2), Items.OAK_SAPLING), "not on stone");
+        helper.assertFalse(
+                TreeDetector.canPlantSaplingAt(level, abs(helper, 3, 1, 3), Items.OAK_SAPLING), "not in a block");
+        helper.assertTrue(
+                TreeDetector.canPlantSaplingAt(level, abs(helper, 4, 1, 4), Items.CRIMSON_FUNGUS), "fungus on nylium");
+        helper.assertFalse(
+                TreeDetector.canPlantSaplingAt(level, abs(helper, 4, 1, 4), Items.OAK_SAPLING), "oak not on nylium");
+        helper.assertFalse(
+                TreeDetector.canPlantSaplingAt(level, abs(helper, 1, 1, 1), Items.STICK), "a stick isn't a sapling");
 
         helper.assertTrue(TreeDetector.plantSapling(level, abs(helper, 1, 1, 1), Items.OAK_SAPLING), "plants it");
         helper.assertBlockPresent(Blocks.OAK_SAPLING, new BlockPos(1, 1, 1));
@@ -299,9 +323,11 @@ public class TreeGameTests {
         helper.setBlock(3, 1, 3, Blocks.WATER);
         BlockPos spot = abs(helper, 3, 1, 3);
 
-        helper.assertFalse(TreeDetector.canPlantSaplingAt(helper.getLevel(), spot, Items.OAK_SAPLING),
-            "an oak sapling can't go in water");
-        helper.assertTrue(TreeDetector.plantSapling(helper.getLevel(), spot, Items.MANGROVE_PROPAGULE), "a propagule can");
+        helper.assertFalse(
+                TreeDetector.canPlantSaplingAt(helper.getLevel(), spot, Items.OAK_SAPLING),
+                "an oak sapling can't go in water");
+        helper.assertTrue(
+                TreeDetector.plantSapling(helper.getLevel(), spot, Items.MANGROVE_PROPAGULE), "a propagule can");
         BlockState planted = helper.getLevel().getBlockState(spot);
         helper.assertTrue(planted.is(Blocks.MANGROVE_PROPAGULE), "it's a propagule");
         helper.assertTrue(planted.getValue(BlockStateProperties.WATERLOGGED), "and waterlogged");
@@ -315,9 +341,11 @@ public class TreeGameTests {
         // Found by name like any modded tree: cobblemon:saccharine_log -> cobblemon:saccharine_sapling
         Block log = block(helper, "cobblemon:saccharine_log");
         Item sapling = TreeDetector.saplingFor(log);
-        helper.assertTrue(sapling != null
-                && BuiltInRegistries.ITEM.getKey(sapling).toString().equals("cobblemon:saccharine_sapling"),
-            "saccharine log should find cobblemon:saccharine_sapling, got " + sapling);
+        helper.assertTrue(
+                sapling != null
+                        && "cobblemon:saccharine_sapling"
+                                .equals(BuiltInRegistries.ITEM.getKey(sapling).toString()),
+                "saccharine log should find cobblemon:saccharine_sapling, got " + sapling);
         helper.succeed();
     }
 

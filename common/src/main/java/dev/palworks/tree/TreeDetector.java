@@ -1,6 +1,17 @@
 package dev.palworks.tree;
 
 import dev.palworks.Palworks;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -22,9 +33,6 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * Detects valid trees using BFS traversal.
  *
@@ -40,14 +48,14 @@ public class TreeDetector {
     private static final boolean DEBUG = Palworks.DEBUG;
 
     // Configuration constants
-    private static final int MAX_TREE_BLOCKS = 256;      // Max logs to search before considering tree too big
-    private static final int MIN_LEAF_COUNT = 4;         // Minimum leaves required for a valid tree
-    private static final int LEAF_SEARCH_RADIUS = 2;     // Radius around logs to search for leaves
+    private static final int MAX_TREE_BLOCKS = 256; // Max logs to search before considering tree too big
+    private static final int MIN_LEAF_COUNT = 4; // Minimum leaves required for a valid tree
+    private static final int LEAF_SEARCH_RADIUS = 2; // Radius around logs to search for leaves
     // Huge fungus canopies don't decay like leaves, so they're broken with the stem. Same rule as the
     // FallingTree mod: warts connected to the tree, within this x/z distance of the chopped block, and
     // no higher than one above the top stem.
     private static final int WART_BREAK_RADIUS = 4;
-    private static final int MAX_WART_BLOCKS = 512;      // Safety cap on canopy blocks broken per tree
+    private static final int MAX_WART_BLOCKS = 512; // Safety cap on canopy blocks broken per tree
     // How far (x/z) from the chopped block to look for neighbouring fungi's stems: far enough to
     // catch one whose canopy (up to ~4 blocks from its stem) reaches into the wart-break column.
     private static final int NEIGHBOR_STEM_SEARCH_RADIUS = WART_BREAK_RADIUS + 4;
@@ -60,8 +68,10 @@ public class TreeDetector {
     private static final Direction[] DIRECTIONS = Direction.values();
 
     // Cobblemon apricorn tags to exclude from tree detection
-    private static final TagKey<Block> APRICORN_LOGS = TagKey.create(Registries.BLOCK, ResourceLocation.parse("cobblemon:apricorn_logs"));
-    private static final TagKey<Block> APRICORN_LEAVES = TagKey.create(Registries.BLOCK, ResourceLocation.parse("cobblemon:apricorn_leaves"));
+    private static final TagKey<Block> APRICORN_LOGS =
+            TagKey.create(Registries.BLOCK, ResourceLocation.parse("cobblemon:apricorn_logs"));
+    private static final TagKey<Block> APRICORN_LEAVES =
+            TagKey.create(Registries.BLOCK, ResourceLocation.parse("cobblemon:apricorn_leaves"));
 
     /**
      * Result of tree detection containing all relevant information.
@@ -74,8 +84,13 @@ public class TreeDetector {
         private final BlockPos basePosition;
         private final Map<Block, Integer> leafBlocks;
 
-        private TreeValidationResult(boolean valid, String reason, Set<BlockPos> logPositions,
-                                      int leafCount, BlockPos basePosition, Map<Block, Integer> leafBlocks) {
+        private TreeValidationResult(
+                boolean valid,
+                String reason,
+                Set<BlockPos> logPositions,
+                int leafCount,
+                BlockPos basePosition,
+                Map<Block, Integer> leafBlocks) {
             this.valid = valid;
             this.reason = reason;
             this.logPositions = logPositions != null ? logPositions : Collections.emptySet();
@@ -88,19 +103,38 @@ public class TreeDetector {
             return new TreeValidationResult(false, reason, null, 0, null, null);
         }
 
-        public static TreeValidationResult valid(Set<BlockPos> logs, int leafCount, BlockPos base, Map<Block, Integer> leafBlocks) {
+        public static TreeValidationResult valid(
+                Set<BlockPos> logs, int leafCount, BlockPos base, Map<Block, Integer> leafBlocks) {
             return new TreeValidationResult(true, "Valid tree", logs, leafCount, base, leafBlocks);
         }
 
-        public boolean isValid() { return valid; }
-        public String getReason() { return reason; }
-        public Set<BlockPos> getLogPositions() { return logPositions; }
-        public int getLeafCount() { return leafCount; }
-        public BlockPos getBasePosition() { return basePosition; }
+        public boolean isValid() {
+            return valid;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public Set<BlockPos> getLogPositions() {
+            return logPositions;
+        }
+
+        public int getLeafCount() {
+            return leafCount;
+        }
+
+        public BlockPos getBasePosition() {
+            return basePosition;
+        }
         /** The kinds of leaf (canopy) block the tree has, for finding its sapling by name. */
-        public Set<Block> getLeafBlocks() { return leafBlocks.keySet(); }
+        public Set<Block> getLeafBlocks() {
+            return leafBlocks.keySet();
+        }
         /** How many of the tree's natural leaves (canopy blocks) are of this kind. */
-        public int getLeafCount(Block leaf) { return leafBlocks.getOrDefault(leaf, 0); }
+        public int getLeafCount(Block leaf) {
+            return leafBlocks.getOrDefault(leaf, 0);
+        }
     }
 
     /**
@@ -121,7 +155,7 @@ public class TreeDetector {
         // BFS to find all connected logs and validate the tree structure
         Set<BlockPos> visitedLogs = new HashSet<>();
         Set<BlockPos> visitedForValidation = new HashSet<>();
-        Queue<BlockPos> queue = new LinkedList<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
         Map<BlockPos, Block> leaves = new HashMap<>();
         BlockPos lowestLog = startPos;
         boolean foundGroundConnection = false;
@@ -155,7 +189,8 @@ public class TreeDetector {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
                         int faces = (dx != 0 ? 1 : 0) + (dy != 0 ? 1 : 0) + (dz != 0 ? 1 : 0);
-                        if (faces < 2) {
+                        boolean diagonalNeighbour = faces > 1;
+                        if (!diagonalNeighbour) {
                             continue; // itself, or a face neighbour (handled below)
                         }
                         BlockPos diagonal = current.offset(dx, dy, dz);
@@ -206,8 +241,8 @@ public class TreeDetector {
                     // Invalid block touching the tree!
                     Block invalidBlock = neighborState.getBlock();
                     if (DEBUG) {
-                        Palworks.LOGGER.debug("Tree at {} has invalid adjacent block {} at {}",
-                            startPos, invalidBlock, neighbor);
+                        Palworks.LOGGER.debug(
+                                "Tree at {} has invalid adjacent block {} at {}", startPos, invalidBlock, neighbor);
                     }
                     return TreeValidationResult.invalid("Tree is touching invalid block: " + invalidBlock);
                 }
@@ -247,8 +282,8 @@ public class TreeDetector {
 
         if (!foundGroundConnection) {
             if (DEBUG) {
-                Palworks.LOGGER.debug("Tree at {} is not touching valid ground (lowest log at {})",
-                    startPos, lowestLog);
+                Palworks.LOGGER.debug(
+                        "Tree at {} is not touching valid ground (lowest log at {})", startPos, lowestLog);
             }
             return TreeValidationResult.invalid("Tree is not touching valid ground");
         }
@@ -256,15 +291,20 @@ public class TreeDetector {
         // Check 2: Minimum leaf count
         if (leaves.size() < MIN_LEAF_COUNT) {
             if (DEBUG) {
-                Palworks.LOGGER.debug("Tree at {} has only {} leaves (minimum: {})",
-                    startPos, leaves.size(), MIN_LEAF_COUNT);
+                Palworks.LOGGER.debug(
+                        "Tree at {} has only {} leaves (minimum: {})", startPos, leaves.size(), MIN_LEAF_COUNT);
             }
-            return TreeValidationResult.invalid("Not enough leaves (found " + leaves.size() + ", need " + MIN_LEAF_COUNT + ")");
+            return TreeValidationResult.invalid(
+                    "Not enough leaves (found " + leaves.size() + ", need " + MIN_LEAF_COUNT + ")");
         }
 
         if (DEBUG) {
-            Palworks.LOGGER.debug("Valid tree found at {}: {} logs, {} leaves, base at {}",
-                startPos, visitedLogs.size(), leaves.size(), lowestLog);
+            Palworks.LOGGER.debug(
+                    "Valid tree found at {}: {} logs, {} leaves, base at {}",
+                    startPos,
+                    visitedLogs.size(),
+                    leaves.size(),
+                    lowestLog);
         }
 
         Map<Block, Integer> leafBlocks = new HashMap<>();
@@ -314,8 +354,8 @@ public class TreeDetector {
      */
     private static boolean isAllowedTreeNeighbor(Level level, BlockPos pos, BlockState state) {
         return state.getCollisionShape(level, pos).isEmpty()
-            || state.is(Blocks.MOSS_CARPET)
-            || state.getBlock() instanceof CocoaBlock;
+                || state.is(Blocks.MOSS_CARPET)
+                || state.getBlock() instanceof CocoaBlock;
     }
 
     /**
@@ -374,8 +414,12 @@ public class TreeDetector {
         // Stems of neighbouring fungi near enough for their canopy to reach into the break column
         Set<Long> neighborColumns = new HashSet<>();
         BlockPos.MutableBlockPos scan = new BlockPos.MutableBlockPos();
-        for (int x = origin.getX() - NEIGHBOR_STEM_SEARCH_RADIUS; x <= origin.getX() + NEIGHBOR_STEM_SEARCH_RADIUS; x++) {
-            for (int z = origin.getZ() - NEIGHBOR_STEM_SEARCH_RADIUS; z <= origin.getZ() + NEIGHBOR_STEM_SEARCH_RADIUS; z++) {
+        for (int x = origin.getX() - NEIGHBOR_STEM_SEARCH_RADIUS;
+                x <= origin.getX() + NEIGHBOR_STEM_SEARCH_RADIUS;
+                x++) {
+            for (int z = origin.getZ() - NEIGHBOR_STEM_SEARCH_RADIUS;
+                    z <= origin.getZ() + NEIGHBOR_STEM_SEARCH_RADIUS;
+                    z++) {
                 long column = columnKey(x, z);
                 if (ownColumns.contains(column) || neighborColumns.contains(column)) {
                     continue;
@@ -430,8 +474,8 @@ public class TreeDetector {
     private static long nearestColumnDistSq(BlockPos pos, Set<Long> columns) {
         long best = Long.MAX_VALUE;
         for (long column : columns) {
-            long dx = pos.getX() - columnX(column);
-            long dz = pos.getZ() - columnZ(column);
+            long dx = (long) pos.getX() - columnX(column);
+            long dz = (long) pos.getZ() - columnZ(column);
             best = Math.min(best, dx * dx + dz * dz);
         }
         return best;
@@ -474,15 +518,13 @@ public class TreeDetector {
         if (state.getBlock() instanceof VineBlock) {
             return true;
         }
-        // Also check the block directly
-        Block block = state.getBlock();
-        return block == Blocks.VINE ||
-               block == Blocks.CAVE_VINES ||
-               block == Blocks.CAVE_VINES_PLANT ||
-               block == Blocks.TWISTING_VINES ||
-               block == Blocks.TWISTING_VINES_PLANT ||
-               block == Blocks.WEEPING_VINES ||
-               block == Blocks.WEEPING_VINES_PLANT;
+        return state.is(Blocks.VINE)
+                || state.is(Blocks.CAVE_VINES)
+                || state.is(Blocks.CAVE_VINES_PLANT)
+                || state.is(Blocks.TWISTING_VINES)
+                || state.is(Blocks.TWISTING_VINES_PLANT)
+                || state.is(Blocks.WEEPING_VINES)
+                || state.is(Blocks.WEEPING_VINES_PLANT);
     }
 
     /**
@@ -493,9 +535,9 @@ public class TreeDetector {
         // muddy mangrove roots...), and tree mods add their own soils to it so vanilla saplings work
         // there too. Plus the nether: nylium, netherrack and soul soil.
         return state.is(BlockTags.DIRT)
-            || state.is(BlockTags.NYLIUM)
-            || state.is(Blocks.NETHERRACK)
-            || state.is(Blocks.SOUL_SOIL);
+                || state.is(BlockTags.NYLIUM)
+                || state.is(Blocks.NETHERRACK)
+                || state.is(Blocks.SOUL_SOIL);
     }
 
     /**
@@ -572,7 +614,9 @@ public class TreeDetector {
     /** The sapling for a log, root or leaf block, found by name (cached); null if none. */
     @Nullable
     public static Item saplingFor(Block block) {
-        return SAPLING_CACHE.computeIfAbsent(block, TreeDetector::findSaplingByName).orElse(null);
+        return SAPLING_CACHE
+                .computeIfAbsent(block, TreeDetector::findSaplingByName)
+                .orElse(null);
     }
 
     private static Optional<Item> findSaplingByName(Block block) {
@@ -624,7 +668,8 @@ public class TreeDetector {
                 bottom.add(pos);
             }
         }
-        if (bottom.size() == 4 && isTwoByTwo(bottom)
+        if (bottom.size() == 4
+                && isTwoByTwo(bottom)
                 && bottom.stream().allMatch(pos -> isLog(level.getBlockState(pos)))) {
             return bottom;
         }
@@ -662,7 +707,8 @@ public class TreeDetector {
             below.move(Direction.DOWN);
             BlockState state = level.getBlockState(below);
             // Roots, and anything the propagule could have stood in: air, water, seagrass...
-            if (!isMangroveRoots(state) && !state.getCollisionShape(level, below).isEmpty()) {
+            if (!isMangroveRoots(state)
+                    && !state.getCollisionShape(level, below).isEmpty()) {
                 return below.above();
             }
         }
@@ -701,7 +747,10 @@ public class TreeDetector {
 
     /** Whether four positions (on one Y level) form a 2x2 square. */
     private static boolean isTwoByTwo(List<BlockPos> positions) {
-        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
         for (BlockPos pos : positions) {
             minX = Math.min(minX, pos.getX());
             maxX = Math.max(maxX, pos.getX());
@@ -747,8 +796,7 @@ public class TreeDetector {
         }
 
         BlockState saplingState = saplingBlock.defaultBlockState();
-        if (isWaterSource(level.getBlockState(pos))
-                && saplingState.hasProperty(BlockStateProperties.WATERLOGGED)) {
+        if (isWaterSource(level.getBlockState(pos)) && saplingState.hasProperty(BlockStateProperties.WATERLOGGED)) {
             saplingState = saplingState.setValue(BlockStateProperties.WATERLOGGED, true);
         }
         level.setBlock(pos, saplingState, 3);

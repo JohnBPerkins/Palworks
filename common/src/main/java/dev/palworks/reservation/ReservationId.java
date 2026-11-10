@@ -1,15 +1,14 @@
 package dev.palworks.reservation;
 
 import dev.palworks.job.JobType;
-import net.minecraft.core.BlockPos;
-
 import java.util.Objects;
+import net.minecraft.core.BlockPos;
 
 /**
  * Identifies a reservation for a job at a station.
  * Used to prevent multiple workers from claiming the same task.
  */
-public class ReservationId {
+public final class ReservationId {
     private final BlockPos stationPos;
     private final JobType jobType;
     // Game time (ticks) when it was taken or last refreshed. Game time, not the clock: the game
@@ -57,10 +56,8 @@ public class ReservationId {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ReservationId that = (ReservationId) o;
-        return Objects.equals(stationPos, that.stationPos) &&
-                jobType == that.jobType;
+        if (!(o instanceof ReservationId that)) return false;
+        return Objects.equals(stationPos, that.stationPos) && jobType == that.jobType;
     }
 
     @Override
@@ -70,10 +67,6 @@ public class ReservationId {
 
     @Override
     public String toString() {
-        return "ReservationId{" +
-                "station=" + stationPos +
-                ", job=" + jobType +
-                ", time=" + timestamp +
-                '}';
+        return "ReservationId{" + "station=" + stationPos + ", job=" + jobType + ", time=" + timestamp + '}';
     }
 }

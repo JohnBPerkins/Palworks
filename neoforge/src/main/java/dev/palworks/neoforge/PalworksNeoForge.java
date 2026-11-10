@@ -14,14 +14,16 @@ import org.slf4j.LoggerFactory;
 
 @Mod("palworks")
 public class PalworksNeoForge {
+    private static final String BANNER = "==================================================";
+
     public static final String MOD_ID = "palworks";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public PalworksNeoForge(IEventBus modEventBus) {
-        LOGGER.info("==================================================");
+        LOGGER.info(BANNER);
         LOGGER.info("PALWORKS NEOFORGE INITIALIZING...");
-        LOGGER.info("==================================================");
-        System.out.println("[Palworks] NeoForge mod is loading!");
+        LOGGER.info(BANNER);
+        LOGGER.info("NeoForge mod is loading!");
 
         // Register menu types (NeoForge-specific)
         NeoForgeModMenuTypes.register(modEventBus);
@@ -30,15 +32,15 @@ public class PalworksNeoForge {
         MenuOpener.Holder.setInstance(new NeoForgeMenuOpener());
 
         // Load work suitabilities from datapacks (data/<namespace>/palworks/suitability)
-        NeoForge.EVENT_BUS.addListener(AddReloadListenerEvent.class,
-                event -> event.addListener(new SuitabilityReloadListener()));
+        NeoForge.EVENT_BUS.addListener(
+                AddReloadListenerEvent.class, event -> event.addListener(new SuitabilityReloadListener()));
 
         // Register command handler (WorkerTickHandler is auto-registered via @EventBusSubscriber)
         NeoForge.EVENT_BUS.register(new PalworksCommands());
 
-        System.out.println("[Palworks] WorkerTickHandler will be auto-registered via @EventBusSubscriber");
-        LOGGER.info("==================================================");
+        LOGGER.info("WorkerTickHandler will be auto-registered via @EventBusSubscriber");
+        LOGGER.info(BANNER);
         LOGGER.info("PALWORKS NEOFORGE INITIALIZED!");
-        LOGGER.info("==================================================");
+        LOGGER.info(BANNER);
     }
 }

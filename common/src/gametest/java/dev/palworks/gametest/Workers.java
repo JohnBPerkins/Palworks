@@ -42,7 +42,7 @@ final class Workers {
                     // A grass floor level with the test's own, so a worker that wanders off the
                     // edge isn't left straddling a ledge; everything above it cleared
                     var want = y == 0 ? Blocks.GRASS_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState();
-                    if (level.getBlockState(pos) != want) {
+                    if (!level.getBlockState(pos).equals(want)) {
                         level.setBlock(pos, want, 2);
                     }
                 }
@@ -76,6 +76,7 @@ final class Workers {
      * (On NeoForge the test mod lets Cobblemon's packets through to the mock player's fake
      * connection, which never negotiated them.)
      */
+    @SuppressWarnings("removal") // makeMockServerPlayerInLevel: vanilla's only mock player in 1.21.1
     static PokemonEntity sendOut(GameTestHelper helper, String properties, BlockPos rel) {
         ServerPlayer owner = helper.makeMockServerPlayerInLevel();
         BlockPos abs = helper.absolutePos(rel);

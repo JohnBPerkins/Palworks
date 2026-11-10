@@ -1,17 +1,16 @@
 package dev.palworks.inventory;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.UUID;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What each kind of worker can carry, with real items (see CarryMode). */
 class WorkerInventoryTest {
@@ -82,8 +81,15 @@ class WorkerInventoryTest {
 
     @Test
     void everyVanillaCropSeedFitsTheSeedPouch() {
-        for (var seed : new net.minecraft.world.item.Item[] {Items.WHEAT_SEEDS, Items.BEETROOT_SEEDS,
-                Items.CARROT, Items.POTATO, Items.PUMPKIN_SEEDS, Items.MELON_SEEDS, Items.NETHER_WART}) {
+        for (var seed : new net.minecraft.world.item.Item[] {
+            Items.WHEAT_SEEDS,
+            Items.BEETROOT_SEEDS,
+            Items.CARROT,
+            Items.POTATO,
+            Items.PUMPKIN_SEEDS,
+            Items.MELON_SEEDS,
+            Items.NETHER_WART
+        }) {
             assertTrue(WorkerInventory.accepts(CarryMode.SEED_POUCH, new ItemStack(seed)), seed + " should fit");
         }
     }

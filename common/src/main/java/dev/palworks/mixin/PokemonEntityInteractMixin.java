@@ -6,14 +6,13 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.net.packets.WorkerStatusPacket;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkerStateManager;
+import java.util.UUID;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import java.util.UUID;
 
 /**
  * Tells the owner whether a Pokemon is working just before Cobblemon opens its interact wheel.
@@ -40,7 +39,10 @@ public abstract class PokemonEntityInteractMixin {
             return;
         }
         boolean enabled = WorkerStateManager.getOrCreate(pokemon).isEnabled();
-        new WorkerStatusPacket(((PokemonEntity) (Object) this).getUUID(), enabled,
-                WorkerInventoryManager.carryModeFor(pokemon)).sendToPlayer(player);
+        new WorkerStatusPacket(
+                        ((PokemonEntity) (Object) this).getUUID(),
+                        enabled,
+                        WorkerInventoryManager.carryModeFor(pokemon))
+                .sendToPlayer(player);
     }
 }

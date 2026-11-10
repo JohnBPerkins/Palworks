@@ -29,15 +29,13 @@ final class Scenes {
     /** Natural leaves (not player placed), close enough to a log that they don't decay mid-test. */
     static BlockState naturalLeaves(Block leaves) {
         return leaves.defaultBlockState()
-            .setValue(LeavesBlock.PERSISTENT, false)
-            .setValue(LeavesBlock.DISTANCE, 1);
+                .setValue(LeavesBlock.PERSISTENT, false)
+                .setValue(LeavesBlock.DISTANCE, 1);
     }
 
     /** Player-placed leaves. */
     static BlockState placedLeaves(Block leaves) {
-        return leaves.defaultBlockState()
-            .setValue(LeavesBlock.PERSISTENT, true)
-            .setValue(LeavesBlock.DISTANCE, 1);
+        return leaves.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true).setValue(LeavesBlock.DISTANCE, 1);
     }
 
     /**
@@ -66,7 +64,9 @@ final class Scenes {
 
     /** Total count of an item lying on the ground anywhere in the test area. */
     static int itemsOnGround(GameTestHelper helper, Item item) {
-        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO)).expandTowards(8, 8, 8).inflate(1);
+        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO))
+                .expandTowards(8, 8, 8)
+                .inflate(1);
         int total = 0;
         for (ItemEntity entity : helper.getLevel().getEntitiesOfClass(ItemEntity.class, area)) {
             if (entity.getItem().is(item)) {
@@ -78,7 +78,9 @@ final class Scenes {
 
     /** Remove every item lying on the ground in the test area. */
     static void clearItems(GameTestHelper helper) {
-        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO)).expandTowards(8, 8, 8).inflate(1);
+        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO))
+                .expandTowards(8, 8, 8)
+                .inflate(1);
         helper.getLevel().getEntitiesOfClass(ItemEntity.class, area).forEach(ItemEntity::discard);
     }
 

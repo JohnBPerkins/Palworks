@@ -1,6 +1,8 @@
 package dev.palworks.inventory;
 
 import dev.palworks.suitability.Suitability;
+import java.util.Set;
+import java.util.UUID;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -9,9 +11,6 @@ import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-
-import java.util.Set;
-import java.util.UUID;
 
 /**
  * A worker Pokemon's carried items. Always 3 slots of storage, but how many it may use, and for
@@ -314,7 +313,10 @@ public class WorkerInventory implements Container {
                 CompoundTag slotTag = itemsTag.getCompound(i);
                 int slot = slotTag.getByte("Slot") & 255;
                 if (slot < INVENTORY_SIZE) {
-                    items.set(slot, ItemStack.parse(net.minecraft.core.RegistryAccess.EMPTY, slotTag).orElse(ItemStack.EMPTY));
+                    items.set(
+                            slot,
+                            ItemStack.parse(net.minecraft.core.RegistryAccess.EMPTY, slotTag)
+                                    .orElse(ItemStack.EMPTY));
                 }
             }
         }

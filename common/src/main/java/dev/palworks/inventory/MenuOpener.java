@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerPlayer;
  * Platform-agnostic interface for opening menus.
  * Each platform (Fabric/NeoForge) provides its own implementation.
  */
+@FunctionalInterface
 public interface MenuOpener {
     /**
      * The current platform's menu opener instance.

@@ -1,5 +1,6 @@
 package dev.palworks.inventory;
 
+import java.util.UUID;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -10,13 +11,11 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.UUID;
-
 /**
  * Menu (Container) for the worker inventory GUI.
  * Handles server-side slot management and item transfer.
  */
-public class WorkerInventoryMenu extends AbstractContainerMenu {
+public final class WorkerInventoryMenu extends AbstractContainerMenu {
     private final Container workerInventory;
     private final UUID pokemonUUID;
     // The worker's CarryMode (ordinal), synced to the client so it shows only the slots the worker
@@ -34,7 +33,13 @@ public class WorkerInventoryMenu extends AbstractContainerMenu {
     /**
      * Server-side constructor.
      */
-    public WorkerInventoryMenu(MenuType<?> menuType, int containerId, Inventory playerInventory, Container workerInventory, UUID pokemonUUID) {
+    @SuppressWarnings("EnumOrdinal") // the data slot syncs CarryMode by ordinal; see CarryMode.fromOrdinal
+    public WorkerInventoryMenu(
+            MenuType<?> menuType,
+            int containerId,
+            Inventory playerInventory,
+            Container workerInventory,
+            UUID pokemonUUID) {
         super(menuType, containerId);
         this.workerInventory = workerInventory;
         this.pokemonUUID = pokemonUUID;

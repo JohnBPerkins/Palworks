@@ -12,12 +12,11 @@ import dev.palworks.net.packets.ToggleWorkerPacket;
 import dev.palworks.net.packets.WorkActivityPacket;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.net.packets.WorkerStatusPacket;
+import java.util.List;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import java.util.List;
 
 /**
  * Mixin to register Palworks network packets with Cobblemon's network system.
@@ -34,18 +33,10 @@ public abstract class CobblemonNetworkMixin {
 
         // Register OpenInventoryPacket
         list.add(new PacketRegisterInfo<>(
-                OpenInventoryPacket.ID,
-                OpenInventoryPacket::decode,
-                new OpenInventoryHandler(),
-                null
-        ));
+                OpenInventoryPacket.ID, OpenInventoryPacket::decode, new OpenInventoryHandler(), null));
 
         list.add(new PacketRegisterInfo<>(
-                ToggleWorkerPacket.ID,
-                ToggleWorkerPacket::decode,
-                new ToggleWorkerHandler(),
-                null
-        ));
+                ToggleWorkerPacket.ID, ToggleWorkerPacket::decode, new ToggleWorkerHandler(), null));
     }
 
     /**
@@ -53,23 +44,14 @@ public abstract class CobblemonNetworkMixin {
      */
     @Inject(method = "generateS2CPacketInfoList", at = @At("RETURN"))
     private void addPalworksS2CPackets(CallbackInfoReturnable<List<PacketRegisterInfo<?>>> cir) {
-        cir.getReturnValue().add(new PacketRegisterInfo<>(
-                WorkerStatusPacket.ID,
-                WorkerStatusPacket::decode,
-                new WorkerStatusHandler(),
-                null
-        ));
-        cir.getReturnValue().add(new PacketRegisterInfo<>(
-                WorkActivityPacket.ID,
-                WorkActivityPacket::decode,
-                new WorkActivityHandler(),
-                null
-        ));
-        cir.getReturnValue().add(new PacketRegisterInfo<>(
-                WorkerDebugPacket.ID,
-                WorkerDebugPacket::decode,
-                new WorkerDebugHandler(),
-                null
-        ));
+        cir.getReturnValue()
+                .add(new PacketRegisterInfo<>(
+                        WorkerStatusPacket.ID, WorkerStatusPacket::decode, new WorkerStatusHandler(), null));
+        cir.getReturnValue()
+                .add(new PacketRegisterInfo<>(
+                        WorkActivityPacket.ID, WorkActivityPacket::decode, new WorkActivityHandler(), null));
+        cir.getReturnValue()
+                .add(new PacketRegisterInfo<>(
+                        WorkerDebugPacket.ID, WorkerDebugPacket::decode, new WorkerDebugHandler(), null));
     }
 }

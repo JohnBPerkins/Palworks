@@ -5,13 +5,12 @@ import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.Mob;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Mob;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Read-only snapshot of a worker's state, formatted for the {@code /palworks inspect worker} command.
@@ -44,13 +43,14 @@ public class DebugInfo {
         public WorkerDebugInfo(Pokemon pokemon, WorkerState state, @Nullable Mob entity) {
             this.speciesName = pokemon.getSpecies().getName();
             this.enabled = state.isEnabled();
-            this.assignedJob = state.getAssignedJob() != null ? state.getAssignedJob().name() : "None";
+            this.assignedJob =
+                    state.getAssignedJob() != null ? state.getAssignedJob().name() : "None";
 
             ReservationId reservation = state.getCurrentReservation();
             if (reservation != null) {
                 BlockPos pos = reservation.getStationPos();
-                this.currentReservation = String.format("%s at [%d, %d, %d]",
-                        reservation.getJobType().name(), pos.getX(), pos.getY(), pos.getZ());
+                this.currentReservation = String.format(
+                        "%s at [%d, %d, %d]", reservation.getJobType().name(), pos.getX(), pos.getY(), pos.getZ());
             } else {
                 this.currentReservation = "None";
             }
@@ -58,17 +58,16 @@ public class DebugInfo {
             this.suitabilities = new ArrayList<>();
             Set<Suitability> suits = dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon);
             for (Suitability suit : suits) {
-                String cooldownInfo = state.isOnCooldown(suit) ?
-                        String.format(" (CD: %ds)", state.getRemainingCooldown(suit) / 20) :
-                        "";
+                String cooldownInfo = state.isOnCooldown(suit)
+                        ? String.format(" (CD: %ds)", state.getRemainingCooldown(suit) / 20)
+                        : "";
                 this.suitabilities.add(suit.getId() + cooldownInfo);
             }
 
             this.cooldowns = new ArrayList<>();
             for (Suitability suit : Suitability.values()) {
                 if (state.isOnCooldown(suit)) {
-                    this.cooldowns.add(String.format("%s: %ds",
-                            suit.getId(), state.getRemainingCooldown(suit) / 20));
+                    this.cooldowns.add(String.format("%s: %ds", suit.getId(), state.getRemainingCooldown(suit) / 20));
                 }
             }
 
@@ -87,8 +86,8 @@ public class DebugInfo {
             lines.add("Reservation: " + currentReservation);
 
             if (entityPosition != null) {
-                lines.add(String.format("Position: [%d, %d, %d]",
-                        entityPosition.getX(), entityPosition.getY(), entityPosition.getZ()));
+                lines.add(String.format(
+                        "Position: [%d, %d, %d]", entityPosition.getX(), entityPosition.getY(), entityPosition.getZ()));
             }
 
             lines.add("Suitabilities: " + (suitabilities.isEmpty() ? "None" : ""));

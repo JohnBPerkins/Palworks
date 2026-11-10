@@ -111,8 +111,8 @@ public class JobGameTests {
         helper.assertFalse(there(helper, JobType.COLLECT_DROPS, pos), "nothing on the ground");
 
         var abs = helper.absolutePos(pos);
-        ItemEntity item = new ItemEntity(helper.getLevel(), abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5,
-            new ItemStack(Items.WHEAT, 3));
+        ItemEntity item = new ItemEntity(
+                helper.getLevel(), abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, new ItemStack(Items.WHEAT, 3));
         helper.getLevel().addFreshEntity(item);
         helper.assertTrue(there(helper, JobType.COLLECT_DROPS, pos), "wheat on the ground");
 

@@ -4,14 +4,13 @@ import com.cobblemon.mod.common.api.net.NetworkPacket;
 import dev.palworks.job.JobType;
 import dev.palworks.net.PalworksResource;
 import dev.palworks.worker.WorkActivity;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Sent from server to a player with {@code /palworks debug} on: every worker near them, what it's
@@ -22,14 +21,21 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
     public static final ResourceLocation ID = PalworksResource.of("worker_debug");
 
     /**
+     * One worker's debug overlay: its job, path and timers.
+     *
      * @param entityId    the worker's entity id (it's in the client's world)
      * @param target      the block its job is at, or null with no job
      * @param path        the rest of the path it's walking, in order (empty when not walking)
      * @param details     timers and path status
      * @param unreachable the spots it currently remembers it couldn't reach (it won't take jobs there)
      */
-    public record Entry(int entityId, WorkActivity activity, @Nullable BlockPos target, List<BlockPos> path,
-                        Details details, List<BlockPos> unreachable) {}
+    public record Entry(
+            int entityId,
+            WorkActivity activity,
+            @Nullable BlockPos target,
+            List<BlockPos> path,
+            Details details,
+            List<BlockPos> unreachable) {}
 
     /** Whether the path it's walking gets it to its job. */
     public enum PathStatus {
@@ -47,6 +53,8 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
     }
 
     /**
+     * A worker's timers and path status, shown under its label.
+     *
      * @param jobAgeTicks    how long it has had its job; -1 with no job
      * @param expiresInTicks ticks until it gives the job up for not having started it; -1 when it
      *                       won't (no job, already working on it, or paused)
@@ -62,9 +70,18 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
      * @param stillTicks     ticks it has stood still while meant to be walking (counted while
      *                       someone has the overlay on)
      */
-    public record Details(int jobAgeTicks, int expiresInTicks, String stepName, int stepIndex, int stepCount,
-                          int stepTicks, int stepLength, PathStatus pathStatus, int pathFailures,
-                          int stepInTicks, int stillTicks) {
+    public record Details(
+            int jobAgeTicks,
+            int expiresInTicks,
+            String stepName,
+            int stepIndex,
+            int stepCount,
+            int stepTicks,
+            int stepLength,
+            PathStatus pathStatus,
+            int pathFailures,
+            int stepInTicks,
+            int stillTicks) {
         public static final Details NONE = new Details(-1, -1, "", 0, 0, 0, 0, PathStatus.NONE, 0, 0, 0);
     }
 
@@ -85,12 +102,14 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
     }
 
     @Override
+    @SuppressWarnings("EnumOrdinal") // decoded by fromOrdinal; both ends run the same jar
     public void encode(@NotNull RegistryFriendlyByteBuf buffer) {
         buffer.writeVarInt(entries.size());
         for (Entry entry : entries) {
             buffer.writeVarInt(entry.entityId());
             buffer.writeVarInt(entry.activity().phase().ordinal());
-            buffer.writeUtf(entry.activity().job() == null ? "" : entry.activity().job().name());
+            buffer.writeUtf(
+                    entry.activity().job() == null ? "" : entry.activity().job().name());
             buffer.writeBoolean(entry.target() != null);
             if (entry.target() != null) {
                 buffer.writeBlockPos(entry.target());
@@ -132,9 +151,17 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
             BlockPos target = buffer.readBoolean() ? buffer.readBlockPos() : null;
             List<BlockPos> path = readPositions(buffer);
 
-            Details details = new Details(buffer.readVarInt() - 1, buffer.readVarInt() - 1, buffer.readUtf(),
-                    buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(),
-                    PathStatus.fromOrdinal(buffer.readVarInt()), buffer.readVarInt(), buffer.readVarInt(),
+            Details details = new Details(
+                    buffer.readVarInt() - 1,
+                    buffer.readVarInt() - 1,
+                    buffer.readUtf(),
+                    buffer.readVarInt(),
+                    buffer.readVarInt(),
+                    buffer.readVarInt(),
+                    buffer.readVarInt(),
+                    PathStatus.fromOrdinal(buffer.readVarInt()),
+                    buffer.readVarInt(),
+                    buffer.readVarInt(),
                     buffer.readVarInt());
 
             List<BlockPos> unreachable = readPositions(buffer);

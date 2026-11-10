@@ -1,5 +1,8 @@
 package dev.palworks.station;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.Item;
@@ -7,10 +10,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * Helper for interacting with chests and other containers.
@@ -112,8 +111,8 @@ public class ChestHelper {
             if (slotStack.isEmpty()) {
                 return true;
             }
-            if (ItemStack.isSameItemSameComponents(slotStack, stack) &&
-                slotStack.getCount() < slotStack.getMaxStackSize()) {
+            if (ItemStack.isSameItemSameComponents(slotStack, stack)
+                    && slotStack.getCount() < slotStack.getMaxStackSize()) {
                 return true;
             }
         }

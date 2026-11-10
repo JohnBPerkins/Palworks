@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Palworks"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>
+        PMD rules for Palworks: the error prone, best practices, multithreading and performance
+        categories. A rule is configured for Minecraft (below) where that's possible, and excluded
+        only where following it would make the code worse; each exclusion says why.
+        Formatting is spotless's job (palantir-java-format), not PMD's.
+        To keep one intentional finding, end its line with `// NOPMD - reason`.
+    </description>
+
+    <rule ref="category/java/errorprone.xml">
+        <!-- Covered by Error Prone (ReferenceEquality, StringCaseLocaleUsage): one tool per
+             concern, so an intentional case needs one suppression, not two. -->
+        <exclude name="CompareObjectsWithEquals"/>
+        <exclude name="UseLocaleWithCaseConversions"/>
+        <!-- Configured below. -->
+        <exclude name="CloseResource"/>
+        <exclude name="TestClassWithoutTestCases"/>
+        <!-- null is how optional state is cleared here (fields are @Nullable); the alternative,
+             Optional fields, is worse Java. -->
+        <exclude name="NullAssignment"/>
+        <!-- Flags every record-style accessor (field `pos`, method `pos()`), the convention Java's
+             own records use. -->
+        <exclude name="AvoidFieldNameMatchingMethodName"/>
+    </rule>
+
+    <!-- Level, ServerLevel, ClientLevel and Minecraft are AutoCloseable but owned by the game:
+         closing them would be the bug. Still checked for everything else (streams, files). -->
+    <rule ref="category/java/errorprone.xml/CloseResource">
+        <properties>
+            <property name="allowedResourceTypes" value="java.io.ByteArrayOutputStream,java.io.ByteArrayInputStream,java.io.StringWriter,java.io.CharArrayWriter,java.util.stream.Stream,java.util.stream.IntStream,java.util.stream.LongStream,java.util.stream.DoubleStream,net.minecraft.world.level.Level,net.minecraft.server.level.ServerLevel,net.minecraft.client.multiplayer.ClientLevel,net.minecraft.client.Minecraft"/>
+        </properties>
+    </rule>
+
+    <!-- JUnit test classes are named *Test. GameTest classes (*GameTests) hold @GameTest methods,
+         which this rule doesn't know, and TestArea isn't a test. -->
+    <rule ref="category/java/errorprone.xml/TestClassWithoutTestCases">
+        <properties>
+            <property name="testClassPattern" value="^(?:.*\.)?.*Test$"/>
+        </properties>
+    </rule>
+
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Configured below. -->
+        <exclude name="LooseCoupling"/>
+        <exclude name="GuardLogStatement"/>
+        <exclude name="UnusedPrivateMethod"/>
+        <exclude name="UnusedFormalParameter"/>
+        <exclude name="AbstractClassWithoutAbstractMethod"/>
+        <!-- A message on each of 170 assertEquals calls would repeat what JUnit already prints
+             (expected vs actual), and one test checking several related values is clearer than
+             splitting it. -->
+        <exclude name="UnitTestAssertionsShouldIncludeMessage"/>
+        <exclude name="UnitTestContainsTooManyAsserts"/>
+    </rule>
+
+    <!-- Debug logging must sit behind the DEBUG flag (see CONTRIBUTING), which compiles it out.
+         PMD only knows logger.isDebugEnabled() guards, so it's taught the flag. Info and above
+         are meant to always log. -->
+    <rule ref="category/java/bestpractices.xml/GuardLogStatement">
+        <properties>
+            <property name="logLevels" value="trace,debug"/>
+            <property name="guardsMethods" value="isTraceEnabled,isDebugEnabled"/>
+            <property name="violationSuppressXPath" value="./ancestor::IfStatement[.//VariableAccess[@Name = 'DEBUG']]"/>
+        </properties>
+    </rule>
+
+    <!-- Minecraft's ListTag and NonNullList are Lists with methods the code needs (getCompound,
+         a fixed size); declaring them as List would lose those. -->
+    <rule ref="category/java/bestpractices.xml/LooseCoupling">
+        <properties>
+            <property name="allowedTypes" value="java.util.Properties,net.minecraft.nbt.ListTag,net.minecraft.core.NonNullList"/>
+        </properties>
+    </rule>
+
+    <!-- Mixin handlers are called by the injected code, which PMD can't see. -->
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod">
+        <properties>
+            <property name="violationSuppressXPath" value="./ancestor-or-self::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject')]"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/bestpractices.xml/UnusedFormalParameter">
+        <properties>
+            <property name="violationSuppressXPath" value="./ancestor::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject')]"/>
+        </properties>
+    </rule>
+
+    <rule ref="category/java/multithreading.xml">
+        <!-- Game state is only touched from the server thread, so plain HashMaps are right;
+             ConcurrentHashMap is used where a map is shared (e.g. JobManager's caches). -->
+        <exclude name="UseConcurrentHashMap"/>
+        <!-- J2EE rules (a webapp shouldn't manage threads); not relevant to a mod. -->
+        <exclude name="DoNotUseThreads"/>
+        <exclude name="AvoidUsingVolatile"/>
+    </rule>
+
+    <rule ref="category/java/performance.xml">
+        <!-- Flags every `new BlockPos(...)` in a loop; block positions are small immutable values
+             and that's how Minecraft code walks the world. -->
+        <exclude name="AvoidInstantiatingObjectsInLoops"/>
+    </rule>
+
+    <!-- Mixin classes are abstract by convention (they're never instantiated). -->
+    <rule ref="category/java/bestpractices.xml/AbstractClassWithoutAbstractMethod">
+        <properties>
+            <property name="violationSuppressXPath" value="./ancestor-or-self::ClassDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.Mixin')]"/>
+        </properties>
+    </rule>
+</ruleset>

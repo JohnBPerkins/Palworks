@@ -1,7 +1,6 @@
 package dev.palworks.client.debug;
 
 import dev.palworks.net.packets.WorkerDebugPacket;
-
 import java.util.List;
 
 /**

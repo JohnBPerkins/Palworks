@@ -2,12 +2,11 @@ package dev.palworks.worker;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.net.packets.WorkActivityPacket;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Mob;
-
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Mob;
 
 /**
  * Keeps each worker's owner told what it's doing ({@link WorkActivity}), for the party HUD. Called
@@ -27,7 +26,9 @@ public final class WorkActivitySync {
     public static WorkActivity activityOf(Mob entity, WorkerState state) {
         return WorkActivity.of(
                 state.isEnabled(),
-                state.getCurrentReservation() == null ? null : state.getCurrentReservation().getJobType(),
+                state.getCurrentReservation() == null
+                        ? null
+                        : state.getCurrentReservation().getJobType(),
                 WorkerEligibility.isBusy(entity),
                 state.isWorking());
     }

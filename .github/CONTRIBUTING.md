@@ -17,7 +17,36 @@ Gradle wrapper provides the right Gradle version). The commands you'll use day t
 ./gradlew :fabric:runGameTest    # runs the in-game tests on a headless Fabric server (about 30 seconds)
 ./gradlew :neoforge:runGameTest  # the same in-game tests on a headless NeoForge server
 ./gradlew clean                # if you hit Minecraft mapping errors
+./gradlew spotlessApply          # formats all Java code
+./gradlew lint                   # checks formatting, and runs Error Prone and PMD
 ```
+
+Then install the git hooks, which format and lint each commit with the same tools CI uses:
+
+```bash
+brew install pre-commit          # or: pipx install pre-commit
+pre-commit install
+```
+
+### Formatting and linting
+
+- **Formatting** is [palantir-java-format](https://github.com/palantir/palantir-java-format),
+  applied by Spotless. Don't format by hand: the pre-commit hook (or `./gradlew spotlessApply`)
+  does it. If the hook reformats something, the commit stops; `git add` the changes and commit
+  again. For your IDE, the palantir-java-format plugin (IntelliJ) or Spotless's own integrations
+  give the same output.
+- **[Error Prone](https://errorprone.info)** runs inside every Java compile with all its default
+  checks, and **any compiler warning fails the build**. Compare blocks and items with
+  `state.is(Blocks.X)` / `stack.is(Items.X)` rather than `==`. To keep an intentional finding,
+  put `@SuppressWarnings("CheckName")` on the smallest method that holds it, with a comment
+  saying why (enum ordinals in network packets, for example).
+- **[PMD](https://pmd.github.io)** rules are in `config/pmd/ruleset.xml`: four whole categories,
+  with rules configured for Minecraft (game-owned resources, Mixin handlers, the `DEBUG` flag),
+  and the few exclusions each explained. To keep an intentional finding, end its line with
+  `// NOPMD - reason`.
+- Prefer fixing a finding over suppressing it, and suppressing one over excluding a rule.
+
+CI's `lint` job runs `./gradlew lint`, the same check as the hook.
 
 ## Project layout
 
@@ -114,8 +143,8 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
 
 - **Match the surrounding code.** Follow existing naming, structure, and style rather than
   introducing new patterns.
-- **Keep changes surgical.** Touch only what the change requires; don't reformat or refactor
-  unrelated code in the same PR.
+- **Keep changes surgical.** Touch only what the change requires; don't refactor unrelated
+  code in the same PR. (Formatting is automatic; see [Formatting and linting](#formatting-and-linting).)
 - **Namespaced keys.** Persistent data and identifiers are namespaced `palworks:*`.
 - **Debug logging** is gated behind a single flag and is off by default. Launch with
   `-Dpalworks.debug=true` to enable verbose logging while developing.

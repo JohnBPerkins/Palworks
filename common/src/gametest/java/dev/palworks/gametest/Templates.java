@@ -17,14 +17,14 @@ public final class Templates {
 
     /** Every test class. Fabric lists the same classes in its fabric.mod.json entrypoint. */
     public static final List<Class<?>> TEST_CLASSES = List.of(
-        TreeGameTests.class,
-        CropGameTests.class,
-        JobGameTests.class,
-        WorkerGameTests.class,
-        RealTreeGameTests.class,
-        WorkStatusGameTests.class,
-        PickupGameTests.class,
-        TestAreaGameTests.class,
-        HangingFruitGameTests.class,
-        CobblemonCropGameTests.class);
+            TreeGameTests.class,
+            CropGameTests.class,
+            JobGameTests.class,
+            WorkerGameTests.class,
+            RealTreeGameTests.class,
+            WorkStatusGameTests.class,
+            PickupGameTests.class,
+            TestAreaGameTests.class,
+            HangingFruitGameTests.class,
+            CobblemonCropGameTests.class);
 }

@@ -4,13 +4,12 @@ import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.job.WorkRange;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.UUID;
 
 /**
  * Checks if a Pokémon is eligible to be a worker.
@@ -18,15 +17,6 @@ import java.util.UUID;
  */
 public class WorkerEligibility {
 
-    /**
-     * Check if a Pokémon is eligible to work.
-     * Must be:
-     * 1. Owned by a player
-     * 2. Currently in the world (sent out from party or pasture)
-     *
-     * @param pokemon The Pokémon to check
-     * @return true if eligible to work
-     */
     /**
      * Whether the Pokemon is busy with something that should pause its work: in a battle, or
      * evolving. Uses Cobblemon's own busy flag (PokemonEntity.isBusy, set by its battle and
@@ -41,6 +31,15 @@ public class WorkerEligibility {
         return pokemon.getCurrentHealth() <= 0;
     }
 
+    /**
+     * Check if a Pokémon is eligible to work.
+     * Must be:
+     * 1. Owned by a player
+     * 2. Currently in the world (sent out from party or pasture)
+     *
+     * @param pokemon The Pokémon to check
+     * @return true if eligible to work
+     */
     public static boolean isEligible(Pokemon pokemon) {
         // Must be owned
         if (!isOwned(pokemon)) {
@@ -76,13 +75,9 @@ public class WorkerEligibility {
             return false;
         }
 
-        try {
-            // Check if the Pokemon's store is a PlayerPartyStore
-            var storeCoords = pokemon.getStoreCoordinates().get();
-            return storeCoords != null && storeCoords.getStore() instanceof PlayerPartyStore;
-        } catch (Exception e) {
-            return false;
-        }
+        // Check if the Pokemon's store is a PlayerPartyStore
+        var storeCoords = pokemon.getStoreCoordinates().get();
+        return storeCoords != null && storeCoords.getStore() instanceof PlayerPartyStore;
     }
 
     /**
@@ -92,7 +87,7 @@ public class WorkerEligibility {
     @Nullable
     public static BlockPos partyOwnerPosition(Pokemon pokemon, Level level) {
         ServerPlayer owner = pokemon.getOwnerPlayer();
-        return owner != null && owner.level() == level ? owner.blockPosition() : null;
+        return owner != null && level.equals(owner.level()) ? owner.blockPosition() : null;
     }
 
     /**
@@ -113,13 +108,9 @@ public class WorkerEligibility {
             return false;
         }
 
-        try {
-            // Has store coordinates but not from party
-            var storeCoords = pokemon.getStoreCoordinates().get();
-            return storeCoords != null && !isFromParty(pokemon);
-        } catch (Exception e) {
-            return false;
-        }
+        // Has store coordinates but not from party
+        var storeCoords = pokemon.getStoreCoordinates().get();
+        return storeCoords != null && !isFromParty(pokemon);
     }
 
     /**
@@ -139,26 +130,5 @@ public class WorkerEligibility {
         }
 
         return "Unknown";
-    }
-
-    /**
-     * Check if a Pokémon entity is eligible to work.
-     * Convenience method that extracts the Pokemon from the entity.
-     */
-    public static boolean isEligible(Entity entity) {
-        Pokemon pokemon = getPokemonFromEntity(entity);
-        return pokemon != null && isEligible(pokemon);
-    }
-
-    /**
-     * Platform-specific: Get Pokemon from entity.
-     * This needs to be implemented per platform or updated when entity is known.
-     */
-    @Nullable
-    private static Pokemon getPokemonFromEntity(Entity entity) {
-        // This would check if entity instanceof PokemonEntity
-        // and return entity.getPokemon()
-        // For now, return null - platform modules will need to implement this
-        return null;
     }
 }
