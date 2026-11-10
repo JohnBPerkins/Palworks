@@ -1,9 +1,11 @@
 package dev.palworks.ai;
 
+import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
 import dev.palworks.tree.TreeDetector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -36,6 +38,10 @@ public final class WorkPositions {
             return stand == null ? null : stand.stand();
         }
         int distance = reachDistanceFor(entity);
+
+        if (CropAdapter.isHangingFruit(level.getBlockState(targetPos))) {
+            return hangingFruitStand(level, targetPos, entity, distance);
+        }
 
         Direction facing = stationFacing(level, targetPos);
         if (facing != null) {
@@ -79,6 +85,47 @@ public final class WorkPositions {
                         bestDistSq = distSq;
                     }
                     break; // one height per tile: the first that works, level ground first
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * How far below a hanging fruit a worker may stand to pick it. Cocoa grows on a jungle trunk's
+     * lowest three logs, so up to 2 blocks above the ground; apricorns hang 2 or 3 blocks up.
+     */
+    private static final int HANGING_FRUIT_REACH_DOWN = 3;
+
+    /**
+     * Where to stand to pick a hanging fruit (a cocoa pod, an apricorn): on the ground beneath it,
+     * a ring or more out, like any crop. Each tile is tried from {@link #HANGING_FRUIT_REACH_DOWN}
+     * below the fruit up to one above, and the lowest spot the worker fits on is the one: the fruit
+     * is usually above head height, so a spot level with it is in the air, or up on the leaves.
+     * Never on top of leaves (the canopy an apricorn hangs in): workers can't get up there.
+     */
+    @Nullable
+    private static BlockPos hangingFruitStand(Level level, BlockPos fruit, Mob entity, int distance) {
+        for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
+            BlockPos best = null;
+            double bestDistSq = Double.MAX_VALUE;
+            for (BlockPos tile : ring(fruit, d)) {
+                for (int dy = -HANGING_FRUIT_REACH_DOWN; dy <= 1; dy++) {
+                    BlockPos spot = tile.above(dy);
+                    if (!fits(level, spot, entity)) {
+                        continue;
+                    }
+                    if (!level.getBlockState(spot.below()).is(BlockTags.LEAVES)) {
+                        double distSq = distSqTo(entity, spot);
+                        if (distSq < bestDistSq - 1e-6) {
+                            best = spot;
+                            bestDistSq = distSq;
+                        }
+                    }
+                    break; // one height per tile: the lowest it fits on
                 }
             }
             if (best != null) {
@@ -447,6 +494,11 @@ public final class WorkPositions {
     @Nullable
     private static Direction stationFacing(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
+        // Cocoa pods and apricorns face what they hang from (the log, the leaves): "in front" of
+        // one is inside that block. Treated as stations, workers were sent to stand in the log.
+        if (CropAdapter.isHangingFruit(state)) {
+            return null;
+        }
         if (state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
             return state.getValue(BlockStateProperties.HORIZONTAL_FACING);
         }

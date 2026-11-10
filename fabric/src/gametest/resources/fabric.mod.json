@@ -14,7 +14,9 @@
       "dev.palworks.gametest.RealTreeGameTests",
       "dev.palworks.gametest.WorkStatusGameTests",
       "dev.palworks.gametest.PickupGameTests",
-      "dev.palworks.gametest.TestAreaGameTests"
+      "dev.palworks.gametest.TestAreaGameTests",
+      "dev.palworks.gametest.HangingFruitGameTests",
+      "dev.palworks.gametest.CobblemonCropGameTests"
     ]
   },
   "depends": {
