@@ -20,7 +20,6 @@ import org.jetbrains.annotations.NotNull;
  * Opens the worker inventory GUI for the specified Pokemon.
  */
 public class OpenInventoryHandler implements ServerNetworkPacketHandler<OpenInventoryPacket> {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     @Override
     public void handle(
@@ -79,11 +78,9 @@ public class OpenInventoryHandler implements ServerNetworkPacketHandler<OpenInve
 
         // Open the inventory GUI
         ModMenuTypes.openWorkerInventory(player, pokemon);
-        if (DEBUG) {
-            Palworks.LOGGER.debug(
-                    "Opened worker inventory for Pokemon {} for player {}",
-                    pokemon.getSpecies().getName(),
-                    player.getName().getString());
-        }
+        Palworks.LOGGER.debug(
+                "Opened worker inventory for Pokemon {} for player {}",
+                pokemon.getSpecies().getName(),
+                player.getName().getString());
     }
 }

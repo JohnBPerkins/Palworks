@@ -11,7 +11,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 
 final class DeliverItemsHandler implements JobHandler {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     private final List<Step> steps = List.of(Step.of("deliver", 20, Step.effect(this::work)));
 
@@ -41,12 +40,10 @@ final class DeliverItemsHandler implements JobHandler {
             }
         }
 
-        if (DEBUG) {
-            if (totalDelivered > 0) {
-                Palworks.LOGGER.info("{} delivered {} items to chest at {}", ctx.name(), totalDelivered, chestPos);
-            } else {
-                Palworks.LOGGER.warn("{} failed to deliver items to chest at {}", ctx.name(), chestPos);
-            }
+        if (totalDelivered > 0) {
+            Palworks.LOGGER.debug("{} delivered {} items to chest at {}", ctx.name(), totalDelivered, chestPos);
+        } else {
+            Palworks.LOGGER.debug("{} failed to deliver items to chest at {}", ctx.name(), chestPos);
         }
     }
 }

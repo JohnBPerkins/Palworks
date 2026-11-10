@@ -45,7 +45,6 @@ import org.jetbrains.annotations.Nullable;
  * - Not be connected to invalid blocks (only logs, leaves, air, and vines are allowed)
  */
 public class TreeDetector {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     // Configuration constants
     private static final int MAX_TREE_BLOCKS = 256; // Max logs to search before considering tree too big
@@ -169,9 +168,7 @@ public class TreeDetector {
         while (!queue.isEmpty()) {
             // Check if tree is too big
             if (visitedLogs.size() > MAX_TREE_BLOCKS) {
-                if (DEBUG) {
-                    Palworks.LOGGER.debug("Tree at {} exceeds max size of {} blocks", startPos, MAX_TREE_BLOCKS);
-                }
+                Palworks.LOGGER.trace("Tree at {} exceeds max size of {} blocks", startPos, MAX_TREE_BLOCKS);
                 return TreeValidationResult.invalid("Tree exceeds maximum size of " + MAX_TREE_BLOCKS + " blocks");
             }
 
@@ -240,10 +237,8 @@ public class TreeDetector {
                 } else {
                     // Invalid block touching the tree!
                     Block invalidBlock = neighborState.getBlock();
-                    if (DEBUG) {
-                        Palworks.LOGGER.debug(
-                                "Tree at {} has invalid adjacent block {} at {}", startPos, invalidBlock, neighbor);
-                    }
+                    Palworks.LOGGER.trace(
+                            "Tree at {} has invalid adjacent block {} at {}", startPos, invalidBlock, neighbor);
                     return TreeValidationResult.invalid("Tree is touching invalid block: " + invalidBlock);
                 }
             }
@@ -281,25 +276,22 @@ public class TreeDetector {
         }
 
         if (!foundGroundConnection) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug(
-                        "Tree at {} is not touching valid ground (lowest log at {})", startPos, lowestLog);
-            }
+            Palworks.LOGGER.trace("Tree at {} is not touching valid ground (lowest log at {})", startPos, lowestLog);
             return TreeValidationResult.invalid("Tree is not touching valid ground");
         }
 
         // Check 2: Minimum leaf count
         if (leaves.size() < MIN_LEAF_COUNT) {
-            if (DEBUG) {
-                Palworks.LOGGER.debug(
+            if (Palworks.LOGGER.isTraceEnabled()) {
+                Palworks.LOGGER.trace(
                         "Tree at {} has only {} leaves (minimum: {})", startPos, leaves.size(), MIN_LEAF_COUNT);
             }
             return TreeValidationResult.invalid(
                     "Not enough leaves (found " + leaves.size() + ", need " + MIN_LEAF_COUNT + ")");
         }
 
-        if (DEBUG) {
-            Palworks.LOGGER.debug(
+        if (Palworks.LOGGER.isTraceEnabled()) {
+            Palworks.LOGGER.trace(
                     "Valid tree found at {}: {} logs, {} leaves, base at {}",
                     startPos,
                     visitedLogs.size(),

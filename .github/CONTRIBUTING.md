@@ -41,7 +41,7 @@ pre-commit install
   put `@SuppressWarnings("CheckName")` on the smallest method that holds it, with a comment
   saying why (enum ordinals in network packets, for example).
 - **[PMD](https://pmd.github.io)** rules are in `config/pmd/ruleset.xml`: four whole categories,
-  with rules configured for Minecraft (game-owned resources, Mixin handlers, the `DEBUG` flag),
+  with rules configured for Minecraft (game-owned resources, Mixin handlers, log level guards),
   and the few exclusions each explained. To keep an intentional finding, end its line with
   `// NOPMD - reason`.
 - Prefer fixing a finding over suppressing it, and suppressing one over excluding a rule.
@@ -146,8 +146,15 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
 - **Keep changes surgical.** Touch only what the change requires; don't refactor unrelated
   code in the same PR. (Formatting is automatic; see [Formatting and linting](#formatting-and-linting).)
 - **Namespaced keys.** Persistent data and identifiers are namespaced `palworks:*`.
-- **Debug logging** is gated behind a single flag and is off by default. Launch with
-  `-Dpalworks.debug=true` to enable verbose logging while developing.
+- **Logging levels.** Log through `Palworks.LOGGER` with SLF4J `{}` placeholders:
+  - `debug` for job-level events (assigned, completed, chopped...). Dev runs on both loaders
+    write these to `run/logs/debug.log`, and so does NeoForge in production.
+  - `trace` for per-tick or per-block detail (the chunk scan, tree checks, a worker's every
+    tick). It's off by default; wrap each call in `if (Palworks.LOGGER.isTraceEnabled())` (lint
+    checks this) so its arguments aren't built for nothing. To see it, add
+    `-Dfabric.log.debug.level=trace` (Fabric) or `-Dforge.logging.debugFile.level=trace`
+    (NeoForge) to the run's JVM arguments.
+  - `info` and above for what a server admin should always see.
 - **Seeing what workers do in game** (op commands):
   - `/palworks debug` toggles worker debugging for you. It posts job activity (assignments,
     completions) in chat, and shows every worker within 48 blocks in the world: its job icon and a

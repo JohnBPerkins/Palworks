@@ -6,14 +6,11 @@ import org.slf4j.LoggerFactory;
 
 public final class Palworks {
     public static final String MOD_ID = "palworks";
-    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
     /**
-     * Master debug toggle for verbose logging and in-chat broadcasts. Off by default;
-     * enable at launch with {@code -Dpalworks.debug=true}. Classes reference this rather than
-     * hardcoding their own {@code DEBUG = true} flag.
+     * Palworks's logger. Job-level events log at DEBUG (in {@code logs/debug.log} in dev runs, and
+     * on NeoForge); per-tick detail at TRACE, off unless the log config turns it on.
      */
-    public static final boolean DEBUG = Boolean.getBoolean("palworks.debug");
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     private Palworks() {}
 

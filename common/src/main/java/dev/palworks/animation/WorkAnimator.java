@@ -39,7 +39,6 @@ import org.jetbrains.annotations.Nullable;
  * worker's tick.
  */
 public final class WorkAnimator {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     /** One worker's animation in progress. */
     private static final class Playing {
@@ -80,9 +79,7 @@ public final class WorkAnimator {
         ActionEffectTimeline timeline =
                 ActionEffects.INSTANCE.getActionEffects().get(animation.moveEffect());
         if (timeline == null) {
-            if (DEBUG) {
-                Palworks.LOGGER.warn("No Cobblemon action effect registered for {}", animation.moveEffect());
-            }
+            Palworks.LOGGER.debug("No Cobblemon action effect registered for {}", animation.moveEffect());
             return;
         }
 

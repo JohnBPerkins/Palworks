@@ -8,7 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 
 final class PlantSeedsHandler implements JobHandler {
-    private static final boolean DEBUG = Palworks.DEBUG;
 
     private final List<Step> steps = List.of(Step.animated("plant", 20, WorkAnimations.PLANT, Step.effect(this::work)));
 
@@ -33,9 +32,7 @@ final class PlantSeedsHandler implements JobHandler {
             }
         }
         if (seedStack.isEmpty()) {
-            if (DEBUG) {
-                Palworks.LOGGER.warn("{} has no seeds to plant at {}", ctx.name(), plantPos);
-            }
+            Palworks.LOGGER.debug("{} has no seeds to plant at {}", ctx.name(), plantPos);
             return;
         }
 
@@ -44,16 +41,14 @@ final class PlantSeedsHandler implements JobHandler {
         if (planted) {
             seedStack.shrink(1);
             inventory.setChanged();
-            if (DEBUG) {
-                Palworks.LOGGER.info(
-                        "{} planted {} at {} ({} items remaining)",
-                        ctx.name(),
-                        seed.toString(),
-                        plantPos,
-                        inventory.getTotalItemCount());
-            }
-        } else if (DEBUG) {
-            Palworks.LOGGER.warn("{} failed to plant {} at {}", ctx.name(), seed.toString(), plantPos);
+            Palworks.LOGGER.debug(
+                    "{} planted {} at {} ({} items remaining)",
+                    ctx.name(),
+                    seed.toString(),
+                    plantPos,
+                    inventory.getTotalItemCount());
+        } else {
+            Palworks.LOGGER.debug("{} failed to plant {} at {}", ctx.name(), seed.toString(), plantPos);
         }
     }
 }
