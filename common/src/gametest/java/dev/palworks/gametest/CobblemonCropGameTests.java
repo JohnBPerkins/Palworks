@@ -32,6 +32,16 @@ import static dev.palworks.gametest.Scenes.abs;
 public class CobblemonCropGameTests {
 
     private static final BlockPos CROP = new BlockPos(3, 1, 3);
+
+    /**
+     * Red mint, by id: Cobblemon 1.7.0 has no @JvmField on CobblemonBlocks.RED_MINT (only a Kotlin
+     * getter) and 1.8.4 does (no getter), so neither spelling compiles against both. Looked up when
+     * a test runs, not when the class loads, which can be before Cobblemon registers its blocks.
+     */
+    private static Block redMint() {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+            net.minecraft.resources.ResourceLocation.parse("cobblemon:red_mint"));
+    }
     private static final BlockPos START = new BlockPos(3, 1, 1);
 
     private static BlockState ripe(Block crop) {
@@ -71,7 +81,7 @@ public class CobblemonCropGameTests {
 
     @GameTest(template = Templates.EMPTY)
     public void mintsGiveTheirLeaves(GameTestHelper helper) {
-        List<Block> mints = List.of(CobblemonBlocks.INSTANCE.getRED_MINT(), CobblemonBlocks.BLUE_MINT, CobblemonBlocks.CYAN_MINT,
+        List<Block> mints = List.of(redMint(), CobblemonBlocks.BLUE_MINT, CobblemonBlocks.CYAN_MINT,
             CobblemonBlocks.PINK_MINT, CobblemonBlocks.GREEN_MINT, CobblemonBlocks.WHITE_MINT);
         List<Item> leaves = List.of(CobblemonItems.RED_MINT_LEAF, CobblemonItems.BLUE_MINT_LEAF, CobblemonItems.CYAN_MINT_LEAF,
             CobblemonItems.PINK_MINT_LEAF, CobblemonItems.GREEN_MINT_LEAF, CobblemonItems.WHITE_MINT_LEAF);
@@ -121,11 +131,11 @@ public class CobblemonCropGameTests {
     public void wildMintStaysWild(GameTestHelper helper) {
         // Wild mint grows on grass, which only wild mint can: reset as farmed mint it would pop off
         helper.setBlock(CROP.below(), Blocks.GRASS_BLOCK);
-        helper.setBlock(CROP, with(ripe(CobblemonBlocks.INSTANCE.getRED_MINT()), "is_wild", "true"));
+        helper.setBlock(CROP, with(ripe(redMint()), "is_wild", "true"));
 
         helper.assertTrue(CropAdapter.harvestCrop(helper.getLevel(), helper.absolutePos(CROP)), "it harvests");
         BlockState after = helper.getBlockState(CROP);
-        helper.assertTrue(after.is(CobblemonBlocks.INSTANCE.getRED_MINT()) && valueOf(after, "is_wild").equals("true"),
+        helper.assertTrue(after.is(redMint()) && valueOf(after, "is_wild").equals("true"),
             "still wild mint, got " + after);
         helper.succeed();
     }
@@ -238,7 +248,7 @@ public class CobblemonCropGameTests {
 
         helper.succeedWhen(() -> {
             for (int x = 2; x <= 4; x++) {
-                helper.assertBlockPresent(CobblemonBlocks.INSTANCE.getRED_MINT(), new BlockPos(x, 1, 5));
+                helper.assertBlockPresent(redMint(), new BlockPos(x, 1, 5));
             }
             helper.assertTrue(pouch.getTotalItemCount() == 13, "one seed per tile, got " + pouch.getTotalItemCount() + " left");
         });
