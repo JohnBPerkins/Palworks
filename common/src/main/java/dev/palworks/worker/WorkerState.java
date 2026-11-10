@@ -352,7 +352,7 @@ public class WorkerState {
         if (tag.contains("assignedJob")) {
             String jobId = tag.getString("assignedJob");
             try {
-                assignedJob = JobType.valueOf(jobId.toUpperCase());
+                assignedJob = JobType.valueOf(jobId.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
                 assignedJob = null;
             }
@@ -407,7 +407,7 @@ public class WorkerState {
             long timestamp = reservationTag.getLong("timestamp");
 
             try {
-                JobType jobType = JobType.valueOf(jobTypeId.toUpperCase());
+                JobType jobType = JobType.valueOf(jobTypeId.toUpperCase(Locale.ROOT));
                 currentReservation = new ReservationId(stationPos, jobType, timestamp);
             } catch (IllegalArgumentException e) {
                 currentReservation = null;

@@ -4,6 +4,7 @@ import dev.palworks.gametest.Templates;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Locale;
 import java.util.function.Consumer;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -50,8 +51,8 @@ public class PalworksGameTestsNeoForge {
                 if (test == null) {
                     continue;
                 }
-                String name = testClass.getSimpleName().toLowerCase() + "."
-                        + method.getName().toLowerCase();
+                String name = testClass.getSimpleName().toLowerCase(Locale.ROOT) + "."
+                        + method.getName().toLowerCase(Locale.ROOT);
                 GameTestRegistry.getAllTestFunctions()
                         .add(new TestFunction(
                                 test.batch(),
@@ -78,7 +79,8 @@ public class PalworksGameTestsNeoForge {
                 method.invoke(testClass.getConstructor().newInstance(), helper);
             } catch (InvocationTargetException e) {
                 if (e.getCause() instanceof RuntimeException runtime) {
-                    throw runtime; // assertion failures (GameTestAssertException) included
+                    // Unwrapped on purpose: the test's own failure, not the reflection wrapper
+                    throw runtime; // NOPMD - assertion failures (GameTestAssertException) included
                 }
                 throw new RuntimeException(e.getCause());
             } catch (ReflectiveOperationException e) {

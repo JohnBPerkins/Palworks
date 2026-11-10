@@ -10,6 +10,7 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.manager.JobManager;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -62,7 +63,7 @@ public class CobblemonCropGameTests {
 
     private static String valueOf(BlockState state, String property) {
         Property<?> p = state.getBlock().getStateDefinition().getProperty(property);
-        return state.getValue(p).toString().toLowerCase();
+        return state.getValue(p).toString().toLowerCase(Locale.ROOT);
     }
 
     /** Harvest a ripe crop at {@code pos}: it drops {@code produce} and is back to age 0, in place. */

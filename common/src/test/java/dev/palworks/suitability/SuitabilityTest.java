@@ -3,6 +3,7 @@ package dev.palworks.suitability;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
 /** Pure-logic tests for the Suitability enum and its id round-trip (no running game needed). */
@@ -18,7 +19,7 @@ class SuitabilityTest {
     @Test
     void idsAreLowercase() {
         for (Suitability s : Suitability.values()) {
-            assertEquals(s.getId().toLowerCase(), s.getId(), s + " id should be lowercase");
+            assertEquals(s.getId().toLowerCase(Locale.ROOT), s.getId(), s + " id should be lowercase");
         }
     }
 

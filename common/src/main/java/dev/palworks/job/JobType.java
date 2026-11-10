@@ -1,6 +1,7 @@
 package dev.palworks.job;
 
 import dev.palworks.suitability.Suitability;
+import java.util.Locale;
 
 /**
  * Represents what needs doing NOW.
@@ -60,6 +61,6 @@ public enum JobType {
     }
 
     public String getId() {
-        return name().toLowerCase();
+        return name().toLowerCase(Locale.ROOT);
     }
 }

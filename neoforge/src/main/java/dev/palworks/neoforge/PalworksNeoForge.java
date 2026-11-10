@@ -21,7 +21,7 @@ public class PalworksNeoForge {
         LOGGER.info("==================================================");
         LOGGER.info("PALWORKS NEOFORGE INITIALIZING...");
         LOGGER.info("==================================================");
-        System.out.println("[Palworks] NeoForge mod is loading!");
+        LOGGER.info("NeoForge mod is loading!");
 
         // Register menu types (NeoForge-specific)
         NeoForgeModMenuTypes.register(modEventBus);
@@ -36,7 +36,7 @@ public class PalworksNeoForge {
         // Register command handler (WorkerTickHandler is auto-registered via @EventBusSubscriber)
         NeoForge.EVENT_BUS.register(new PalworksCommands());
 
-        System.out.println("[Palworks] WorkerTickHandler will be auto-registered via @EventBusSubscriber");
+        LOGGER.info("WorkerTickHandler will be auto-registered via @EventBusSubscriber");
         LOGGER.info("==================================================");
         LOGGER.info("PALWORKS NEOFORGE INITIALIZED!");
         LOGGER.info("==================================================");

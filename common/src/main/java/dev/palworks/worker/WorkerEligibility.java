@@ -18,15 +18,6 @@ import org.jetbrains.annotations.Nullable;
 public class WorkerEligibility {
 
     /**
-     * Check if a Pokémon is eligible to work.
-     * Must be:
-     * 1. Owned by a player
-     * 2. Currently in the world (sent out from party or pasture)
-     *
-     * @param pokemon The Pokémon to check
-     * @return true if eligible to work
-     */
-    /**
      * Whether the Pokemon is busy with something that should pause its work: in a battle, or
      * evolving. Uses Cobblemon's own busy flag (PokemonEntity.isBusy, set by its battle and
      * evolution locks), so anything else Cobblemon marks as busy pauses work too.
@@ -40,6 +31,15 @@ public class WorkerEligibility {
         return pokemon.getCurrentHealth() <= 0;
     }
 
+    /**
+     * Check if a Pokémon is eligible to work.
+     * Must be:
+     * 1. Owned by a player
+     * 2. Currently in the world (sent out from party or pasture)
+     *
+     * @param pokemon The Pokémon to check
+     * @return true if eligible to work
+     */
     public static boolean isEligible(Pokemon pokemon) {
         // Must be owned
         if (!isOwned(pokemon)) {
@@ -138,26 +138,5 @@ public class WorkerEligibility {
         }
 
         return "Unknown";
-    }
-
-    /**
-     * Check if a Pokémon entity is eligible to work.
-     * Convenience method that extracts the Pokemon from the entity.
-     */
-    public static boolean isEligible(Entity entity) {
-        Pokemon pokemon = getPokemonFromEntity(entity);
-        return pokemon != null && isEligible(pokemon);
-    }
-
-    /**
-     * Platform-specific: Get Pokemon from entity.
-     * This needs to be implemented per platform or updated when entity is known.
-     */
-    @Nullable
-    private static Pokemon getPokemonFromEntity(Entity entity) {
-        // This would check if entity instanceof PokemonEntity
-        // and return entity.getPokemon()
-        // For now, return null - platform modules will need to implement this
-        return null;
     }
 }

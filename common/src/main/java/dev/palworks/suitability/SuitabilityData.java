@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -209,7 +210,7 @@ public final class SuitabilityData {
             return levels;
         }
         for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
-            String name = entry.getKey().toLowerCase();
+            String name = entry.getKey().toLowerCase(Locale.ROOT);
             JsonElement value = entry.getValue();
             if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
                 warn.accept("Ignoring \"" + entry.getKey() + "\" in " + fileId + " " + section

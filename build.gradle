@@ -3,10 +3,31 @@ plugins {
     id 'architectury-plugin' version '3.4-SNAPSHOT'
     id 'com.gradleup.shadow' version '8.3.6' apply false
     id 'org.jetbrains.kotlin.jvm' version '2.3.0' apply false
+    id 'com.diffplug.spotless' version '8.10.0'
+    id 'net.ltgt.errorprone' version '5.1.1' apply false
 }
 
 architectury {
     minecraft = project.minecraft_version
+}
+
+// Formatting: `./gradlew spotlessApply` formats every Java file, `spotlessCheck` (part of `check`)
+// fails if any isn't formatted. Configured once here rather than per subproject, so the shared
+// GameTest sources (common/src/gametest, compiled only by the loaders) are covered too.
+spotless {
+    java {
+        target '*/src/**/*.java'
+        palantirJavaFormat('2.102.0')
+    }
+}
+
+// Everything the pre-commit hook and CI's lint job check: formatting, Error Prone (it runs while
+// compiling, and PMD needs the compiled classes) and PMD, on every source set of every module.
+tasks.register('lint') {
+    group = 'verification'
+    description = 'Checks formatting, and runs Error Prone and PMD on all Java sources.'
+    dependsOn 'spotlessCheck'
+    dependsOn { subprojects.collect { it.tasks.withType(Pmd) } }
 }
 
 allprojects {
@@ -52,6 +73,10 @@ subprojects {
     apply plugin: 'org.jetbrains.kotlin.jvm'
     apply plugin: 'architectury-plugin'
     apply plugin: 'maven-publish'
+    // Linting: Error Prone runs inside every Java compile (configured below); PMD runs as
+    // `pmdMain`/`pmdTest`/`pmdGametest`, all part of `check`. `./gradlew lint` runs them all.
+    apply plugin: 'net.ltgt.errorprone'
+    apply plugin: 'pmd'
 
     base {
         // Set up a suffixed format for the mod jar names, e.g. `example-fabric`.
@@ -72,6 +97,38 @@ subprojects {
 
     dependencies {
         minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
+        errorprone "com.google.errorprone:error_prone_core:2.51.0"
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        // Any compiler warning fails the build (Error Prone's included), so they get fixed rather
+        // than pile up. To silence one that's intentional, use @SuppressWarnings("CheckName").
+        options.compilerArgs << '-Werror'
+        options.errorprone {
+            // Blocks, items, levels and registry entries are singletons: == is the Minecraft idiom.
+            disable('ReferenceEquality')
+            // Packets and menus encode enums by ordinal, on both ends of the same jar.
+            disable('EnumOrdinal')
+            // Javadoc style, not bugs.
+            disable('MissingSummary')
+            // Mixin handlers are called by the injected code, not by anything Error Prone can see.
+            option('UnusedMethod:ExemptingMethodAnnotations', 'org.spongepowered.asm.mixin.injection.Inject')
+            option('Unused:methodAnnotationsExemptingParameters', 'org.spongepowered.asm.mixin.injection.Inject')
+        }
+    }
+
+    pmd {
+        toolVersion = '7.28.0'
+        ruleSetFiles = rootProject.files('config/pmd/ruleset.xml')
+        ruleSets = []
+        consoleOutput = true
+    }
+
+    // Gives PMD the JDK's classes for type resolution (Gradle doesn't), which also silences its
+    // "Adding current platform jrt-fs.jar to auxClasspath" warning.
+    dependencies {
+        def jdk = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+        pmdAux files(jdk.map { it.metadata.installationPath.file('lib/jrt-fs.jar') })
     }
 
     java {

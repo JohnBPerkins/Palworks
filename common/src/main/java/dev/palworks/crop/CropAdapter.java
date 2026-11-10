@@ -160,8 +160,7 @@ public class CropAdapter {
         // Galarica nut bush - harvestable at age 3
         if (isGalaricaNutBush(block)) {
             for (Property<?> property : state.getProperties()) {
-                if (property.getName().equals("age") && property instanceof IntegerProperty) {
-                    IntegerProperty ageProperty = (IntegerProperty) property;
+                if (property.getName().equals("age") && property instanceof IntegerProperty ageProperty) {
                     int age = state.getValue(ageProperty);
                     return age >= 3; // Galarica is harvestable at age 3
                 }
@@ -174,8 +173,7 @@ public class CropAdapter {
         if (state.is(COBBLEMON_BERRIES)) {
             // Find the AGE property dynamically (Cobblemon berries use their own AGE property)
             for (Property<?> property : state.getProperties()) {
-                if (property.getName().equals("age") && property instanceof IntegerProperty) {
-                    IntegerProperty ageProperty = (IntegerProperty) property;
+                if (property.getName().equals("age") && property instanceof IntegerProperty ageProperty) {
                     int age = state.getValue(ageProperty);
                     return age >= 5; // Cobblemon berries are harvestable at age 5
                 }
@@ -437,8 +435,8 @@ public class CropAdapter {
         // Other crops - check if they have an age property
         IntegerProperty ageProperty = null;
         for (Property<?> property : state.getProperties()) {
-            if (property.getName().equals("age") && property instanceof IntegerProperty) {
-                ageProperty = (IntegerProperty) property;
+            if (property.getName().equals("age") && property instanceof IntegerProperty integerProperty) {
+                ageProperty = integerProperty;
                 break;
             }
         }

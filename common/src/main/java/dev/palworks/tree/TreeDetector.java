@@ -146,7 +146,7 @@ public class TreeDetector {
         // BFS to find all connected logs and validate the tree structure
         Set<BlockPos> visitedLogs = new HashSet<>();
         Set<BlockPos> visitedForValidation = new HashSet<>();
-        Queue<BlockPos> queue = new LinkedList<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
         Map<BlockPos, Block> leaves = new HashMap<>();
         BlockPos lowestLog = startPos;
         boolean foundGroundConnection = false;
@@ -464,8 +464,8 @@ public class TreeDetector {
     private static long nearestColumnDistSq(BlockPos pos, Set<Long> columns) {
         long best = Long.MAX_VALUE;
         for (long column : columns) {
-            long dx = pos.getX() - columnX(column);
-            long dz = pos.getZ() - columnZ(column);
+            long dx = (long) pos.getX() - columnX(column);
+            long dz = (long) pos.getZ() - columnZ(column);
             best = Math.min(best, dx * dx + dz * dz);
         }
         return best;

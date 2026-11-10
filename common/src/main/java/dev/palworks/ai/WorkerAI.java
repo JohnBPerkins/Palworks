@@ -49,9 +49,6 @@ public class WorkerAI {
     // Cooldown before finding new work after completing a job (in ticks)
     private static final int JOB_COMPLETE_COOLDOWN = 60; // 3 seconds
 
-    // How often to scan for new jobs when idle (in ticks)
-    private static final int JOB_SCAN_INTERVAL = 40; // 2 seconds
-
     // Arrived when within this squared distance of the stand tile. The stand tile sits a block back
     // from a directional station (see WorkPositions), so this radius stays clear of the station's
     // side tiles (front-only) while keeping arrival prompt — no fidgeting to hit an exact tile.
@@ -68,9 +65,6 @@ public class WorkerAI {
     public static final int STEP_IN_TICKS = 40;
     // How near the middle of its tile counts as on it, for a lumberjack (crossing its edge doesn't)
     private static final double ON_TILE_DIST = 0.35;
-
-    // Work radius around the worker (no base required)
-    private static final int WORK_RADIUS = 32;
 
     // How often (ticks) to flush in-progress worker state to NBT. Between flushes the state
     // lives in the WorkerStateManager cache; staggered per-entity to avoid a save spike.
@@ -1137,7 +1131,8 @@ public class WorkerAI {
                     serverLevel);
 
             GenericBedrockEntity marker = targetMarker; // effectively final for the callback
-            timeline.run(context).whenComplete((result, error) -> marker.discard());
+            // Only the cleanup matters; the completion future itself isn't needed.
+            var unused = timeline.run(context).whenComplete((result, error) -> marker.discard());
         } catch (Exception e) {
             if (targetMarker != null) {
                 targetMarker.discard();

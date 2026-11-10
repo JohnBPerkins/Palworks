@@ -69,6 +69,11 @@ dependencies {
     // spark profiler, for dev runs only (/spark profiler, /spark tps). See CONTRIBUTING. Already
     // uses NeoForge's names, so it needs no remapping.
     localRuntime("maven.modrinth:spark:1.10.124-neoforge-1.21.1") { transitive = false }
+
+    // Cobblemon's classes carry Kotlin annotations (@Deprecated(level = WARNING)); without the
+    // stdlib to resolve them javac warns, and warnings fail the build. Compile only: Kotlin for
+    // Forge provides it at runtime.
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.21"
 }
 
 processResources {

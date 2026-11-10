@@ -55,7 +55,7 @@ public class FurnaceHelper {
             isLit = state.getValue(BlockStateProperties.LIT);
         }
 
-        boolean needsFuel = hasInput && !isLit;
+        boolean needsFuel = !isLit; // hasInput is known true: returned early above
 
         if (DEBUG && needsFuel) {
             Palworks.LOGGER.debug("Furnace at {} needs fuel (hasInput: {}, isLit: {})", pos, hasInput, isLit);

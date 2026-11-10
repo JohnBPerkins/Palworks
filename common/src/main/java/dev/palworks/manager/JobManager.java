@@ -830,7 +830,7 @@ public class JobManager {
 
         int assignedCount = 0;
         for (WorkerInfo worker : idleWorkers) {
-            Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
+            Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
 
             // A transporter carrying cargo (anything but a planter's seeds) fills up before it
             // delivers: it takes pickups it has room for, nearest first (a free slot takes anything;
@@ -989,7 +989,7 @@ public class JobManager {
      * stand position, path) are in {@link #assignFirstReachable}.
      */
     private List<JobRecord> poolCandidates(WorkerInfo worker) {
-        Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
+        Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
         WorkerInventory inventory = pokemon != null ? WorkerInventoryManager.getOrCreate(pokemon) : null;
         boolean carriesSeeds = inventory != null && inventory.hasAnySeed();
 
@@ -1073,7 +1073,7 @@ public class JobManager {
         if (candidates.isEmpty()) {
             return null;
         }
-        PokemonEntity entity = getEntityByUUID(level, worker.pokemonUUID);
+        PokemonEntity entity = getEntityByUUID(worker.pokemonUUID);
         if (entity == null) {
             return null; // can't check reachability without the entity; try again next tick
         }
@@ -1209,7 +1209,7 @@ public class JobManager {
      * directly, or the job skips those checks.
      */
     private void assignJobToWorker(ServerLevel level, WorkerInfo worker, JobRecord job) {
-        Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
+        Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
         if (pokemon == null) {
             // Pokemon entity not found - put job back in available pool
             if (DEBUG) {
@@ -1253,7 +1253,6 @@ public class JobManager {
             // Send chat message to nearby players
             sendDebugMessage(
                     level,
-                    job.position,
                     String.format(
                             "§a%s§f assigned §e%s§f at [%d, %d, %d] (dist: %s)",
                             pokemon.getSpecies().getName(),
@@ -1269,8 +1268,8 @@ public class JobManager {
      * Get a Pokemon entity by UUID.
      */
     @Nullable
-    private Pokemon getPokemonByUUID(ServerLevel level, UUID uuid) {
-        PokemonEntity entity = getEntityByUUID(level, uuid);
+    private Pokemon getPokemonByUUID(UUID uuid) {
+        PokemonEntity entity = getEntityByUUID(uuid);
         return entity != null ? entity.getPokemon() : null;
     }
 
@@ -1279,7 +1278,7 @@ public class JobManager {
      * Only workers are looked up, and registerWorker() keeps entityCache current for them.
      */
     @Nullable
-    private PokemonEntity getEntityByUUID(ServerLevel level, UUID uuid) {
+    private PokemonEntity getEntityByUUID(UUID uuid) {
         PokemonEntity cached = entityCache.get(uuid);
         return cached != null && cached.isAlive() ? cached : null;
     }
@@ -1338,7 +1337,6 @@ public class JobManager {
             // Send chat message to nearby players
             sendDebugMessage(
                     serverLevel,
-                    jobPos,
                     String.format(
                             "§a%s§f completed §e%s§f at [%d, %d, %d]",
                             pokemon.getSpecies().getName(),
@@ -1356,7 +1354,7 @@ public class JobManager {
             // and berries regrow on their own. See CropAdapter.harvestCrop.
             if (DEBUG) {
                 Palworks.LOGGER.info("Queuing pickup job for harvest at {}", jobPos);
-                sendDebugMessage(serverLevel, jobPos, "  §7→ Queued §eCOLLECT_DROPS§7");
+                sendDebugMessage(serverLevel, "  §7→ Queued §eCOLLECT_DROPS§7");
             }
 
             // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
@@ -1550,7 +1548,6 @@ public class JobManager {
 
             sendDebugMessage(
                     serverLevel,
-                    basePos,
                     String.format(
                             "§a%s§f chopped tree, queuing §eCOLLECT_DROPS§f",
                             pokemon.getSpecies().getName()));
@@ -1592,7 +1589,7 @@ public class JobManager {
         if (job.type != JobType.COLLECT_DROPS) {
             return true;
         }
-        Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
+        Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
         if (pokemon == null) {
             return false;
         }
@@ -1729,7 +1726,7 @@ public class JobManager {
     /**
      * Send a debug message to all players who have debug enabled.
      */
-    private void sendDebugMessage(ServerLevel level, BlockPos pos, String message) {
+    private void sendDebugMessage(ServerLevel level, String message) {
         // Goes only to players who opted in via /palworks debug. These call sites are still gated
         // by DEBUG, so these verbose assignment-detail lines only appear in a debug build.
         DebugManager.broadcastActivity(level, message);
@@ -1788,7 +1785,7 @@ public class JobManager {
             for (JobRecord job : reservedJobs.values()) {
                 String workerName = "unknown";
                 if (job.reservedByWorker != null) {
-                    Pokemon pokemon = getPokemonByUUID(level, job.reservedByWorker);
+                    Pokemon pokemon = getPokemonByUUID(job.reservedByWorker);
                     if (pokemon != null) {
                         workerName = pokemon.getSpecies().getName();
                     }
@@ -1806,7 +1803,7 @@ public class JobManager {
             lines.add("  §7(none)");
         } else {
             for (WorkerInfo worker : activeWorkers.values()) {
-                Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
+                Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
                 String name = pokemon != null ? pokemon.getSpecies().getName() : "unknown";
                 String status;
                 if (worker.idle) {
@@ -1832,7 +1829,7 @@ public class JobManager {
         for (WorkerInfo worker : activeWorkers.values()) {
             if (!worker.idle || worker.currentReservation != null) continue;
 
-            Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
+            Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
             String name = pokemon != null ? pokemon.getSpecies().getName() : "unknown";
             Mob entity = pokemon != null ? (Mob) pokemon.getEntity() : null;
 

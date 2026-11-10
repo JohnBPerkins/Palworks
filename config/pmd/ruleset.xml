@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Palworks"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>
+        PMD rules for Palworks: the "error prone" and "best practices" categories, minus rules that
+        are only style, that Error Prone already covers, or that misfire on Minecraft code.
+        Formatting is spotless's job (palantir-java-format), not PMD's.
+        To silence one finding that's intentional, put `// NOPMD - reason` on its line.
+    </description>
+
+    <rule ref="category/java/errorprone.xml">
+        <!-- Minecraft's Level, ServerLevel and Minecraft are AutoCloseable but owned by the game:
+             closing them would be the bug. -->
+        <exclude name="CloseResource"/>
+        <!-- Blocks, items and levels are singletons: == is the idiom (and Error Prone's
+             ReferenceEquality is off for the same reason). -->
+        <exclude name="CompareObjectsWithEquals"/>
+        <!-- Menus must call addSlot/addDataSlot in their constructor; that's how vanilla does it. -->
+        <exclude name="ConstructorCallsOverridableMethod"/>
+        <!-- Catching Exception around one worker's job keeps a bad job from crashing the server. -->
+        <exclude name="AvoidCatchingGenericException"/>
+        <!-- GameTest classes hold @GameTest methods, which PMD doesn't recognize as tests. -->
+        <exclude name="TestClassWithoutTestCases"/>
+        <!-- Duplicates Error Prone's StringCaseLocaleUsage. -->
+        <exclude name="UseLocaleWithCaseConversions"/>
+        <!-- Style only. -->
+        <exclude name="AvoidDuplicateLiterals"/>
+        <exclude name="AvoidLiteralsInIfCondition"/>
+        <exclude name="AvoidFieldNameMatchingMethodName"/>
+        <exclude name="AvoidFieldNameMatchingTypeName"/>
+        <exclude name="AvoidBranchingStatementAsLastInLoop"/>
+        <exclude name="AssignmentInOperand"/>
+        <exclude name="NullAssignment"/>
+    </rule>
+
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Error Prone's UnusedVariable/UnusedMethod cover these, and know Mixin handlers. -->
+        <exclude name="UnusedFormalParameter"/>
+        <exclude name="UnusedPrivateField"/>
+        <exclude name="UnusedPrivateMethod"/>
+        <!-- Test style: JUnit's own messages are clear enough, and one test may check several things. -->
+        <exclude name="UnitTestAssertionsShouldIncludeMessage"/>
+        <exclude name="UnitTestContainsTooManyAsserts"/>
+        <!-- Logging uses SLF4J {} placeholders, so unguarded debug calls cost next to nothing. -->
+        <exclude name="GuardLogStatement"/>
+        <!-- Style only. -->
+        <exclude name="LiteralsFirstInComparisons"/>
+        <exclude name="LooseCoupling"/>
+        <exclude name="OneDeclarationPerLine"/>
+        <exclude name="UseEnumCollections"/>
+        <exclude name="ImplicitFunctionalInterface"/>
+        <exclude name="AbstractClassWithoutAbstractMethod"/>
+        <exclude name="OnDemandImport"/>
+    </rule>
+
+    <rule ref="category/java/multithreading.xml/DoubleCheckedLocking"/>
+    <rule ref="category/java/multithreading.xml/UnsynchronizedStaticFormatter"/>
+</ruleset>

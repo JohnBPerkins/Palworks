@@ -15,6 +15,8 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
+// Bus.MOD is deprecated for removal in later NeoForge versions, which infer the bus from the event.
+@SuppressWarnings("removal")
 @EventBusSubscriber(modid = "palworks", bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class PalworksNeoForgeClient {
 
@@ -26,7 +28,7 @@ public class PalworksNeoForgeClient {
 
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
+        var unused = event.enqueueWork(() -> {
             // Register Pokemon interact wheel handler
             PokemonInteractHandler.init();
         });

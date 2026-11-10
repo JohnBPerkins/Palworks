@@ -1,0 +1,26 @@
+# Git hooks, run by pre-commit (https://pre-commit.com) on every commit:
+#   brew install pre-commit   (or: pipx install pre-commit)
+#   pre-commit install        (once per clone)
+# Both hooks go through Gradle, so they use exactly the formatter and linters CI does. They only
+# run when a commit touches Java sources or the lint configuration. pre-commit hides unstaged
+# changes while they run, so only what's being committed is formatted and checked.
+# Skip them once with `git commit --no-verify`.
+repos:
+  - repo: local
+    hooks:
+      # Formats the code in place. If it changed anything the commit stops: look over the
+      # changes, `git add` them and commit again.
+      - id: format
+        name: format (palantir-java-format)
+        entry: ./gradlew spotlessApply --quiet
+        language: system
+        files: \.java$
+        pass_filenames: false
+
+      # Error Prone (while compiling) and PMD, on every module.
+      - id: lint
+        name: lint (Error Prone, PMD)
+        entry: ./gradlew lint --quiet
+        language: system
+        files: (\.java|\.gradle|gradle\.properties|^config/pmd/.*)$
+        pass_filenames: false

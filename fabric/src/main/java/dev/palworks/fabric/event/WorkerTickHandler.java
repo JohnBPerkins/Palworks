@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Mob;
 
 /**
  * Handles ticking for Pokémon workers on Fabric.
@@ -64,19 +63,12 @@ public class WorkerTickHandler {
             lastDebugLog = System.currentTimeMillis();
         }
 
-        // Cast to Mob for navigation
-        if (pokemonEntity instanceof Mob mob && pokemonEntity.level() instanceof ServerLevel serverLevel) {
+        if (pokemonEntity.level() instanceof ServerLevel serverLevel) {
             // Register worker with JobManager
-            JobManager.getInstance(serverLevel).registerWorker(pokemon, mob, serverLevel);
+            JobManager.getInstance(serverLevel).registerWorker(pokemon, pokemonEntity, serverLevel);
 
             // Execute assigned work
-            WorkerAI.tick(pokemon, mob, serverLevel);
-        } else {
-            if (DEBUG && System.currentTimeMillis() - lastDebugLog > 5000) {
-                PalworksFabric.LOGGER.warn(
-                        "PokemonEntity is not a Mob! Class: {}",
-                        pokemonEntity.getClass().getName());
-            }
+            WorkerAI.tick(pokemon, pokemonEntity, serverLevel);
         }
     }
 }

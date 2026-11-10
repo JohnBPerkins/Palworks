@@ -61,10 +61,10 @@ jobs:
         run: ./gradlew assemble
 
       # The in-game tests (which `check` also runs) have their own job, below, so the boot jobs
-      # waiting on this one aren't held up by them.
+      # waiting on this one aren't held up by them. So do formatting and PMD (the lint job).
       - name: Test
         id: test
-        run: ./gradlew check -x :fabric:runGameTest
+        run: ./gradlew check -x :fabric:runGameTest -x spotlessCheck -x pmdMain -x pmdTest -x pmdGametest
 
       # Runs whether the tests passed or failed (but not if the build itself failed), and puts a
       # results table plus each failure's message in the run summary and as PR annotations.
@@ -91,6 +91,46 @@ jobs:
             fabric/build/libs/*.jar
             neoforge/build/libs/*.jar
           if-no-files-found: ignore
+
+  # Formatting (palantir-java-format, via spotless), Error Prone (runs while compiling) and PMD:
+  # the same `./gradlew lint` the pre-commit hook runs. To fix formatting: ./gradlew spotlessApply
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Same cache as the build job (same key), so the Minecraft jars aren't remapped again.
+      - name: Cache Loom project files
+        uses: actions/cache@v6
+        with:
+          path: |
+            .gradle/loom-cache
+            */.gradle/loom-cache
+          key: loom-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+          restore-keys: |
+            loom-${{ runner.os }}-
+
+      - name: Lint
+        run: ./gradlew lint
+
+      - name: Upload PMD reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pmd-reports
+          path: "*/build/reports/pmd/"
+          if-no-files-found: ignore
+          retention-days: 14
 
   # In-game tests: boots a headless dev server with Palworks, Cobblemon and the GameTests
   # (common/src/gametest), and runs them: real worlds, real blocks, real Pokémon doing jobs. The

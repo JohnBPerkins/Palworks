@@ -76,6 +76,7 @@ final class Workers {
      * (On NeoForge the test mod lets Cobblemon's packets through to the mock player's fake
      * connection, which never negotiated them.)
      */
+    @SuppressWarnings("removal") // makeMockServerPlayerInLevel: vanilla's only mock player in 1.21.1
     static PokemonEntity sendOut(GameTestHelper helper, String properties, BlockPos rel) {
         ServerPlayer owner = helper.makeMockServerPlayerInLevel();
         BlockPos abs = helper.absolutePos(rel);
