@@ -282,6 +282,9 @@ public class JobManager {
         info.pokemonUUID = uuid;
         BlockPos entityPos = entity.blockPosition();
         info.position = entityPos;
+        // A party Pokémon works near its owner; one from a pasture works round its pasture
+        info.fromParty = WorkerEligibility.isFromParty(pokemon);
+        info.ownerPosition = info.fromParty ? WorkerEligibility.partyOwnerPosition(pokemon, level) : null;
         if (newlyActive) {
             // Just sent out (or back in range): its first job comes from a fresh look round, not
             // from chunk scans up to 2s old that may have missed what's there now
@@ -927,6 +930,9 @@ public class JobManager {
                             || Math.abs(chestPos.getY() - workerPos.getY()) > DELIVERY_SEARCH_VERTICAL) {
                         continue;
                     }
+                    if (!nearEnoughToOwner(worker, chestPos)) {
+                        continue;
+                    }
                     // The cached position may be up to one scan old, so re-check it's still a chest
                     if (isChest(level.getBlockState(chestPos).getBlock())
                             && ChestHelper.canAcceptItems(level, chestPos, firstItem)) {
@@ -973,7 +979,7 @@ public class JobManager {
         List<JobRecord> candidates = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
             // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
-            if (!canDoJob(worker, job) || !WorkRange.contains(worker.position, job.position)
+            if (!canDoJob(worker, job) || !inWorkRange(worker, job.position)
                     || isRecentlyUnreachable(worker, job.position) || !canTakeFrom(worker, job)) {
                 continue;
             }
@@ -1056,8 +1062,8 @@ public class JobManager {
         for (JobRecord job : candidates) {
             // Only jobs within its work range: a far one (found round some other worker, or left
             // over from one) would send it off across the world, and checking a path to it loads
-            // chunks out there
-            if (!canDoJob(worker, job) || !WorkRange.contains(worker.position, job.position)
+            // chunks out there. A party Pokémon's must be near its owner too.
+            if (!canDoJob(worker, job) || !inWorkRange(worker, job.position)
                     || isRecentlyUnreachable(worker, job.position) || !canTakeFrom(worker, job)) {
                 continue;
             }
@@ -1132,6 +1138,23 @@ public class JobManager {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether {@code pos} is somewhere this worker may be sent: within its own work range and,
+     * for one from a party, within work range of its owner too (see {@link #nearEnoughToOwner}).
+     */
+    private static boolean inWorkRange(WorkerInfo worker, BlockPos pos) {
+        return WorkRange.contains(worker.position, pos) && nearEnoughToOwner(worker, pos);
+    }
+
+    /**
+     * A party Pokémon only works near its owner ({@link WorkRange#OWNER_RANGE}), so it doesn't head
+     * off to (or path-check) jobs far from them, which Cobblemon would teleport it back from part
+     * way; with its owner not in this level, nowhere is. Pasture Pokémon aren't limited.
+     */
+    private static boolean nearEnoughToOwner(WorkerInfo worker, BlockPos pos) {
+        return !worker.fromParty || WorkRange.nearOwner(worker.ownerPosition, pos);
     }
 
     /**
@@ -1803,6 +1826,9 @@ public class JobManager {
     public static class WorkerInfo {
         public UUID pokemonUUID;
         public BlockPos position;
+        public boolean fromParty;      // From its owner's party (not a pasture): works near its owner
+        @Nullable
+        public BlockPos ownerPosition; // Where its owner is, for one from a party (null if not in this level)
         public Set<Suitability> suitabilities;
         public ReservationId currentReservation;
         public boolean idle;

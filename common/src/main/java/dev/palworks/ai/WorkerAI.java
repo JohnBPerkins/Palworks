@@ -282,6 +282,27 @@ public class WorkerAI {
             return false;
         }
 
+        // A party Pokémon works near its owner: if they've moved so far off from the job it's on its
+        // way to that Cobblemon would teleport it back to them once it got there, it drops the job
+        // rather than head off away from them. Nothing's wrong with the job, so it isn't remembered
+        // as unreachable: JobManager.registerWorker puts it back in the pool, for whoever is near
+        // it (this worker too, once its owner is back).
+        if (distanceSq > ARRIVAL_DISTSQ
+                && !state.isWorking()
+                && !state.hasJobProgress()
+                && (level.getGameTime() + entity.getId()) % JOB_RECHECK_INTERVAL == 0
+                && !dev.palworks.worker.WorkerEligibility.withinOwnerLeash(pokemon, level, targetPos)) {
+            if (DEBUG) {
+                Palworks.LOGGER.info("{}'s owner moved away from its {} job at {} - dropping",
+                    pokemon.getSpecies().getName(), reservation.getJobType(), targetPos);
+            }
+            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+            state.clearReservation();
+            state.resetPathFailures();
+            WorkerStateManager.save(pokemon, state);
+            return false;
+        }
+
         // Arrived when within ARRIVAL_DISTSQ of the stand tile (prompt, no fidgeting to hit the exact
         // tile), or when its walk has ended right next to the tile (SETTLED_DISTSQ), or, for a job
         // that doesn't need a particular side (a crop), anywhere within reach of it.
