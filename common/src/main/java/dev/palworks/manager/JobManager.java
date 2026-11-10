@@ -9,6 +9,8 @@ import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.WorkerDebugSync;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
+import dev.palworks.manager.JobPool.JobKey;
+import dev.palworks.manager.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkActivitySync;

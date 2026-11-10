@@ -13,6 +13,7 @@ import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.WorkRange;
+import dev.palworks.manager.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
