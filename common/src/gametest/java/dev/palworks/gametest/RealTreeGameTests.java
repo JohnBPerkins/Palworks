@@ -28,6 +28,7 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
  * real lumberjack sent at them. Uses the 16x24x16 arena so full-size trees fit.
  */
 public class RealTreeGameTests {
+    private static final String MACHOP = "machop";
 
     /** Where trees grow in the arena (relative), on its grass floor. */
     static final BlockPos TREE = new BlockPos(8, 1, 9);
@@ -184,46 +185,46 @@ public class RealTreeGameTests {
 
     @GameTest(template = Templates.ARENA, batch = "real_oak", timeoutTicks = 300)
     public void machopChopsARealOak(GameTestHelper helper) {
-        chopRealTree(helper, TreeFeatures.OAK, 1, "machop", Blocks.OAK_SAPLING);
+        chopRealTree(helper, TreeFeatures.OAK, 1, MACHOP, Blocks.OAK_SAPLING);
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_fancy_oak", timeoutTicks = 300)
     public void machopChopsARealBigOak(GameTestHelper helper) {
         // Big oaks' branches join the trunk diagonally
-        chopRealTree(helper, TreeFeatures.FANCY_OAK, 2, "machop", Blocks.OAK_SAPLING);
+        chopRealTree(helper, TreeFeatures.FANCY_OAK, 2, MACHOP, Blocks.OAK_SAPLING);
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_birch", timeoutTicks = 300)
     public void machopChopsARealBirch(GameTestHelper helper) {
-        chopRealTree(helper, TreeFeatures.BIRCH, 3, "machop", Blocks.BIRCH_SAPLING);
+        chopRealTree(helper, TreeFeatures.BIRCH, 3, MACHOP, Blocks.BIRCH_SAPLING);
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_spruce", timeoutTicks = 300)
     public void machopChopsARealSpruce(GameTestHelper helper) {
-        chopRealTree(helper, TreeFeatures.SPRUCE, 4, "machop", Blocks.SPRUCE_SAPLING);
+        chopRealTree(helper, TreeFeatures.SPRUCE, 4, MACHOP, Blocks.SPRUCE_SAPLING);
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_acacia", timeoutTicks = 300)
     public void machopChopsARealAcacia(GameTestHelper helper) {
         // Acacia trunks bend diagonally
-        chopRealTree(helper, TreeFeatures.ACACIA, 5, "machop", Blocks.ACACIA_SAPLING);
+        chopRealTree(helper, TreeFeatures.ACACIA, 5, MACHOP, Blocks.ACACIA_SAPLING);
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_cherry", timeoutTicks = 300)
     public void machopChopsARealCherry(GameTestHelper helper) {
-        chopRealTree(helper, TreeFeatures.CHERRY, 6, "machop", Blocks.CHERRY_SAPLING);
+        chopRealTree(helper, TreeFeatures.CHERRY, 6, MACHOP, Blocks.CHERRY_SAPLING);
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_dark_oak", timeoutTicks = 300)
     public void machopChopsARealDarkOak(GameTestHelper helper) {
-        chopRealTree(helper, TreeFeatures.DARK_OAK, 7, "machop", Blocks.DARK_OAK_SAPLING);
+        chopRealTree(helper, TreeFeatures.DARK_OAK, 7, MACHOP, Blocks.DARK_OAK_SAPLING);
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_jungle_cocoa", timeoutTicks = 300)
     public void machopChopsARealJungleTreeWithCocoaPods(GameTestHelper helper) {
         // Cocoa pods grow on jungle trunks and are solid, which used to get the tree skipped. One
         // at head height on the side facing the worker (it can't stand there), one above it.
-        chopRealTree(helper, TreeFeatures.JUNGLE_TREE, 8, "machop", Blocks.JUNGLE_SAPLING, () -> {
+        chopRealTree(helper, TreeFeatures.JUNGLE_TREE, 8, MACHOP, Blocks.JUNGLE_SAPLING, () -> {
             helper.setBlock(
                     TREE.offset(0, 1, -1),
                     Blocks.COCOA
@@ -244,7 +245,7 @@ public class RealTreeGameTests {
     public void machopChopsARealMangroveAndReplantsItUnderItsTrunk(GameTestHelper helper) {
         // Its lowest block is a root off to one side; the propagule goes back under the trunk,
         // where the tree grew from
-        chopRealTree(helper, TreeFeatures.MANGROVE, 9, "machop", Blocks.MANGROVE_PROPAGULE, Blocks.MUD, () -> {});
+        chopRealTree(helper, TreeFeatures.MANGROVE, 9, MACHOP, Blocks.MANGROVE_PROPAGULE, Blocks.MUD, () -> {});
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_mangrove_detect")
@@ -270,7 +271,7 @@ public class RealTreeGameTests {
             }
             helper.assertTrue(
                     at.equals(chopAt), "one job spot whichever base it's found from: " + at + " and " + chopAt);
-            helper.assertTrue(TreeDetector.getSaplingForTree(level, tree) == Items.MANGROVE_PROPAGULE, "a propagule");
+            helper.assertValueEqual(TreeDetector.getSaplingForTree(level, tree), Items.MANGROVE_PROPAGULE, "sapling");
             List<BlockPos> spots = TreeDetector.saplingPositions(level, tree.getLogPositions(), tree.getBasePosition());
             helper.assertTrue(
                     spots.equals(List.of(helper.absolutePos(TREE))),
@@ -290,7 +291,7 @@ public class RealTreeGameTests {
         helper.assertTrue(tree.isValid(), "a real azalea is a tree: " + tree.getReason());
         Item sapling = TreeDetector.getSaplingForTree(level, tree);
         helper.assertTrue(
-                sapling == Items.AZALEA || sapling == Items.FLOWERING_AZALEA,
+                Items.AZALEA.equals(sapling) || Items.FLOWERING_AZALEA.equals(sapling),
                 "an azalea is replanted with an azalea, got " + sapling);
         helper.succeed();
     }
@@ -346,9 +347,10 @@ public class RealTreeGameTests {
         arenaFloor(helper, Blocks.GRASS_BLOCK);
         grow(helper, TreeFeatures.OAK, 1);
         List<BlockPos> fenceAt = new ArrayList<>();
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                if (Math.max(Math.abs(dx), Math.abs(dz)) == 2) {
+        int fenceRing = 2;
+        for (int dx = -fenceRing; dx <= fenceRing; dx++) {
+            for (int dz = -fenceRing; dz <= fenceRing; dz++) {
+                if (Math.max(Math.abs(dx), Math.abs(dz)) == fenceRing) {
                     for (int y = 0; y < 2; y++) {
                         BlockPos pos = TREE.offset(dx, y, dz);
                         helper.setBlock(pos, fence);

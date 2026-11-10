@@ -26,6 +26,9 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
  * would otherwise wander into neighbouring tests' scenes.
  */
 public class WorkerGameTests {
+    // A Grass type (Planting, Gathering) and a Fighting type (Lumbering)
+    private static final String BULBASAUR = "bulbasaur level=20";
+    private static final String MACHOP = "machop level=20";
 
     private static final CropBlock WHEAT = (CropBlock) Blocks.WHEAT;
     private static final BlockPos START = new BlockPos(3, 1, 1);
@@ -57,7 +60,7 @@ public class WorkerGameTests {
         // unreachable while it was still dropping to the ground)
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         ripeWheatRow(helper);
-        Workers.sendOut(helper, "bulbasaur level=20", START);
+        Workers.sendOut(helper, BULBASAUR, START);
 
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested and reset"));
     }
@@ -67,7 +70,7 @@ public class WorkerGameTests {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 5, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
-        Workers.sendOut(helper, "machop level=20", START); // Fighting: Lumbering
+        Workers.sendOut(helper, MACHOP, START); // Fighting: Lumbering
 
         helper.succeedWhen(() -> {
             for (int y = 1; y <= 4; y++) {
@@ -87,7 +90,7 @@ public class WorkerGameTests {
         for (BlockPos trunk : nearestFirst) {
             Scenes.tree(helper, trunk.getX(), trunk.getZ(), 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
         }
-        Workers.sendOut(helper, "machop level=20", new BlockPos(8, 1, 1));
+        Workers.sendOut(helper, MACHOP, new BlockPos(8, 1, 1));
 
         java.util.List<BlockPos> chopped = new java.util.ArrayList<>();
         helper.onEachTick(() -> {
@@ -129,7 +132,7 @@ public class WorkerGameTests {
         for (int x = 2; x <= 4; x++) {
             helper.setBlock(x, 0, 5, Blocks.FARMLAND);
         }
-        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
         var pouch = WorkerInventoryManager.getOrCreate(worker.getPokemon());
         helper.assertTrue(pouch.getMode() == CarryMode.SEED_POUCH, "a Grass type carries a seed pouch");
         pouch.addItem(new ItemStack(Items.WHEAT_SEEDS, 16));
@@ -152,7 +155,7 @@ public class WorkerGameTests {
         helper.setBlock(chestPos, Blocks.CHEST);
         ((ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos)))
                 .setItem(0, new ItemStack(Items.WHEAT_SEEDS, 8));
-        Workers.sendOut(helper, "bulbasaur level=20", START);
+        Workers.sendOut(helper, BULBASAUR, START);
 
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "planted with seeds from the chest"));
     }
@@ -165,7 +168,7 @@ public class WorkerGameTests {
         for (int x = 2; x <= 4; x++) {
             helper.setBlock(x, 0, 5, Blocks.FARMLAND);
         }
-        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
 
         helper.runAfterDelay(200, () -> {
             WorkerState state = WorkerStateManager.get(worker.getPokemon());
@@ -188,7 +191,7 @@ public class WorkerGameTests {
         ripeWheatRow(helper);
         BlockPos chestPos = new BlockPos(6, 1, 1);
         helper.setBlock(chestPos, Blocks.CHEST);
-        Workers.sendOut(helper, "bulbasaur level=20", START);
+        Workers.sendOut(helper, BULBASAUR, START);
         Workers.sendOut(helper, "pidgey level=20", new BlockPos(1, 1, 1)); // Flying: Transporting
 
         helper.succeedWhen(() -> {
@@ -210,7 +213,7 @@ public class WorkerGameTests {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         ripeWheatRow(helper);
-        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
         WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
         state.setEnabled(false);
         WorkerStateManager.save(worker.getPokemon(), state);
@@ -229,7 +232,7 @@ public class WorkerGameTests {
         // job on resume. Blocking the server thread is that pause.
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         ripeWheatRow(helper);
-        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
         long[] pausedAt = {-1};
         long[] heldSince = {0};
 
@@ -262,7 +265,7 @@ public class WorkerGameTests {
         // Busy is what a battle (or evolving) sets on the Pokémon; it should stop working until free
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         ripeWheatRow(helper);
-        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
         worker.getBusyLocks().add("palworks-test");
 
         helper.runAfterDelay(200, () -> {
@@ -312,7 +315,7 @@ public class WorkerGameTests {
                 }
             }
         }
-        Workers.sendOut(helper, "bulbasaur level=20", inside);
+        Workers.sendOut(helper, BULBASAUR, inside);
 
         helper.runAfterDelay(150, () -> {
             assertWheatRow(helper, 7, "out of reach while the worker is boxed in");
@@ -369,7 +372,7 @@ public class WorkerGameTests {
     public void lumberjacksWithoutNetherLeaveNetherTreesAlone(GameTestHelper helper) {
         Workers.isolate(helper);
         crimsonFungus(helper);
-        Workers.sendOut(helper, "machop level=20", START); // Fighting: Lumbering only
+        Workers.sendOut(helper, MACHOP, START); // Fighting: Lumbering only
 
         helper.runAfterDelay(250, () -> {
             helper.assertBlockPresent(Blocks.CRIMSON_STEM, new BlockPos(3, 1, 5));
@@ -433,14 +436,14 @@ public class WorkerGameTests {
         // needs replanting", goes to the second one, which plants the sapling.
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 5, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
-        PokemonEntity first = Workers.sendOut(helper, "machop level=20", START);
+        PokemonEntity first = Workers.sendOut(helper, MACHOP, START);
         boolean[] recalled = {false};
 
         helper.onEachTick(() -> {
             if (!recalled[0] && helper.getBlockState(new BlockPos(3, 2, 5)).isAir()) {
                 recalled[0] = true; // the trunk just came down: recall before it replants
                 first.getPokemon().recall();
-                Workers.sendOut(helper, "machop level=20", new BlockPos(1, 1, 1));
+                Workers.sendOut(helper, MACHOP, new BlockPos(1, 1, 1));
             }
         });
         helper.succeedWhen(() -> {
@@ -455,14 +458,14 @@ public class WorkerGameTests {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         Scenes.tree(helper, 3, 5, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
-        PokemonEntity first = Workers.sendOut(helper, "machop level=20", START);
+        PokemonEntity first = Workers.sendOut(helper, MACHOP, START);
         boolean[] fainted = {false};
 
         helper.onEachTick(() -> {
             if (!fainted[0] && helper.getBlockState(new BlockPos(3, 2, 5)).isAir()) {
                 fainted[0] = true; // the trunk just came down: faint before it replants
                 first.getPokemon().setCurrentHealth(0);
-                Workers.sendOut(helper, "machop level=20", new BlockPos(1, 1, 1));
+                Workers.sendOut(helper, MACHOP, new BlockPos(1, 1, 1));
             }
         });
         helper.succeedWhen(() -> {
@@ -511,7 +514,7 @@ public class WorkerGameTests {
         BlockPos crop = new BlockPos(8, 1, 14);
         helper.setBlock(crop.below(), Blocks.FARMLAND);
         helper.setBlock(crop, WHEAT.getStateForAge(7));
-        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(8, 1, 1));
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, new BlockPos(8, 1, 1));
         long[] harvestedAt = {-1};
 
         helper.onEachTick(() -> {
@@ -546,8 +549,8 @@ public class WorkerGameTests {
             helper.setBlock(x, 0, 5, Blocks.FARMLAND);
             helper.setBlock(x, 1, 5, WHEAT.getStateForAge(7));
         }
-        Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(1, 1, 1));
-        Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(6, 1, 1));
+        Workers.sendOut(helper, BULBASAUR, new BlockPos(1, 1, 1));
+        Workers.sendOut(helper, BULBASAUR, new BlockPos(6, 1, 1));
 
         helper.succeedWhen(() -> {
             for (int x = 1; x <= 6; x++) {

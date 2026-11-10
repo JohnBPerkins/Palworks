@@ -5,6 +5,8 @@ import dev.palworks.job.JobType;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.IntStream;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
@@ -67,23 +69,22 @@ public final class WorkPositions {
         // ring, from `distance` out, that has a tile the worker fits on; in that ring, the tile
         // nearest the worker. Rings are square (cardinal and diagonal tiles), and each tile is also
         // tried one block up and down so slopes work.
+        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
             for (BlockPos candidate : ring(targetPos, d)) {
-                for (int dy : SLOPE_STEPS) {
-                    BlockPos spot = candidate.above(dy);
-                    if (!fits(level, spot, entity)) {
-                        continue;
-                    }
-                    // Ties keep ring order (a fixed direction order), so the choice doesn't flip
-                    // between equally near tiles as the worker walks (this is recomputed each tick)
-                    double distSq = entity.distanceToSqr(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
-                    if (distSq < bestDistSq - 1e-6) {
-                        best = spot;
-                        bestDistSq = distSq;
-                    }
-                    break; // one height per tile: the first that works, level ground first
+                // One height per tile: the first that works, level ground first
+                BlockPos spot = firstHeight(candidate, SLOPE_STEPS, fitsThere);
+                if (spot == null) {
+                    continue;
+                }
+                // Ties keep ring order (a fixed direction order), so the choice doesn't flip
+                // between equally near tiles as the worker walks (this is recomputed each tick)
+                double distSq = entity.distanceToSqr(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+                if (distSq < bestDistSq - 1e-6) {
+                    best = spot;
+                    bestDistSq = distSq;
                 }
             }
             if (best != null) {
@@ -99,6 +100,10 @@ public final class WorkPositions {
      */
     private static final int HANGING_FRUIT_REACH_DOWN = 3;
 
+    /** The heights tried under a hanging fruit, lowest first: see {@link #hangingFruitStand}. */
+    private static final int[] HANGING_FRUIT_STEPS =
+            IntStream.rangeClosed(-HANGING_FRUIT_REACH_DOWN, 1).toArray();
+
     /**
      * Where to stand to pick a hanging fruit (a cocoa pod, an apricorn): on the ground beneath it,
      * a ring or more out, like any crop. Each tile is tried from {@link #HANGING_FRUIT_REACH_DOWN}
@@ -108,23 +113,20 @@ public final class WorkPositions {
      */
     @Nullable
     private static BlockPos hangingFruitStand(Level level, BlockPos fruit, Mob entity, int distance) {
+        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
             for (BlockPos tile : ring(fruit, d)) {
-                for (int dy = -HANGING_FRUIT_REACH_DOWN; dy <= 1; dy++) {
-                    BlockPos spot = tile.above(dy);
-                    if (!fits(level, spot, entity)) {
-                        continue;
-                    }
-                    if (!level.getBlockState(spot.below()).is(BlockTags.LEAVES)) {
-                        double distSq = distSqTo(entity, spot);
-                        if (distSq < bestDistSq - 1e-6) {
-                            best = spot;
-                            bestDistSq = distSq;
-                        }
-                    }
-                    break; // one height per tile: the lowest it fits on
+                // One height per tile: the lowest it fits on
+                BlockPos spot = firstHeight(tile, HANGING_FRUIT_STEPS, fitsThere);
+                if (spot == null || level.getBlockState(spot.below()).is(BlockTags.LEAVES)) {
+                    continue;
+                }
+                double distSq = distSqTo(entity, spot);
+                if (distSq < bestDistSq - 1e-6) {
+                    best = spot;
+                    bestDistSq = distSq;
                 }
             }
             if (best != null) {
@@ -167,6 +169,8 @@ public final class WorkPositions {
     public static TreeStand treeStandFor(Level level, BlockPos treePos, Mob entity) {
         List<BlockPos> trunk = trunkColumns(level, treePos);
         int closest = closestChopRing(entity);
+        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
+        Predicate<BlockPos> fitsIfCleared = spot -> fitsIfLeavesCleared(level, spot, entity);
         for (int d = closest; d <= closest + 1; d++) {
             List<BlockPos> ring = ringAround(trunk, d);
 
@@ -174,16 +178,14 @@ public final class WorkPositions {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
             for (BlockPos tile : ring) {
-                for (int dy : SLOPE_STEPS) {
-                    BlockPos spot = tile.above(dy);
-                    if (fits(level, spot, entity)) {
-                        double distSq = distSqTo(entity, spot);
-                        if (distSq < bestDistSq - 1e-6) {
-                            best = spot;
-                            bestDistSq = distSq;
-                        }
-                        break;
-                    }
+                BlockPos spot = firstHeight(tile, SLOPE_STEPS, fitsThere);
+                if (spot == null) {
+                    continue;
+                }
+                double distSq = distSqTo(entity, spot);
+                if (distSq < bestDistSq - 1e-6) {
+                    best = spot;
+                    bestDistSq = distSq;
                 }
             }
             if (best != null) {
@@ -194,22 +196,19 @@ public final class WorkPositions {
             TreeStand cleared = null;
             bestDistSq = Double.MAX_VALUE;
             for (BlockPos tile : ring) {
-                for (int dy : SLOPE_STEPS) {
-                    BlockPos spot = tile.above(dy);
-                    if (!fitsIfLeavesCleared(level, spot, entity)) {
-                        continue;
-                    }
-                    for (Direction out : outwardDirections(trunk, spot)) {
-                        TreeStand way = wayIn(level, spot, out, entity);
-                        if (way != null) {
-                            double distSq = distSqTo(entity, way.stand());
-                            if (distSq < bestDistSq - 1e-6) {
-                                cleared = way;
-                                bestDistSq = distSq;
-                            }
+                BlockPos spot = firstHeight(tile, SLOPE_STEPS, fitsIfCleared);
+                if (spot == null) {
+                    continue;
+                }
+                for (Direction out : outwardDirections(trunk, spot)) {
+                    TreeStand way = wayIn(level, spot, out, entity);
+                    if (way != null) {
+                        double distSq = distSqTo(entity, way.stand());
+                        if (distSq < bestDistSq - 1e-6) {
+                            cleared = way;
+                            bestDistSq = distSq;
                         }
                     }
-                    break;
                 }
             }
             if (cleared != null) {
@@ -259,7 +258,10 @@ public final class WorkPositions {
 
     /** The tiles exactly {@code d} away (Chebyshev) from the nearest trunk column, at the base's Y. */
     private static List<BlockPos> ringAround(List<BlockPos> trunk, int d) {
-        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
         for (BlockPos column : trunk) {
             minX = Math.min(minX, column.getX());
             maxX = Math.max(maxX, column.getX());
@@ -389,6 +391,18 @@ public final class WorkPositions {
     private static final int EXTRA_RINGS = 3;
     /** Heights tried for each tile: level first, then one up and one down (slopes). */
     private static final int[] SLOPE_STEPS = {0, 1, -1};
+
+    /** The first of {@code tile}'s heights, in {@code dys} order, where {@code fits}; null if none. */
+    @Nullable
+    private static BlockPos firstHeight(BlockPos tile, int[] dys, Predicate<BlockPos> fits) {
+        for (int dy : dys) {
+            BlockPos spot = tile.above(dy);
+            if (fits.test(spot)) {
+                return spot;
+            }
+        }
+        return null;
+    }
 
     /** The tiles at Chebyshev distance {@code d} around {@code center}, cardinals first, on its Y. */
     private static java.util.List<BlockPos> ring(BlockPos center, int d) {

@@ -20,6 +20,9 @@ import java.util.Locale;
  * so it's unit-tested.
  */
 public final class WorkerDebugText {
+    // Standing still for this long shows on the label (in red after STILL_WARNING_TICKS)
+    static final int STILL_SHOWN_TICKS = 20;
+
     /** Below this many ticks left, the "gives up in" countdown is a warning. */
     static final int EXPIRY_WARNING_TICKS = 10 * 20;
     /** Standing still while meant to be walking for this long is a warning. */
@@ -76,7 +79,7 @@ public final class WorkerDebugText {
                 parts.add("fails " + d.pathFailures() + "/" + stuckAfterPathFailures);
                 warning = true;
             }
-            if (d.stillTicks() >= 20) {
+            if (d.stillTicks() >= STILL_SHOWN_TICKS) {
                 parts.add("still " + seconds(d.stillTicks()));
                 warning |= d.stillTicks() >= STILL_WARNING_TICKS;
             }

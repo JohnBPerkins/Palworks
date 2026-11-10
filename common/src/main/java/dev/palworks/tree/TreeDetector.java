@@ -1,7 +1,16 @@
 package dev.palworks.tree;
 
 import dev.palworks.Palworks;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -180,7 +189,8 @@ public class TreeDetector {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
                         int faces = (dx != 0 ? 1 : 0) + (dy != 0 ? 1 : 0) + (dz != 0 ? 1 : 0);
-                        if (faces < 2) {
+                        boolean diagonalNeighbour = faces > 1;
+                        if (!diagonalNeighbour) {
                             continue; // itself, or a face neighbour (handled below)
                         }
                         BlockPos diagonal = current.offset(dx, dy, dz);
@@ -508,15 +518,13 @@ public class TreeDetector {
         if (state.getBlock() instanceof VineBlock) {
             return true;
         }
-        // Also check the block directly
-        Block block = state.getBlock();
-        return block == Blocks.VINE
-                || block == Blocks.CAVE_VINES
-                || block == Blocks.CAVE_VINES_PLANT
-                || block == Blocks.TWISTING_VINES
-                || block == Blocks.TWISTING_VINES_PLANT
-                || block == Blocks.WEEPING_VINES
-                || block == Blocks.WEEPING_VINES_PLANT;
+        return state.is(Blocks.VINE)
+                || state.is(Blocks.CAVE_VINES)
+                || state.is(Blocks.CAVE_VINES_PLANT)
+                || state.is(Blocks.TWISTING_VINES)
+                || state.is(Blocks.TWISTING_VINES_PLANT)
+                || state.is(Blocks.WEEPING_VINES)
+                || state.is(Blocks.WEEPING_VINES_PLANT);
     }
 
     /**
@@ -739,7 +747,10 @@ public class TreeDetector {
 
     /** Whether four positions (on one Y level) form a 2x2 square. */
     private static boolean isTwoByTwo(List<BlockPos> positions) {
-        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        int minX = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxZ = Integer.MIN_VALUE;
         for (BlockPos pos : positions) {
             minX = Math.min(minX, pos.getX());
             maxX = Math.max(maxX, pos.getX());

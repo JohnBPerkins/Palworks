@@ -3,7 +3,9 @@ package dev.palworks.worker;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
-import java.util.*;
+import java.util.EnumMap;
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
@@ -14,6 +16,11 @@ import org.jetbrains.annotations.Nullable;
  * Stores: enabled state, assigned job, cooldowns, skill XP, base link.
  */
 public class WorkerState {
+    // Path failures further apart than this start the count again
+    private static final long PATH_FAILURE_RESET_MS = 5000;
+    // Old-format reservations with a station further than this from y=0 were corrupted
+    private static final int MAX_SANE_STATION_Y = 300;
+
     private boolean enabled;
     private JobType assignedJob;
     private ReservationId currentReservation;
@@ -45,7 +52,7 @@ public class WorkerState {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
         this.currentReservation = null;
-        this.cooldowns = new HashMap<>();
+        this.cooldowns = new EnumMap<>(Suitability.class);
         this.pathFailCount = 0;
         this.lastPathFailTime = 0;
         this.jobStep = 0;
@@ -128,7 +135,7 @@ public class WorkerState {
         if (lastPathFailTime != 0 && now - lastPathFailTime < PATH_FAILURE_SPACING_MS) {
             return;
         }
-        if (now - lastPathFailTime > 5000) { // Reset if > 5 seconds since last failure
+        if (now - lastPathFailTime > PATH_FAILURE_RESET_MS) {
             pathFailCount = 0;
         }
         pathFailCount++;
@@ -395,7 +402,7 @@ public class WorkerState {
                 dev.palworks.Palworks.LOGGER.warn(
                         "Loaded reservation from OLD format (asLong): {} - this may be corrupted!", stationPos);
                 // Clear corrupted reservations immediately during migration
-                if (Math.abs(stationPos.getY()) > 300) {
+                if (Math.abs(stationPos.getY()) > MAX_SANE_STATION_Y) {
                     dev.palworks.Palworks.LOGGER.warn(
                             "Old reservation has suspicious Y coordinate {}, clearing it!", stationPos.getY());
                     currentReservation = null;

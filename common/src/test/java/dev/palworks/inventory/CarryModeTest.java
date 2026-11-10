@@ -51,6 +51,7 @@ class CarryModeTest {
     }
 
     @Test
+    @SuppressWarnings("EnumOrdinal") // tests the ordinal lookup itself
     void fromOrdinalFallsBackToNone() {
         for (CarryMode mode : CarryMode.values()) {
             assertEquals(mode, CarryMode.fromOrdinal(mode.ordinal()));

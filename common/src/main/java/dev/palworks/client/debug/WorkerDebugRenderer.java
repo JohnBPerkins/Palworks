@@ -9,6 +9,7 @@ import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkerState;
 import java.util.List;
+import java.util.Objects;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -62,7 +63,7 @@ public final class WorkerDebugRenderer {
         Minecraft minecraft = Minecraft.getInstance();
         ClientLevel level = minecraft.level;
         // A new world or server: the entity ids we were sent belong to the old one.
-        if (level != lastLevel) {
+        if (!Objects.equals(level, lastLevel)) {
             lastLevel = level;
             WorkerDebugCache.set(List.of());
         }
@@ -151,7 +152,10 @@ public final class WorkerDebugRenderer {
         @Nullable ResourceLocation icon = iconOf(activity);
         if (icon != null) {
             VertexConsumer quad = BUFFERS.getBuffer(RenderType.textSeeThrough(icon));
-            float x0 = -ICON_PX / 2F, x1 = ICON_PX / 2F, y0 = -ICON_PX - 2F, y1 = -2F;
+            float x0 = -ICON_PX / 2F;
+            float x1 = ICON_PX / 2F;
+            float y0 = -ICON_PX - 2F;
+            float y1 = -2F;
             int light = LightTexture.FULL_BRIGHT;
             quad.addVertex(matrix, x0, y0, 0).setColor(0xFFFFFFFF).setUv(0, 0).setLight(light);
             quad.addVertex(matrix, x0, y1, 0).setColor(0xFFFFFFFF).setUv(0, 1).setLight(light);

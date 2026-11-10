@@ -1,6 +1,7 @@
 package dev.palworks.neoforge.command;
 
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.palworks.command.DebugCommand;
 import java.util.function.Consumer;
 import net.minecraft.commands.CommandSourceStack;
@@ -51,12 +52,11 @@ public class PalworksCommands {
                         .then(Commands.literal("jobs").executes(ctx -> run(ctx, DebugCommand::showJobsInfo))));
     }
 
-    private static int run(CommandContext<CommandSourceStack> ctx, Consumer<ServerPlayer> action) {
-        try {
-            action.accept(ctx.getSource().getPlayerOrException());
-            return 1;
-        } catch (Exception e) {
-            return 0;
-        }
+    // Not a player: Brigadier tells the sender. Anything else is a bug, which Minecraft logs and
+    // reports in chat ("An unexpected error occurred"); it used to be swallowed without a trace.
+    private static int run(CommandContext<CommandSourceStack> ctx, Consumer<ServerPlayer> action)
+            throws CommandSyntaxException {
+        action.accept(ctx.getSource().getPlayerOrException());
+        return 1;
     }
 }

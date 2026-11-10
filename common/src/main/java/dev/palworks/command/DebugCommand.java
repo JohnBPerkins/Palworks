@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
  * inventory access, and the job-state dump.
  */
 public class DebugCommand {
+    private static final String NO_POKEMON_NEARBY = "No owned Pokemon nearby";
 
     /** Toggle worker debugging for this player: job activity in chat, and the overlay in the world. */
     public static void toggleDebug(ServerPlayer player) {
@@ -80,7 +81,7 @@ public class DebugCommand {
     public static void showWorkerInventory(ServerPlayer player) {
         Pokemon pokemon = findNearestOwnedPokemon(player);
         if (pokemon == null) {
-            player.sendSystemMessage(Component.literal("No owned Pokemon nearby"));
+            player.sendSystemMessage(Component.literal(NO_POKEMON_NEARBY));
             return;
         }
 
@@ -121,7 +122,7 @@ public class DebugCommand {
     public static void clearWorkerInventory(ServerPlayer player) {
         Pokemon pokemon = findNearestOwnedPokemon(player);
         if (pokemon == null) {
-            player.sendSystemMessage(Component.literal("No owned Pokemon nearby"));
+            player.sendSystemMessage(Component.literal(NO_POKEMON_NEARBY));
             return;
         }
 
@@ -142,7 +143,7 @@ public class DebugCommand {
     public static void openWorkerInventoryGUI(ServerPlayer player) {
         Pokemon pokemon = findNearestOwnedPokemon(player);
         if (pokemon == null) {
-            player.sendSystemMessage(Component.literal("No owned Pokemon nearby"));
+            player.sendSystemMessage(Component.literal(NO_POKEMON_NEARBY));
             return;
         }
         ModMenuTypes.openWorkerInventory(player, pokemon);
@@ -203,7 +204,7 @@ public class DebugCommand {
     public static void enableNearestWorker(ServerPlayer player) {
         Pokemon pokemon = findNearestOwnedPokemon(player);
         if (pokemon == null) {
-            player.sendSystemMessage(Component.literal("No owned Pokemon nearby"));
+            player.sendSystemMessage(Component.literal(NO_POKEMON_NEARBY));
             return;
         }
 
@@ -222,7 +223,7 @@ public class DebugCommand {
     public static void disableNearestWorker(ServerPlayer player) {
         Pokemon pokemon = findNearestOwnedPokemon(player);
         if (pokemon == null) {
-            player.sendSystemMessage(Component.literal("No owned Pokemon nearby"));
+            player.sendSystemMessage(Component.literal(NO_POKEMON_NEARBY));
             return;
         }
 

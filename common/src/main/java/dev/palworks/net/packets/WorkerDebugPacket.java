@@ -21,6 +21,8 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
     public static final ResourceLocation ID = PalworksResource.of("worker_debug");
 
     /**
+     * One worker's debug overlay: its job, path and timers.
+     *
      * @param entityId    the worker's entity id (it's in the client's world)
      * @param target      the block its job is at, or null with no job
      * @param path        the rest of the path it's walking, in order (empty when not walking)
@@ -51,6 +53,8 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
     }
 
     /**
+     * A worker's timers and path status, shown under its label.
+     *
      * @param jobAgeTicks    how long it has had its job; -1 with no job
      * @param expiresInTicks ticks until it gives the job up for not having started it; -1 when it
      *                       won't (no job, already working on it, or paused)
@@ -98,6 +102,7 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
     }
 
     @Override
+    @SuppressWarnings("EnumOrdinal") // decoded by fromOrdinal; both ends run the same jar
     public void encode(@NotNull RegistryFriendlyByteBuf buffer) {
         buffer.writeVarInt(entries.size());
         for (Entry entry : entries) {

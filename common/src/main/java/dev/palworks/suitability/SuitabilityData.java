@@ -43,6 +43,10 @@ import java.util.function.Consumer;
  * reads it.
  */
 public final class SuitabilityData {
+    private static final String REPLACE = "replace";
+    // A suitability given by both of a dual-type Pokemon's types gets a level more
+    private static final int BOTH_TYPES = 2;
+
     public static final int MAX_LEVEL = 5;
     private static final String DEFAULT_SPECIES_NAMESPACE = "cobblemon";
 
@@ -106,7 +110,7 @@ public final class SuitabilityData {
         }
         // Both types give it: a dual-type bonus.
         typesGiving.forEach((suitability, count) -> {
-            if (count >= 2) {
+            if (count >= BOTH_TYPES) {
                 result.computeIfPresent(suitability, (s, level) -> Math.min(MAX_LEVEL, level + 1));
             }
         });
@@ -182,15 +186,15 @@ public final class SuitabilityData {
             return null;
         }
         for (String key : object.keySet()) {
-            if (!key.equals("types") && !key.equals("species") && !key.equals("replace")) {
-                warn.accept("Ignoring \"" + key + "\" in " + fileId
-                        + ": only \"types\", \"species\" and \"replace\" are read");
+            if (!"types".equals(key) && !"species".equals(key) && !REPLACE.equals(key)) {
+                warn.accept(
+                        "Ignoring " + quotedIn(key, fileId) + ": only \"types\", \"species\" and \"replace\" are read");
             }
         }
-        boolean replace = object.has("replace")
-                && object.get("replace").isJsonPrimitive()
-                && object.get("replace").getAsJsonPrimitive().isBoolean()
-                && object.get("replace").getAsBoolean();
+        boolean replace = object.has(REPLACE)
+                && object.get(REPLACE).isJsonPrimitive()
+                && object.get(REPLACE).getAsJsonPrimitive().isBoolean()
+                && object.get(REPLACE).getAsBoolean();
         Map<String, Integer> types = parseLevels(fileId, "types", object.get("types"), 1, warn);
         Map<String, Integer> species = new HashMap<>();
         parseLevels(fileId, "species", object.get("species"), 0, warn)
@@ -206,26 +210,31 @@ public final class SuitabilityData {
             return levels;
         }
         if (!(json instanceof JsonObject object)) {
-            warn.accept("Ignoring \"" + section + "\" in " + fileId + ": expected an object like {\"name\": 1}");
+            warn.accept("Ignoring " + quotedIn(section, fileId) + ": expected an object like {\"name\": 1}");
             return levels;
         }
         for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
             String name = entry.getKey().toLowerCase(Locale.ROOT);
             JsonElement value = entry.getValue();
             if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
-                warn.accept("Ignoring \"" + entry.getKey() + "\" in " + fileId + " " + section
+                warn.accept("Ignoring " + quotedIn(entry.getKey(), fileId) + " " + section
                         + ": the level must be a number");
                 continue;
             }
             int level = value.getAsInt();
             if (level < min || level > MAX_LEVEL) {
                 int clamped = Math.max(min, Math.min(MAX_LEVEL, level));
-                warn.accept("Level " + level + " for \"" + entry.getKey() + "\" in " + fileId + " " + section
+                warn.accept("Level " + level + " for " + quotedIn(entry.getKey(), fileId) + " " + section
                         + " is outside " + min + "-" + MAX_LEVEL + "; using " + clamped);
                 level = clamped;
             }
             levels.put(name, level);
         }
         return levels;
+    }
+
+    /** {@code "name" in fileId}, for warnings. */
+    private static String quotedIn(String name, String fileId) {
+        return "\"" + name + "\" in " + fileId;
     }
 }

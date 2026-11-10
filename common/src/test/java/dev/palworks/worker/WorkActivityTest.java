@@ -38,6 +38,7 @@ class WorkActivityTest {
     }
 
     @Test
+    @SuppressWarnings("EnumOrdinal") // tests the ordinal lookup itself
     void phaseOrdinalLookupIsSafe() {
         for (WorkActivity.Phase phase : WorkActivity.Phase.values()) {
             assertEquals(phase, WorkActivity.Phase.fromOrdinal(phase.ordinal()));

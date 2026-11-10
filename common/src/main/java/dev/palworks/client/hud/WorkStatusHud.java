@@ -10,6 +10,7 @@ import dev.palworks.job.JobType;
 import dev.palworks.net.PalworksResource;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
+import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -79,7 +80,7 @@ public final class WorkStatusHud {
     public static void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         // A new world or server: what we were told about the old one's workers no longer applies.
-        if (minecraft.level != lastLevel) {
+        if (!Objects.equals(minecraft.level, lastLevel)) {
             lastLevel = minecraft.level;
             WorkActivityCache.clear();
         }

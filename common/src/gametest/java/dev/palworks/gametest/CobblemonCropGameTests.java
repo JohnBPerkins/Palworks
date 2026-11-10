@@ -30,6 +30,7 @@ import net.minecraft.world.level.block.state.properties.Property;
  * harvested in place with their real loot, and planted from their seeds like vanilla crops.
  */
 public class CobblemonCropGameTests {
+    private static final String IT_HARVESTS = "it harvests";
 
     private static final BlockPos CROP = new BlockPos(3, 1, 3);
 
@@ -137,11 +138,11 @@ public class CobblemonCropGameTests {
         helper.setBlock(CROP, with(ripe(CobblemonBlocks.REVIVAL_HERB), "mutation", "power"));
         var level = helper.getLevel();
 
-        helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), "it harvests");
+        helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), IT_HARVESTS);
         helper.assertItemEntityPresent(CobblemonItems.POWER_HERB, CROP, 2.0);
         BlockState after = helper.getBlockState(CROP);
         helper.assertTrue(after.is(CobblemonBlocks.REVIVAL_HERB) && age(after) == 0, "reset in place, got " + after);
-        helper.assertTrue(valueOf(after, "mutation").equals("none"), "no longer mutated, got " + after);
+        helper.assertTrue("none".equals(valueOf(after, "mutation")), "no longer mutated, got " + after);
         helper.succeed();
     }
 
@@ -151,10 +152,10 @@ public class CobblemonCropGameTests {
         helper.setBlock(CROP.below(), Blocks.GRASS_BLOCK);
         helper.setBlock(CROP, with(ripe(redMint()), "is_wild", "true"));
 
-        helper.assertTrue(CropAdapter.harvestCrop(helper.getLevel(), helper.absolutePos(CROP)), "it harvests");
+        helper.assertTrue(CropAdapter.harvestCrop(helper.getLevel(), helper.absolutePos(CROP)), IT_HARVESTS);
         BlockState after = helper.getBlockState(CROP);
         helper.assertTrue(
-                after.is(redMint()) && valueOf(after, "is_wild").equals("true"), "still wild mint, got " + after);
+                after.is(redMint()) && "true".equals(valueOf(after, "is_wild")), "still wild mint, got " + after);
         helper.succeed();
     }
 
@@ -178,7 +179,7 @@ public class CobblemonCropGameTests {
                 JobManager.isJobStillThere(level, JobType.HARVEST_CROPS, helper.absolutePos(CROP.above())),
                 "no harvest job on the top");
 
-        helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), "it harvests");
+        helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), IT_HARVESTS);
         helper.assertBlockNotPresent(CobblemonBlocks.HEARTY_GRAINS, CROP.above());
         BlockState after = helper.getBlockState(CROP);
         helper.assertTrue(
@@ -212,7 +213,7 @@ public class CobblemonCropGameTests {
         var level = helper.getLevel();
         helper.assertTrue(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP)), "it looks ripe");
 
-        helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), "it harvests");
+        helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), IT_HARVESTS);
         helper.assertItemEntityNotPresent(CobblemonItems.ORAN_BERRY, CROP, 3.0);
         helper.assertTrue(
                 helper.getBlockState(CROP).is(CobblemonBlocks.ORAN_BERRY) && age(helper.getBlockState(CROP)) == 3,
@@ -261,8 +262,8 @@ public class CobblemonCropGameTests {
         helper.assertTrue(
                 planted.is(CobblemonBlocks.REVIVAL_HERB)
                         && age(planted) == 0
-                        && valueOf(planted, "mutation").equals("none")
-                        && valueOf(planted, "is_wild").equals("false"),
+                        && "none".equals(valueOf(planted, "mutation"))
+                        && "false".equals(valueOf(planted, "is_wild")),
                 "a young, plain, farmed revival herb, got " + planted);
         helper.succeed();
     }

@@ -16,7 +16,15 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.AttachedStemBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CocoaBlock;
+import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.NetherWartBlock;
+import net.minecraft.world.level.block.PitcherCropBlock;
+import net.minecraft.world.level.block.StemBlock;
+import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
@@ -30,6 +38,12 @@ import org.jetbrains.annotations.Nullable;
  * Makes it easy to add modded crop support later.
  */
 public class CropAdapter {
+    // The property of a Cobblemon crop that says whether (and how) it has mutated
+    private static final String MUTATION = "mutation";
+    // Ages at which Cobblemon's galarica nut bushes and berry bushes are ripe
+    private static final int GALARICA_RIPE_AGE = 3;
+    private static final int BERRY_RIPE_AGE = 5;
+
     // Cobblemon berry tag for modded berry support
     private static final TagKey<Block> COBBLEMON_BERRIES =
             TagKey.create(Registries.BLOCK, new ResourceLocation("cobblemon", "berries"));
@@ -42,15 +56,14 @@ public class CropAdapter {
      */
     public static boolean isPlantableSurface(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        Block block = state.getBlock();
 
         // Farmland for most crops (grass types with PLANTING)
-        if (block == Blocks.FARMLAND) {
+        if (state.is(Blocks.FARMLAND)) {
             return true;
         }
 
         // Soul sand for nether wart (requires both PLANTING and NETHER suitabilities)
-        if (block == Blocks.SOUL_SAND) {
+        if (state.is(Blocks.SOUL_SAND)) {
             return true;
         }
 
@@ -65,7 +78,7 @@ public class CropAdapter {
         Block block = state.getBlock();
 
         // Vanilla berries
-        if (block instanceof SweetBerryBushBlock || block == Blocks.CAVE_VINES || block == Blocks.CAVE_VINES_PLANT) {
+        if (block instanceof SweetBerryBushBlock || state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT)) {
             return true;
         }
 
@@ -153,33 +166,22 @@ public class CropAdapter {
         }
 
         // Glow berries (cave vines)
-        if (block == Blocks.CAVE_VINES || block == Blocks.CAVE_VINES_PLANT) {
+        if (state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT)) {
             return state.getValue(net.minecraft.world.level.block.CaveVines.BERRIES);
         }
 
         // Galarica nut bush - harvestable at age 3
         if (isGalaricaNutBush(block)) {
-            for (Property<?> property : state.getProperties()) {
-                if (property.getName().equals("age") && property instanceof IntegerProperty ageProperty) {
-                    int age = state.getValue(ageProperty);
-                    return age >= 3; // Galarica is harvestable at age 3
-                }
-            }
-            return false;
+            IntegerProperty age = ageProperty(state);
+            return age != null && state.getValue(age) >= GALARICA_RIPE_AGE;
         }
 
         // Cobblemon berries - harvestable at age 5
         // Cobblemon berry blocks use an AGE property (0-5)
         if (state.is(COBBLEMON_BERRIES)) {
-            // Find the AGE property dynamically (Cobblemon berries use their own AGE property)
-            for (Property<?> property : state.getProperties()) {
-                if (property.getName().equals("age") && property instanceof IntegerProperty ageProperty) {
-                    int age = state.getValue(ageProperty);
-                    return age >= 5; // Cobblemon berries are harvestable at age 5
-                }
-            }
-            // No age property found - not harvestable
-            return false;
+            // Cobblemon berries use their own AGE property; no age property, not harvestable
+            IntegerProperty age = ageProperty(state);
+            return age != null && state.getValue(age) >= BERRY_RIPE_AGE;
         }
 
         return false;
@@ -243,8 +245,8 @@ public class CropAdapter {
                 || block instanceof CocoaBlock
                 || isApricorn(state)
                 || block instanceof SweetBerryBushBlock
-                || block == Blocks.CAVE_VINES
-                || block == Blocks.CAVE_VINES_PLANT
+                || state.is(Blocks.CAVE_VINES)
+                || state.is(Blocks.CAVE_VINES_PLANT)
                 || state.is(COBBLEMON_BERRIES);
     }
 
@@ -306,8 +308,8 @@ public class CropAdapter {
     public static Block getPlantedBlock(Item seed) {
         Block crop = fieldCropOf(seed);
         if (crop != null) return crop;
-        if (seed == Items.COCOA_BEANS) return Blocks.COCOA;
-        if (seed == Items.SWEET_BERRIES) return Blocks.SWEET_BERRY_BUSH;
+        if (seed.equals(Items.COCOA_BEANS)) return Blocks.COCOA;
+        if (seed.equals(Items.SWEET_BERRIES)) return Blocks.SWEET_BERRY_BUSH;
 
         return null;
     }
@@ -405,7 +407,7 @@ public class CropAdapter {
             }
 
             // Glow berries: as CaveVines.use, one berry, the vine left without
-            if (block == Blocks.CAVE_VINES || block == Blocks.CAVE_VINES_PLANT) {
+            if (state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT)) {
                 Block.popResource(level, pos, new ItemStack(Items.GLOW_BERRIES, 1));
                 playPickSound(level, pos, net.minecraft.sounds.SoundEvents.CAVE_VINES_PICK_BERRIES);
                 level.setBlock(pos, state.setValue(net.minecraft.world.level.block.CaveVines.BERRIES, false), 2);
@@ -433,13 +435,7 @@ public class CropAdapter {
         }
 
         // Other crops - check if they have an age property
-        IntegerProperty ageProperty = null;
-        for (Property<?> property : state.getProperties()) {
-            if (property.getName().equals("age") && property instanceof IntegerProperty integerProperty) {
-                ageProperty = integerProperty;
-                break;
-            }
-        }
+        IntegerProperty ageProperty = ageProperty(state);
 
         if (ageProperty != null) {
             // This crop has an age property - harvest and reset to age 0
@@ -495,7 +491,7 @@ public class CropAdapter {
      */
     private static BlockState asReplanted(BlockState reset) {
         for (Property<?> property : reset.getProperties()) {
-            if (property.getName().equals("mutation")) {
+            if (MUTATION.equals(property.getName())) {
                 return withDefault(reset, property);
             }
         }
@@ -510,7 +506,7 @@ public class CropAdapter {
     @Nullable
     private static IntegerProperty ageProperty(BlockState state) {
         for (Property<?> property : state.getProperties()) {
-            if (property.getName().equals("age") && property instanceof IntegerProperty age) {
+            if ("age".equals(property.getName()) && property instanceof IntegerProperty age) {
                 return age;
             }
         }

@@ -109,9 +109,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      # Same cache as the build job (same key), so the Minecraft jars aren't remapped again.
-      - name: Cache Loom project files
-        uses: actions/cache@v6
+      # The build job's cache (same key), so the Minecraft jars aren't remapped again. Restore
+      # only: the build job saves it, and two jobs saving one key just fails one of them.
+      - name: Restore Loom project files
+        uses: actions/cache/restore@v6
         with:
           path: |
             .gradle/loom-cache

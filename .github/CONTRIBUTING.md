@@ -35,12 +35,16 @@ pre-commit install
   does it. If the hook reformats something, the commit stops; `git add` the changes and commit
   again. For your IDE, the palantir-java-format plugin (IntelliJ) or Spotless's own integrations
   give the same output.
-- **[Error Prone](https://errorprone.info)** runs inside every Java compile, and **any compiler
-  warning fails the build**. A few checks that misfire on Minecraft code (`==` on blocks, enum
-  ordinals in packets) are off; see the root `build.gradle`. To keep an intentional one, use
-  `@SuppressWarnings("CheckName")` with a comment saying why.
-- **[PMD](https://pmd.github.io)** rules are in `config/pmd/ruleset.xml`, with the reason for
-  each exclusion. To keep an intentional finding, end its line with `// NOPMD - reason`.
+- **[Error Prone](https://errorprone.info)** runs inside every Java compile with all its default
+  checks, and **any compiler warning fails the build**. Compare blocks and items with
+  `state.is(Blocks.X)` / `stack.is(Items.X)` rather than `==`. To keep an intentional finding,
+  put `@SuppressWarnings("CheckName")` on the smallest method that holds it, with a comment
+  saying why (enum ordinals in network packets, for example).
+- **[PMD](https://pmd.github.io)** rules are in `config/pmd/ruleset.xml`: four whole categories,
+  with rules configured for Minecraft (game-owned resources, Mixin handlers, the `DEBUG` flag),
+  and the few exclusions each explained. To keep an intentional finding, end its line with
+  `// NOPMD - reason`.
+- Prefer fixing a finding over suppressing it, and suppressing one over excluding a rule.
 
 CI's `lint` job runs `./gradlew lint`, the same check as the hook.
 

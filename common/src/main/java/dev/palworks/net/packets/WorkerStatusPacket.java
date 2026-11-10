@@ -46,6 +46,7 @@ public class WorkerStatusPacket implements NetworkPacket<WorkerStatusPacket> {
     }
 
     @Override
+    @SuppressWarnings("EnumOrdinal") // decoded by fromOrdinal; both ends run the same jar
     public void encode(@NotNull RegistryFriendlyByteBuf buffer) {
         buffer.writeUUID(entityUUID);
         buffer.writeBoolean(enabled);

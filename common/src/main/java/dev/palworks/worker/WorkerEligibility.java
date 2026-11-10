@@ -75,13 +75,9 @@ public class WorkerEligibility {
             return false;
         }
 
-        try {
-            // Check if the Pokemon's store is a PlayerPartyStore
-            var storeCoords = pokemon.getStoreCoordinates().get();
-            return storeCoords != null && storeCoords.getStore() instanceof PlayerPartyStore;
-        } catch (Exception e) {
-            return false;
-        }
+        // Check if the Pokemon's store is a PlayerPartyStore
+        var storeCoords = pokemon.getStoreCoordinates().get();
+        return storeCoords != null && storeCoords.getStore() instanceof PlayerPartyStore;
     }
 
     /**
@@ -91,7 +87,7 @@ public class WorkerEligibility {
     @Nullable
     public static BlockPos partyOwnerPosition(Pokemon pokemon, Level level) {
         ServerPlayer owner = pokemon.getOwnerPlayer();
-        return owner != null && owner.level() == level ? owner.blockPosition() : null;
+        return owner != null && level.equals(owner.level()) ? owner.blockPosition() : null;
     }
 
     /**
@@ -112,13 +108,9 @@ public class WorkerEligibility {
             return false;
         }
 
-        try {
-            // Has store coordinates but not from party
-            var storeCoords = pokemon.getStoreCoordinates().get();
-            return storeCoords != null && !isFromParty(pokemon);
-        } catch (Exception e) {
-            return false;
-        }
+        // Has store coordinates but not from party
+        var storeCoords = pokemon.getStoreCoordinates().get();
+        return storeCoords != null && !isFromParty(pokemon);
     }
 
     /**

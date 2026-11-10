@@ -475,6 +475,7 @@ public class WorkerAI {
      * Strategy for executing one {@link JobType} at the work site: a list of timed {@link Step}s.
      * Add a job type by registering a handler in {@link #HANDLERS} rather than editing performWork().
      */
+    @FunctionalInterface
     private interface JobHandler {
         /** The job's steps, in order. The shared code walks the worker there and runs them. */
         List<Step> steps();
@@ -528,11 +529,13 @@ public class WorkerAI {
         }
     }
 
+    @FunctionalInterface
     private interface StepStart {
         void run(JobContext ctx);
     }
 
     /** A step's effect. Return false to end the job here (e.g. there turned out to be nothing to do). */
+    @FunctionalInterface
     private interface StepFinish {
         boolean run(JobContext ctx);
     }
@@ -1133,7 +1136,7 @@ public class WorkerAI {
             GenericBedrockEntity marker = targetMarker; // effectively final for the callback
             // Only the cleanup matters; the completion future itself isn't needed.
             var unused = timeline.run(context).whenComplete((result, error) -> marker.discard());
-        } catch (Exception e) {
+        } catch (Exception e) { // NOPMD - Cobblemon's effect code can throw anything; it's only a visual
             if (targetMarker != null) {
                 targetMarker.discard();
             }

@@ -105,12 +105,6 @@ subprojects {
         // than pile up. To silence one that's intentional, use @SuppressWarnings("CheckName").
         options.compilerArgs << '-Werror'
         options.errorprone {
-            // Blocks, items, levels and registry entries are singletons: == is the Minecraft idiom.
-            disable('ReferenceEquality')
-            // Packets and menus encode enums by ordinal, on both ends of the same jar.
-            disable('EnumOrdinal')
-            // Javadoc style, not bugs.
-            disable('MissingSummary')
             // Mixin handlers are called by the injected code, not by anything Error Prone can see.
             option('UnusedMethod:ExemptingMethodAnnotations', 'org.spongepowered.asm.mixin.injection.Inject')
             option('Unused:methodAnnotationsExemptingParameters', 'org.spongepowered.asm.mixin.injection.Inject')
@@ -129,6 +123,20 @@ subprojects {
     dependencies {
         def jdk = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
         pmdAux files(jdk.map { it.metadata.installationPath.file('lib/jrt-fs.jar') })
+    }
+
+    // PMD only logs a file it couldn't check (a broken rule property, a parse error) and passes
+    // the build, so a misconfigured rule would quietly check nothing. Fail on those too.
+    tasks.withType(Pmd).configureEach { task ->
+        reports.xml.required = true
+        doLast {
+            def report = task.reports.xml.outputLocation.get().asFile
+            def errors = report.exists() ? new groovy.xml.XmlSlurper().parse(report).error : []
+            if (errors.size() > 0) {
+                throw new GradleException("PMD couldn't check ${errors.size()} file(s); the first: " +
+                        "${errors[0].@filename}: ${errors[0].@msg}")
+            }
+        }
     }
 
     java {

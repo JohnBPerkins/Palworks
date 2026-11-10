@@ -6,6 +6,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.function.Consumer;
+import javax.xml.parsers.ParserConfigurationException;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestRegistry;
@@ -38,7 +39,7 @@ public class PalworksGameTestsNeoForge {
                 File file = new File(report);
                 file.getParentFile().mkdirs();
                 GlobalTestReporter.replaceWith(new JUnitLikeTestReporter(file));
-            } catch (Exception e) {
+            } catch (ParserConfigurationException e) {
                 throw new IllegalStateException("couldn't set up the GameTest report " + report, e);
             }
         }

@@ -41,7 +41,7 @@ public class PalworksNeoForgeClient {
                 renderEvent -> WorkStatusHud.render(renderEvent.getGuiGraphics()));
         // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
         NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, stageEvent -> {
-            if (stageEvent.getStage() == RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
+            if (RenderLevelStageEvent.Stage.AFTER_ENTITIES.equals(stageEvent.getStage())) {
                 WorkerDebugRenderer.render(
                         stageEvent.getCamera(), stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false));
             }

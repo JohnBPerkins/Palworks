@@ -14,13 +14,15 @@ import org.slf4j.LoggerFactory;
 
 @Mod("palworks")
 public class PalworksNeoForge {
+    private static final String BANNER = "==================================================";
+
     public static final String MOD_ID = "palworks";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public PalworksNeoForge(IEventBus modEventBus) {
-        LOGGER.info("==================================================");
+        LOGGER.info(BANNER);
         LOGGER.info("PALWORKS NEOFORGE INITIALIZING...");
-        LOGGER.info("==================================================");
+        LOGGER.info(BANNER);
         LOGGER.info("NeoForge mod is loading!");
 
         // Register menu types (NeoForge-specific)
@@ -37,8 +39,8 @@ public class PalworksNeoForge {
         NeoForge.EVENT_BUS.register(new PalworksCommands());
 
         LOGGER.info("WorkerTickHandler will be auto-registered via @EventBusSubscriber");
-        LOGGER.info("==================================================");
+        LOGGER.info(BANNER);
         LOGGER.info("PALWORKS NEOFORGE INITIALIZED!");
-        LOGGER.info("==================================================");
+        LOGGER.info(BANNER);
     }
 }

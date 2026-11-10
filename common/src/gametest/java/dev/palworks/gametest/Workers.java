@@ -42,7 +42,7 @@ final class Workers {
                     // A grass floor level with the test's own, so a worker that wanders off the
                     // edge isn't left straddling a ledge; everything above it cleared
                     var want = y == 0 ? Blocks.GRASS_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState();
-                    if (level.getBlockState(pos) != want) {
+                    if (!level.getBlockState(pos).equals(want)) {
                         level.setBlock(pos, want, 2);
                     }
                 }

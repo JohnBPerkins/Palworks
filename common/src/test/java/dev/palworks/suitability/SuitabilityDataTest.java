@@ -1,6 +1,18 @@
 package dev.palworks.suitability;
 
-import static dev.palworks.suitability.Suitability.*;
+import static dev.palworks.suitability.Suitability.COOLING;
+import static dev.palworks.suitability.Suitability.FARMING;
+import static dev.palworks.suitability.Suitability.GATHERING;
+import static dev.palworks.suitability.Suitability.GENERATING_ELECTRICITY;
+import static dev.palworks.suitability.Suitability.HANDIWORK;
+import static dev.palworks.suitability.Suitability.KINDLING;
+import static dev.palworks.suitability.Suitability.LUMBERING;
+import static dev.palworks.suitability.Suitability.MEDICINE_PRODUCTION;
+import static dev.palworks.suitability.Suitability.MINING;
+import static dev.palworks.suitability.Suitability.NETHER;
+import static dev.palworks.suitability.Suitability.PLANTING;
+import static dev.palworks.suitability.Suitability.TRANSPORTING;
+import static dev.palworks.suitability.Suitability.WATERING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,6 +29,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /** Tests how the per-job suitability files are parsed and combined, and the files the mod ships. */
+// Test data reads better inline than as constants
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 class SuitabilityDataTest {
 
     private static SuitabilityData load(Map<String, String> files, List<String> warnings) {

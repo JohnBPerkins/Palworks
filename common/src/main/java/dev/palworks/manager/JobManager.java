@@ -25,7 +25,18 @@ import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import net.minecraft.core.BlockPos;
@@ -49,6 +60,9 @@ import org.jetbrains.annotations.Nullable;
  * Designed for 50+ workers with chunk-based caching and performance optimization.
  */
 public class JobManager {
+    // Job positions listed per job type by /palworks jobs
+    private static final int JOB_POSITIONS_SHOWN = 3;
+
     private static final boolean DEBUG = Palworks.DEBUG;
 
     // Performance tuning constants
@@ -150,6 +164,7 @@ public class JobManager {
      * broken or placed), workers nearby forget which jobs they couldn't reach, so they re-check
      * on their next assignment. Must stay cheap: returns early unless some worker has failures.
      */
+    @SuppressWarnings("ReferenceEquality") // identity on purpose, see below
     public static void onBlockStateChange(ServerLevel level, BlockPos pos, BlockState oldState, BlockState newState) {
         JobManager manager = byLevel.get(level);
         if (manager == null || manager.recentlyFailedJobs.isEmpty()) {
@@ -474,7 +489,7 @@ public class JobManager {
                     BlockState state = level.getBlockState(pos);
 
                     // Remember chests so delivery can pick one without its own block search
-                    if (isChest(state.getBlock())) {
+                    if (isChest(state)) {
                         cache.chests.add(pos.immutable());
                     }
 
@@ -551,7 +566,7 @@ public class JobManager {
             case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
             case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
             case GET_SEEDS ->
-                isChest(level.getBlockState(pos).getBlock())
+                isChest(level.getBlockState(pos))
                         && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));
             case DELIVER_ITEMS -> level.getBlockEntity(pos) instanceof net.minecraft.world.Container;
             case COLLECT_DROPS -> !itemsToPickUp(level, pos).isEmpty();
@@ -618,7 +633,7 @@ public class JobManager {
             // Nether wart is Nether work (Ghost types), like planting it and fetching it from
             // chests: Gathering alone let any Grass type harvest it
             job.requiredSuitabilities =
-                    block == Blocks.NETHER_WART ? EnumSet.of(Suitability.NETHER) : EnumSet.of(Suitability.GATHERING);
+                    state.is(Blocks.NETHER_WART) ? EnumSet.of(Suitability.NETHER) : EnumSet.of(Suitability.GATHERING);
             job.discoveryTime = level.getGameTime();
             job.priority = 8; // High priority for ripe crops
             return job;
@@ -627,7 +642,7 @@ public class JobManager {
         // Check for planting jobs (empty farmland)
         if (CropAdapter.isPlantableSurface(level, pos)) {
             // Exclude soul sand from PLANTING - that requires NETHER suitability
-            if (block == Blocks.SOUL_SAND) {
+            if (state.is(Blocks.SOUL_SAND)) {
                 BlockPos abovePos = pos.above();
                 if (level.getBlockState(abovePos).isAir()) {
                     if (DEBUG) {
@@ -663,7 +678,7 @@ public class JobManager {
         }
 
         // Check for get seeds jobs (chests with seeds)
-        if (isChest(block)) {
+        if (isChest(state)) {
             if (hasPlantableSeeds(level, pos)) {
                 JobRecord job = new JobRecord();
                 job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
@@ -728,8 +743,8 @@ public class JobManager {
     }
 
     // Helper methods for job detection
-    private static boolean isChest(Block block) {
-        return block == Blocks.CHEST || block == Blocks.TRAPPED_CHEST;
+    private static boolean isChest(BlockState state) {
+        return state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST);
     }
 
     private static boolean hasPlantableSeeds(Level level, BlockPos pos) {
@@ -742,7 +757,7 @@ public class JobManager {
      * CropAdapter.fieldCropOf), vanilla or modded, except nether wart, which is Nether work.
      */
     private static boolean isFarmlandSeed(Item item) {
-        return item != Items.NETHER_WART && CropAdapter.fieldCropOf(item) != null;
+        return !item.equals(Items.NETHER_WART) && CropAdapter.fieldCropOf(item) != null;
     }
 
     /**
@@ -954,7 +969,7 @@ public class JobManager {
                         continue;
                     }
                     // The cached position may be up to one scan old, so re-check it's still a chest
-                    if (isChest(level.getBlockState(chestPos).getBlock())
+                    if (isChest(level.getBlockState(chestPos))
                             && ChestHelper.canAcceptItems(level, chestPos, firstItem)) {
                         chests.add(chestPos);
                     }
@@ -1109,7 +1124,8 @@ public class JobManager {
             // Remember it, so next time this worker checks other candidates instead of
             // pathfinding to the same unreachable ones again.
             rememberUnreachable(worker.pokemonUUID, worker.position, job.position, now);
-            if (++pathChecks >= MAX_PATH_CHECKS_PER_WORKER) {
+            pathChecks++;
+            if (pathChecks >= MAX_PATH_CHECKS_PER_WORKER) {
                 break;
             }
         }
@@ -1761,11 +1777,10 @@ public class JobManager {
                 lines.add(String.format(
                         "  §a%s§f: %d jobs (need §b%s§f)",
                         type.name(), jobs.size(), jobs.get(0).requiredSuitabilities));
-                // Show first 3 positions
                 int shown = 0;
                 for (JobRecord job : jobs) {
-                    if (shown >= 3) {
-                        lines.add(String.format("    §7... and %d more", jobs.size() - 3));
+                    if (shown >= JOB_POSITIONS_SHOWN) {
+                        lines.add(String.format("    §7... and %d more", jobs.size() - JOB_POSITIONS_SHOWN));
                         break;
                     }
                     lines.add(String.format(
@@ -1837,7 +1852,7 @@ public class JobManager {
             int noSuitability = 0;
             int noPath = 0;
             int canAssign = 0;
-            Map<JobType, Integer> noPathByType = new HashMap<>();
+            Map<JobType, Integer> noPathByType = new EnumMap<>(JobType.class);
 
             for (JobRecord job : availableJobs.values()) {
                 // Check suitability
@@ -1907,7 +1922,7 @@ public class JobManager {
         public long lastSeenTick; // Game tick of the worker's last registerWorker() call
 
         public WorkerInfo() {
-            this.suitabilities = new HashSet<>();
+            this.suitabilities = EnumSet.noneOf(Suitability.class);
             this.idle = true;
             this.lastAssignmentTime = 0;
         }
@@ -1964,7 +1979,7 @@ public class JobManager {
         public boolean isDirty;
 
         public ChunkJobCache() {
-            this.cachedJobs = new HashMap<>();
+            this.cachedJobs = new EnumMap<>(JobType.class);
             this.isDirty = false;
         }
     }

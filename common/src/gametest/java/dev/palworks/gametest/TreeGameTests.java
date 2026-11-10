@@ -175,9 +175,10 @@ public class TreeGameTests {
         helper.assertTrue(tree.isValid(), "a mangrove in water is a tree: " + tree.getReason());
         helper.assertTrue(tree.getLogPositions().contains(abs(helper, 3, 1, 3)), "its roots are chopped with it");
         helper.assertTrue(tree.getBasePosition().equals(abs(helper, 3, 1, 3)), "its base is the bottom root");
-        helper.assertTrue(
-                TreeDetector.getSaplingForTree(helper.getLevel(), tree) == Items.MANGROVE_PROPAGULE,
-                "it's replanted with a propagule");
+        helper.assertValueEqual(
+                TreeDetector.getSaplingForTree(helper.getLevel(), tree),
+                Items.MANGROVE_PROPAGULE,
+                "the sapling it's replanted with");
         helper.assertTrue(
                 TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition())
                                 .size()
@@ -221,9 +222,10 @@ public class TreeGameTests {
         // Three 3x3 layers around the top, minus the two stem blocks inside them
         helper.assertTrue(canopy.size() == 27 - 2, "all 25 canopy blocks around it are broken, got " + canopy.size());
         helper.assertTrue(canopy.contains(abs(helper, 4, 3, 4)), "the shroomlight too");
-        helper.assertTrue(
-                TreeDetector.getSaplingForTree(helper.getLevel(), tree) == Items.CRIMSON_FUNGUS,
-                "it's replanted with a crimson fungus");
+        helper.assertValueEqual(
+                TreeDetector.getSaplingForTree(helper.getLevel(), tree),
+                Items.CRIMSON_FUNGUS,
+                "the sapling it's replanted with");
         helper.succeed();
     }
 
@@ -341,7 +343,8 @@ public class TreeGameTests {
         Item sapling = TreeDetector.saplingFor(log);
         helper.assertTrue(
                 sapling != null
-                        && BuiltInRegistries.ITEM.getKey(sapling).toString().equals("cobblemon:saccharine_sapling"),
+                        && "cobblemon:saccharine_sapling"
+                                .equals(BuiltInRegistries.ITEM.getKey(sapling).toString()),
                 "saccharine log should find cobblemon:saccharine_sapling, got " + sapling);
         helper.succeed();
     }

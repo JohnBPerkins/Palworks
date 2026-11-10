@@ -1,7 +1,10 @@
 package dev.palworks.suitability;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Detects which suitabilities a Pokémon has. By default they come from datapack files
@@ -27,7 +30,7 @@ public class SuitabilityDetector {
      * Get all suitabilities for a Pokémon.
      */
     public static Set<Suitability> getSuitabilities(Pokemon pokemon) {
-        Set<Suitability> suitabilities = new HashSet<>();
+        Set<Suitability> suitabilities = EnumSet.noneOf(Suitability.class);
 
         for (SuitabilityProvider provider : providers) {
             suitabilities.addAll(provider.getSuitabilities(pokemon));

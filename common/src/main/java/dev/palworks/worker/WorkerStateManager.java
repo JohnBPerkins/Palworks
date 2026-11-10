@@ -20,6 +20,8 @@ import org.jetbrains.annotations.Nullable;
  * {@link #unload} when an entity despawns and {@link #clearCache} on server stop.
  */
 public class WorkerStateManager {
+    private static final boolean DEBUG = Palworks.DEBUG;
+
     private static final String WORKER_STATE_KEY = "palworks:worker_state";
 
     private static final Map<UUID, WorkerState> CACHE = new ConcurrentHashMap<>();
@@ -37,7 +39,7 @@ public class WorkerStateManager {
         if (persistentData.contains(WORKER_STATE_KEY)) {
             WorkerState state = WorkerState.fromNBT(persistentData.getCompound(WORKER_STATE_KEY));
 
-            if (state.getCurrentReservation() != null) {
+            if (DEBUG && state.getCurrentReservation() != null) {
                 Palworks.LOGGER.debug(
                         "Loaded state for {} with reservation: {}",
                         pokemon.getSpecies().getName(),
@@ -48,8 +50,10 @@ public class WorkerStateManager {
             return state;
         }
 
-        Palworks.LOGGER.debug(
-                "Creating new WorkerState for {}", pokemon.getSpecies().getName());
+        if (DEBUG) {
+            Palworks.LOGGER.debug(
+                    "Creating new WorkerState for {}", pokemon.getSpecies().getName());
+        }
         WorkerState state = new WorkerState();
         save(pokemon, state); // writes NBT + caches
         return state;

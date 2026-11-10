@@ -18,7 +18,7 @@ import net.minecraft.server.level.ServerLevel;
  */
 public class WorkerTickHandler {
     private static final boolean DEBUG = false; // Reduced debug spam
-    private static long lastDebugLog = 0;
+    private static long lastDebugLog;
 
     public static void register() {
         // Register server tick event to tick JobManager once per tick

@@ -39,6 +39,7 @@ public class WorkActivityPacket implements NetworkPacket<WorkActivityPacket> {
     }
 
     @Override
+    @SuppressWarnings("EnumOrdinal") // decoded by fromOrdinal; both ends run the same jar
     public void encode(@NotNull RegistryFriendlyByteBuf buffer) {
         buffer.writeUUID(pokemonUUID);
         buffer.writeVarInt(activity.phase().ordinal());

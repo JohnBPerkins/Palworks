@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -30,6 +31,8 @@ import net.minecraft.world.level.block.state.properties.Property;
 
 /** The /palworks testarea build: everything placed, fully grown, and still there a moment later. */
 public class TestAreaGameTests {
+    // The furthest a natural leaf may be from a log (through leaves) before it decays
+    private static final int MAX_LEAF_DISTANCE = 6;
 
     /** Whether a plant's "age" (if it has one) is its highest. */
     private static boolean fullyGrown(BlockState state) {
@@ -37,7 +40,7 @@ public class TestAreaGameTests {
             return crop.isMaxAge(state);
         }
         for (Property<?> property : state.getProperties()) {
-            if (property instanceof IntegerProperty age && property.getName().equals("age")) {
+            if (property instanceof IntegerProperty age && "age".equals(property.getName())) {
                 return state.getValue(age).equals(Collections.max(age.getPossibleValues()));
             }
         }
@@ -66,14 +69,14 @@ public class TestAreaGameTests {
                     || block instanceof BerryBlock
                     || block instanceof NutBushBlock
                     || block instanceof RootBlock
-                    || block == Blocks.NETHER_WART
-                    || block == Blocks.COCOA
-                    || block == Blocks.SWEET_BERRY_BUSH
-                    || block == Blocks.PITCHER_CROP
-                    || block == Blocks.TORCHFLOWER
-                    || block == Blocks.CAVE_VINES
-                    || block == Blocks.ATTACHED_PUMPKIN_STEM
-                    || block == Blocks.ATTACHED_MELON_STEM;
+                    || state.is(Blocks.NETHER_WART)
+                    || state.is(Blocks.COCOA)
+                    || state.is(Blocks.SWEET_BERRY_BUSH)
+                    || state.is(Blocks.PITCHER_CROP)
+                    || state.is(Blocks.TORCHFLOWER)
+                    || state.is(Blocks.CAVE_VINES)
+                    || state.is(Blocks.ATTACHED_PUMPKIN_STEM)
+                    || state.is(Blocks.ATTACHED_MELON_STEM);
             if (plant) {
                 plants.add(block);
                 if (!fullyGrown(state)) {
@@ -120,7 +123,7 @@ public class TestAreaGameTests {
         BlockPos min = area.min().below(2);
         BlockPos max = area.max();
         Map<BlockPos, Integer> distance = new HashMap<>();
-        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
         List<BlockPos> leaves = new ArrayList<>();
         for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
             BlockState state = level.getBlockState(pos);
@@ -136,7 +139,7 @@ public class TestAreaGameTests {
         while (!queue.isEmpty()) {
             BlockPos pos = queue.poll();
             int next = distance.get(pos) + 1;
-            if (next > 6) {
+            if (next > MAX_LEAF_DISTANCE) {
                 continue;
             }
             for (Direction direction : Direction.values()) {
@@ -184,7 +187,7 @@ public class TestAreaGameTests {
                 Blocks.SWEET_BERRY_BUSH,
                 Blocks.CAVE_VINES));
         for (Block block : BuiltInRegistries.BLOCK) {
-            if (BuiltInRegistries.BLOCK.getKey(block).getNamespace().equals("cobblemon")
+            if ("cobblemon".equals(BuiltInRegistries.BLOCK.getKey(block).getNamespace())
                     && (block instanceof CropBlock
                             || block instanceof BerryBlock
                             || block instanceof NutBushBlock

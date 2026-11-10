@@ -35,6 +35,8 @@ public record WorkActivity(Phase phase, @Nullable JobType job) {
     public static final WorkActivity IDLE = new WorkActivity(Phase.IDLE, null);
 
     /**
+     * What a worker is doing, from its state.
+     *
      * @param enabled whether its work is switched on
      * @param job     the job it has reserved, or null
      * @param busy    whether it's in a battle or evolving

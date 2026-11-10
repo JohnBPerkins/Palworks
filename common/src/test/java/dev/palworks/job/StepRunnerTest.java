@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** The rules every job's steps run by: timing, order, early end, repeat, resume. */
+// Test data reads better inline than as constants
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 class StepRunnerTest {
 
     @BeforeAll

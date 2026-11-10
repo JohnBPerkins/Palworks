@@ -15,7 +15,7 @@ import net.minecraft.world.item.ItemStack;
  * Menu (Container) for the worker inventory GUI.
  * Handles server-side slot management and item transfer.
  */
-public class WorkerInventoryMenu extends AbstractContainerMenu {
+public final class WorkerInventoryMenu extends AbstractContainerMenu {
     private final Container workerInventory;
     private final UUID pokemonUUID;
     // The worker's CarryMode (ordinal), synced to the client so it shows only the slots the worker
@@ -33,6 +33,7 @@ public class WorkerInventoryMenu extends AbstractContainerMenu {
     /**
      * Server-side constructor.
      */
+    @SuppressWarnings("EnumOrdinal") // the data slot syncs CarryMode by ordinal; see CarryMode.fromOrdinal
     public WorkerInventoryMenu(
             MenuType<?> menuType,
             int containerId,

@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 /** Harvesting (real loot, minus one seed, reset in place), gourds, berries, and planting. */
 public class CropGameTests {
+    private static final String IT_HARVESTS = "it harvests";
 
     private static final BlockPos CROP = new BlockPos(3, 1, 3);
 
@@ -41,7 +42,7 @@ public class CropGameTests {
         crop(helper, soil, mature);
         helper.assertTrue(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), mature + " is ripe");
 
-        helper.assertTrue(harvest(helper), "it harvests");
+        helper.assertTrue(harvest(helper), IT_HARVESTS);
         helper.assertTrue(
                 helper.getBlockState(CROP).equals(reset),
                 "it's reset in place to " + reset + ", got " + helper.getBlockState(CROP));
@@ -106,7 +107,7 @@ public class CropGameTests {
         helper.setBlock(CROP, pod.setValue(CocoaBlock.AGE, 2));
         helper.assertTrue(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), "the pod is ripe");
 
-        helper.assertTrue(harvest(helper), "it harvests");
+        helper.assertTrue(harvest(helper), IT_HARVESTS);
         helper.assertTrue(
                 helper.getBlockState(CROP).equals(pod.setValue(CocoaBlock.AGE, 0)), "reset, still on its log");
         helper.assertItemEntityPresent(Items.COCOA_BEANS, CROP, 2.0);
@@ -119,7 +120,7 @@ public class CropGameTests {
         // and the farmland is left empty for the planters
         crop(helper, Blocks.FARMLAND, Blocks.TORCHFLOWER.defaultBlockState());
         helper.assertTrue(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), "a grown torchflower");
-        helper.assertTrue(harvest(helper), "it harvests");
+        helper.assertTrue(harvest(helper), IT_HARVESTS);
         helper.assertBlockPresent(Blocks.AIR, CROP);
         helper.assertItemEntityPresent(Items.TORCHFLOWER, CROP, 2.0);
 
@@ -142,7 +143,7 @@ public class CropGameTests {
         helper.assertTrue(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP)), "a grown pitcher's lower half");
         helper.assertFalse(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP.above())), "not its upper half too");
 
-        helper.assertTrue(harvest(helper), "it harvests");
+        helper.assertTrue(harvest(helper), IT_HARVESTS);
         helper.assertBlockPresent(Blocks.AIR, CROP);
         helper.assertBlockPresent(Blocks.AIR, CROP.above());
         helper.assertItemEntityPresent(Items.PITCHER_PLANT, CROP, 2.0);
@@ -255,7 +256,7 @@ public class CropGameTests {
         BlockState bush = Blocks.SWEET_BERRY_BUSH.defaultBlockState();
         crop(helper, Blocks.GRASS_BLOCK, bush.setValue(SweetBerryBushBlock.AGE, 3));
 
-        helper.assertTrue(harvest(helper), "it harvests");
+        helper.assertTrue(harvest(helper), IT_HARVESTS);
         helper.assertTrue(helper.getBlockState(CROP).getValue(SweetBerryBushBlock.AGE) == 1, "back to age 1");
         helper.assertItemEntityPresent(Items.SWEET_BERRIES, CROP, 2.0);
         helper.succeed();
@@ -294,7 +295,7 @@ public class CropGameTests {
         for (int i = 0; i < 200; i++) {
             Scenes.clearItems(helper);
             helper.setBlock(CROP, ripe);
-            helper.assertTrue(harvest(helper), "it harvests");
+            helper.assertTrue(harvest(helper), IT_HARVESTS);
             int got = Scenes.itemsOnGround(helper, item);
             helper.assertTrue(
                     got >= min && got <= max, "each harvest gives " + min + "-" + max + " " + item + ", got " + got);

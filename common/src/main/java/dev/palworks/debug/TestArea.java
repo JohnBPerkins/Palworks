@@ -65,6 +65,7 @@ import org.jetbrains.annotations.Nullable;
  * cleared first. What couldn't be placed is reported in the result instead of failing.
  */
 public final class TestArea {
+    private static final String COBBLEMON = "cobblemon"; // Cobblemon's namespace
     /** What was built, and anything that couldn't be. */
     public record Result(BlockPos min, BlockPos max, int plots, List<String> problems) {}
 
@@ -111,6 +112,7 @@ public final class TestArea {
 
     private record Tree(String label, ResourceKey<ConfiguredFeature<?, ?>> feature, Block floor, boolean big) {}
 
+    @FunctionalInterface
     private interface CellBuilder {
         void build(BlockPos cell, Grid grid);
     }
@@ -177,7 +179,7 @@ public final class TestArea {
      * the lighting thread (which reads chunk sections while we write them) more chances to trip.
      */
     private void set(BlockPos pos, BlockState state) {
-        if (level.getBlockState(pos) != state) {
+        if (!level.getBlockState(pos).equals(state)) {
             level.setBlock(pos, state, FLAGS);
         }
     }
@@ -276,7 +278,7 @@ public final class TestArea {
             try {
                 plot.builder().build(cell, grid);
                 plots++;
-            } catch (RuntimeException e) {
+            } catch (RuntimeException e) { // NOPMD - one plot failing is reported, not the whole build
                 problems.add(plot.label() + ": " + e.getMessage());
             }
         }
@@ -338,7 +340,7 @@ public final class TestArea {
                 try {
                     plant.placer().accept(pos);
                     plots++;
-                } catch (RuntimeException e) {
+                } catch (RuntimeException e) { // NOPMD - one plant failing is reported, not the whole build
                     problems.add(plant.label() + ": " + e.getMessage());
                 }
                 sign(pos.south(), signLines(plant.label()));
@@ -353,7 +355,7 @@ public final class TestArea {
             return crop.getStateForAge(crop.getMaxAge());
         }
         for (Property<?> property : state.getProperties()) {
-            if (property instanceof IntegerProperty age && property.getName().equals("age")) {
+            if (property instanceof IntegerProperty age && "age".equals(property.getName())) {
                 return state.setValue(age, Collections.max(age.getPossibleValues()));
             }
         }
@@ -424,7 +426,7 @@ public final class TestArea {
     private static List<Block> cobblemonBlocks() {
         List<Block> blocks = new ArrayList<>();
         for (Block block : BuiltInRegistries.BLOCK) {
-            if (BuiltInRegistries.BLOCK.getKey(block).getNamespace().equals("cobblemon")) {
+            if (COBBLEMON.equals(BuiltInRegistries.BLOCK.getKey(block).getNamespace())) {
                 blocks.add(block);
             }
         }
@@ -471,7 +473,7 @@ public final class TestArea {
     }
 
     private void soil(BlockPos pos, Block soil) {
-        BlockState state = soil == Blocks.FARMLAND
+        BlockState state = soil.equals(Blocks.FARMLAND)
                 ? Blocks.FARMLAND.defaultBlockState().setValue(FarmBlock.MOISTURE, FarmBlock.MAX_MOISTURE)
                 : soil.defaultBlockState();
         set(pos, state);
@@ -668,7 +670,8 @@ public final class TestArea {
         void restore() {
             int i = 0;
             for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
-                set(pos.immutable(), states.get(i++));
+                set(pos.immutable(), states.get(i));
+                i++;
             }
         }
     }

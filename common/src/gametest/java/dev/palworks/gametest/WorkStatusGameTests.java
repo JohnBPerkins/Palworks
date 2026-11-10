@@ -112,8 +112,7 @@ public class WorkStatusGameTests {
                     }
                     sawReachingPath[0] |= d.pathStatus() == WorkerDebugPacket.PathStatus.REACHES;
                 }
-                if (entry.activity().phase() == WorkActivity.Phase.WORKING
-                        && d.stepName().equals("chop")) {
+                if (entry.activity().phase() == WorkActivity.Phase.WORKING && "chop".equals(d.stepName())) {
                     sawChopStep[0] = d.stepCount() > 0 && d.stepLength() > 0;
                 }
                 if (entry.activity().phase() == WorkActivity.Phase.WALKING
