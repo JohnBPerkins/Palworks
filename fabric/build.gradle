@@ -122,7 +122,7 @@ loom.runs.matching { it.name == "gameTest" }.configureEach {
     vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.file('test-results/gametest/TEST-gametest.xml').get().asFile}"
 }
 
-// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): about 50 workers on a big
+// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers on a big
 // farm, with spark measuring tick times. Its own source set and mod (palworks_stress, never
 // published), so `./gradlew :fabric:runStressTest` runs it alone, without the in-game tests: Fabric's
 // GameTest API runs every test its mods register. It reuses the in-game tests' helpers (Workers,

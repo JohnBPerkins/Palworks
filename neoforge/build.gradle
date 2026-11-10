@@ -132,7 +132,7 @@ loom {
     }
 }
 
-// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): about 50 workers on a big
+// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers on a big
 // farm, with spark measuring tick times. Its own source set and mod (palworks_stress, never
 // published, src/stress), so `./gradlew :neoforge:runStressTest` runs only it (by its template
 // namespace): the in-game test mod is loaded too, for its helpers, but none of its tests run.

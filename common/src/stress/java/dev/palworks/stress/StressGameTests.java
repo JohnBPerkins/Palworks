@@ -20,6 +20,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
@@ -29,7 +30,7 @@ import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 /**
- * The stress test: about 50 workers of every kind on a big farm, with their work coming back as
+ * The stress test: 200 workers of every kind on a big farm, with their work coming back as
  * fast as they do it, and the server's tick times measured with spark. Run on its own
  * ({@code ./gradlew :fabric:runStressTest} / {@code :neoforge:runStressTest}), never with the
  * in-game tests, so nothing else adds to the load.
@@ -64,7 +65,7 @@ public class StressGameTests {
 
     // Ends itself after the measured minute; the timeout only catches a hang
     @GameTest(template = "palworks_stress:farm", batch = "stress", timeoutTicks = 200_000)
-    public void fiftyWorkersOnABigFarm(GameTestHelper helper) {
+    public void twoHundredWorkersOnABigFarm(GameTestHelper helper) {
         Workers.isolate(helper);
         for (int x = 0; x < SIZE; x++) {
             for (int z = 0; z < SIZE; z++) {
@@ -72,11 +73,11 @@ public class StressGameTests {
             }
         }
 
-        // Four wheat fields, one in each corner: 200 crops
+        // Four wheat fields, one in each corner: 560 crops
         List<BlockPos> crops = new ArrayList<>();
-        for (int[] corner : new int[][] {{3, 3}, {35, 3}, {3, 40}, {35, 40}}) {
-            for (int dx = 0; dx < 10; dx++) {
-                for (int dz = 0; dz < 5; dz++) {
+        for (int[] corner : new int[][] {{2, 2}, {32, 2}, {2, 36}, {32, 36}}) {
+            for (int dx = 0; dx < 14; dx++) {
+                for (int dz = 0; dz < 10; dz++) {
                     BlockPos crop = new BlockPos(corner[0] + dx, 1, corner[1] + dz);
                     helper.setBlock(crop.below(), Blocks.FARMLAND);
                     helper.setBlock(crop, WHEAT.getStateForAge(7));
@@ -84,34 +85,47 @@ public class StressGameTests {
                 }
             }
         }
-        // A row of trees across the middle, a row of furnaces in front of them, chests between
-        List<BlockPos> trees = new ArrayList<>();
-        for (int x = 3; x < SIZE; x += 6) {
-            trees.add(new BlockPos(x, 1, 26));
-            Scenes.tree(helper, x, 26, TREE_HEIGHT, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
+        // Between the fields: chests, a row of furnaces, two rows of trees, chests
+        List<BlockPos> chests = new ArrayList<>();
+        for (int x = 18; x <= 30; x += 4) {
+            chests.add(new BlockPos(x, 1, 13));
+            chests.add(new BlockPos(x, 1, 34));
+        }
+        for (BlockPos chest : chests) {
+            helper.setBlock(chest, Blocks.CHEST);
         }
         List<BlockPos> furnaces = new ArrayList<>();
-        for (int x = 8; x <= 36; x += 4) {
-            BlockPos furnace = new BlockPos(x, 1, 18);
+        for (int x = 4; x <= 43; x += 3) {
+            BlockPos furnace = new BlockPos(x, 1, 17);
             helper.setBlock(
                     furnace, Blocks.FURNACE.defaultBlockState().setValue(AbstractFurnaceBlock.FACING, Direction.NORTH));
             furnaces.add(furnace);
         }
-        List<BlockPos> chests = List.of(
-                new BlockPos(20, 1, 10), new BlockPos(27, 1, 10), new BlockPos(20, 1, 36), new BlockPos(27, 1, 36));
-        for (BlockPos chest : chests) {
-            helper.setBlock(chest, Blocks.CHEST);
+        List<BlockPos> trees = new ArrayList<>();
+        for (int z : new int[] {22, 29}) {
+            for (int x = 3; x < SIZE; x += 6) {
+                trees.add(new BlockPos(x, 1, z));
+                Scenes.tree(helper, x, z, TREE_HEIGHT, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
+            }
         }
 
-        // 50 workers, each with a (mock) owner where it's sent out, near the work it does
-        sendOutRow(helper, BULBASAUR, 5, 3, 2);
-        sendOutRow(helper, BULBASAUR, 5, 35, 2);
-        sendOutRow(helper, BULBASAUR, 5, 3, 46);
-        sendOutRow(helper, BULBASAUR, 5, 35, 46);
-        sendOutRow(helper, MACHOP, 10, 3, 22);
-        sendOutRow(helper, CHARMANDER, 8, 8, 15);
-        sendOutRow(helper, PIDGEY, 6, 12, 13);
-        sendOutRow(helper, PIDGEY, 6, 12, 33);
+        // 200 workers in parties of 5 or 6 (Cobblemon's most), each owner standing by its party's work
+        int workers = 0;
+        for (int[] spot : new int[][] {
+            {4, 12}, {8, 12}, {12, 12}, {15, 12}, {33, 12}, {37, 12}, {41, 12}, {44, 12}, {4, 35}, {8, 35}, {12, 35},
+            {15, 35}, {33, 35}, {37, 35}, {41, 35}, {44, 35}
+        }) {
+            workers += sendOutParty(helper, BULBASAUR, 5, spot[0], spot[1]); // 80, by the fields
+        }
+        for (int x = 3; x < SIZE; x += 6) {
+            workers += sendOutParty(helper, MACHOP, 5, x, 25); // 40, between the trees
+        }
+        for (int x = 6; x <= 38; x += 8) {
+            workers += sendOutParty(helper, CHARMANDER, 6, x, 15); // 30, by the furnaces
+            workers += sendOutParty(helper, PIDGEY, 5, x, 19); // 50, all over
+            workers += sendOutParty(helper, PIDGEY, 5, x, 32);
+        }
+        int workerCount = workers;
 
         int[] harvests = {0};
         int[] chops = {0};
@@ -144,7 +158,7 @@ public class StressGameTests {
                 ticks[0]++;
                 if (System.nanoTime() - measureStart[0] >= MEASURE_NANOS) {
                     measuring[0] = false;
-                    report(helper, ticks[0], harvests[0], chops[0]);
+                    report(helper, workerCount, ticks[0], harvests[0], chops[0]);
                     helper.assertTrue(
                             harvests[0] >= MIN_HARVESTS,
                             "the workers barely worked (" + harvests[0] + " harvests in " + ticks[0]
@@ -182,12 +196,14 @@ public class StressGameTests {
         }
     }
 
-    /** Send out {@code count} of a species in a row along x from {@code x}, 4 blocks apart (2 for 5 or fewer). */
-    private static void sendOutRow(GameTestHelper helper, String species, int count, int x, int z) {
-        int step = count <= 5 ? 2 : 4;
+    /** Send out {@code count} of a species, one owner's party, at a spot. Returns how many. */
+    private static int sendOutParty(GameTestHelper helper, String species, int count, int x, int z) {
+        BlockPos at = new BlockPos(x, 1, z);
+        ServerPlayer owner = Workers.owner(helper, at);
         for (int i = 0; i < count; i++) {
-            Workers.sendOut(helper, species, new BlockPos(Math.min(SIZE - 2, x + i * step), 1, z));
+            Workers.sendOut(helper, owner, species, at);
         }
+        return count;
     }
 
     /** Bring back the work that's been done, so there's always plenty. */
@@ -233,7 +249,7 @@ public class StressGameTests {
     }
 
     /** Write spark's timings for the measured minute, and the work done, to the report file. */
-    private static void report(GameTestHelper helper, int ticks, int harvests, int chops) {
+    private static void report(GameTestHelper helper, int workers, int ticks, int harvests, int chops) {
         Spark spark = SparkProvider.get();
         DoubleAverageInfo mspt =
                 spark.mspt() == null ? null : spark.mspt().poll(StatisticWindow.MillisPerTick.MINUTES_1);
@@ -241,11 +257,12 @@ public class StressGameTests {
         double tps = spark.tps().poll(StatisticWindow.TicksPerSecond.MINUTES_1);
         String json = String.format(
                 Locale.ROOT,
-                "{%n  \"scenario\": %d,%n  \"loader\": \"%s\",%n  \"workers\": 50,%n  \"ticks\": %d,%n"
+                "{%n  \"scenario\": %d,%n  \"loader\": \"%s\",%n  \"workers\": %d,%n  \"ticks\": %d,%n"
                         + "  \"mspt\": {\"mean\": %.3f, \"median\": %.3f, \"p95\": %.3f, \"max\": %.3f},%n"
                         + "  \"unpaced_tps\": %.1f,%n  \"harvests\": %d,%n  \"chops\": %d%n}%n",
                 SCENARIO_VERSION,
                 Platform.isFabric() ? "fabric" : "neoforge",
+                workers,
                 ticks,
                 mspt.mean(),
                 mspt.median(),

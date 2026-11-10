@@ -97,7 +97,7 @@ There are three kinds, and CI runs all of them on every PR:
 |---|---|---|---|
 | Unit tests | `common/src/test/java` | `./gradlew :common:test` | Logic that doesn't need a world: rules (steps, carry modes, sapling names), saved state, items |
 | In-game tests (GameTests) | `common/src/gametest/java` | `./gradlew :fabric:runGameTest`, `./gradlew :neoforge:runGameTest` | Anything that needs a real world: blocks, block tags, loot, entities, and real Cobblemon Pokémon doing jobs |
-| Stress test | `common/src/stress/java` | `./gradlew :fabric:runStressTest`, `./gradlew :neoforge:runStressTest` | Performance: how long each server tick takes with about 50 workers busy |
+| Stress test | `common/src/stress/java` | `./gradlew :fabric:runStressTest`, `./gradlew :neoforge:runStressTest` | Performance: how long each server tick takes with 200 workers busy |
 
 **Unit tests** can use items, blocks and block states after `Bootstrap.bootStrap()` (see
 `WorkerStateTest`), but not block tags or a world: tags only exist once a world loads its data.
@@ -138,9 +138,9 @@ it covers and check that it fails.
 
 ### Performance (stress test)
 
-`StressGameTests` puts about 50 workers (harvesters, planters, lumberjacks, kindlers and
-transporters, each with a mock owner) on a 48x48 farm with 200 crops, 8 trees, 8 furnaces and 4
-chests, and keeps their work coming back as fast as they do it. After 30 seconds to settle, it
+`StressGameTests` puts 200 workers (80 harvester-planters, 40 lumberjacks, 30 kindlers and 50
+transporters, in parties of 5 or 6 with a mock owner each) on a 48x48 farm with 560 crops, 16 trees,
+14 furnaces and 8 chests, and keeps their work coming back as fast as they do it. After 30 seconds to settle, it
 measures for a minute with [spark](https://spark.lucko.me/docs): spark's milliseconds per tick
 (MSPT: mean, median, 95th percentile, max) go to `<loader>/build/stress/results.json`, and spark's
 profile of that minute to `<loader>/build/run/stressTest/config/spark/` (open it at

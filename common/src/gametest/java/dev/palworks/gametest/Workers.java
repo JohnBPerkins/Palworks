@@ -76,12 +76,25 @@ public final class Workers {
      * (On NeoForge the test mod lets Cobblemon's packets through to the mock player's fake
      * connection, which never negotiated them.)
      */
-    @SuppressWarnings("removal") // makeMockServerPlayerInLevel: vanilla's only mock player in 1.21.1
     public static PokemonEntity sendOut(GameTestHelper helper, String properties, BlockPos rel) {
+        return sendOut(helper, owner(helper, rel), properties, rel);
+    }
+
+    /** A mock player standing at a spot in the test, to own Pokémon sent out there. */
+    @SuppressWarnings("removal") // makeMockServerPlayerInLevel: vanilla's only mock player in 1.21.1
+    public static ServerPlayer owner(GameTestHelper helper, BlockPos rel) {
         ServerPlayer owner = helper.makeMockServerPlayerInLevel();
         BlockPos abs = helper.absolutePos(rel);
         owner.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5);
+        return owner;
+    }
 
+    /**
+     * Send out a Pokémon of {@code owner}'s at a spot in the test, joining its party (6 at most, as
+     * in Cobblemon).
+     */
+    public static PokemonEntity sendOut(GameTestHelper helper, ServerPlayer owner, String properties, BlockPos rel) {
+        BlockPos abs = helper.absolutePos(rel);
         Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
         Cobblemon.INSTANCE.getStorage().getParty(owner).add(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
