@@ -25,7 +25,7 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - **Work icons on the party HUD** — in the top-left corner of each sent-out party member's card, next
   to the "sent out" icon: its job's icon while it works, faded while it walks there, greyed out while
   it's in a battle, or a red cross if its work is off.
-- **Data-driven** — which Pokémon can do which work, and what counts as "ore", come from datapack
+- **Data-driven** — which Pokémon can do which work, and what counts as a furnace or an "ore", come from datapack
   files, so modpacks can tune them without code changes (see
   [Customizing work skills](#customizing-work-skills)).
 - **Multi-loader** — a shared core runs on both Fabric and NeoForge from the same codebase
@@ -79,6 +79,11 @@ The jobs are `kindling`, `watering`, `planting`, `generating_electricity`, `hand
 `lumbering`, `mining`, `medicine_production`, `cooling`, `transporting`, `nether` and `farming`. The
 defaults are in
 [`common/src/main/resources/data/palworks/palworks/suitability`](common/src/main/resources/data/palworks/palworks/suitability).
+
+Which blocks are work come from block tags: `#palworks:furnaces` (lit by Kindling workers: the
+furnace, blast furnace and smoker; a modded block needs a furnace block entity) and `#palworks:ores`
+(for Mining, once it's done). Add to them like any tag, with a
+`data/palworks/tags/block/<tag>.json` in your datapack.
 
 ## Customizing work animations
 

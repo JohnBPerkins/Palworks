@@ -52,12 +52,4 @@ class ReservationIdTest {
         assertFalse(a.isExpired(1_600L, 600), "exactly the timeout: not yet");
         assertTrue(a.isExpired(1_601L, 600), "past the timeout");
     }
-
-    @Test
-    void aReservationTimedByTheClockIsFromTheFuture() {
-        // Older versions saved System.currentTimeMillis(); game time is far smaller
-        ReservationId old = new ReservationId(POS, JobType.HARVEST_CROPS, 1_731_000_000_000L);
-        assertTrue(old.isFromTheFuture(24_000L));
-        assertFalse(new ReservationId(POS, JobType.HARVEST_CROPS, 24_000L).isFromTheFuture(24_000L));
-    }
 }

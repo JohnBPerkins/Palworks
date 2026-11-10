@@ -16,6 +16,12 @@ import net.minecraft.world.level.block.Block;
 public final class JobBlockTags {
     private JobBlockTags() {}
 
+    /**
+     * Furnaces a KINDLING worker lights for {@link JobType#FUEL_FURNACE}. Each must have a furnace
+     * block entity ({@code AbstractFurnaceBlockEntity}); any other block in the tag is ignored.
+     */
+    public static final TagKey<Block> FURNACES = TagKey.create(Registries.BLOCK, PalworksResource.of("furnaces"));
+
     /** Blocks a MINING worker will break for {@link JobType#MINE_RESOURCE}. */
     public static final TagKey<Block> ORES = TagKey.create(Registries.BLOCK, PalworksResource.of("ores"));
 }

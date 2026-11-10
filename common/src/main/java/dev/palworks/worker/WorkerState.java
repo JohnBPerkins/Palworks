@@ -8,18 +8,16 @@ import java.util.Locale;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Persistent data for a Pokémon worker.
- * Stores: enabled state, assigned job, cooldowns, skill XP, base link.
+ * Stores: enabled state, assigned job and its reservation, progress through it, cooldowns and
+ * path-failure tracking.
  */
 public class WorkerState {
     // Path failures further apart than this start the count again
     private static final long PATH_FAILURE_RESET_MS = 5000;
-    // Old-format reservations with a station further than this from y=0 were corrupted
-    private static final int MAX_SANE_STATION_Y = 300;
 
     private boolean enabled;
     private JobType assignedJob;
@@ -44,10 +42,6 @@ public class WorkerState {
     // Ticks spent stepping the last bit onto its stand tile after its walk ended just short (not saved)
     private int stepInTicks;
 
-    // Work inventory - separate from Cobblemon's held item, used for job items
-    // Single slot that can hold a full stack (up to 64 items)
-    private ItemStack workInventory;
-
     public WorkerState() {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
@@ -58,7 +52,6 @@ public class WorkerState {
         this.jobStep = 0;
         this.stepTicks = 0;
         this.jobData = new CompoundTag();
-        this.workInventory = ItemStack.EMPTY;
     }
 
     // Enabled state
@@ -242,72 +235,6 @@ public class WorkerState {
         return jobData;
     }
 
-    // Work Inventory Management
-    public ItemStack getWorkInventory() {
-        return workInventory;
-    }
-
-    public void setWorkInventory(ItemStack stack) {
-        this.workInventory = stack.copy();
-    }
-
-    public boolean hasWorkInventorySpace() {
-        return workInventory.isEmpty() || workInventory.getCount() < workInventory.getMaxStackSize();
-    }
-
-    public boolean hasItemInWorkInventory(net.minecraft.world.item.Item item) {
-        return !workInventory.isEmpty() && workInventory.is(item);
-    }
-
-    public int getWorkInventoryCount() {
-        return workInventory.getCount();
-    }
-
-    /**
-     * Add items to work inventory. Returns the number of items that couldn't fit.
-     */
-    public int addToWorkInventory(ItemStack stack) {
-        if (stack.isEmpty()) {
-            return 0;
-        }
-
-        if (workInventory.isEmpty()) {
-            int toAdd = Math.min(stack.getCount(), stack.getMaxStackSize());
-            workInventory = stack.copy();
-            workInventory.setCount(toAdd);
-            return stack.getCount() - toAdd;
-        }
-
-        // Only add if same item type
-        if (ItemStack.isSameItemSameComponents(workInventory, stack)) {
-            int space = workInventory.getMaxStackSize() - workInventory.getCount();
-            int toAdd = Math.min(space, stack.getCount());
-            workInventory.grow(toAdd);
-            return stack.getCount() - toAdd;
-        }
-
-        return stack.getCount(); // Couldn't add any
-    }
-
-    /**
-     * Remove items from work inventory. Returns true if successful.
-     */
-    public boolean removeFromWorkInventory(int count) {
-        if (workInventory.isEmpty() || workInventory.getCount() < count) {
-            return false;
-        }
-
-        workInventory.shrink(count);
-        if (workInventory.isEmpty()) {
-            workInventory = ItemStack.EMPTY;
-        }
-        return true;
-    }
-
-    public void clearWorkInventory() {
-        workInventory = ItemStack.EMPTY;
-    }
-
     // NBT Serialization
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
@@ -333,8 +260,6 @@ public class WorkerState {
         if (currentReservation != null) {
             CompoundTag reservationTag = new CompoundTag();
             BlockPos pos = currentReservation.getStationPos();
-            // CRITICAL FIX: Store X, Y, Z separately instead of using asLong()
-            // This avoids BlockPos.asLong() bugs with negative Y coordinates
             reservationTag.putInt("posX", pos.getX());
             reservationTag.putInt("posY", pos.getY());
             reservationTag.putInt("posZ", pos.getZ());
@@ -343,17 +268,11 @@ public class WorkerState {
             tag.put("currentReservation", reservationTag);
         }
 
-        // Serialize work inventory
-        if (!workInventory.isEmpty()) {
-            CompoundTag inventoryTag = (CompoundTag) workInventory.save(net.minecraft.core.RegistryAccess.EMPTY);
-            tag.put("workInventory", inventoryTag);
-        }
-
         return tag;
     }
 
     public void deserializeNBT(CompoundTag tag) {
-        // Missing key means the state predates this field: treat as enabled (the default).
+        // Missing key: never toggled, so enabled (the default).
         enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
 
         if (tag.contains("assignedJob")) {
@@ -364,10 +283,6 @@ public class WorkerState {
                 assignedJob = null;
             }
         }
-
-        // Older versions also saved the worker's suitabilities ("suitabilities"). They're ignored:
-        // suitabilities come from the Pokémon's species and types (SuitabilityDetector), so they
-        // follow it through evolution and form changes.
 
         // Deserialize cooldowns
         cooldowns.clear();
@@ -388,27 +303,8 @@ public class WorkerState {
         if (tag.contains("currentReservation")) {
             CompoundTag reservationTag = tag.getCompound("currentReservation");
 
-            BlockPos stationPos;
-            // CRITICAL FIX: Read X, Y, Z separately (new format) or fall back to old asLong format
-            if (reservationTag.contains("posX")) {
-                // New format: separate X, Y, Z integers
-                int x = reservationTag.getInt("posX");
-                int y = reservationTag.getInt("posY");
-                int z = reservationTag.getInt("posZ");
-                stationPos = new BlockPos(x, y, z);
-            } else {
-                // Old format: packed long (may be corrupted)
-                stationPos = BlockPos.of(reservationTag.getLong("stationPos"));
-                dev.palworks.Palworks.LOGGER.warn(
-                        "Loaded reservation from OLD format (asLong): {} - this may be corrupted!", stationPos);
-                // Clear corrupted reservations immediately during migration
-                if (Math.abs(stationPos.getY()) > MAX_SANE_STATION_Y) {
-                    dev.palworks.Palworks.LOGGER.warn(
-                            "Old reservation has suspicious Y coordinate {}, clearing it!", stationPos.getY());
-                    currentReservation = null;
-                    return; // Skip rest of deserialization
-                }
-            }
+            BlockPos stationPos = new BlockPos(
+                    reservationTag.getInt("posX"), reservationTag.getInt("posY"), reservationTag.getInt("posZ"));
 
             String jobTypeId = reservationTag.getString("jobType");
             long timestamp = reservationTag.getLong("timestamp");
@@ -423,19 +319,10 @@ public class WorkerState {
             currentReservation = null;
         }
 
-        // Job progress (missing in older saves: start of the job)
-        jobStep = tag.contains("jobStep") ? Math.max(0, tag.getInt("jobStep")) : 0;
+        // Job progress
+        jobStep = Math.max(0, tag.getInt("jobStep"));
         jobData = tag.contains("jobData") ? tag.getCompound("jobData").copy() : new CompoundTag();
         stepTicks = 0;
-
-        // Deserialize work inventory
-        if (tag.contains("workInventory")) {
-            CompoundTag inventoryTag = tag.getCompound("workInventory");
-            workInventory = ItemStack.parse(net.minecraft.core.RegistryAccess.EMPTY, inventoryTag)
-                    .orElse(ItemStack.EMPTY);
-        } else {
-            workInventory = ItemStack.EMPTY;
-        }
     }
 
     public static WorkerState fromNBT(CompoundTag tag) {

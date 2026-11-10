@@ -42,14 +42,6 @@ public final class ReservationId {
         return gameTime - timestamp > timeoutTicks;
     }
 
-    /**
-     * Whether its time is from later than now. Only a reservation saved by an older version, which
-     * timed them by the clock (milliseconds since 1970, far beyond any world's game time), is.
-     */
-    public boolean isFromTheFuture(long gameTime) {
-        return timestamp > gameTime;
-    }
-
     // Identity is the (station, job) pair. The timestamp is deliberately excluded: it's
     // freshness metadata (for isExpired / refresh), not part of what makes two reservations
     // "the same job". Including it made every refreshed reservation compare unequal.
