@@ -140,13 +140,13 @@ public class WorkerAI {
                         reservation.getStationPos());
             }
 
-            // CRITICAL FIX: Check if reservation is impossibly far away (likely corrupted Y coordinate)
-            // Normal work radius is 32 blocks, so anything over 100 blocks is suspicious
+            // A saved job far outside any work range (e.g. the Pokémon was recalled and sent out
+            // somewhere else) is dropped rather than walked to. Work range is 32 blocks.
             BlockPos entityPos = entity.blockPosition();
             double distanceSq = entityPos.distSqr(reservation.getStationPos());
-            if (distanceSq > 100 * 100) { // 100 block radius check
+            if (distanceSq > 100 * 100) {
                 Palworks.LOGGER.warn(
-                        "{} has impossible reservation distance {} blocks (entity at {}, job at {}) - clearing corrupted reservation!",
+                        "{} has a job {} blocks away (entity at {}, job at {}) - dropping it",
                         pokemon.getSpecies().getName(),
                         Math.sqrt(distanceSq),
                         entityPos,
@@ -162,17 +162,7 @@ public class WorkerAI {
             // Don't expire if worker is actively working, or has already done part of the job
             boolean isActivelyWorking = state.isWorking();
 
-            // Saved by an older version, which timed reservations by the clock: start its time now
-            // instead of reading a clock time as game time (it would never expire)
             long now = level.getGameTime();
-            if (reservation.isFromTheFuture(now)) {
-                ReservationId refreshedReservation =
-                        new ReservationId(reservation.getStationPos(), reservation.getJobType(), now);
-                state.setCurrentReservation(refreshedReservation);
-                WorkerStateManager.save(pokemon, state);
-                reservation = refreshedReservation;
-            }
-
             if (!isActivelyWorking && reservation.isExpired(now, RESERVATION_TIMEOUT_TICKS)) {
                 Palworks.LOGGER.info(
                         "{} reservation expired for {}", pokemon.getSpecies().getName(), reservation.getJobType());

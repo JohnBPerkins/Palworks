@@ -3,23 +3,18 @@ package dev.palworks.fabric.event;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkerAI;
-import dev.palworks.fabric.PalworksFabric;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.manager.JobManager;
 import dev.palworks.worker.WorkerStateManager;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * Handles ticking for Pokémon workers on Fabric.
- * Hooks into Cobblemon entity tick events.
+ * Handles ticking for Pokémon workers on Fabric. Each worker runs from its own entity tick (see
+ * PokemonEntityMixin), and JobManager once per server tick.
  */
 public class WorkerTickHandler {
-    private static final boolean DEBUG = false; // Reduced debug spam
-    private static long lastDebugLog;
-
     public static void register() {
         // Register server tick event to tick JobManager once per tick
         ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -27,11 +22,6 @@ public class WorkerTickHandler {
             for (ServerLevel level : server.getAllLevels()) {
                 JobManager.getInstance(level).tick(level);
             }
-        });
-
-        // Register server entity load event
-        ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
-            // Entities are loaded, we'll tick them via the tick event
         });
 
         // Clear per-dimension state on shutdown so it doesn't leak across world reloads.
@@ -54,13 +44,6 @@ public class WorkerTickHandler {
         Pokemon pokemon = pokemonEntity.getPokemon();
         if (pokemon == null || pokemon.getOwnerUUID() == null) {
             return; // Only process owned Pokemon
-        }
-
-        // Debug log every 5 seconds
-        if (DEBUG && System.currentTimeMillis() - lastDebugLog > 5000) {
-            PalworksFabric.LOGGER.debug(
-                    "Fabric tick handler called for {}", pokemon.getSpecies().getName());
-            lastDebugLog = System.currentTimeMillis();
         }
 
         if (pokemonEntity.level() instanceof ServerLevel serverLevel) {

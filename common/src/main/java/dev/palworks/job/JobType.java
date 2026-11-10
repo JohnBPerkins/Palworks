@@ -5,50 +5,29 @@ import java.util.Locale;
 
 /**
  * Represents what needs doing NOW.
- * Separate from Suitability to allow flexible job definitions.
+ * Separate from Suitability to allow flexible job definitions. Only jobs a worker can actually do
+ * are listed; add a value together with its handler (WorkerAI) and its scan (JobManager).
  */
 public enum JobType {
-    // Kindling jobs
+    // Kindling
     FUEL_FURNACE(Suitability.KINDLING),
-    COOK_FOOD(Suitability.KINDLING),
 
-    // Watering jobs
-    WATER_CROPS(Suitability.WATERING),
-    POWER_WATER_WHEEL(Suitability.WATERING),
-
-    // Planting jobs
+    // Planting
     PLANT_SEEDS(Suitability.PLANTING),
+    GET_SEEDS(Suitability.PLANTING), // Get seeds from a chest for planting
 
-    // Electric jobs
-    POWER_DEVICE(Suitability.GENERATING_ELECTRICITY),
-
-    // Handiwork jobs
-    CRAFT_ITEM(Suitability.HANDIWORK),
-    MANAGE_CONVEYOR(Suitability.HANDIWORK),
-
-    // Gathering jobs
+    // Gathering
     HARVEST_CROPS(Suitability.GATHERING),
-    CARRY_BODY(Suitability.GATHERING),
 
-    // Lumbering jobs
+    // Lumbering
     CHOP_TREE(Suitability.LUMBERING),
 
-    // Mining jobs
+    // Mining (not scanned for yet: see JobManager's MINING_JOBS_ENABLED)
     MINE_RESOURCE(Suitability.MINING),
 
-    // Medicine jobs
-    BREW_POTION(Suitability.MEDICINE_PRODUCTION),
-
-    // Cooling jobs
-    COOL_CONTAINER(Suitability.COOLING),
-
-    // Transporting jobs
-    GET_SEEDS(Suitability.PLANTING), // Get seeds from chest for planting
-    COLLECT_DROPS(Suitability.TRANSPORTING), // Pick up dropped items from ground
-    DELIVER_ITEMS(Suitability.TRANSPORTING), // Deliver items to destination
-
-    // Farming jobs (ranch)
-    PRODUCE_RANCH_ITEMS(Suitability.FARMING);
+    // Transporting
+    COLLECT_DROPS(Suitability.TRANSPORTING), // Pick up dropped items from the ground
+    DELIVER_ITEMS(Suitability.TRANSPORTING); // Deliver carried items to a chest
 
     private final Suitability requiredSuitability;
 

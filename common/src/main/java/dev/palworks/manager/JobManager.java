@@ -20,9 +20,6 @@ import dev.palworks.job.WorkRange;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
-import dev.palworks.station.StationDetector;
-import dev.palworks.station.StationState;
-import dev.palworks.station.StationStateManager;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
@@ -52,7 +49,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -631,37 +627,15 @@ public class JobManager {
      */
     @Nullable
     private JobRecord scanPositionForJob(Level level, BlockPos pos, BlockState state) {
-        Block block = state.getBlock();
-
-        // Check for station-based jobs (furnaces, etc.)
-        JobType stationJob = StationDetector.getJobType(block);
-        if (stationJob != null) {
-            // Special handling for furnaces (Kindling jobs)
-            if (stationJob == JobType.FUEL_FURNACE) {
-                if (FurnaceHelper.needsFuel(level, pos)) {
-                    JobRecord job = new JobRecord();
-                    job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
-                    job.type = JobType.FUEL_FURNACE;
-                    job.requiredSuitabilities = EnumSet.of(Suitability.KINDLING);
-                    job.discoveryTime = level.getGameTime();
-                    job.priority = 7;
-                    return job;
-                }
-            } else {
-                // Other stations use the station state system
-                StationState station = StationStateManager.get(level, pos);
-                if (station != null && station.isEnabled() && !station.isReserved()) {
-                    if (station.hasQueuedJobs() || station.hasCurrentJob()) {
-                        JobRecord job = new JobRecord();
-                        job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
-                        job.type = stationJob;
-                        job.requiredSuitabilities = EnumSet.of(stationJob.getRequiredSuitability());
-                        job.discoveryTime = level.getGameTime();
-                        job.priority = 6;
-                        return job;
-                    }
-                }
-            }
+        // Furnaces that need lighting (Kindling)
+        if (state.is(JobBlockTags.FURNACES) && FurnaceHelper.needsFuel(level, pos)) {
+            JobRecord job = new JobRecord();
+            job.position = pos.immutable();
+            job.type = JobType.FUEL_FURNACE;
+            job.requiredSuitabilities = EnumSet.of(Suitability.KINDLING);
+            job.discoveryTime = level.getGameTime();
+            job.priority = 7;
+            return job;
         }
 
         // Pumpkins and melons: a stem that has grown its fruit is "attached" to it. The harvest job
@@ -680,7 +654,7 @@ public class JobManager {
         // Check for gathering jobs (harvestable crops)
         if (CropAdapter.isFullyGrown(level, pos)) {
             JobRecord job = new JobRecord();
-            job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
+            job.position = pos.immutable();
             job.type = JobType.HARVEST_CROPS;
             // Nether wart is Nether work (Ghost types), like planting it and fetching it from
             // chests: Gathering alone let any Grass type harvest it
@@ -733,7 +707,7 @@ public class JobManager {
         if (isChest(state)) {
             if (hasPlantableSeeds(level, pos)) {
                 JobRecord job = new JobRecord();
-                job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
+                job.position = pos.immutable();
                 job.type = JobType.GET_SEEDS;
                 job.requiredSuitabilities = EnumSet.of(Suitability.PLANTING);
                 job.discoveryTime = level.getGameTime();
@@ -742,7 +716,7 @@ public class JobManager {
             }
             if (ChestHelper.hasItem(level, pos, Items.NETHER_WART)) {
                 JobRecord job = new JobRecord();
-                job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
+                job.position = pos.immutable();
                 job.type = JobType.GET_SEEDS;
                 job.requiredSuitabilities = EnumSet.of(Suitability.NETHER);
                 job.discoveryTime = level.getGameTime();
@@ -783,7 +757,7 @@ public class JobManager {
         // doesn't break the ore yet), so workers don't walk to ores and stand there forever.
         if (MINING_JOBS_ENABLED && state.is(JobBlockTags.ORES)) {
             JobRecord job = new JobRecord();
-            job.position = pos.immutable(); // CRITICAL FIX: Create immutable copy
+            job.position = pos.immutable();
             job.type = JobType.MINE_RESOURCE;
             job.requiredSuitabilities = EnumSet.of(Suitability.MINING);
             job.discoveryTime = level.getGameTime();
