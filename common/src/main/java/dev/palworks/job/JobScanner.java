@@ -19,12 +19,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -138,7 +141,8 @@ final class JobScanner {
 
         int blocksScanned = 0;
 
-        // Scan every block in the worker-height band (16x16 x-z, every Y layer - no gaps).
+        // Scan every block in the worker-height band (16x16 x-z, every Y layer - no gaps), a chunk
+        // section (16 blocks high) at a time
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 
         if (Palworks.LOGGER.isTraceEnabled()) {
@@ -153,34 +157,54 @@ final class JobScanner {
                     chunkPos.getMaxBlockZ());
         }
 
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                for (int y = scanMinY; y < scanMaxY; y++) {
-                    int worldX = chunkPos.getMinBlockX() + x;
-                    int worldZ = chunkPos.getMinBlockZ() + z;
-                    pos.set(worldX, y, worldZ);
-                    blocksScanned++;
+        LevelChunk chunk = level.getChunk(chunkPos.x, chunkPos.z);
+        LevelChunkSection[] sections = chunk.getSections();
+        for (int sectionY = SectionPos.blockToSectionCoord(scanMinY);
+                sectionY <= SectionPos.blockToSectionCoord(scanMaxY - 1);
+                sectionY++) {
+            int index = chunk.getSectionIndexFromSectionY(sectionY);
+            if (index < 0 || index >= sections.length) {
+                continue;
+            }
+            // A section made only of air and plain terrain holds no job (JobChecks.canNeverBeWork):
+            // its palette, the block types it's made of, says so without looking at its 4096 blocks.
+            // That's most sections: solid ground below the surface, open sky above it.
+            LevelChunkSection section = sections[index];
+            if (section.hasOnlyAir() || !section.maybeHas(state -> !JobChecks.canNeverBeWork(state))) {
+                continue;
+            }
+            int bottom = SectionPos.sectionToBlockCoord(sectionY);
+            int yFrom = Math.max(scanMinY, bottom);
+            int yTo = Math.min(scanMaxY, bottom + 16);
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int y = yFrom; y < yTo; y++) {
+                        int worldX = chunkPos.getMinBlockX() + x;
+                        int worldZ = chunkPos.getMinBlockZ() + z;
+                        pos.set(worldX, y, worldZ);
+                        blocksScanned++;
 
-                    BlockState state = level.getBlockState(pos);
+                        BlockState state = level.getBlockState(pos);
 
-                    // Remember chests so delivery can pick one without its own block search
-                    if (JobChecks.isChest(state)) {
-                        cache.addChest(pos.immutable());
-                    }
-
-                    // Check for job opportunities at this position
-                    JobRecord job = scanPositionForJob(level, pos, state);
-                    if (job != null && !pool.isReserved(JobKey.of(job))) {
-                        if (Palworks.LOGGER.isTraceEnabled()) {
-                            Palworks.LOGGER.trace(
-                                    "Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
-                                    job.type(),
-                                    job.position(),
-                                    new BlockPos(worldX, y, worldZ),
-                                    job.position());
+                        // Remember chests so delivery can pick one without its own block search
+                        if (JobChecks.isChest(state)) {
+                            cache.addChest(pos.immutable());
                         }
-                        pool.offer(job);
-                        cache.addJob(job.type(), job.position());
+
+                        // Check for job opportunities at this position
+                        JobRecord job = scanPositionForJob(level, pos, state);
+                        if (job != null && !pool.isReserved(JobKey.of(job))) {
+                            if (Palworks.LOGGER.isTraceEnabled()) {
+                                Palworks.LOGGER.trace(
+                                        "Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
+                                        job.type(),
+                                        job.position(),
+                                        new BlockPos(worldX, y, worldZ),
+                                        job.position());
+                            }
+                            pool.offer(job);
+                            cache.addJob(job.type(), job.position());
+                        }
                     }
                 }
             }

@@ -1,21 +1,28 @@
 package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.crop.CropAdapter;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobBlockTags;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.station.FurnaceHelper;
+import dev.palworks.tree.TreeDetector;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Whether each kind of job still exists in the world (JobChecks.isJobStillThere): what workers
@@ -25,6 +32,34 @@ public class JobGameTests {
 
     private static boolean there(GameTestHelper helper, JobType type, BlockPos rel) {
         return JobChecks.isJobStillThere(helper.getLevel(), type, helper.absolutePos(rel));
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void plainTerrainIsNeverWork(GameTestHelper helper) {
+        // The chunk scan skips whole sections made only of these (JobChecks.canNeverBeWork), so
+        // none may be anything the scan looks for: checked with the scan's own checks
+        BlockPos spot = new BlockPos(3, 1, 3);
+        List<Block> blocks = new ArrayList<>(JobChecks.neverWorkBlocks());
+        blocks.add(Blocks.AIR);
+        for (Block block : blocks) {
+            helper.setBlock(spot, block);
+            helper.setBlock(spot.above(), Blocks.AIR);
+            BlockState state = helper.getBlockState(spot);
+            BlockPos abs = helper.absolutePos(spot);
+            String what = block + " ";
+            helper.assertTrue(JobChecks.canNeverBeWork(state), what + "counts as never work");
+            helper.assertFalse(state.is(JobBlockTags.FURNACES), what + "is a furnace");
+            helper.assertFalse(state.is(JobBlockTags.ORES), what + "is an ore");
+            helper.assertFalse(JobChecks.isChest(state), what + "is a chest");
+            helper.assertFalse(TreeDetector.isTreeBlock(state), what + "is part of a tree");
+            helper.assertTrue(CropAdapter.attachedFruitPos(state, abs) == null, what + "has a fruit");
+            helper.assertFalse(CropAdapter.isFullyGrown(helper.getLevel(), abs), what + "is a ripe crop");
+            helper.assertFalse(CropAdapter.isPlantableSurface(helper.getLevel(), abs), what + "can be planted in");
+        }
+        // And the soils seeds do go in aren't on the list
+        helper.assertFalse(JobChecks.canNeverBeWork(Blocks.FARMLAND.defaultBlockState()), "farmland");
+        helper.assertFalse(JobChecks.canNeverBeWork(Blocks.SOUL_SAND.defaultBlockState()), "soul sand");
+        helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY)
