@@ -86,7 +86,6 @@ public class JobManager {
     // (a little slack so a skipped tick isn't a despawn)
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2; // Ticks to wait for items to spawn
     private static final int FOLLOW_UP_RECHECK_INTERVAL = 20; // Ticks between checks that follow-up jobs still exist
-    private static final int HIGH_PRIORITY = 9; // Priority for consecutive jobs
     /** How far round a pickup job's spot its items are looked for (and picked up by the worker). */
     public static final double PICKUP_RADIUS = 3.0;
 
@@ -128,7 +127,7 @@ public class JobManager {
     private final Set<BlockPos> treeBlocksSeenThisScan = new HashSet<>();
 
     // Consecutive job queue (harvest → pickup + replant)
-    private final Queue<ConsecutiveJobRequest> consecutiveJobQueue;
+    private final Queue<PickupRequest> consecutiveJobQueue;
 
     // World reference
     private final ServerLevel level;
@@ -144,7 +143,7 @@ public class JobManager {
         this.chunkCaches = new ConcurrentHashMap<>();
         // Ordered by due time, since processConsecutiveJobs stops at the first request not yet due
         // (a FIFO would only be correct while every request uses the same delay).
-        this.consecutiveJobQueue = new PriorityQueue<>(Comparator.comparingLong(r -> r.creationTime));
+        this.consecutiveJobQueue = new PriorityQueue<>(Comparator.comparingLong(PickupRequest::dueTime));
     }
 
     /**
@@ -278,7 +277,7 @@ public class JobManager {
 
         // Create or update worker info
         boolean newlyActive = !activeWorkers.containsKey(uuid);
-        WorkerInfo info = activeWorkers.computeIfAbsent(uuid, k -> new WorkerInfo());
+        WorkerInfo info = activeWorkers.computeIfAbsent(uuid, k -> new WorkerInfo(uuid, entity.blockPosition()));
 
         // WorkerState (NBT) is the single source of truth for a worker's reservation.
         // If the worker has dropped its reservation (job complete, stuck, expired, or
@@ -295,7 +294,6 @@ public class JobManager {
             }
         }
 
-        info.pokemonUUID = uuid;
         BlockPos entityPos = entity.blockPosition();
         info.position = entityPos;
         // A party Pokémon works near its owner; one from a pasture works round its pasture
@@ -400,7 +398,7 @@ public class JobManager {
             ChunkJobCache cache = chunkCaches.get(chunk);
 
             // Skip if cache is fresh and not dirty
-            if (cache != null && !cache.isDirty && (currentTime - cache.lastScanTime < JOB_CACHE_LIFETIME_TICKS)) {
+            if (cache != null && !cache.isDirty() && (currentTime - cache.scanTime() < JOB_CACHE_LIFETIME_TICKS)) {
                 continue;
             }
 
@@ -458,11 +456,8 @@ public class JobManager {
      */
     private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int scanMinY, int scanMaxY) {
         ChunkJobCache previous = chunkCaches.get(chunkPos);
-        ChunkJobCache cache = new ChunkJobCache();
+        ChunkJobCache cache = new ChunkJobCache(level.getGameTime());
         treeBlocksSeenThisScan.clear();
-        cache.chunk = chunkPos;
-        cache.lastScanTime = level.getGameTime();
-        cache.isDirty = false;
 
         int blocksScanned = 0;
 
@@ -493,7 +488,7 @@ public class JobManager {
 
                     // Remember chests so delivery can pick one without its own block search
                     if (isChest(state)) {
-                        cache.chests.add(pos.immutable());
+                        cache.addChest(pos.immutable());
                     }
 
                     // Check for job opportunities at this position
@@ -502,15 +497,13 @@ public class JobManager {
                         if (DEBUG) {
                             Palworks.LOGGER.info(
                                     "Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
-                                    job.type,
-                                    job.position,
+                                    job.type(),
+                                    job.position(),
                                     new BlockPos(worldX, y, worldZ),
-                                    job.position);
+                                    job.position());
                         }
                         availableJobs.put(JobKey.of(job), job);
-                        cache.cachedJobs
-                                .computeIfAbsent(job.type, k -> new ArrayList<>())
-                                .add(job.position);
+                        cache.addJob(job.type(), job.position());
                     }
                 }
             }
@@ -529,8 +522,8 @@ public class JobManager {
 
     /** Remove the available jobs an earlier scan found that a newer scan of the same chunk didn't. */
     private void removeJobsNotFoundAgain(ChunkJobCache previous, ChunkJobCache current) {
-        previous.cachedJobs.forEach((type, positions) -> {
-            List<BlockPos> stillThere = current.cachedJobs.getOrDefault(type, List.of());
+        previous.jobs().forEach((type, positions) -> {
+            List<BlockPos> stillThere = current.jobs().getOrDefault(type, List.of());
             for (BlockPos pos : positions) {
                 if (!stillThere.contains(pos)) {
                     removeScannedJob(new JobKey(pos, type));
@@ -541,8 +534,7 @@ public class JobManager {
 
     /** Remove all of a chunk cache's available jobs (when the cache itself is dropped). */
     private void removeJobsOf(ChunkJobCache cache) {
-        cache.cachedJobs.forEach(
-                (type, positions) -> positions.forEach(pos -> removeScannedJob(new JobKey(pos, type))));
+        cache.jobs().forEach((type, positions) -> positions.forEach(pos -> removeScannedJob(new JobKey(pos, type))));
     }
 
     /**
@@ -552,7 +544,7 @@ public class JobManager {
      */
     private void removeScannedJob(JobKey key) {
         JobRecord job = availableJobs.get(key);
-        if (job != null && !job.isConsecutiveJob && !job.isHandedOver()) {
+        if (job != null && !job.isFollowUp() && !job.isHandedOver()) {
             availableJobs.remove(key);
         }
     }
@@ -619,7 +611,7 @@ public class JobManager {
     /** {@link #canWorkerDo} for a worker being offered a job. One that isn't loaded can't do any. */
     private boolean canWorkerDo(WorkerInfo worker, JobRecord job) {
         Pokemon pokemon = getPokemonByUUID(worker.pokemonUUID);
-        return pokemon != null && canWorkerDo(level, pokemon, job.type, job.position);
+        return pokemon != null && canWorkerDo(level, pokemon, job.type(), job.position());
     }
 
     /**
@@ -627,101 +619,54 @@ public class JobManager {
      */
     @Nullable
     private JobRecord scanPositionForJob(Level level, BlockPos pos, BlockState state) {
+        long now = level.getGameTime();
+
         // Furnaces that need lighting (Kindling)
         if (state.is(JobBlockTags.FURNACES) && FurnaceHelper.needsFuel(level, pos)) {
-            JobRecord job = new JobRecord();
-            job.position = pos.immutable();
-            job.type = JobType.FUEL_FURNACE;
-            job.requiredSuitabilities = EnumSet.of(Suitability.KINDLING);
-            job.discoveryTime = level.getGameTime();
-            job.priority = 7;
-            return job;
+            return JobRecord.of(JobType.FUEL_FURNACE, pos, now);
         }
 
         // Pumpkins and melons: a stem that has grown its fruit is "attached" to it. The harvest job
         // goes on the fruit (the stem itself is never harvested).
         BlockPos fruitPos = CropAdapter.attachedFruitPos(state, pos);
         if (fruitPos != null) {
-            JobRecord job = new JobRecord();
-            job.position = fruitPos.immutable();
-            job.type = JobType.HARVEST_CROPS;
-            job.requiredSuitabilities = EnumSet.of(Suitability.GATHERING);
-            job.discoveryTime = level.getGameTime();
-            job.priority = 8; // Same as ripe crops
-            return job;
+            return JobRecord.of(JobType.HARVEST_CROPS, fruitPos, now);
         }
 
         // Check for gathering jobs (harvestable crops)
         if (CropAdapter.isFullyGrown(level, pos)) {
-            JobRecord job = new JobRecord();
-            job.position = pos.immutable();
-            job.type = JobType.HARVEST_CROPS;
             // Nether wart is Nether work (Ghost types), like planting it and fetching it from
             // chests: Gathering alone let any Grass type harvest it
-            job.requiredSuitabilities =
-                    state.is(Blocks.NETHER_WART) ? EnumSet.of(Suitability.NETHER) : EnumSet.of(Suitability.GATHERING);
-            job.discoveryTime = level.getGameTime();
-            job.priority = 8; // High priority for ripe crops
-            return job;
+            return state.is(Blocks.NETHER_WART)
+                    ? JobRecord.of(JobType.HARVEST_CROPS, pos, now, EnumSet.of(Suitability.NETHER))
+                    : JobRecord.of(JobType.HARVEST_CROPS, pos, now);
         }
 
-        // Check for planting jobs (empty farmland)
+        // Check for planting jobs (empty farmland, or soul sand: that's Nether work)
         if (CropAdapter.isPlantableSurface(level, pos)) {
-            // Exclude soul sand from PLANTING - that requires NETHER suitability
-            if (state.is(Blocks.SOUL_SAND)) {
-                BlockPos abovePos = pos.above();
-                if (level.getBlockState(abovePos).isAir()) {
-                    if (DEBUG) {
-                        Palworks.LOGGER.info(
-                                "JobManager: Found NETHER planting job - farmland at {}, planting at {}",
-                                pos,
-                                abovePos);
-                    }
-                    JobRecord job = new JobRecord();
-                    job.position = abovePos;
-                    job.type = JobType.PLANT_SEEDS;
-                    job.requiredSuitabilities = EnumSet.of(Suitability.NETHER);
-                    job.discoveryTime = level.getGameTime();
-                    job.priority = 5;
-                    return job;
+            BlockPos abovePos = pos.above();
+            if (level.getBlockState(abovePos).isAir()) {
+                boolean nether = state.is(Blocks.SOUL_SAND);
+                if (DEBUG) {
+                    Palworks.LOGGER.info(
+                            "JobManager: Found {} planting job - farmland at {}, planting at {}",
+                            nether ? "NETHER" : "PLANTING",
+                            pos,
+                            abovePos);
                 }
-            } else {
-                BlockPos abovePos = pos.above();
-                if (level.getBlockState(abovePos).isAir()) {
-                    if (DEBUG) {
-                        Palworks.LOGGER.info(
-                                "JobManager: Found PLANTING job - farmland at {}, planting at {}", pos, abovePos);
-                    }
-                    JobRecord job = new JobRecord();
-                    job.position = abovePos;
-                    job.type = JobType.PLANT_SEEDS;
-                    job.requiredSuitabilities = EnumSet.of(Suitability.PLANTING);
-                    job.discoveryTime = level.getGameTime();
-                    job.priority = 5;
-                    return job;
-                }
+                return nether
+                        ? JobRecord.of(JobType.PLANT_SEEDS, abovePos, now, EnumSet.of(Suitability.NETHER))
+                        : JobRecord.of(JobType.PLANT_SEEDS, abovePos, now);
             }
         }
 
         // Check for get seeds jobs (chests with seeds)
         if (isChest(state)) {
             if (hasPlantableSeeds(level, pos)) {
-                JobRecord job = new JobRecord();
-                job.position = pos.immutable();
-                job.type = JobType.GET_SEEDS;
-                job.requiredSuitabilities = EnumSet.of(Suitability.PLANTING);
-                job.discoveryTime = level.getGameTime();
-                job.priority = 6;
-                return job;
+                return JobRecord.of(JobType.GET_SEEDS, pos, now);
             }
             if (ChestHelper.hasItem(level, pos, Items.NETHER_WART)) {
-                JobRecord job = new JobRecord();
-                job.position = pos.immutable();
-                job.type = JobType.GET_SEEDS;
-                job.requiredSuitabilities = EnumSet.of(Suitability.NETHER);
-                job.discoveryTime = level.getGameTime();
-                job.priority = 6;
-                return job;
+                return JobRecord.of(JobType.GET_SEEDS, pos, now, EnumSet.of(Suitability.NETHER));
             }
         }
 
@@ -739,30 +684,19 @@ public class JobManager {
                 return null;
             }
             treeBlocksSeenThisScan.addAll(tree.getLogPositions());
-            JobRecord job = new JobRecord();
             // The same spot for the tree whichever base this scan found it from, so a tree seen
             // from two chunks (or by scans of different heights) is one job, not one per base
-            job.position = TreeDetector.chopPosition(level, tree).immutable();
-            job.type = JobType.CHOP_TREE;
-            job.requiredSuitabilities = EnumSet.of(Suitability.LUMBERING);
-            if (TreeDetector.isNetherStem(state)) {
-                job.requiredSuitabilities.add(Suitability.NETHER); // nether trees need Lumbering + Nether
-            }
-            job.discoveryTime = level.getGameTime();
-            job.priority = 4;
-            return job;
+            BlockPos chopPos = TreeDetector.chopPosition(level, tree);
+            return TreeDetector.isNetherStem(state)
+                    ? JobRecord.of(
+                            JobType.CHOP_TREE, chopPos, now, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER))
+                    : JobRecord.of(JobType.CHOP_TREE, chopPos, now);
         }
 
         // Check for mining jobs (ores). Off until mining is implemented (MINE_RESOURCE's handler
         // doesn't break the ore yet), so workers don't walk to ores and stand there forever.
         if (MINING_JOBS_ENABLED && state.is(JobBlockTags.ORES)) {
-            JobRecord job = new JobRecord();
-            job.position = pos.immutable();
-            job.type = JobType.MINE_RESOURCE;
-            job.requiredSuitabilities = EnumSet.of(Suitability.MINING);
-            job.discoveryTime = level.getGameTime();
-            job.priority = 7; // High priority for ores
-            return job;
+            return JobRecord.of(JobType.MINE_RESOURCE, pos, now);
         }
 
         return null;
@@ -793,10 +727,10 @@ public class JobManager {
     private List<BlockPos> openFarmlandSpots(@Nullable BlockPos workerPos) {
         List<BlockPos> spots = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
-            if (job.type == JobType.PLANT_SEEDS
-                    && job.requiredSuitabilities.contains(Suitability.PLANTING)
-                    && (workerPos == null || WorkRange.contains(workerPos, job.position))) {
-                spots.add(job.position);
+            if (job.type() == JobType.PLANT_SEEDS
+                    && job.requiredSuitabilities().contains(Suitability.PLANTING)
+                    && (workerPos == null || WorkRange.contains(workerPos, job.position()))) {
+                spots.add(job.position());
             }
         }
         return spots;
@@ -881,7 +815,7 @@ public class JobManager {
                     && worker.suitabilities.contains(Suitability.TRANSPORTING)
                     && WorkerInventoryManager.getOrCreate(pokemon).hasCargo(worker.suitabilities)) {
                 List<JobRecord> pickups = poolCandidates(worker).stream()
-                        .filter(job -> job.type == JobType.COLLECT_DROPS)
+                        .filter(job -> job.type() == JobType.COLLECT_DROPS)
                         .collect(Collectors.toList());
                 if (!pickups.isEmpty()) {
                     // Pickups left that it has room for. If none can be reached right now, they're
@@ -927,7 +861,7 @@ public class JobManager {
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
                 ChunkJobCache cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
-                if (cache == null || cache.isDirty) {
+                if (cache == null || cache.isDirty()) {
                     return false;
                 }
             }
@@ -956,7 +890,7 @@ public class JobManager {
             for (int z = minChunkZ; z <= maxChunkZ; z++) {
                 ChunkJobCache cache = chunkCaches.get(new ChunkPos(x, z));
                 if (cache != null) {
-                    cache.isDirty = true;
+                    cache.markDirty();
                 }
             }
         }
@@ -985,7 +919,7 @@ public class JobManager {
                 if (cache == null) {
                     continue;
                 }
-                for (BlockPos chestPos : cache.chests) {
+                for (BlockPos chestPos : cache.chests()) {
                     if (Math.abs(chestPos.getX() - workerPos.getX()) > DELIVERY_SEARCH_RADIUS
                             || Math.abs(chestPos.getZ() - workerPos.getZ()) > DELIVERY_SEARCH_RADIUS
                             || Math.abs(chestPos.getY() - workerPos.getY()) > DELIVERY_SEARCH_VERTICAL) {
@@ -1006,13 +940,7 @@ public class JobManager {
 
         List<JobRecord> candidates = new ArrayList<>(chests.size());
         for (BlockPos chestPos : chests) {
-            JobRecord job = new JobRecord();
-            job.position = chestPos;
-            job.type = JobType.DELIVER_ITEMS;
-            job.requiredSuitabilities = EnumSet.of(Suitability.TRANSPORTING);
-            job.discoveryTime = level.getGameTime();
-            job.priority = 10; // Highest priority - must deliver before doing anything else
-            candidates.add(job);
+            candidates.add(JobRecord.of(JobType.DELIVER_ITEMS, chestPos, level.getGameTime()));
         }
 
         if (DEBUG && candidates.isEmpty()) {
@@ -1042,8 +970,8 @@ public class JobManager {
         for (JobRecord job : availableJobs.values()) {
             // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
             if (!canDoJob(worker, job)
-                    || !inWorkRange(worker, job.position)
-                    || isRecentlyUnreachable(worker, job.position)
+                    || !inWorkRange(worker, job.position())
+                    || isRecentlyUnreachable(worker, job.position())
                     || !canWorkerDo(worker, job)) {
                 continue;
             }
@@ -1052,12 +980,13 @@ public class JobManager {
             // room to carry them is canWorkerDo's. For farmland, "run out" means of seeds the
             // open farmland in range can take, and it only goes for a chest with some of those:
             // seeds that grow elsewhere (medicinal leek, cocoa beans) don't count either way.
-            if (job.type == JobType.GET_SEEDS && inventory != null) {
-                if (job.requiredSuitabilities.contains(Suitability.PLANTING)) {
+            if (job.type() == JobType.GET_SEEDS && inventory != null) {
+                if (job.requiredSuitabilities().contains(Suitability.PLANTING)) {
                     if (openFarmland == null) {
                         openFarmland = openFarmlandSpots(worker.position);
                     }
-                    if (carriesSeedForAny(inventory, openFarmland) || seedToFetch(job.position, openFarmland) == null) {
+                    if (carriesSeedForAny(inventory, openFarmland)
+                            || seedToFetch(job.position(), openFarmland) == null) {
                         continue;
                     }
                 } else if (carriesSeeds) {
@@ -1071,8 +1000,8 @@ public class JobManager {
         // Harvest everything first, then plant: while this worker has any harvest it could take,
         // planting jobs wait. Unreachable harvests drop out of candidates (recentlyFailedJobs), so
         // they can't hold planting back.
-        if (candidates.stream().anyMatch(j -> j.type == JobType.HARVEST_CROPS)) {
-            candidates.removeIf(j -> j.type == JobType.PLANT_SEEDS);
+        if (candidates.stream().anyMatch(j -> j.type() == JobType.HARVEST_CROPS)) {
+            candidates.removeIf(j -> j.type() == JobType.PLANT_SEEDS);
         }
 
         // Sort by score (lower is better) so only the most promising jobs get path-checked.
@@ -1117,12 +1046,12 @@ public class JobManager {
             // over from one) would send it off across the world, and checking a path to it loads
             // chunks out there. A party Pokémon's must be near its owner too.
             if (!canDoJob(worker, job)
-                    || !inWorkRange(worker, job.position)
-                    || isRecentlyUnreachable(worker, job.position)
+                    || !inWorkRange(worker, job.position())
+                    || isRecentlyUnreachable(worker, job.position())
                     || !canWorkerDo(worker, job)) {
                 continue;
             }
-            BlockPos standPos = WorkPositions.standingPosFor(level, job.position, job.type, entity);
+            BlockPos standPos = WorkPositions.standingPosFor(level, job.position(), job.type(), entity);
             WorkerPathfinder.Result path =
                     standPos == null ? new WorkerPathfinder.Result(Reach.NO, null) : canPathTo(entity, standPos);
             Reach reach = path.reach();
@@ -1144,7 +1073,7 @@ public class JobManager {
             }
             // Remember it, so next time this worker checks other candidates instead of
             // pathfinding to the same unreachable ones again.
-            rememberUnreachable(worker.pokemonUUID, worker.position, job.position, now);
+            rememberUnreachable(worker.pokemonUUID, worker.position, job.position(), now);
             pathChecks++;
             if (pathChecks >= MAX_PATH_CHECKS_PER_WORKER) {
                 break;
@@ -1220,7 +1149,7 @@ public class JobManager {
      * Lumbering).
      */
     private static boolean canDoJob(WorkerInfo worker, JobRecord job) {
-        return worker.suitabilities.containsAll(job.requiredSuitabilities);
+        return worker.suitabilities.containsAll(job.requiredSuitabilities());
     }
 
     /**
@@ -1228,10 +1157,10 @@ public class JobManager {
      * with a large discount for consecutive jobs hinted to this worker.
      */
     private double scoreJob(WorkerInfo worker, JobRecord job) {
-        double distance = worker.position.distSqr(job.position);
-        double priorityPenalty = (10 - job.priority) * 100; // higher priority = lower penalty
+        double distance = worker.position.distSqr(job.position());
+        double priorityPenalty = (10 - job.priority()) * 100; // higher priority = lower penalty
         double score = distance + priorityPenalty;
-        if (job.isConsecutiveJob && job.reservedByWorker != null && job.reservedByWorker.equals(worker.pokemonUUID)) {
+        if (job.isFollowUp() && job.isReservedBy(worker.pokemonUUID)) {
             score *= 0.1; // 90% discount for consecutive jobs
         }
         return score;
@@ -1249,38 +1178,37 @@ public class JobManager {
             if (DEBUG) {
                 Palworks.LOGGER.warn(
                         "Failed to assign {} job at {} - Pokemon entity not found for UUID {}",
-                        job.type,
-                        job.position,
+                        job.type(),
+                        job.position(),
                         worker.pokemonUUID);
             }
             availableJobs.put(JobKey.of(job), job);
             return;
         }
 
-        ReservationId reservation = new ReservationId(job.position, job.type, level.getGameTime());
+        ReservationId reservation = new ReservationId(job.position(), job.type(), level.getGameTime());
 
         // WorkerState (NBT) is the single source of truth for the reservation.
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
         state.setCurrentReservation(reservation);
-        state.setAssignedJob(job.type);
+        state.setAssignedJob(job.type());
         // Start from the job's first step, or from where the previous worker left it (handed over)
-        state.startJob(job.resumeStep, job.resumeData);
+        state.startJob(job.resumeStep(), job.resumeData());
         WorkerStateManager.save(pokemon, state);
 
         // Mirror into the in-memory caches; registerWorker re-derives these from
         // WorkerState each tick, so they stay reconciled with the source of truth.
         worker.currentReservation = reservation;
         worker.idle = false;
-        worker.lastAssignmentTime = System.currentTimeMillis();
-        job.reservedByWorker = worker.pokemonUUID;
+        job.reserveFor(worker.pokemonUUID);
         reservedJobs.put(JobKey.of(job), job);
 
         if (DEBUG) {
-            String dist = String.format("%.1f", Math.sqrt(worker.position.distSqr(job.position)));
+            String dist = String.format("%.1f", Math.sqrt(worker.position.distSqr(job.position())));
             Palworks.LOGGER.debug(
                     "Assigned {} job at {} to worker {} (distance: {})",
-                    job.type,
-                    job.position,
+                    job.type(),
+                    job.position(),
                     pokemon.getSpecies().getName(),
                     dist);
 
@@ -1290,10 +1218,10 @@ public class JobManager {
                     String.format(
                             "§a%s§f assigned §e%s§f at [%d, %d, %d] (dist: %s)",
                             pokemon.getSpecies().getName(),
-                            job.type.name(),
-                            job.position.getX(),
-                            job.position.getY(),
-                            job.position.getZ(),
+                            job.type().name(),
+                            job.position().getX(),
+                            job.position().getY(),
+                            job.position().getZ(),
                             dist));
         }
     }
@@ -1502,7 +1430,7 @@ public class JobManager {
     }
 
     /**
-     * Process consecutive job queue (delayed job creation).
+     * Create the queued pickup jobs that are due (their items have had time to spawn).
      */
     private void processConsecutiveJobs(ServerLevel level) {
         long currentTime = level.getGameTime();
@@ -1516,14 +1444,13 @@ public class JobManager {
 
         // Process all ready requests
         while (!consecutiveJobQueue.isEmpty()) {
-            ConsecutiveJobRequest request = consecutiveJobQueue.peek();
+            PickupRequest request = consecutiveJobQueue.peek();
 
             // Check if ready to process (delay elapsed)
-            if (currentTime < request.creationTime) {
+            if (currentTime < request.dueTime()) {
                 if (DEBUG) {
-                    long ticksRemaining = request.creationTime - currentTime;
                     Palworks.LOGGER.info(
-                            "Next job ({}) not ready yet - {} ticks remaining", request.nextJobType, ticksRemaining);
+                            "Next pickup not ready yet - {} ticks remaining", request.dueTime() - currentTime);
                 }
                 break; // Not ready yet, and queue is ordered
             }
@@ -1531,52 +1458,40 @@ public class JobManager {
             consecutiveJobQueue.poll();
 
             if (DEBUG) {
-                Palworks.LOGGER.info(
-                        "Creating consecutive job: {} at {}", request.nextJobType, request.sourceJobLocation);
+                Palworks.LOGGER.info("Creating pickup job at {}", request.pos());
             }
-
-            if (request.nextJobType == JobType.COLLECT_DROPS) {
-                // Create collect drops job for items at harvest location
-                createCollectDropsJob(level, request);
-            }
+            createCollectDropsJob(level, request);
         }
     }
 
     /**
      * Create a collect drops job for items at a location.
      */
-    private void createCollectDropsJob(ServerLevel level, ConsecutiveJobRequest request) {
+    private void createCollectDropsJob(ServerLevel level, PickupRequest request) {
         // Scan for items at harvest location
-        List<ItemEntity> items = itemsToPickUp(level, request.sourceJobLocation);
+        List<ItemEntity> items = itemsToPickUp(level, request.pos());
 
         if (items.isEmpty()) {
             if (DEBUG) {
-                Palworks.LOGGER.debug("No items found at {} for collect drops job", request.sourceJobLocation);
+                Palworks.LOGGER.debug("No items found at {} for collect drops job", request.pos());
             }
             return;
         }
 
         // Create collect drops job
-        JobRecord collectJob = new JobRecord();
-        collectJob.position = request.sourceJobLocation;
-        collectJob.type = JobType.COLLECT_DROPS;
-        collectJob.requiredSuitabilities = EnumSet.of(Suitability.TRANSPORTING);
-        collectJob.discoveryTime = level.getGameTime();
-        collectJob.isConsecutiveJob = true;
-        collectJob.priority = HIGH_PRIORITY;
-        collectJob.reservedByWorker = request.suggestedWorkerUUID; // Hint for assignment
+        JobRecord collectJob = JobRecord.followUp(
+                JobType.COLLECT_DROPS, request.pos(), level.getGameTime(), request.suggestedWorker());
 
         // Offer it to the suggested worker first (same checks as any job: suitability, reachable);
         // otherwise it goes to the pool for anyone
         WorkerInfo suggestedWorker =
-                request.suggestedWorkerUUID == null ? null : activeWorkers.get(request.suggestedWorkerUUID);
+                request.suggestedWorker() == null ? null : activeWorkers.get(request.suggestedWorker());
         if (suggestedWorker != null
                 && suggestedWorker.idle
                 && assignFirstReachable(suggestedWorker, List.of(collectJob)) != null) {
             if (DEBUG) {
                 Palworks.LOGGER.debug(
-                        "Assigned consecutive collect drops job to original harvester at {}",
-                        request.sourceJobLocation);
+                        "Assigned consecutive collect drops job to original harvester at {}", request.pos());
             }
         } else {
             // Otherwise add to available jobs
@@ -1585,7 +1500,7 @@ public class JobManager {
             if (DEBUG) {
                 Palworks.LOGGER.debug(
                         "Added consecutive collect drops job to available pool at {} ({} items)",
-                        request.sourceJobLocation,
+                        request.pos(),
                         items.size());
             }
         }
@@ -1622,13 +1537,7 @@ public class JobManager {
      * offered it first (still only if it's a transporter with room for them).
      */
     public void queuePickup(BlockPos pos, @Nullable UUID suggestedWorker, long gameTime) {
-        ConsecutiveJobRequest pickupRequest = new ConsecutiveJobRequest();
-        pickupRequest.sourceJobLocation = pos;
-        pickupRequest.nextJobType = JobType.COLLECT_DROPS;
-        pickupRequest.requiredSuitability = Suitability.TRANSPORTING;
-        pickupRequest.suggestedWorkerUUID = suggestedWorker;
-        pickupRequest.creationTime = gameTime;
-        consecutiveJobQueue.add(pickupRequest);
+        consecutiveJobQueue.add(new PickupRequest(pos.immutable(), suggestedWorker, gameTime));
     }
 
     /** The items lying round a pickup job's spot. */
@@ -1651,7 +1560,7 @@ public class JobManager {
         ChunkPos chunk = new ChunkPos(pos);
         ChunkJobCache cache = chunkCaches.get(chunk);
         if (cache != null) {
-            cache.isDirty = true;
+            cache.markDirty();
 
             if (DEBUG) {
                 Palworks.LOGGER.debug("Invalidated chunk cache at {} due to block change at {}", chunk, pos);
@@ -1670,13 +1579,10 @@ public class JobManager {
      */
     private void releaseJobReservation(JobKey key) {
         JobRecord job = reservedJobs.remove(key);
-        if (job == null || job.type == JobType.DELIVER_ITEMS) {
+        if (job == null || job.type() == JobType.DELIVER_ITEMS) {
             return;
         }
-        job.reservedByWorker = null;
-        if (job.isHandedOver()) {
-            job.discoveryTime = level.getGameTime(); // don't let the pool's expiry drop it straight away
-        }
+        job.release(level.getGameTime());
         availableJobs.put(key, job);
     }
 
@@ -1688,8 +1594,7 @@ public class JobManager {
     private void captureProgress(WorkerState state, JobKey key) {
         JobRecord job = reservedJobs.get(key);
         if (job != null && state.hasJobProgress()) {
-            job.resumeStep = state.getJobStep();
-            job.resumeData = state.getJobData().copy();
+            job.saveProgress(state.getJobStep(), state.getJobData());
         }
     }
 
@@ -1706,7 +1611,7 @@ public class JobManager {
         if (currentTime % FOLLOW_UP_RECHECK_INTERVAL == 0) {
             availableJobs.entrySet().removeIf(entry -> {
                 JobRecord job = entry.getValue();
-                return job.isConsecutiveJob && !job.isHandedOver() && !isJobStillThere(level, job.type, job.position);
+                return job.isFollowUp() && !job.isHandedOver() && !isJobStillThere(level, job.type(), job.position());
             });
         }
 
@@ -1714,7 +1619,7 @@ public class JobManager {
         // enough to rescan them, so nothing would ever notice those jobs disappearing.
         chunkCaches.entrySet().removeIf(entry -> {
             ChunkJobCache cache = entry.getValue();
-            boolean stale = !cache.isDirty && (currentTime - cache.lastScanTime) > JOB_CACHE_LIFETIME_TICKS * 2;
+            boolean stale = !cache.isDirty() && (currentTime - cache.scanTime()) > JOB_CACHE_LIFETIME_TICKS * 2;
             if (stale) {
                 removeJobsOf(cache);
             }
@@ -1725,7 +1630,7 @@ public class JobManager {
         // count: that used to drop every job, handed-over ones included, after a 5-minute pause)
         availableJobs
                 .entrySet()
-                .removeIf(entry -> (currentTime - entry.getValue().discoveryTime) > JOB_POOL_EXPIRY_TICKS);
+                .removeIf(entry -> (currentTime - entry.getValue().discoveryTime()) > JOB_POOL_EXPIRY_TICKS);
 
         // Expire per-worker job-failure blacklist entries (stored as game ticks).
         recentlyFailedJobs.values().forEach(failed -> failed.entrySet().removeIf(e -> e.getValue() <= currentTime));
@@ -1736,14 +1641,14 @@ public class JobManager {
         List<JobKey> orphanedJobs = new ArrayList<>();
         for (Map.Entry<JobKey, JobRecord> entry : reservedJobs.entrySet()) {
             JobRecord job = entry.getValue();
-            if (job.reservedByWorker != null && !activeWorkers.containsKey(job.reservedByWorker)) {
+            if (job.reservedBy() != null && !activeWorkers.containsKey(job.reservedBy())) {
                 orphanedJobs.add(entry.getKey());
                 if (DEBUG) {
                     Palworks.LOGGER.debug(
                             "Found orphaned job {} at {} - worker {} no longer exists",
-                            job.type,
-                            job.position,
-                            job.reservedByWorker);
+                            job.type(),
+                            job.position(),
+                            job.reservedBy());
                 }
             }
         }
@@ -1791,13 +1696,13 @@ public class JobManager {
         } else {
             // Group by type
             Map<JobType, List<JobRecord>> byType =
-                    availableJobs.values().stream().collect(Collectors.groupingBy(j -> j.type));
+                    availableJobs.values().stream().collect(Collectors.groupingBy(j -> j.type()));
             for (Map.Entry<JobType, List<JobRecord>> entry : byType.entrySet()) {
                 JobType type = entry.getKey();
                 List<JobRecord> jobs = entry.getValue();
                 lines.add(String.format(
                         "  §a%s§f: %d jobs (need §b%s§f)",
-                        type.name(), jobs.size(), jobs.get(0).requiredSuitabilities));
+                        type.name(), jobs.size(), jobs.get(0).requiredSuitabilities()));
                 int shown = 0;
                 for (JobRecord job : jobs) {
                     if (shown >= JOB_POSITIONS_SHOWN) {
@@ -1806,7 +1711,10 @@ public class JobManager {
                     }
                     lines.add(String.format(
                             "    §7[%d, %d, %d] pri=%d",
-                            job.position.getX(), job.position.getY(), job.position.getZ(), job.priority));
+                            job.position().getX(),
+                            job.position().getY(),
+                            job.position().getZ(),
+                            job.priority()));
                     shown++;
                 }
             }
@@ -1820,15 +1728,19 @@ public class JobManager {
         } else {
             for (JobRecord job : reservedJobs.values()) {
                 String workerName = "unknown";
-                if (job.reservedByWorker != null) {
-                    Pokemon pokemon = getPokemonByUUID(job.reservedByWorker);
+                if (job.reservedBy() != null) {
+                    Pokemon pokemon = getPokemonByUUID(job.reservedBy());
                     if (pokemon != null) {
                         workerName = pokemon.getSpecies().getName();
                     }
                 }
                 lines.add(String.format(
                         "  §a%s§f at [%d, %d, %d] -> §b%s",
-                        job.type.name(), job.position.getX(), job.position.getY(), job.position.getZ(), workerName));
+                        job.type().name(),
+                        job.position().getX(),
+                        job.position().getY(),
+                        job.position().getZ(),
+                        workerName));
             }
         }
 
@@ -1884,11 +1796,11 @@ public class JobManager {
 
                 // Check pathfinding to the resolved stand position
                 BlockPos standPos =
-                        entity != null ? WorkPositions.standingPosFor(level, job.position, job.type, entity) : null;
+                        entity != null ? WorkPositions.standingPosFor(level, job.position(), job.type(), entity) : null;
                 if (entity != null
                         && (standPos == null || canPathTo(entity, standPos).reach() != Reach.YES)) {
                     noPath++;
-                    noPathByType.merge(job.type, 1, Integer::sum);
+                    noPathByType.merge(job.type(), 1, Integer::sum);
                     continue;
                 }
 
@@ -1926,98 +1838,14 @@ public class JobManager {
     // Data Structures
     // ============================================
 
-    /**
-     * Information about an active worker Pokemon.
-     */
-    public static class WorkerInfo {
-        public UUID pokemonUUID;
-        public BlockPos position;
-        public boolean fromParty; // From its owner's party (not a pasture): works near its owner
-
-        @Nullable
-        public BlockPos ownerPosition; // Where its owner is, for one from a party (null if not in this level)
-
-        public Set<Suitability> suitabilities;
-        public ReservationId currentReservation;
-        public boolean idle;
-        public long lastAssignmentTime;
-        public long lastSeenTick; // Game tick of the worker's last registerWorker() call
-
-        public WorkerInfo() {
-            this.suitabilities = EnumSet.noneOf(Suitability.class);
-            this.idle = true;
-            this.lastAssignmentTime = 0;
-        }
-    }
-
     /** What identifies a job: where it is and what it is (several jobs can share a block). */
     record JobKey(BlockPos pos, JobType type) {
         static JobKey of(JobRecord job) {
-            return new JobKey(job.position, job.type);
+            return new JobKey(job.position(), job.type());
         }
 
         static JobKey of(ReservationId reservation) {
             return new JobKey(reservation.getStationPos(), reservation.getJobType());
-        }
-    }
-
-    /**
-     * A discovered job opportunity.
-     */
-    public static class JobRecord {
-        public BlockPos position;
-        public JobType type;
-        public Set<Suitability> requiredSuitabilities = EnumSet.noneOf(Suitability.class); // Worker needs all of them
-        public long discoveryTime; // Game time it was found (or handed over)
-        public UUID reservedByWorker; // null if available
-        public int priority; // 0-10, higher = more important
-        public boolean isConsecutiveJob;
-        // Progress left by a previous worker (handed over): the step to carry on from, and the
-        // job's data (e.g. where to replant after a chop). 0 / null for a fresh job.
-        public int resumeStep;
-
-        @Nullable
-        public net.minecraft.nbt.CompoundTag resumeData;
-
-        /** Whether a previous worker already did part of this job. */
-        public boolean isHandedOver() {
-            return resumeStep > 0;
-        }
-
-        public JobRecord() {
-            this.priority = 5; // Default priority
-            this.isConsecutiveJob = false;
-        }
-    }
-
-    /**
-     * Cached job information for a chunk.
-     */
-    public static class ChunkJobCache {
-        public ChunkPos chunk;
-        public Map<JobType, List<BlockPos>> cachedJobs;
-        public List<BlockPos> chests = new ArrayList<>(); // Chests seen in the last scan (delivery targets)
-        public long lastScanTime;
-        public boolean isDirty;
-
-        public ChunkJobCache() {
-            this.cachedJobs = new EnumMap<>(JobType.class);
-            this.isDirty = false;
-        }
-    }
-
-    /**
-     * A request for a consecutive job (delayed creation).
-     */
-    public static class ConsecutiveJobRequest {
-        public BlockPos sourceJobLocation;
-        public JobType nextJobType;
-        public Suitability requiredSuitability;
-        public UUID suggestedWorkerUUID;
-        public long creationTime; // Game time when this job should be created
-
-        public ConsecutiveJobRequest() {
-            this.creationTime = 0;
         }
     }
 }
