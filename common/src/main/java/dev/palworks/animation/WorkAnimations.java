@@ -1,7 +1,11 @@
 package dev.palworks.animation;
 
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkStance;
 import java.util.List;
+import net.minecraft.world.entity.Mob;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Every animation a job plays, in one place. All are placeholders for now: Cobblemon move effects
@@ -56,8 +60,18 @@ public final class WorkAnimations {
      * @param speciesId the species' id, e.g. {@code cobblemon:scizor}; null for a worker that isn't
      *                  a Pokémon, which plays the default
      */
-    public static WorkAnimation forSpecies(
-            WorkAnimation animation, @org.jetbrains.annotations.Nullable String speciesId) {
+    public static WorkAnimation forSpecies(WorkAnimation animation, @Nullable String speciesId) {
         return speciesId == null ? animation : WorkAnimationData.current().forSpecies(animation, speciesId);
+    }
+
+    /** A worker's species id ({@code cobblemon:scizor}), or null if it isn't a Pokémon. */
+    @Nullable
+    public static String speciesOf(Mob worker) {
+        return worker instanceof PokemonEntity pokemonEntity ? speciesOf(pokemonEntity.getPokemon()) : null;
+    }
+
+    /** A Pokémon's species id ({@code cobblemon:scizor}), as species' own animations are keyed by. */
+    public static String speciesOf(Pokemon pokemon) {
+        return pokemon.getSpecies().getResourceIdentifier().toString();
     }
 }
