@@ -1,21 +1,22 @@
-package dev.palworks.fabric.command;
+package dev.palworks.command;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import dev.palworks.command.DebugCommand;
 import java.util.function.Consumer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Registers the /palworks commands for Fabric. All require OP level 2.
+ * The /palworks commands, all requiring OP level 2. Each loader registers {@link #build()} with
+ * its own command event.
  */
-public class PalworksCommands {
+public final class PalworksCommands {
+    private PalworksCommands() {}
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("palworks")
+    public static LiteralArgumentBuilder<CommandSourceStack> build() {
+        return Commands.literal("palworks")
                 .requires(source -> source.hasPermission(2))
 
                 // Toggle worker debugging for this player: activity in chat, and the in-world overlay
@@ -43,7 +44,7 @@ public class PalworksCommands {
                 .then(Commands.literal("testarea").executes(ctx -> run(ctx, DebugCommand::buildTestArea)))
 
                 // Dump current job state (available/reserved/workers + assignment analysis)
-                .then(Commands.literal("jobs").executes(ctx -> run(ctx, DebugCommand::showJobsInfo))));
+                .then(Commands.literal("jobs").executes(ctx -> run(ctx, DebugCommand::showJobsInfo)));
     }
 
     // Not a player: Brigadier tells the sender. Anything else is a bug, which Minecraft logs and

@@ -1,0 +1,51 @@
+package dev.palworks.worker;
+
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.ai.WorkerAI;
+import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.manager.JobManager;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+
+/**
+ * What runs workers, on both loaders: each loader calls these from its own events (Fabric from
+ * its server events and a PokemonEntity tick mixin, NeoForge from its event bus).
+ */
+public final class WorkerTicking {
+    private WorkerTicking() {}
+
+    /**
+     * Once per server tick, after entities have ticked: each level's JobManager scans for jobs
+     * and hands them out (its workers have already reported in this tick, see {@link #onPokemonTick}).
+     */
+    public static void onServerTick(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            JobManager.getInstance(level).tick(level);
+        }
+    }
+
+    /**
+     * After each Pokémon entity's tick: an owned Pokémon out in the world reports in as a worker
+     * and does its job. Run from each worker's own tick rather than by looping over every entity
+     * in the level, so ones in non-ticking chunks stop reporting in and JobManager unregisters them.
+     */
+    public static void onPokemonTick(PokemonEntity entity) {
+        if (!(entity.level() instanceof ServerLevel level)) {
+            return; // Only on the server
+        }
+        Pokemon pokemon = entity.getPokemon();
+        if (pokemon == null || pokemon.getOwnerUUID() == null || pokemon.getEntity() == null) {
+            return; // Only owned Pokémon that are out in the world
+        }
+        JobManager.getInstance(level).registerWorker(pokemon, entity, level);
+        WorkerAI.tick(pokemon, entity, level);
+    }
+
+    /** Clear per-dimension state on shutdown so it doesn't leak across world reloads. */
+    public static void onServerStopped() {
+        JobManager.clearAll();
+        WorkerInventoryManager.clearCache();
+        WorkerStateManager.clearCache();
+    }
+}

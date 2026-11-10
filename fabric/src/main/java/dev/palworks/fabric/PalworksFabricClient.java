@@ -1,5 +1,6 @@
 package dev.palworks.fabric;
 
+import dev.palworks.Palworks;
 import dev.palworks.client.debug.WorkerDebugRenderer;
 import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.hud.WorkStatusHud;
@@ -20,7 +21,7 @@ public class PalworksFabricClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        PalworksFabric.LOGGER.info("Palworks Fabric Client initializing...");
+        Palworks.LOGGER.info("Palworks Fabric Client initializing...");
 
         // Register screens using vanilla API
         MenuScreens.register(FabricModMenuTypes.WORKER_INVENTORY, WorkerInventoryScreen::new);
@@ -38,6 +39,6 @@ public class PalworksFabricClient implements ClientModInitializer {
         WorldRenderEvents.AFTER_ENTITIES.register(context -> WorkerDebugRenderer.render(
                 context.camera(), context.tickCounter().getGameTimeDeltaPartialTick(false)));
 
-        PalworksFabric.LOGGER.info("Palworks Fabric Client initialized!");
+        Palworks.LOGGER.info("Palworks Fabric Client initialized!");
     }
 }

@@ -1,9 +1,10 @@
 package dev.palworks.neoforge;
 
+import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimationReloadListener;
 import dev.palworks.animation.WorkAspectSync;
+import dev.palworks.command.PalworksCommands;
 import dev.palworks.inventory.MenuOpener;
-import dev.palworks.neoforge.command.PalworksCommands;
 import dev.palworks.neoforge.inventory.NeoForgeMenuOpener;
 import dev.palworks.neoforge.inventory.NeoForgeModMenuTypes;
 import dev.palworks.suitability.SuitabilityReloadListener;
@@ -11,21 +12,15 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-@Mod("palworks")
+@Mod(Palworks.MOD_ID)
 public class PalworksNeoForge {
-    private static final String BANNER = "==================================================";
-
-    public static final String MOD_ID = "palworks";
-    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+    private static final Logger LOGGER = Palworks.LOGGER;
 
     public PalworksNeoForge(IEventBus modEventBus) {
-        LOGGER.info(BANNER);
-        LOGGER.info("PALWORKS NEOFORGE INITIALIZING...");
-        LOGGER.info(BANNER);
-        LOGGER.info("NeoForge mod is loading!");
+        LOGGER.info("Palworks NeoForge initializing...");
 
         // Register menu types (NeoForge-specific)
         NeoForgeModMenuTypes.register(modEventBus);
@@ -40,15 +35,14 @@ public class PalworksNeoForge {
         NeoForge.EVENT_BUS.addListener(
                 AddReloadListenerEvent.class, event -> event.addListener(new WorkAnimationReloadListener()));
 
-        // Register command handler (WorkerTickHandler is auto-registered via @EventBusSubscriber)
-        NeoForge.EVENT_BUS.register(new PalworksCommands());
+        // The /palworks commands
+        NeoForge.EVENT_BUS.addListener(
+                RegisterCommandsEvent.class, event -> event.getDispatcher().register(PalworksCommands.build()));
+        // Workers run from event/WorkerTickHandler (registered by its @EventBusSubscriber)
 
         // Show what workers are doing as aspects, for posers to animate from
         WorkAspectSync.register();
 
-        LOGGER.info("WorkerTickHandler will be auto-registered via @EventBusSubscriber");
-        LOGGER.info(BANNER);
-        LOGGER.info("PALWORKS NEOFORGE INITIALIZED!");
-        LOGGER.info(BANNER);
+        LOGGER.info("Palworks NeoForge initialized!");
     }
 }
