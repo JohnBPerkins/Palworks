@@ -8,6 +8,8 @@ import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.WorkerDebugSync;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobPool.JobKey;
+import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkActivitySync;
