@@ -3,8 +3,10 @@ package dev.palworks.worker;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkerAI;
+import dev.palworks.config.PalworksConfig;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
+import java.nio.file.Path;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
@@ -14,6 +16,11 @@ import net.minecraft.server.level.ServerLevel;
  */
 public final class WorkerTicking {
     private WorkerTicking() {}
+
+    /** As the server starts: read the settings in {@code palworks.json} in the loader's config folder. */
+    public static void onServerStarting(Path configDir) {
+        PalworksConfig.load(configDir);
+    }
 
     /**
      * Once per server tick, after entities have ticked: each level's JobManager scans for jobs

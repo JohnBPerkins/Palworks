@@ -5,6 +5,8 @@ import dev.palworks.Palworks;
 import dev.palworks.worker.WorkerTicking;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -13,6 +15,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 @EventBusSubscriber(modid = Palworks.MOD_ID)
 public final class WorkerTickHandler {
     private WorkerTickHandler() {}
+
+    @SubscribeEvent
+    public static void onServerStarting(ServerStartingEvent event) {
+        WorkerTicking.onServerStarting(FMLPaths.CONFIGDIR.get());
+    }
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {

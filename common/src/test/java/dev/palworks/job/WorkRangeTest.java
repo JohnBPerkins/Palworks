@@ -13,16 +13,16 @@ class WorkRangeTest {
     @Test
     void jobsUpToTheEdgeAreInRange() {
         assertTrue(WorkRange.contains(WORKER, WORKER));
-        assertTrue(WorkRange.contains(WORKER, WORKER.offset(WorkRange.HORIZONTAL, 0, -WorkRange.HORIZONTAL)));
-        assertTrue(WorkRange.contains(WORKER, WORKER.offset(-WorkRange.HORIZONTAL, WorkRange.VERTICAL, 0)));
-        assertTrue(WorkRange.contains(WORKER, WORKER.offset(0, -WorkRange.VERTICAL, WorkRange.HORIZONTAL)));
+        assertTrue(WorkRange.contains(WORKER, WORKER.offset(WorkRange.horizontal(), 0, -WorkRange.horizontal())));
+        assertTrue(WorkRange.contains(WORKER, WORKER.offset(-WorkRange.horizontal(), WorkRange.vertical(), 0)));
+        assertTrue(WorkRange.contains(WORKER, WORKER.offset(0, -WorkRange.vertical(), WorkRange.horizontal())));
     }
 
     @Test
     void jobsPastTheEdgeAreNot() {
-        assertFalse(WorkRange.contains(WORKER, WORKER.offset(WorkRange.HORIZONTAL + 1, 0, 0)));
-        assertFalse(WorkRange.contains(WORKER, WORKER.offset(0, 0, -WorkRange.HORIZONTAL - 1)));
-        assertFalse(WorkRange.contains(WORKER, WORKER.offset(0, WorkRange.VERTICAL + 1, 0)));
+        assertFalse(WorkRange.contains(WORKER, WORKER.offset(WorkRange.horizontal() + 1, 0, 0)));
+        assertFalse(WorkRange.contains(WORKER, WORKER.offset(0, 0, -WorkRange.horizontal() - 1)));
+        assertFalse(WorkRange.contains(WORKER, WORKER.offset(0, WorkRange.vertical() + 1, 0)));
         assertFalse(WorkRange.contains(WORKER, WORKER.offset(30_000_000, 0, 0)), "the other side of the world");
     }
 

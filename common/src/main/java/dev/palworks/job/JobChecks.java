@@ -1,6 +1,7 @@
 package dev.palworks.job;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -23,8 +24,13 @@ import net.minecraft.world.phys.AABB;
  * jobs are found, handed out and worked by. No state, so WorkerAI's steps ask them too.
  */
 public final class JobChecks {
-    /** How far round a pickup job's spot its items are looked for (and picked up by the worker). */
-    public static final double PICKUP_RADIUS = 3.0;
+    /**
+     * How far round a pickup job's spot its items are looked for (and picked up by the worker): set
+     * in {@code config/palworks.json}.
+     */
+    public static double pickupRadius() {
+        return PalworksConfig.current().pickupRadius();
+    }
 
     /**
      * Whether a job still exists in the world: the same checks the chunk scan uses to find it.
@@ -89,7 +95,7 @@ public final class JobChecks {
     public static List<ItemEntity> itemsToPickUp(Level level, BlockPos pos) {
         return level.getEntitiesOfClass(
                 ItemEntity.class,
-                new AABB(pos).inflate(PICKUP_RADIUS),
+                new AABB(pos).inflate(pickupRadius()),
                 item -> item.isAlive() && !item.getItem().isEmpty());
     }
 

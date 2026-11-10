@@ -14,6 +14,7 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.packs.PackType;
 import org.slf4j.Logger;
 
@@ -41,6 +42,8 @@ public class PalworksFabric implements ModInitializer {
 
         // Run workers: each from its own entity tick (PokemonEntityMixin), JobManager once a tick
         ServerTickEvents.END_SERVER_TICK.register(WorkerTicking::onServerTick);
+        ServerLifecycleEvents.SERVER_STARTING.register(server ->
+                WorkerTicking.onServerStarting(FabricLoader.getInstance().getConfigDir()));
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> WorkerTicking.onServerStopped());
 
         // Show what workers are doing as aspects, for posers to animate from

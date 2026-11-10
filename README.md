@@ -12,7 +12,7 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 
 ## Features
 
-- **Autonomous workers** — a sent-out Pokémon scans the area around it (~32-block radius) for
+- **Autonomous workers** — a sent-out Pokémon scans the area around it (32 blocks by default, see [Server settings](#server-settings)) for
   available work and performs it without micromanagement.
 - **Jobs** — smelting (furnaces), planting & harvesting crops, lumbering (chopping trees), and
   hauling finished goods to nearby chests. Haulers fill up before a trip: they pick up anything while
@@ -46,6 +46,31 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 2. Drop the matching Palworks jar (`palworks-fabric-*.jar` or `palworks-neoforge-*.jar`) into
    your `mods/` folder.
 3. Launch the game.
+
+## Server settings
+
+`config/palworks.json` (written with the defaults the first time the server starts) holds the
+settings that aren't per-Pokémon:
+
+```json
+{
+  "work_range_horizontal": 32,
+  "work_range_vertical": 32,
+  "owner_range": 24,
+  "pickup_radius": 3.0
+}
+```
+
+- **`work_range_horizontal`** (8 to 64): how many blocks out each way a worker looks for and takes
+  jobs. Bigger ranges scan more of the world each tick.
+- **`work_range_vertical`** (4 to 64): how many blocks up and down it does.
+- **`owner_range`** (4 to 32): how far from its owner a Pokémon from a party takes jobs. Cobblemon
+  teleports a party Pokémon back to its owner past 32 blocks, so it can't be more.
+- **`pickup_radius`** (1 to 8): how far round a harvest, chop or pickup spot dropped items are
+  collected from.
+
+Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
+the server logs a warning and uses the defaults. Changes apply the next time the server starts.
 
 ## Customizing work skills
 
