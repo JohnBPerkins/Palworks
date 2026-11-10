@@ -52,7 +52,7 @@ case "$loader" in
     fi
     echo "-Xmx3G" > user_jvm_args.txt
     server_cmd=(bash run.sh nogui)
-    init_marker="PALWORKS NEOFORGE INITIALIZED!"
+    init_marker="Palworks NeoForge initialized!"
     ;;
   *)
     echo "Unknown loader: $loader" >&2
