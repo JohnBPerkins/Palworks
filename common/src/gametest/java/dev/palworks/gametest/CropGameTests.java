@@ -13,9 +13,11 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
+import net.minecraft.world.level.block.PitcherCropBlock;
 import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import static dev.palworks.gametest.Scenes.abs;
 
@@ -96,6 +98,40 @@ public class CropGameTests {
         helper.assertTrue(harvest(helper), "it harvests");
         helper.assertTrue(helper.getBlockState(CROP).equals(pod.setValue(CocoaBlock.AGE, 0)), "reset, still on its log");
         helper.assertItemEntityPresent(Items.COCOA_BEANS, CROP, 2.0);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void torchflowersArePickedNotReplanted(GameTestHelper helper) {
+        // A grown torchflower crop is a plain torchflower. It drops no seed back, so it's picked
+        // and the farmland is left empty for the planters
+        crop(helper, Blocks.FARMLAND, Blocks.TORCHFLOWER.defaultBlockState());
+        helper.assertTrue(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), "a grown torchflower");
+        helper.assertTrue(harvest(helper), "it harvests");
+        helper.assertBlockPresent(Blocks.AIR, CROP);
+        helper.assertItemEntityPresent(Items.TORCHFLOWER, CROP, 2.0);
+
+        // One in a flower bed is decoration, not a crop
+        helper.setBlock(new BlockPos(5, 0, 5), Blocks.GRASS_BLOCK);
+        helper.setBlock(new BlockPos(5, 1, 5), Blocks.TORCHFLOWER);
+        helper.assertFalse(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(new BlockPos(5, 1, 5))),
+            "a torchflower on grass isn't harvested");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void pitcherPlantsArePickedNotReplanted(GameTestHelper helper) {
+        BlockState lower = Blocks.PITCHER_CROP.defaultBlockState().setValue(PitcherCropBlock.AGE, PitcherCropBlock.MAX_AGE);
+        crop(helper, Blocks.FARMLAND, lower);
+        helper.setBlock(CROP.above(), lower.setValue(PitcherCropBlock.HALF, DoubleBlockHalf.UPPER));
+        var level = helper.getLevel();
+        helper.assertTrue(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP)), "a grown pitcher's lower half");
+        helper.assertFalse(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP.above())), "not its upper half too");
+
+        helper.assertTrue(harvest(helper), "it harvests");
+        helper.assertBlockPresent(Blocks.AIR, CROP);
+        helper.assertBlockPresent(Blocks.AIR, CROP.above());
+        helper.assertItemEntityPresent(Items.PITCHER_PLANT, CROP, 2.0);
         helper.succeed();
     }
 

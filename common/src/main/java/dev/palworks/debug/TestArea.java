@@ -154,8 +154,10 @@ public final class TestArea {
         section("Trees", smallTreesZ, smallTrees, SMALL_TREES);
         section("Big trees", bigTreesZ, bigTrees, BIG_TREES);
 
-        return new Result(origin, origin.offset(width - 1, TREE_CLEAR_HEIGHT, depth - 1), plots,
-                Collections.unmodifiableList(problems));
+        BlockPos max = origin.offset(width - 1, TREE_CLEAR_HEIGHT, depth - 1);
+        // Workers already out look round again before taking any of it, so they start nearest first
+        dev.palworks.manager.JobManager.getInstance(level).rescanArea(origin, max);
+        return new Result(origin, max, plots, Collections.unmodifiableList(problems));
     }
 
     // ---- Ground, walkways, signs ----

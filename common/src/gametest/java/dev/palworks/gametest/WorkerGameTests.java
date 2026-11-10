@@ -15,6 +15,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
@@ -71,6 +72,32 @@ public class WorkerGameTests {
                 helper.assertBlockNotPresent(Blocks.OAK_LOG, new BlockPos(3, y, 5));
             }
             helper.assertBlockPresent(Blocks.OAK_SAPLING, new BlockPos(3, 1, 5));
+        });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "worker_chop_nearest", timeoutTicks = 1200)
+    public void lumberjackChopsTheNearestTreeFirst(GameTestHelper helper) {
+        Workers.isolate(helper);
+        RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
+        // From where it starts, and then from each tree in turn, the next is the nearest one left
+        java.util.List<BlockPos> nearestFirst = java.util.List.of(
+            new BlockPos(8, 1, 4), new BlockPos(12, 1, 9), new BlockPos(3, 1, 13));
+        for (BlockPos trunk : nearestFirst) {
+            Scenes.tree(helper, trunk.getX(), trunk.getZ(), 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
+        }
+        Workers.sendOut(helper, "machop level=20", new BlockPos(8, 1, 1));
+
+        java.util.List<BlockPos> chopped = new java.util.ArrayList<>();
+        helper.onEachTick(() -> {
+            for (BlockPos trunk : nearestFirst) {
+                if (!chopped.contains(trunk) && !helper.getBlockState(trunk.above()).is(Blocks.OAK_LOG)) {
+                    chopped.add(trunk);
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(chopped.size() == nearestFirst.size(), "all chopped so far: " + chopped);
+            helper.assertTrue(chopped.equals(nearestFirst), "nearest first: expected " + nearestFirst + ", got " + chopped);
         });
     }
 
@@ -327,6 +354,39 @@ public class WorkerGameTests {
             helper.assertBlockNotPresent(Blocks.NETHER_WART_BLOCK, new BlockPos(3, 5, 5));
             helper.assertBlockPresent(Blocks.CRIMSON_FUNGUS, new BlockPos(3, 1, 5));
         });
+    }
+
+    // ---- Nether wart is Nether work, not Gathering ----
+
+    private static final BlockPos WART = new BlockPos(3, 1, 5);
+
+    private static void ripeWart(GameTestHelper helper) {
+        Scenes.floor(helper, Blocks.STONE);
+        helper.setBlock(WART.below(), Blocks.SOUL_SAND);
+        helper.setBlock(WART, Blocks.NETHER_WART.defaultBlockState().setValue(NetherWartBlock.AGE, 3));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_no", timeoutTicks = 400)
+    public void grassTypesLeaveNetherWartAlone(GameTestHelper helper) {
+        Workers.isolate(helper);
+        ripeWart(helper);
+        Workers.sendOut(helper, "ivysaur level=20", START); // Grass/Poison: Gathering, no Nether
+
+        helper.runAfterDelay(300, () -> {
+            helper.assertTrue(helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 3,
+                "a Grass type shouldn't harvest nether wart");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_yes", timeoutTicks = 800)
+    public void ghostTypesHarvestNetherWart(GameTestHelper helper) {
+        Workers.isolate(helper);
+        ripeWart(helper);
+        Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether
+
+        helper.succeedWhen(() -> helper.assertTrue(
+            helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, "harvested and reset"));
     }
 
     // ---- Handing a job over ----
