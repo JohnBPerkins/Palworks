@@ -14,6 +14,7 @@ import dev.palworks.station.StationStateManager;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
+import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
@@ -196,6 +197,7 @@ public class JobManager {
     public static void clearAll() {
         instances.clear();
         byLevel.clear();
+        WorkActivitySync.clear();
     }
 
     /**
@@ -321,6 +323,7 @@ public class JobManager {
         forgetUnreachable(pokemonUUID);
         WorkerInventoryManager.unload(pokemonUUID);
         WorkerStateManager.unload(pokemonUUID);
+        WorkActivitySync.forget(pokemonUUID);
     }
 
     /**

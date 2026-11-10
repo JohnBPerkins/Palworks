@@ -1,6 +1,7 @@
 package dev.palworks.neoforge.client;
 
 import dev.palworks.client.gui.PokemonInteractHandler;
+import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.inventory.WorkerInventoryScreen;
 import dev.palworks.neoforge.inventory.NeoForgeModMenuTypes;
 import net.neoforged.api.distmarker.Dist;
@@ -8,6 +9,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.common.NeoForge;
 
 @EventBusSubscriber(modid = "palworks", bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public class PalworksNeoForgeClient {
@@ -24,5 +27,8 @@ public class PalworksNeoForgeClient {
             // Register Pokemon interact wheel handler
             PokemonInteractHandler.init();
         });
+        // Work icons beside the party HUD (Cobblemon draws the HUD from the same event)
+        NeoForge.EVENT_BUS.addListener(RenderGuiEvent.Post.class,
+                renderEvent -> WorkStatusHud.render(renderEvent.getGuiGraphics()));
     }
 }
