@@ -14,7 +14,7 @@ import net.minecraft.world.phys.AABB;
  * Builds small test scenes inside a GameTest's 8x8x8 area, in relative coordinates (y=0 is the
  * area's floor layer). Tests pass absolute positions (helper.absolutePos) to Palworks code.
  */
-final class Scenes {
+public final class Scenes {
     private Scenes() {}
 
     /** Fill the floor layer (y=0) of the whole area. */
@@ -27,7 +27,7 @@ final class Scenes {
     }
 
     /** Natural leaves (not player placed), close enough to a log that they don't decay mid-test. */
-    static BlockState naturalLeaves(Block leaves) {
+    public static BlockState naturalLeaves(Block leaves) {
         return leaves.defaultBlockState()
                 .setValue(LeavesBlock.PERSISTENT, false)
                 .setValue(LeavesBlock.DISTANCE, 1);
@@ -42,7 +42,7 @@ final class Scenes {
      * A simple tree: a trunk of {@code log} from y=1 to y=height at (x, z), with a canopy of
      * {@code leaves} around its top two logs and on top. The ground under it isn't touched.
      */
-    static void tree(GameTestHelper helper, int x, int z, int height, Block log, BlockState leaves) {
+    public static void tree(GameTestHelper helper, int x, int z, int height, Block log, BlockState leaves) {
         for (int y = 1; y <= height; y++) {
             helper.setBlock(x, y, z, log);
         }

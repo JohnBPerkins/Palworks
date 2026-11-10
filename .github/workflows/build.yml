@@ -195,6 +195,89 @@ jobs:
             ${{ matrix.loader }}/build/test-results/gametest/
           retention-days: 14
 
+  # Stress test: about 50 workers on a big farm, timed with spark (see StressGameTests). On a PR it
+  # runs main's version first, then this change's, on the same runner, and fails if this change's
+  # ticks are more than 20% slower (.github/scripts/compare_stress.py). Shared runners vary in
+  # speed from run to run, so it's compared with main rather than held to a fixed budget.
+  stress:
+    name: stress (${{ matrix.loader }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        loader: [fabric, neoforge]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # main's commit too, to run its stress test
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # As for the in-game tests: no remapped mods restored from another configuration's cache
+      - name: Cache Loom project files
+        uses: actions/cache@v6
+        with:
+          path: |
+            .gradle/loom-cache
+            */.gradle/loom-cache
+            !.gradle/loom-cache/remapped_mods
+            !*/.gradle/loom-cache/remapped_mods
+          key: loom-stress-${{ matrix.loader }}-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+          restore-keys: |
+            loom-stress-${{ matrix.loader }}-${{ runner.os }}-
+
+      # main first, in this same checkout (so it shares the Gradle and Loom caches), then back
+      - name: Stress test main
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          LOADER: ${{ matrix.loader }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git checkout --quiet --detach "$BASE"
+          if [ -d common/src/stress ]; then
+            ./gradlew ":$LOADER:runStressTest"
+            mkdir -p stress-results/main stress-profiles/main
+            cp "$LOADER/build/stress/results.json" stress-results/main/
+            find "$LOADER/build/run/stressTest/config/spark" -name '*.sparkprofile' -exec cp {} stress-profiles/main/ \; || true
+          else
+            echo "main has no stress test yet: nothing to compare with"
+          fi
+          git checkout --quiet --detach "$GITHUB_SHA"
+
+      - name: Stress test this change
+        id: stress
+        env:
+          LOADER: ${{ matrix.loader }}
+        run: |
+          ./gradlew ":$LOADER:runStressTest"
+          mkdir -p stress-results/head stress-profiles/head
+          cp "$LOADER/build/stress/results.json" stress-results/head/
+          find "$LOADER/build/run/stressTest/config/spark" -name '*.sparkprofile' -exec cp {} stress-profiles/head/ \; || true
+
+      - name: Compare with main
+        run: python3 -I .github/scripts/compare_stress.py --base stress-results/main --head stress-results/head
+
+      - name: Upload stress results and spark profiles
+        if: ${{ !cancelled() && steps.stress.conclusion != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: stress-${{ matrix.loader }}
+          path: |
+            stress-results/
+            stress-profiles/
+            ${{ matrix.loader }}/build/run/stressTest/logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
   # Compiles against the newest supported Cobblemon, catching API that was removed or changed after
   # the oldest supported version (which `build` compiles against).
   compile-newest:

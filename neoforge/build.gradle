@@ -131,3 +131,64 @@ loom {
         }
     }
 }
+
+// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): about 50 workers on a big
+// farm, with spark measuring tick times. Its own source set and mod (palworks_stress, never
+// published, src/stress), so `./gradlew :neoforge:runStressTest` runs only it (by its template
+// namespace): the in-game test mod is loaded too, for its helpers, but none of its tests run.
+// Writes its results to build/stress/results.json.
+sourceSets {
+    stress {
+        java.srcDir project(":common").file("src/stress/java")
+        resources.srcDir project(":common").file("src/stress/resources")
+        // The in-game tests' helpers come from their own mod (palworks_gametest), loaded alongside:
+        // NeoForge loads each mod as a module, and two can't hold the same package
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output + sourceSets.gametest.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+dependencies {
+    stressCompileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.21"
+    // spark's API, bundled in its jar, to read tick times (spark itself is in dev runs, above)
+    stressCompileOnly("maven.modrinth:spark:1.10.124-neoforge-1.21.1") { transitive = false }
+}
+
+loom {
+    mods {
+        palworks_stress {
+            sourceSet sourceSets.stress
+        }
+    }
+    runs {
+        stressTest {
+            server()
+            name "Stress Test"
+            source sourceSets.stress
+            runDir "build/run/stressTest"
+            property "neoforge.gameTestServer", "true"
+            property "neoforge.enableGameTest", "true"
+            property "neoforge.enabledGameTestNamespaces", "palworks_stress"
+            property "palworks.gametest.report", layout.buildDirectory.file("test-results/stress/TEST-stress.xml").get().asFile.absolutePath
+            property "palworks.stress.report", layout.buildDirectory.file("stress/results.json").get().asFile.absolutePath
+        }
+    }
+}
+
+// A fresh run directory each time (its world, and spark's profile from the last run, go), and spark
+// set up for measuring. Loom's dev runs load every mod in loom.mods, so the in-game test mod is built
+// first: the stress test needs it anyway, for its mixin letting Cobblemon's packets reach mock players.
+tasks.matching { it.name == "runStressTest" }.configureEach {
+    dependsOn "gametestClasses"
+    doFirst {
+        def dir = file("build/run/stressTest")
+        delete dir
+        dir.mkdirs()
+        // spark: never upload a profile (bytebin is spark's public paste site; nothing listens on
+        // port 9), and no background profiler adding to the load being measured
+        def spark = new File(dir, "config/spark")
+        spark.mkdirs()
+        new File(spark, "config.json").text = '{"backgroundProfiler": false, "bytebinUrl": "http://127.0.0.1:9/", "bytesocksHost": "127.0.0.1:9"}\n'
+        delete layout.buildDirectory.dir("stress")
+    }
+}
