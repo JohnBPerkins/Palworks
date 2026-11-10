@@ -12,7 +12,8 @@
       "dev.palworks.gametest.JobGameTests",
       "dev.palworks.gametest.WorkerGameTests",
       "dev.palworks.gametest.RealTreeGameTests",
-      "dev.palworks.gametest.WorkStatusGameTests"
+      "dev.palworks.gametest.WorkStatusGameTests",
+      "dev.palworks.gametest.PickupGameTests"
     ]
   },
   "depends": {

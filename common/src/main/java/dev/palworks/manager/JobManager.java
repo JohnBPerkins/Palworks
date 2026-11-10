@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
+import dev.palworks.job.WorkRange;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.station.StationDetector;
@@ -61,8 +62,8 @@ public class JobManager {
     private static final int JOB_CACHE_LIFETIME_TICKS = 40;      // 2s: max staleness of a chunk's job scan
                                                                  // (also bounds furnace/crop discovery latency)
     private static final int ASSIGNMENT_BATCH_SIZE = 10;          // Workers assigned per tick
-    private static final int WORKER_SCAN_RADIUS = 32;            // Block radius to scan around workers
-    private static final int VERTICAL_SCAN_RADIUS = 32;          // Y range above/below a worker to scan
+    private static final int WORKER_SCAN_RADIUS = WorkRange.HORIZONTAL; // Block radius to scan around workers
+    private static final int VERTICAL_SCAN_RADIUS = WorkRange.VERTICAL;  // Y range above/below a worker to scan
     private static final int MAX_PATH_CHECKS_PER_WORKER = 8;     // Cap expensive createPath() calls per assignment
     private static final int DELIVERY_SEARCH_RADIUS = 32;        // Horizontal reach for picking a delivery chest
     private static final int DELIVERY_SEARCH_VERTICAL = 4;       // Y reach for picking a delivery chest
@@ -75,6 +76,8 @@ public class JobManager {
     private static final int CONSECUTIVE_JOB_PICKUP_DELAY = 2;   // Ticks to wait for items to spawn
     private static final int FOLLOW_UP_RECHECK_INTERVAL = 20;    // Ticks between checks that follow-up jobs still exist
     private static final int HIGH_PRIORITY = 9;                   // Priority for consecutive jobs
+    /** How far round a pickup job's spot its items are looked for (and picked up by the worker). */
+    public static final double PICKUP_RADIUS = 3.0;
     private static final boolean MINING_JOBS_ENABLED = false;     // Flip on once MINE_RESOURCE breaks ores
     private static final long JOB_POOL_EXPIRY_TICKS = 5 * 60 * 20; // Drop jobs nobody has taken in 5 minutes
 
@@ -165,11 +168,7 @@ public class JobManager {
 
     private void forgetUnreachableNear(BlockPos pos) {
         for (WorkerInfo worker : activeWorkers.values()) {
-            BlockPos w = worker.position;
-            if (w == null
-                    || Math.abs(w.getX() - pos.getX()) > WORKER_SCAN_RADIUS
-                    || Math.abs(w.getZ() - pos.getZ()) > WORKER_SCAN_RADIUS
-                    || Math.abs(w.getY() - pos.getY()) > VERTICAL_SCAN_RADIUS) {
+            if (!WorkRange.contains(worker.position, pos)) {
                 continue;
             }
             forgetUnreachable(worker.pokemonUUID);
@@ -531,7 +530,7 @@ public class JobManager {
             case GET_SEEDS -> isChest(level.getBlockState(pos).getBlock())
                 && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));
             case DELIVER_ITEMS -> level.getBlockEntity(pos) instanceof net.minecraft.world.Container;
-            case COLLECT_DROPS -> !level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(3.0)).isEmpty();
+            case COLLECT_DROPS -> !itemsToPickUp(level, pos).isEmpty();
             default -> true;
         };
     }
@@ -731,34 +730,34 @@ public class JobManager {
 
         int assignedCount = 0;
         for (WorkerInfo worker : idleWorkers) {
-            // PRIORITY: Check if worker needs to deliver items first.
-            // worker.idle is derived from WorkerState (the source of truth) every tick in
-            // registerWorker, so no separate desync re-check is needed here.
             Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
 
-            // Only Transporting Pokemon deliver: they're the only ones with a real inventory. A
-            // planter's seed pouch is work supplies, used up planting, never delivered.
+            // A transporter carrying cargo (anything but a planter's seeds) fills up before it
+            // delivers: it takes pickups it has room for, nearest first (a free slot takes anything;
+            // once every slot is used, only items matching what it carries), and goes to a chest
+            // only when none are left. Its other jobs wait until it's delivered.
             if (pokemon != null && worker.suitabilities.contains(Suitability.TRANSPORTING)
-                    && WorkerInventoryManager.hasItems(pokemon)) {
-                // Check if worker needs these items for their job
-                boolean needsItems = workerNeedsItemsForJob(worker, pokemon);
-
-                if (!needsItems) {
-                    // Worker has items they don't need - create DELIVER_ITEMS job
-                    if (DEBUG) {
-                        Palworks.LOGGER.info("{} has {} unwanted items in inventory, creating DELIVER_ITEMS job",
-                            pokemon.getSpecies().getName(), WorkerInventoryManager.getTotalItemCount(pokemon));
-                    }
-
-                    // Nearest chests with room first; the first one it can actually reach wins
-                    if (assignFirstReachable(worker, deliveryCandidates(level, worker, pokemon)) != null) {
+                    && WorkerInventoryManager.getOrCreate(pokemon).hasCargo(worker.suitabilities)) {
+                List<JobRecord> pickups = poolCandidates(worker).stream()
+                    .filter(job -> job.type == JobType.COLLECT_DROPS)
+                    .collect(Collectors.toList());
+                if (!pickups.isEmpty()) {
+                    // Pickups left that it has room for. If none can be reached right now, they're
+                    // remembered as unreachable and drop out of the list, and it delivers once
+                    // they're all gone; until then it doesn't go to a chest half full.
+                    if (assignFirstReachable(worker, pickups) != null) {
                         assignedCount++;
-                        continue; // Skip normal job assignment
                     }
-                } else if (DEBUG && WorkerInventoryManager.getTotalItemCount(pokemon) >= 64) {
-                    Palworks.LOGGER.debug("{} has {} work items (seeds), keeping them for planting",
-                        pokemon.getSpecies().getName(), WorkerInventoryManager.getTotalItemCount(pokemon));
+                    continue;
                 }
+
+                // Nothing left to pick up: deliver. Nearest chests with room first; the first one it
+                // can actually reach wins
+                if (assignFirstReachable(worker, deliveryCandidates(level, worker, pokemon)) != null) {
+                    assignedCount++;
+                    continue;
+                }
+                // No chest it can use: fall through to its other jobs
             }
 
             // Best pool jobs first; the first one it can actually reach wins
@@ -774,39 +773,6 @@ public class JobManager {
     }
 
     /**
-     * Check if worker needs the items in their inventory for their job.
-     * PLANTING workers need seeds, GATHERING/TRANSPORTING workers should deliver harvested crops.
-     */
-    private boolean workerNeedsItemsForJob(WorkerInfo worker, Pokemon pokemon) {
-        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
-        if (inventory.isEmpty()) {
-            return false;
-        }
-
-        // Check the first item in the inventory
-        net.minecraft.world.item.ItemStack firstItem = inventory.getFirstItem();
-        net.minecraft.world.item.Item item = firstItem.getItem();
-
-        // Check if this is a seed that PLANTING workers need
-        boolean isSeed = item == Items.WHEAT_SEEDS ||
-                        item == Items.CARROT ||
-                        item == Items.POTATO ||
-                        item == Items.BEETROOT_SEEDS ||
-                        item == Items.PUMPKIN_SEEDS ||
-                        item == Items.MELON_SEEDS ||
-                        item == Items.NETHER_WART;
-
-        if (isSeed) {
-            // Seeds are needed by PLANTING or NETHER workers
-            return worker.suitabilities.contains(Suitability.PLANTING) ||
-                   worker.suitabilities.contains(Suitability.NETHER);
-        }
-
-        // All other items (harvested crops, drops, etc.) should be delivered
-        return false;
-    }
-
-    /**
      * DELIVER_ITEMS candidates for a worker with items to store: the chests (that the chunk scan
      * already found) in range with room for them, nearest first. Assignment then picks the first
      * one the worker can reach, so an unreachable nearest chest no longer traps it in a loop.
@@ -815,7 +781,7 @@ public class JobManager {
         BlockPos workerPos = worker.position;
 
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
-        net.minecraft.world.item.ItemStack firstItem = inventory.getFirstItem();
+        net.minecraft.world.item.ItemStack firstItem = inventory.firstCargo(worker.suitabilities);
 
         // From the chests the chunk scan already found (this used to scan ~38k blocks itself)
         List<BlockPos> chests = new ArrayList<>();
@@ -878,7 +844,8 @@ public class JobManager {
         List<JobRecord> candidates = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
             // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
-            if (!canDoJob(worker, job) || isRecentlyUnreachable(worker, job.position)) {
+            if (!canDoJob(worker, job) || !WorkRange.contains(worker.position, job.position)
+                    || isRecentlyUnreachable(worker, job.position) || !canTakeFrom(worker, job)) {
                 continue;
             }
 
@@ -945,7 +912,11 @@ public class JobManager {
 
         int pathChecks = 0;
         for (JobRecord job : candidates) {
-            if (!canDoJob(worker, job) || isRecentlyUnreachable(worker, job.position)) {
+            // Only jobs within its work range: a far one (found round some other worker, or left
+            // over from one) would send it off across the world, and checking a path to it loads
+            // chunks out there
+            if (!canDoJob(worker, job) || !WorkRange.contains(worker.position, job.position)
+                    || isRecentlyUnreachable(worker, job.position) || !canTakeFrom(worker, job)) {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position, job.type, entity);
@@ -1159,14 +1130,13 @@ public class JobManager {
             }
 
             // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
-            ConsecutiveJobRequest pickupRequest = new ConsecutiveJobRequest();
-            pickupRequest.sourceJobLocation = jobPos;
-            pickupRequest.nextJobType = JobType.COLLECT_DROPS;
-            pickupRequest.requiredSuitability = Suitability.TRANSPORTING;
-            pickupRequest.suggestedWorkerUUID = workerUUID;  // Prefer same worker
-            pickupRequest.creationTime = currentTime + CONSECUTIVE_JOB_PICKUP_DELAY;
+            queuePickup(jobPos, workerUUID, currentTime + CONSECUTIVE_JOB_PICKUP_DELAY);
+        }
 
-            consecutiveJobQueue.add(pickupRequest);
+        // A pickup that left items behind (they didn't fit): they get a job of their own again, for
+        // any transporter with room for them
+        if (completedReservation.getJobType() == JobType.COLLECT_DROPS) {
+            queuePickup(jobPos, null, level.getGameTime());
         }
 
         // IMPORTANT: Remove completed job entirely (don't put back in available pool!)
@@ -1281,8 +1251,7 @@ public class JobManager {
      */
     private void createCollectDropsJob(ServerLevel level, ConsecutiveJobRequest request) {
         // Scan for items at harvest location
-        AABB searchBox = new AABB(request.sourceJobLocation).inflate(3.0);
-        List<ItemEntity> items = level.getEntitiesOfClass(ItemEntity.class, searchBox);
+        List<ItemEntity> items = itemsToPickUp(level, request.sourceJobLocation);
 
         if (items.isEmpty()) {
             if (DEBUG) {
@@ -1303,7 +1272,8 @@ public class JobManager {
 
         // Offer it to the suggested worker first (same checks as any job: suitability, reachable);
         // otherwise it goes to the pool for anyone
-        WorkerInfo suggestedWorker = activeWorkers.get(request.suggestedWorkerUUID);
+        WorkerInfo suggestedWorker = request.suggestedWorkerUUID == null ? null
+            : activeWorkers.get(request.suggestedWorkerUUID);
         if (suggestedWorker != null && suggestedWorker.idle
                 && assignFirstReachable(suggestedWorker, List.of(collectJob)) != null) {
             if (DEBUG) {
@@ -1340,14 +1310,50 @@ public class JobManager {
         }
 
         // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
+        queuePickup(basePos, workerUUID, currentTime + CONSECUTIVE_JOB_PICKUP_DELAY);
+    }
+
+    /**
+     * Queue a job to pick up the items lying round {@code pos} (within {@link #PICKUP_RADIUS}),
+     * created at {@code gameTime} if there are any then. {@code suggestedWorker}, if given, is
+     * offered it first (still only if it's a transporter with room for them).
+     */
+    public void queuePickup(BlockPos pos, @Nullable UUID suggestedWorker, long gameTime) {
         ConsecutiveJobRequest pickupRequest = new ConsecutiveJobRequest();
-        pickupRequest.sourceJobLocation = basePos;
+        pickupRequest.sourceJobLocation = pos;
         pickupRequest.nextJobType = JobType.COLLECT_DROPS;
         pickupRequest.requiredSuitability = Suitability.TRANSPORTING;
-        pickupRequest.suggestedWorkerUUID = workerUUID;
-        pickupRequest.creationTime = currentTime + CONSECUTIVE_JOB_PICKUP_DELAY;
-
+        pickupRequest.suggestedWorkerUUID = suggestedWorker;
+        pickupRequest.creationTime = gameTime;
         consecutiveJobQueue.add(pickupRequest);
+    }
+
+    /** The items lying round a pickup job's spot. */
+    public static List<ItemEntity> itemsToPickUp(Level level, BlockPos pos) {
+        return level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(PICKUP_RADIUS),
+            item -> item.isAlive() && !item.getItem().isEmpty());
+    }
+
+    /**
+     * Whether this worker could take anything from this job: for a pickup, whether its inventory
+     * has room for at least one of the items lying there (a free slot takes anything; with every
+     * slot used, only items matching a stack with room). Every other job: yes.
+     */
+    private boolean canTakeFrom(WorkerInfo worker, JobRecord job) {
+        if (job.type != JobType.COLLECT_DROPS) {
+            return true;
+        }
+        Pokemon pokemon = getPokemonByUUID(level, worker.pokemonUUID);
+        if (pokemon == null) {
+            return false;
+        }
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+        for (ItemEntity item : itemsToPickUp(level, job.position)) {
+            if (inventory.roomFor(item.getItem()) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ============================================

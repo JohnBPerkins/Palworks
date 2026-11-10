@@ -22,5 +22,6 @@ public final class Templates {
         JobGameTests.class,
         WorkerGameTests.class,
         RealTreeGameTests.class,
-        WorkStatusGameTests.class);
+        WorkStatusGameTests.class,
+        PickupGameTests.class);
 }
