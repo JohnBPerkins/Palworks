@@ -15,7 +15,8 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - **Autonomous workers** — a sent-out Pokémon scans the area around it (~32-block radius) for
   available work and performs it without micromanagement.
 - **Jobs** — smelting (furnaces), planting & harvesting crops, lumbering (chopping trees), and
-  hauling finished goods to nearby chests. Mining is in progress.
+  hauling finished goods to nearby chests. Haulers fill up before a trip: they pick up anything while
+  they have a free slot, then only items matching what they carry. Mining is in progress.
 - **Suitability** — type- and species-based mapping decides which jobs a given Pokémon can do
   and how well.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.

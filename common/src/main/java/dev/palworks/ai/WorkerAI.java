@@ -618,33 +618,31 @@ public class WorkerAI {
         private final List<Step> steps = List.of(Step.of("pick up", 20, effect(this::work)));
         @Override public List<Step> steps() { return steps; }
 
+        // Picks up whatever fits (into stacks of the same item first, then free slots). What doesn't
+        // fit stays on the ground, and JobManager gives it a pickup job of its own again.
         private void work(JobContext ctx) {
             BlockPos targetPos = ctx.pos();
             WorkerInventory inventory = ctx.inventory();
-            net.minecraft.world.phys.AABB searchBox = new net.minecraft.world.phys.AABB(targetPos).inflate(2.0);
-            List<net.minecraft.world.entity.item.ItemEntity> items = ctx.level().getEntitiesOfClass(
-                net.minecraft.world.entity.item.ItemEntity.class, searchBox);
 
             int pickedUp = 0;
-            for (net.minecraft.world.entity.item.ItemEntity itemEntity : items) {
-                if (itemEntity.isAlive() && !itemEntity.getItem().isEmpty()) {
-                    ItemStack stack = itemEntity.getItem();
-                    int leftover = inventory.addItem(stack);
-                    if (leftover < stack.getCount()) {
-                        pickedUp += (stack.getCount() - leftover);
-                        itemEntity.discard();
-                    }
-                    if (!inventory.hasSpace()) {
-                        break;
-                    }
+            for (net.minecraft.world.entity.item.ItemEntity itemEntity : JobManager.itemsToPickUp(ctx.level(), targetPos)) {
+                ItemStack stack = itemEntity.getItem();
+                int leftover = inventory.addItem(stack);
+                if (leftover == stack.getCount()) {
+                    continue; // none of it fits
+                }
+                pickedUp += stack.getCount() - leftover;
+                if (leftover == 0) {
+                    itemEntity.discard();
+                } else {
+                    // Only part of it fit: leave the rest on the ground (it used to be deleted)
+                    itemEntity.setItem(stack.copyWithCount(leftover));
                 }
             }
 
-            if (pickedUp > 0) {
-                if (DEBUG) {
-                    Palworks.LOGGER.info("{} collected {} dropped items from ground at {}",
-                        ctx.name(), pickedUp, targetPos);
-                }
+            if (DEBUG && pickedUp > 0) {
+                Palworks.LOGGER.info("{} collected {} dropped items from ground at {}",
+                    ctx.name(), pickedUp, targetPos);
             }
         }
     }
@@ -660,10 +658,12 @@ public class WorkerAI {
                 return;
             }
 
+            // A worker that plants keeps its seeds to plant with; everything else goes in the chest
+            Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
             int totalDelivered = 0;
             for (int i = 0; i < inventory.getContainerSize(); i++) {
                 ItemStack stack = inventory.getItem(i);
-                if (!stack.isEmpty()) {
+                if (WorkerInventory.isCargo(stack, suitabilities)) {
                     int count = stack.getCount();
                     int left = addItemsToChest(ctx.level(), chestPos, stack);
                     totalDelivered += count - left;

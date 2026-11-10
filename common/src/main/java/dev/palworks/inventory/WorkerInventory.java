@@ -1,5 +1,6 @@
 package dev.palworks.inventory;
 
+import dev.palworks.suitability.Suitability;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -9,6 +10,7 @@ import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -179,6 +181,56 @@ public class WorkerInventory implements Container {
         }
 
         return remaining;
+    }
+
+    /**
+     * How many of this stack would fit: into stacks of the exact same item first, then empty slots.
+     * Same rules as {@link #addItem}, without adding anything.
+     */
+    public int roomFor(ItemStack stack) {
+        if (stack.isEmpty() || !accepts(stack)) {
+            return 0;
+        }
+        int room = 0;
+        for (int i = 0; i < INVENTORY_SIZE; i++) {
+            if (!mode.usesSlot(i)) {
+                continue;
+            }
+            ItemStack slotStack = items.get(i);
+            if (slotStack.isEmpty()) {
+                room += stack.getMaxStackSize();
+            } else if (ItemStack.isSameItemSameComponents(slotStack, stack)) {
+                room += Math.max(0, slotStack.getMaxStackSize() - slotStack.getCount());
+            }
+        }
+        return Math.min(room, stack.getCount());
+    }
+
+    /**
+     * Whether a carried stack is cargo, to be delivered to a chest: everything except seeds (and
+     * other plantables) for a worker that plants, which it keeps to plant with.
+     */
+    public static boolean isCargo(ItemStack stack, Set<Suitability> suitabilities) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+        boolean plants = suitabilities.contains(Suitability.PLANTING) || suitabilities.contains(Suitability.NETHER);
+        return !(plants && dev.palworks.crop.CropAdapter.isSeed(stack.getItem()));
+    }
+
+    /** The first carried stack that's cargo (see {@link #isCargo}), or empty if none. */
+    public ItemStack firstCargo(Set<Suitability> suitabilities) {
+        for (ItemStack stack : items) {
+            if (isCargo(stack, suitabilities)) {
+                return stack;
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** Whether it carries any cargo (see {@link #isCargo}). */
+    public boolean hasCargo(Set<Suitability> suitabilities) {
+        return !firstCargo(suitabilities).isEmpty();
     }
 
     /**
