@@ -322,7 +322,7 @@ final class JobAssigner {
     }
 
     /**
-     * A party Pokémon only works near its owner ({@link WorkRange#OWNER_RANGE}), so it doesn't head
+     * A party Pokémon only works near its owner ({@link WorkRange#ownerRange}), so it doesn't head
      * off to (or path-check) jobs far from them, which Cobblemon would teleport it back from part
      * way; with its owner not in this level, nowhere is. Pasture Pokémon aren't limited.
      */

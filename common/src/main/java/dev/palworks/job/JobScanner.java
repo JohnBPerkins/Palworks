@@ -40,8 +40,6 @@ final class JobScanner {
     private static final int MAX_BLOCKS_SCANNED_PER_TICK = 32768;
     // 2s: max staleness of a chunk's job scan (also bounds furnace/crop discovery latency)
     static final int JOB_CACHE_LIFETIME_TICKS = 40;
-    private static final int WORKER_SCAN_RADIUS = WorkRange.HORIZONTAL; // Block radius to scan around workers
-    private static final int VERTICAL_SCAN_RADIUS = WorkRange.VERTICAL; // Y range above/below a worker to scan
     private static final boolean MINING_JOBS_ENABLED = false; // Flip on once MINE_RESOURCE breaks ores
 
     private final JobPool pool;
@@ -104,12 +102,13 @@ final class JobScanner {
         Map<ChunkPos, int[]> ranges = new HashMap<>();
         int worldMinY = level.getMinBuildHeight();
         int worldMaxY = level.getMaxBuildHeight();
-        int chunkRadius = WORKER_SCAN_RADIUS / 16; // Convert block radius to chunks
+        int chunkRadius = WorkRange.chunkRadius();
+        int verticalRadius = WorkRange.vertical(); // Y range above/below a worker to scan
 
         for (WorkerInfo worker : workers) {
             BlockPos workerPos = worker.position;
-            int loY = Math.max(worldMinY, workerPos.getY() - VERTICAL_SCAN_RADIUS);
-            int hiY = Math.min(worldMaxY, workerPos.getY() + VERTICAL_SCAN_RADIUS + 1); // exclusive
+            int loY = Math.max(worldMinY, workerPos.getY() - verticalRadius);
+            int hiY = Math.min(worldMaxY, workerPos.getY() + verticalRadius + 1); // exclusive
             int baseChunkX = workerPos.getX() >> 4;
             int baseChunkZ = workerPos.getZ() >> 4;
 
@@ -311,7 +310,7 @@ final class JobScanner {
      * far, which could be the far side of its range with nearer ones not found yet.
      */
     boolean hasScannedAround(WorkerInfo worker) {
-        int chunkRadius = WORKER_SCAN_RADIUS / 16; // same chunks as getChunkScanRangesNearWorkers
+        int chunkRadius = WorkRange.chunkRadius(); // same chunks as getChunkScanRangesNearWorkers
         int baseChunkX = worker.position.getX() >> 4;
         int baseChunkZ = worker.position.getZ() >> 4;
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
@@ -327,7 +326,7 @@ final class JobScanner {
 
     /** Have the chunks in a worker's range round {@code center} scanned again as soon as possible. */
     void rescanAround(BlockPos center) {
-        int chunkRadius = WORKER_SCAN_RADIUS / 16;
+        int chunkRadius = WorkRange.chunkRadius();
         ChunkPos chunk = new ChunkPos(center);
         markForRescan(chunk.x - chunkRadius, chunk.z - chunkRadius, chunk.x + chunkRadius, chunk.z + chunkRadius);
     }

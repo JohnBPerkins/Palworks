@@ -38,7 +38,7 @@ final class PickupQueue {
     }
 
     /**
-     * Queue a job to pick up the items lying round {@code pos} (within {@link JobChecks#PICKUP_RADIUS}),
+     * Queue a job to pick up the items lying round {@code pos} (within {@link JobChecks#pickupRadius}),
      * created at {@code gameTime} if there are any then. {@code suggestedWorker}, if given, is
      * offered it first (still only if it's a transporter with room for them).
      */

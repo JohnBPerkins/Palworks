@@ -480,7 +480,7 @@ public class JobManager {
 
     /**
      * Queue a job to pick up the items lying round {@code pos} (within
-     * {@link JobChecks#PICKUP_RADIUS}), created at {@code gameTime} if there are any then.
+     * {@link JobChecks#pickupRadius}), created at {@code gameTime} if there are any then.
      * {@code suggestedWorker}, if given, is offered it first.
      */
     public void queuePickup(BlockPos pos, @Nullable UUID suggestedWorker, long gameTime) {
