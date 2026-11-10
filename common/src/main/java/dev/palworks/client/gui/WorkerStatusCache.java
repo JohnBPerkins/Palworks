@@ -1,6 +1,5 @@
 package dev.palworks.client.gui;
 
-import dev.palworks.inventory.CarryMode;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -8,21 +7,18 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Client-side copy of a Pokemon's work status (working or not, and what it can carry), filled by
- * {@code WorkerStatusPacket} just before its interact wheel opens and read once when the wheel is
- * built. Only used to draw the wheel's options; the server never trusts it. Has no client-only imports, so it is safe to load on a
+ * Client-side copy of whether a Pokemon is working, filled by {@code WorkerStatusPacket} just
+ * before its interact wheel opens and read once when the wheel is built. Only used to draw the
+ * toggle; the server never trusts it. Has no client-only imports, so it is safe to load on a
  * dedicated server (where Cobblemon still constructs the client packet handlers).
  */
 public final class WorkerStatusCache {
-    /** What the server said about one Pokemon. */
-    public record Status(boolean enabled, CarryMode carryMode) {}
-
-    private static final Map<UUID, Status> STATUS = new ConcurrentHashMap<>();
+    private static final Map<UUID, Boolean> STATUS = new ConcurrentHashMap<>();
 
     private WorkerStatusCache() {}
 
-    public static void put(UUID entityUUID, Status status) {
-        STATUS.put(entityUUID, status);
+    public static void put(UUID entityUUID, boolean enabled) {
+        STATUS.put(entityUUID, enabled);
     }
 
     /**
@@ -30,7 +26,7 @@ public final class WorkerStatusCache {
      * Null when the server sent none (the Pokemon can't do any work).
      */
     @Nullable
-    public static Status take(UUID entityUUID) {
+    public static Boolean take(UUID entityUUID) {
         return STATUS.remove(entityUUID);
     }
 }
