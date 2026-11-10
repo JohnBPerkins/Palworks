@@ -289,122 +289,147 @@ public class WorkerAI {
         boolean arrived =
                 onStand || (inStance && (distanceSq <= ARRIVAL_DISTSQ || walkEnded)) || (walkEnded && nextToStand);
         if (arrived) {
-            // Only log on first tick of work
-            if (DEBUG && !state.isWorking()) {
-                WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
-                String inventoryInfo = inventory.isEmpty() ? "empty" : inventory.getTotalItemCount() + " items";
-                Palworks.LOGGER.info(
-                        "{} arrived at {} job, starting work (inventory: {})",
-                        pokemon.getSpecies().getName(),
-                        reservation.getJobType(),
-                        inventoryInfo);
+            return workAtJob(pokemon, entity, level, state, reservation);
+        }
+        return walkToJob(pokemon, entity, level, state, reservation, standPos, distanceSq);
+    }
+
+    /**
+     * The worker is at its job: hold still, face it, and run a tick of its current step. Returns
+     * false if the job ended without finishing (it went, or the worker can't do it any more).
+     */
+    private static boolean workAtJob(
+            Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
+        BlockPos targetPos = reservation.getStationPos();
+        // Only log on first tick of work
+        if (DEBUG && !state.isWorking()) {
+            WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+            String inventoryInfo = inventory.isEmpty() ? "empty" : inventory.getTotalItemCount() + " items";
+            Palworks.LOGGER.info(
+                    "{} arrived at {} job, starting work (inventory: {})",
+                    pokemon.getSpecies().getName(),
+                    reservation.getJobType(),
+                    inventoryInfo);
+        }
+
+        // Keep worker stationary while working (for animations). Only horizontally: zeroing its
+        // vertical motion too stops gravity registering it as on the ground, and ground
+        // navigation won't plan a path for a mob that isn't on the ground.
+        entity.getNavigation().stop();
+        entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
+
+        // Turn to face the worked block so animations/effects line up. While its last animation
+        // plays out, keep facing what that was aimed at: the next job may be one it can start
+        // on from where it stands (the next crop along), and it shouldn't turn to it
+        // mid-animation. Its next animation waits until that's over and it's facing its work.
+        BlockPos playingOut = WorkAnimator.playingOutAt(entity);
+        boolean facing = turnTowards(entity, playingOut != null ? playingOut : targetPos);
+
+        // At job location - perform work
+        StepRunner.Outcome outcome =
+                performWork(pokemon, entity, level, state, reservation, playingOut == null && facing);
+        if (outcome == StepRunner.Outcome.GONE || outcome == StepRunner.Outcome.UNABLE) {
+            // Its job went while it worked (the furnace emptied, the crop harvested by someone
+            // else), or it can't do it any more: it stopped there, without the step's effect
+            stopJob(outcome, pokemon, entity, level, state, reservation);
+            return false;
+        }
+        boolean workComplete = outcome == StepRunner.Outcome.FINISHED;
+
+        if (workComplete) {
+            // Notify JobManager of completion (for consecutive jobs)
+            if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
+                JobManager.getInstance(serverLevel).onJobCompleted(pokemon, reservation, level);
             }
 
-            // Keep worker stationary while working (for animations). Only horizontally: zeroing its
-            // vertical motion too stops gravity registering it as on the ground, and ground
-            // navigation won't plan a path for a mob that isn't on the ground.
-            entity.getNavigation().stop();
-            entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
+            // Job complete - clear reservation and set cooldown
+            state.clearReservation();
+            state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
+            state.resetPathFailures();
 
-            // Turn to face the worked block so animations/effects line up. While its last animation
-            // plays out, keep facing what that was aimed at: the next job may be one it can start
-            // on from where it stands (the next crop along), and it shouldn't turn to it
-            // mid-animation. Its next animation waits until that's over and it's facing its work.
-            BlockPos playingOut = WorkAnimator.playingOutAt(entity);
-            boolean facing = turnTowards(entity, playingOut != null ? playingOut : targetPos);
-
-            // At job location - perform work
-            StepRunner.Outcome outcome =
-                    performWork(pokemon, entity, level, state, reservation, playingOut == null && facing);
-            if (outcome == StepRunner.Outcome.GONE || outcome == StepRunner.Outcome.UNABLE) {
-                // Its job went while it worked (the furnace emptied, the crop harvested by someone
-                // else), or it can't do it any more: it stopped there, without the step's effect
-                stopJob(outcome, pokemon, entity, level, state, reservation);
-                return false;
+            // Opt-in activity message (only players who ran /palworks debug see it)
+            if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
+                DebugManager.broadcastActivity(
+                        serverLevel,
+                        pokemon.getSpecies().getName() + " completed "
+                                + reservation.getJobType().name());
             }
-            boolean workComplete = outcome == StepRunner.Outcome.FINISHED;
+        }
 
-            if (workComplete) {
-                // Notify JobManager of completion (for consecutive jobs)
-                if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                    JobManager.getInstance(serverLevel).onJobCompleted(pokemon, reservation, level);
-                }
+        // Work progress lives in the WorkerStateManager cache; flush to NBT on completion
+        // (a transition) or on a staggered heartbeat - not every tick.
+        if (workComplete || (level.getGameTime() + entity.getId()) % WORK_SAVE_INTERVAL == 0) {
+            WorkerStateManager.save(pokemon, state);
+        }
+        return true;
+    }
 
-                // Job complete - clear reservation and set cooldown
-                state.clearReservation();
-                state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
-                state.resetPathFailures();
+    /**
+     * The worker isn't at its job yet: walk it there, giving the job up if it's stuck. Returns false
+     * if it gave the job up.
+     */
+    private static boolean walkToJob(
+            Pokemon pokemon,
+            Mob entity,
+            Level level,
+            WorkerState state,
+            ReservationId reservation,
+            BlockPos standPos,
+            double distanceSq) {
+        BlockPos targetPos = reservation.getStationPos();
+        // Need to navigate to job
+        // Only log when starting navigation (not every tick)
+        if (DEBUG && !state.isWorking() && entity.getNavigation().isDone()) {
+            double distance = Math.sqrt(distanceSq);
+            Palworks.LOGGER.info(
+                    "{} navigating to {} job at {} (distance: {} blocks)",
+                    pokemon.getSpecies().getName(),
+                    reservation.getJobType(),
+                    targetPos,
+                    String.format("%.1f", distance));
+        }
 
-                // Opt-in activity message (only players who ran /palworks debug see it)
-                if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                    DebugManager.broadcastActivity(
-                            serverLevel,
-                            pokemon.getSpecies().getName() + " completed "
-                                    + reservation.getJobType().name());
-                }
-            }
-
-            // Work progress lives in the WorkerStateManager cache; flush to NBT on completion
-            // (a transition) or on a staggered heartbeat - not every tick.
-            if (workComplete || (level.getGameTime() + entity.getId()) % WORK_SAVE_INTERVAL == 0) {
-                WorkerStateManager.save(pokemon, state);
-            }
-            return true;
-        } else {
-            // Need to navigate to job
-            // Only log when starting navigation (not every tick)
-            if (DEBUG && !state.isWorking() && entity.getNavigation().isDone()) {
-                double distance = Math.sqrt(distanceSq);
-                Palworks.LOGGER.info(
-                        "{} navigating to {} job at {} (distance: {} blocks)",
-                        pokemon.getSpecies().getName(),
-                        reservation.getJobType(),
-                        targetPos,
-                        String.format("%.1f", distance));
-            }
-
-            // Its last job's animation plays out where it is before it sets off for this one
-            if (holdForAnimation(entity)) {
-                return true;
-            }
-
-            // A step only counts while standing at the job: if the worker was moved off it (pushed,
-            // paused for a battle, handed a job mid-step), the step it was on starts over.
-            if (state.getStepTicks() > 0) {
-                state.restartStep();
-            }
-            navigateToJob(entity, standPos);
-            state.setWalkedToJob(true);
-            state.resetStepIn();
-
-            // Track path failures for stuck detection: its walk has ended (on the ground, so not just
-            // falling or knocked about) without getting next to the stand tile, so the path can't
-            // get it there. A few in a row and it gives up the job instead of standing around.
-            if (entity.getNavigation().isDone() && entity.onGround() && distanceSq > SETTLED_DISTSQ) {
-                state.recordPathFailure();
-
-                if (state.isStuck()) {
-                    // Give up on this job and clear reservation
-                    Palworks.LOGGER.warn(
-                            "{} is stuck, giving up on job at {}",
-                            pokemon.getSpecies().getName(),
-                            targetPos);
-                    if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                        JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
-                    }
-                    state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
-                    state.resetPathFailures();
-                    dropJob(pokemon, entity, state);
-                    return false;
-                }
-            }
-
-            // Path/idle state lives in the cache; flush periodically (staggered) for durability.
-            if ((level.getGameTime() + entity.getId()) % WORK_SAVE_INTERVAL == 0) {
-                WorkerStateManager.save(pokemon, state);
-            }
+        // Its last job's animation plays out where it is before it sets off for this one
+        if (holdForAnimation(entity)) {
             return true;
         }
+
+        // A step only counts while standing at the job: if the worker was moved off it (pushed,
+        // paused for a battle, handed a job mid-step), the step it was on starts over.
+        if (state.getStepTicks() > 0) {
+            state.restartStep();
+        }
+        navigateToJob(entity, standPos);
+        state.setWalkedToJob(true);
+        state.resetStepIn();
+
+        // Track path failures for stuck detection: its walk has ended (on the ground, so not just
+        // falling or knocked about) without getting next to the stand tile, so the path can't
+        // get it there. A few in a row and it gives up the job instead of standing around.
+        if (entity.getNavigation().isDone() && entity.onGround() && distanceSq > SETTLED_DISTSQ) {
+            state.recordPathFailure();
+
+            if (state.isStuck()) {
+                // Give up on this job and clear reservation
+                Palworks.LOGGER.warn(
+                        "{} is stuck, giving up on job at {}",
+                        pokemon.getSpecies().getName(),
+                        targetPos);
+                if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
+                    JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
+                }
+                state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
+                state.resetPathFailures();
+                dropJob(pokemon, entity, state);
+                return false;
+            }
+        }
+
+        // Path/idle state lives in the cache; flush periodically (staggered) for durability.
+        if ((level.getGameTime() + entity.getId()) % WORK_SAVE_INTERVAL == 0) {
+            WorkerStateManager.save(pokemon, state);
+        }
+        return true;
     }
 
     /**
