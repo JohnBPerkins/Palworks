@@ -2,24 +2,24 @@ package dev.palworks.worker;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.architectury.platform.Platform;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
-import java.nio.file.Path;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * What runs workers, on both loaders: each loader calls these from its own events (Fabric from
- * its server events and a PokemonEntity tick mixin, NeoForge from its event bus).
+ * What runs workers, on both loaders: called from Architectury's server events (see
+ * PalworksCommon) and from each Pokémon's tick (PokemonEntityTickMixin).
  */
 public final class WorkerTicking {
     private WorkerTicking() {}
 
-    /** As the server starts: read the settings in {@code palworks.json} in the loader's config folder. */
-    public static void onServerStarting(Path configDir) {
-        PalworksConfig.load(configDir);
+    /** As the server starts: read the settings in {@code palworks.json} in the config folder. */
+    public static void onServerStarting() {
+        PalworksConfig.load(Platform.getConfigFolder());
     }
 
     /**

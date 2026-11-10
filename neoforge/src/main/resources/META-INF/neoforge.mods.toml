@@ -28,6 +28,13 @@ ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.palworks]]
+modId = "architectury"
+type = "required"
+versionRange = "[13.0.8,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.palworks]]
 modId = "cobblemon"
 type = "required"
 versionRange = "[1.7.0,1.9)"

@@ -296,7 +296,7 @@ jobs:
             pins+=(--pin "fabric-api=$FABRIC_API")
           fi
           python3 -I .github/scripts/fetch_server_mods.py --loader "$LOADER" --minecraft "$MINECRAFT" \
-            --cobblemon "$COBBLEMON" "${pins[@]}" --dest server/mods
+            --cobblemon "$COBBLEMON" "${pins[@]}" --require architectury-api --dest server/mods
 
       - name: Boot server
         env:

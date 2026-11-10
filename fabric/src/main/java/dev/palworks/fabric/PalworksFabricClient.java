@@ -1,32 +1,24 @@
 package dev.palworks.fabric;
 
 import dev.palworks.Palworks;
+import dev.palworks.client.PalworksClient;
 import dev.palworks.client.debug.WorkerDebugRenderer;
-import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.hud.WorkStatusHud;
-import dev.palworks.fabric.inventory.FabricModMenuTypes;
-import dev.palworks.inventory.WorkerInventoryScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.Event;
-import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.resources.ResourceLocation;
 
+/** Fabric's client entry point: common client setup, plus the HUD and world render hooks. */
 @Environment(EnvType.CLIENT)
 public class PalworksFabricClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        Palworks.LOGGER.info("Palworks Fabric Client initializing...");
-
-        // Register screens using vanilla API
-        MenuScreens.register(FabricModMenuTypes.WORKER_INVENTORY, WorkerInventoryScreen::new);
-
-        // Register Pokemon interact wheel handler
-        PokemonInteractHandler.init();
+        PalworksClient.init();
 
         // Work icons on the party HUD's cards. Cobblemon draws the HUD from the same event, in the
         // default phase; this phase runs after it, so the icons go on top.
@@ -37,7 +29,5 @@ public class PalworksFabricClient implements ClientModInitializer {
         // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
         WorldRenderEvents.AFTER_ENTITIES.register(context -> WorkerDebugRenderer.render(
                 context.camera(), context.tickCounter().getGameTimeDeltaPartialTick(false)));
-
-        Palworks.LOGGER.info("Palworks Fabric Client initialized!");
     }
 }
