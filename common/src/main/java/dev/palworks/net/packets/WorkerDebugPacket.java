@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Sent from server to a player with {@code /palworks debug overlay} on: every worker near them,
+ * Sent from server to a player with {@code /palworks debug} on: every worker near them,
  * what it's doing, where its job is and the path it's walking. Replaces the previous one; an empty
  * list clears the overlay.
  */

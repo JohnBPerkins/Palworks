@@ -219,7 +219,7 @@ public class JobManager {
         // Phase 4: Assign jobs to idle workers (proximity + suitability)
         assignJobsToWorkers(level);
 
-        // Debug overlay for players who asked for it (/palworks debug overlay)
+        // Debug overlay for players who asked for it (/palworks debug)
         WorkerDebugSync.tick(level);
 
         // Phase 5: Clean up expired reservations and stale cache

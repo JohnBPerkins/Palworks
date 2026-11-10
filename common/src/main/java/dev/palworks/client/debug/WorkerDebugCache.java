@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Client-side copy of the last {@link WorkerDebugPacket}: the workers near the player, for
- * {@link WorkerDebugRenderer}. Empty unless the player has {@code /palworks debug overlay} on. Has
+ * {@link WorkerDebugRenderer}. Empty unless the player has {@code /palworks debug} on. Has
  * no client-only imports, so it is safe to load on a dedicated server.
  */
 public final class WorkerDebugCache {

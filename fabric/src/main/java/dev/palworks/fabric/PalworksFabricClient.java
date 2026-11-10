@@ -34,7 +34,7 @@ public class PalworksFabricClient implements ClientModInitializer {
         HudRenderCallback.EVENT.addPhaseOrdering(Event.DEFAULT_PHASE, afterCobblemon);
         HudRenderCallback.EVENT.register(afterCobblemon, (graphics, deltaTracker) -> WorkStatusHud.render(graphics));
 
-        // /palworks debug overlay: job icons above workers' heads and their paths
+        // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
         WorldRenderEvents.AFTER_ENTITIES.register(context -> WorkerDebugRenderer.render(
                 context.camera(), context.tickCounter().getGameTimeDeltaPartialTick(false)));
 

@@ -25,7 +25,7 @@ import org.joml.Matrix4f;
 import java.util.List;
 
 /**
- * The {@code /palworks debug overlay} view, drawn in the world for each worker near the player:
+ * The {@code /palworks debug} overlay, drawn in the world for each worker near the player:
  * <ul>
  *   <li>above its head, its job icon (as on the party HUD) and a label such as
  *       "chop_tree · walking", visible through walls;</li>

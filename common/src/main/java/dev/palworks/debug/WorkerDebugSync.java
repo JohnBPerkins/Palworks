@@ -20,7 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Sends players with {@code /palworks debug overlay} on what every worker near them is doing
+ * Sends players with {@code /palworks debug} on what every worker near them is doing
  * ({@link WorkerDebugPacket}), for the in-world overlay. Debug only: nothing is sent to anyone else.
  * Ticked by {@code JobManager.tick} for each level.
  */
@@ -29,7 +29,7 @@ public final class WorkerDebugSync {
     private static final double RADIUS = 48;
     private static final int MAX_PATH_NODES = 64;
 
-    /** Players who had the overlay on at the last send, so turning it off clears theirs once. */
+    /** Players who had debugging on at the last send, so turning it off clears their overlay once. */
     private static final Set<UUID> SENT_TO = ConcurrentHashMap.newKeySet();
 
     private WorkerDebugSync() {}
@@ -40,7 +40,7 @@ public final class WorkerDebugSync {
         }
         for (ServerPlayer player : level.players()) {
             UUID uuid = player.getUUID();
-            if (DebugManager.showsWorkerOverlay(uuid)) {
+            if (DebugManager.isDebugging(uuid)) {
                 new WorkerDebugPacket(entriesIn(level, player.getBoundingBox().inflate(RADIUS))).sendToPlayer(player);
                 SENT_TO.add(uuid);
             } else if (SENT_TO.remove(uuid)) {

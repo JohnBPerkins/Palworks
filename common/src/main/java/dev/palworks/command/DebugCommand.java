@@ -25,16 +25,12 @@ import java.util.List;
  */
 public class DebugCommand {
 
-    /** Toggle whether this player sees worker job activity in chat. */
+    /** Toggle worker debugging for this player: job activity in chat, and the overlay in the world. */
     public static void toggleDebug(ServerPlayer player) {
-        boolean on = DebugManager.toggleWorkerActivity(player.getUUID());
-        player.sendSystemMessage(Component.literal("Worker activity chat: " + (on ? "ON" : "OFF")));
-    }
-
-    /** Toggle the in-world worker overlay (job icons above heads, paths) for this player. */
-    public static void toggleOverlay(ServerPlayer player) {
-        boolean on = DebugManager.toggleWorkerOverlay(player.getUUID());
-        player.sendSystemMessage(Component.literal("Worker overlay: " + (on ? "ON" : "OFF")));
+        boolean on = DebugManager.toggleDebugging(player.getUUID());
+        player.sendSystemMessage(Component.literal("Worker debug: " + (on
+                ? "ON (activity in chat; job icons, paths and job blocks shown in the world)"
+                : "OFF")));
     }
 
     /** Clear all worker reservations (force fresh job assignments). */

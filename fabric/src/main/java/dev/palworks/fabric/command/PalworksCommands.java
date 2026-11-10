@@ -18,12 +18,10 @@ public class PalworksCommands {
         dispatcher.register(Commands.literal("palworks")
             .requires(source -> source.hasPermission(2))
 
-            // Toggle worker-activity chat for this player; "overlay" toggles the in-world overlay
-            // (job icons above workers' heads and their paths)
+            // Toggle worker debugging for this player: activity in chat, and the in-world overlay
+            // (job icons above workers' heads, their paths and job blocks)
             .then(Commands.literal("debug")
-                .executes(ctx -> run(ctx, DebugCommand::toggleDebug))
-                .then(Commands.literal("overlay")
-                    .executes(ctx -> run(ctx, DebugCommand::toggleOverlay))))
+                .executes(ctx -> run(ctx, DebugCommand::toggleDebug)))
 
             // Inspect the nearest worker's state
             .then(Commands.literal("inspect")
