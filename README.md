@@ -19,6 +19,8 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - **Suitability** — type- and species-based mapping decides which jobs a given Pokémon can do
   and how well.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
+- **Work toggle** — shift-right-click your Pokémon and use the bottom slot of the interact wheel
+  to switch its work on (green check) or off (red cross).
 - **Data-driven work detection** — what counts as "ore" or other work is controlled by datapack
   tags, so it can be tuned without code changes.
 - **Multi-loader** — a shared core runs on both Fabric and NeoForge from the same codebase
