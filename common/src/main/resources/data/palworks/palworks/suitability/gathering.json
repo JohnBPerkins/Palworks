@@ -1,0 +1,15 @@
+{
+  "types": {
+    "grass": 1
+  },
+  "species": {
+    "cobblemon:tropius": 3,
+    "cobblemon:exeggutor": 1,
+    "cobblemon:shiftry": 1,
+    "cobblemon:cherubi": 1,
+    "cobblemon:cherrim": 1,
+    "cobblemon:bounsweet": 1,
+    "cobblemon:steenee": 1,
+    "cobblemon:tsareena": 1
+  }
+}

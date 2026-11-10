@@ -1,0 +1,19 @@
+{
+  "types": {
+    "normal": 1
+  },
+  "species": {
+    "cobblemon:miltank": 3,
+    "cobblemon:wooloo": 1,
+    "cobblemon:dubwool": 1,
+    "cobblemon:mareep": 1,
+    "cobblemon:flaaffy": 1,
+    "cobblemon:ampharos": 1,
+    "cobblemon:combee": 1,
+    "cobblemon:vespiquen": 1,
+    "cobblemon:tropius": 1,
+    "cobblemon:shuckle": 1,
+    "cobblemon:chansey": 2,
+    "cobblemon:blissey": 3
+  }
+}

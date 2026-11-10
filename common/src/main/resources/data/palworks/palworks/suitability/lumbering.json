@@ -1,0 +1,20 @@
+{
+  "types": {
+    "fighting": 1,
+    "steel": 1
+  },
+  "species": {
+    "cobblemon:treecko": 1,
+    "cobblemon:grovyle": 1,
+    "cobblemon:sceptile": 1,
+    "cobblemon:pinsir": 2,
+    "cobblemon:heracross": 1,
+    "cobblemon:scyther": 2,
+    "cobblemon:scizor": 3,
+    "cobblemon:durant": 1,
+    "cobblemon:escavalier": 1,
+    "cobblemon:kartana": 3,
+    "cobblemon:trevenant": 1,
+    "cobblemon:phantump": 1
+  }
+}
