@@ -8,7 +8,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
-import dev.palworks.manager.JobManager;
+import dev.palworks.manager.JobChecks;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.core.BlockPos;
@@ -176,7 +176,7 @@ public class CobblemonCropGameTests {
         helper.assertFalse(
                 CropAdapter.isFullyGrown(level, helper.absolutePos(CROP.above())), "the top isn't a crop of its own");
         helper.assertFalse(
-                JobManager.isJobStillThere(level, JobType.HARVEST_CROPS, helper.absolutePos(CROP.above())),
+                JobChecks.isJobStillThere(level, JobType.HARVEST_CROPS, helper.absolutePos(CROP.above())),
                 "no harvest job on the top");
 
         helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), IT_HARVESTS);

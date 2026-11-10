@@ -1,0 +1,126 @@
+package dev.palworks.manager;
+
+import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.crop.CropAdapter;
+import dev.palworks.inventory.WorkerInventory;
+import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobType;
+import dev.palworks.station.ChestHelper;
+import dev.palworks.station.FurnaceHelper;
+import dev.palworks.suitability.SuitabilityDetector;
+import dev.palworks.tree.TreeDetector;
+import java.util.List;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+
+/**
+ * Whether a job is still there in the world, and whether a worker can do it: the checks that
+ * jobs are found, handed out and worked by. No state, so WorkerAI's steps ask them too.
+ */
+public final class JobChecks {
+    /** How far round a pickup job's spot its items are looked for (and picked up by the worker). */
+    public static final double PICKUP_RADIUS = 3.0;
+
+    /**
+     * Whether a job still exists in the world: the same checks the chunk scan uses to find it.
+     * Every step of a job checks it's still there with this, by default (see StepRunner): workers
+     * check it on their way to a job, so they drop it instead of finishing the walk when it's gone
+     * (crop already harvested, tree chopped, chest emptied...), and as they work, so they stop
+     * when it goes, and a step's effect never lands on a job that isn't there. A job changes some
+     * things itself as it goes, so a few checks are looser than the scan's: a furnace the worker
+     * has lit is still its job (see FurnaceHelper.canUseHeat).
+     */
+    public static boolean isJobStillThere(Level level, JobType type, BlockPos pos) {
+        return switch (type) {
+            case FUEL_FURNACE -> FurnaceHelper.canUseHeat(level, pos);
+            case HARVEST_CROPS -> CropAdapter.isFullyGrown(level, pos) || CropAdapter.isAttachedFruit(level, pos);
+            case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
+            case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
+            case GET_SEEDS ->
+                isChest(level.getBlockState(pos))
+                        && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));
+            case DELIVER_ITEMS -> level.getBlockEntity(pos) instanceof net.minecraft.world.Container;
+            case COLLECT_DROPS -> !itemsToPickUp(level, pos).isEmpty();
+            default -> true;
+        };
+    }
+
+    /**
+     * Whether this worker can do this job: it has what the job takes (a seed for the soil, room for
+     * the drops...). The worker's side of a job, as {@link #isJobStillThere} is the world's. The one
+     * check of it, so the two places it's asked agree: when jobs are handed out (a worker is only
+     * offered jobs it can do), and while a worker has one (on its way and as it works, see
+     * StepRunner), so a worker that can't do its job any more gives it back for one that can,
+     * instead of finishing it for nothing. A job type that needs something of its worker goes here.
+     *
+     * <p>Suitabilities aren't asked here: a job's (which can depend on its block: nether wart is
+     * Nether work) are on its record, checked as it's handed out (see JobAssigner.canDoJob).
+     */
+    public static boolean canWorkerDo(Level level, Pokemon pokemon, JobType type, BlockPos pos) {
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+        return switch (type) {
+            // A seed it carries that can be planted there (wart on soul sand, the rest on farmland)
+            case PLANT_SEEDS -> carriesSeedFor(level, inventory, pos);
+            // Room for some of what's lying there
+            case COLLECT_DROPS -> hasRoomForAny(inventory, itemsToPickUp(level, pos));
+            // Room for the seeds it fetches
+            case GET_SEEDS -> inventory.hasSpace();
+            // Something to deliver
+            case DELIVER_ITEMS -> inventory.hasCargo(SuitabilityDetector.getSuitabilities(pokemon));
+            default -> true;
+        };
+    }
+
+    private static boolean hasRoomForAny(WorkerInventory inventory, List<ItemEntity> items) {
+        for (ItemEntity item : items) {
+            if (inventory.roomFor(item.getItem()) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The items lying round a pickup job's spot. */
+    public static List<ItemEntity> itemsToPickUp(Level level, BlockPos pos) {
+        return level.getEntitiesOfClass(
+                ItemEntity.class,
+                new AABB(pos).inflate(PICKUP_RADIUS),
+                item -> item.isAlive() && !item.getItem().isEmpty());
+    }
+
+    /** Whether the worker carries a seed that can be planted at {@code plantPos}. */
+    private static boolean carriesSeedFor(Level level, WorkerInventory inventory, BlockPos plantPos) {
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
+            if (!stack.isEmpty() && CropAdapter.canPlantSeed(stack.getItem(), level, plantPos.below())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Helper methods for job detection
+    static boolean isChest(BlockState state) {
+        return state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST);
+    }
+
+    static boolean hasPlantableSeeds(Level level, BlockPos pos) {
+        return !ChestHelper.itemsMatching(level, pos, JobChecks::isFarmlandSeed).isEmpty();
+    }
+
+    /**
+     * A seed a planter (Planting) plants on farmland: any item that plants a field crop (see
+     * CropAdapter.fieldCropOf), vanilla or modded, except nether wart, which is Nether work.
+     */
+    static boolean isFarmlandSeed(Item item) {
+        return !item.equals(Items.NETHER_WART) && CropAdapter.fieldCropOf(item) != null;
+    }
+
+    private JobChecks() {}
+}
