@@ -30,6 +30,7 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -65,7 +66,7 @@ public class WorkerAI {
     private static final double SETTLED_DISTSQ = 3.0;
     // Most ticks a lumberjack spends stepping from where its walk ended onto its tile by the trunk
     // before it settles for chopping from where it is (something's in the way: another mob, say).
-    private static final int STEP_IN_TICKS = 40;
+    public static final int STEP_IN_TICKS = 40;
     // How near the middle of its tile counts as on it, for a lumberjack (crossing its edge doesn't)
     private static final double ON_TILE_DIST = 0.35;
 
@@ -78,7 +79,7 @@ public class WorkerAI {
 
     // How long (game ticks) a worker may hold a job without starting it before it gives it up.
     // Game time, so pausing the game doesn't count towards it.
-    private static final long RESERVATION_TIMEOUT_TICKS = 30 * 20;
+    public static final long RESERVATION_TIMEOUT_TICKS = 30 * 20;
     // How stale a paused job's reservation may get before it's refreshed (well under the timeout).
     private static final long PAUSED_RESERVATION_REFRESH_TICKS = 10 * 20;
 
@@ -518,6 +519,20 @@ public class WorkerAI {
 
     private static JobHandler handlerFor(JobType type) {
         return HANDLERS.getOrDefault(type, DEFAULT_HANDLER);
+    }
+
+    /** A job's step, for the debug overlay: its name, which of how many it is, and its length. */
+    public record StepView(String name, int index, int count, int ticks) {}
+
+    /** The step at this index of a job's steps, or null if there's none there. */
+    @Nullable
+    public static StepView stepView(JobType job, int index) {
+        List<Step> steps = handlerFor(job).steps();
+        if (index < 0 || index >= steps.size()) {
+            return null;
+        }
+        Step step = steps.get(index);
+        return new StepView(step.name(), index, steps.size(), step.ticks());
     }
 
     private static final class FuelFurnaceHandler implements JobHandler {

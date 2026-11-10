@@ -124,7 +124,18 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
     completions) in chat, and shows every worker within 48 blocks in the world: its job icon and a
     label like `chop_tree · walking` above its head (through walls), the path it's walking, and a
     box around its job's block. Colours: yellow walking, green working, grey paused, red off, white
-    idle.
+    idle. Under the label:
+    - `job 12.3s · gives up in 17.7s`: how long it has had its job, and the countdown to the 30s
+      timeout for a job it hasn't started (none once it's working, or while paused);
+    - `step 2/3 chop · 34/60t`: the step it's on and how far through;
+    - `partial path · fails 2/3 · still 3.5s · step-in 12/40` (while walking): whether its path
+      reaches the job (`path reaches`, `partial path` or `no path`), recent walks that ended short
+      (it gives up at 3), how long it has stood still, and a lumberjack's ticks stepping onto its
+      tile;
+    - `2 unreachable spots`: spots it remembers it couldn't reach (it won't take jobs there for
+      now), each with a dark red box.
+
+    Lines about something going wrong are red, and so is a path that doesn't reach its job.
   - `/palworks inspect worker` and `/palworks jobs` dump the nearest worker's state and the job pool.
 - **Data-driven where possible.** Things like which blocks count as work are controlled by
   datapack tags — prefer editing tags over hard-coding in Java.

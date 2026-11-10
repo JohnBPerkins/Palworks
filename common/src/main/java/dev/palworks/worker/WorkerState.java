@@ -138,8 +138,19 @@ public class WorkerState {
         return pathFailCount;
     }
 
+    /**
+     * Path failures that still count towards giving up: 0 once 5 seconds have passed since the last
+     * one (the count itself is only reset at the next failure).
+     */
+    public int getRecentPathFailCount() {
+        return System.currentTimeMillis() - lastPathFailTime > 5000 ? 0 : pathFailCount;
+    }
+
+    /** Path failures within 5 seconds of each other after which a worker gives its job up. */
+    public static final int STUCK_AFTER_PATH_FAILURES = 3;
+
     public boolean isStuck() {
-        return pathFailCount >= 3; // Stuck if 3+ path failures in 5 seconds
+        return pathFailCount >= STUCK_AFTER_PATH_FAILURES;
     }
 
     // Job progress (steps)

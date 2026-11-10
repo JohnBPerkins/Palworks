@@ -944,6 +944,21 @@ public class JobManager {
         return null;
     }
 
+    /** The spots this worker currently remembers it couldn't reach (for the debug overlay). */
+    public List<BlockPos> unreachableFor(UUID workerUUID, long now) {
+        Map<BlockPos, Long> failed = recentlyFailedJobs.get(workerUUID);
+        if (failed == null) {
+            return List.of();
+        }
+        List<BlockPos> spots = new ArrayList<>();
+        failed.forEach((pos, expiry) -> {
+            if (expiry > now) {
+                spots.add(pos);
+            }
+        });
+        return spots;
+    }
+
     /** Whether the worker recently failed to reach this spot (and nothing has changed since). */
     private boolean isRecentlyUnreachable(WorkerInfo worker, BlockPos pos) {
         Map<BlockPos, Long> failed = recentlyFailedJobs.get(worker.pokemonUUID);

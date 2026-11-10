@@ -3,9 +3,11 @@ package dev.palworks.client.debug;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.palworks.ai.WorkerAI;
 import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.worker.WorkActivity;
+import dev.palworks.worker.WorkerState;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -27,10 +29,14 @@ import java.util.List;
 /**
  * The {@code /palworks debug} overlay, drawn in the world for each worker near the player:
  * <ul>
- *   <li>above its head, its job icon (as on the party HUD) and a label such as
- *       "chop_tree · walking", visible through walls;</li>
- *   <li>the rest of the path it's walking, as a line from its feet;</li>
- *   <li>a box around its job's block.</li>
+ *   <li>above its head, its job icon (as on the party HUD) and a few lines of text (see
+ *       {@link WorkerDebugText}): its job and phase, how long it has had the job and how long until
+ *       it gives it up, the step it's on, whether its path reaches the job, recent path failures,
+ *       how long it has stood still, and how many spots it remembers it couldn't reach. Visible
+ *       through walls; lines about something going wrong are drawn in red;</li>
+ *   <li>the rest of the path it's walking, as a line from its feet (red when it doesn't reach the
+ *       job);</li>
+ *   <li>a box around its job's block, and a dark red box round each spot it couldn't reach.</li>
  * </ul>
  * Colour follows the phase: yellow walking, green working, grey paused, red off, white idle.
  * Called by each loader's level render event (Fabric WorldRenderEvents.AFTER_ENTITIES, NeoForge
@@ -40,6 +46,10 @@ import java.util.List;
 public final class WorkerDebugRenderer {
     private static final float LABEL_SCALE = 0.025F;
     private static final int ICON_PX = 16;
+    private static final int LINE_HEIGHT = 10;
+    private static final int INFO_COLOUR = 0xFFDDDDDD;
+    private static final int WARNING_COLOUR = 0xFFFF6A50;
+    private static final int UNREACHABLE_COLOUR = 0xFFB02A20;
 
     private static final MultiBufferSource.BufferSource BUFFERS = MultiBufferSource.immediate(new ByteBufferBuilder(1 << 12));
 
@@ -71,7 +81,7 @@ public final class WorkerDebugRenderer {
             int colour = colourOf(entry.activity().phase());
             Vec3 feet = entity.getPosition(partialTick);
             drawPathAndTarget(pose, cam, feet, entry, colour);
-            drawLabel(pose, camera, cam, minecraft.font, entity, feet, entry.activity(), colour);
+            drawLabel(pose, camera, cam, minecraft.font, entity, feet, entry, colour);
         }
         BUFFERS.endBatch();
     }
@@ -88,17 +98,25 @@ public final class WorkerDebugRenderer {
 
     private static void drawPathAndTarget(PoseStack pose, Vec3 cam, Vec3 feet, WorkerDebugPacket.Entry entry, int colour) {
         VertexConsumer lines = BUFFERS.getBuffer(RenderType.lines());
+        int pathColour = WorkerDebugText.pathFallsShort(entry.details()) ? WARNING_COLOUR : colour;
         Vec3 previous = feet.add(0, 0.1, 0);
         for (BlockPos node : entry.path()) {
             Vec3 next = Vec3.atBottomCenterOf(node).add(0, 0.1, 0);
-            line(pose, lines, previous.subtract(cam), next.subtract(cam), colour);
+            line(pose, lines, previous.subtract(cam), next.subtract(cam), pathColour);
             previous = next;
         }
         if (entry.target() != null) {
-            AABB box = new AABB(entry.target()).inflate(0.01).move(-cam.x, -cam.y, -cam.z);
-            LevelRenderer.renderLineBox(pose, lines, box,
-                    red(colour) / 255F, green(colour) / 255F, blue(colour) / 255F, 1F);
+            box(pose, lines, cam, entry.target(), 0.01, colour);
         }
+        for (BlockPos spot : entry.unreachable()) {
+            box(pose, lines, cam, spot, 0.03, UNREACHABLE_COLOUR);
+        }
+    }
+
+    private static void box(PoseStack pose, VertexConsumer lines, Vec3 cam, BlockPos pos, double grow, int colour) {
+        AABB box = new AABB(pos).inflate(grow).move(-cam.x, -cam.y, -cam.z);
+        LevelRenderer.renderLineBox(pose, lines, box,
+                red(colour) / 255F, green(colour) / 255F, blue(colour) / 255F, 1F);
     }
 
     private static void line(PoseStack pose, VertexConsumer lines, Vec3 from, Vec3 to, int colour) {
@@ -111,7 +129,8 @@ public final class WorkerDebugRenderer {
     }
 
     private static void drawLabel(PoseStack pose, Camera camera, Vec3 cam, Font font, Entity entity,
-                                  Vec3 feet, WorkActivity activity, int colour) {
+                                  Vec3 feet, WorkerDebugPacket.Entry entry, int colour) {
+        WorkActivity activity = entry.activity();
         pose.pushPose();
         pose.translate(feet.x - cam.x, feet.y - cam.y + entity.getBbHeight() + 0.5, feet.z - cam.z);
         pose.mulPose(camera.rotation());
@@ -130,11 +149,15 @@ public final class WorkerDebugRenderer {
             quad.addVertex(matrix, x1, y0, 0).setColor(0xFFFFFFFF).setUv(1, 0).setLight(light);
         }
 
-        String text = activity.job() == null
-                ? activity.phase().name().toLowerCase()
-                : activity.job().getId() + " · " + activity.phase().name().toLowerCase();
-        font.drawInBatch(text, -font.width(text) / 2F, 0, colour, false, matrix, BUFFERS,
-                Font.DisplayMode.SEE_THROUGH, 0x40000000, LightTexture.FULL_BRIGHT);
+        // The first line (job and phase) in the phase's colour; the rest grey, or red for warnings
+        List<WorkerDebugText.Line> lines = WorkerDebugText.lines(activity, entry.details(), entry.unreachable().size(),
+                WorkerState.STUCK_AFTER_PATH_FAILURES, WorkerAI.STEP_IN_TICKS);
+        for (int i = 0; i < lines.size(); i++) {
+            WorkerDebugText.Line line = lines.get(i);
+            int lineColour = i == 0 ? colour : line.warning() ? WARNING_COLOUR : INFO_COLOUR;
+            font.drawInBatch(line.text(), -font.width(line.text()) / 2F, i * LINE_HEIGHT, lineColour, false, matrix,
+                    BUFFERS, Font.DisplayMode.SEE_THROUGH, 0x40000000, LightTexture.FULL_BRIGHT);
+        }
         pose.popPose();
     }
 
