@@ -71,8 +71,8 @@ public class TestAreaGameTests {
 
     private static void check(GameTestHelper helper, TestArea.Result area, Set<Block> expected, String when) {
         Survey survey = survey(helper, area);
-        helper.assertValueEqual(survey.stations(), 9, "smelting stations " + when);
-        helper.assertValueEqual(survey.stationsReady(), 9, "stations with input and no fuel " + when);
+        helper.assertValueEqual(survey.stations(), 3, "smelting stations (one of each) " + when);
+        helper.assertValueEqual(survey.stationsReady(), 3, "stations with input and no fuel " + when);
         helper.assertTrue(survey.notGrown().isEmpty(), "not fully grown " + when + ": " + survey.notGrown());
         Set<Block> missing = new HashSet<>(expected);
         missing.removeAll(survey.plants());

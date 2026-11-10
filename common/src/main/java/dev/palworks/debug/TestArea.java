@@ -51,19 +51,19 @@ import java.util.Optional;
  * Builds a flat test area for trying workers out ({@code /palworks testarea}), from {@code origin}
  * (its north-west corner, at the height plants stand) east and south:
  * <ol>
- *   <li>Smelting: furnaces, blast furnaces and smokers with something to smelt but no fuel, and a
- *       chest per group for the output.</li>
- *   <li>Vanilla crops: a plot of each, fully grown, from wheat to pumpkins, melons, cocoa, nether
- *       wart, sweet berries and glow berries.</li>
- *   <li>Cobblemon crops: every Cobblemon crop block (mints, revival herb, vivichoke, ...) and every
- *       berry bush with its fruit, found from the block registry, so new ones show up by themselves.
- *       Each one's soil is whichever of a few candidates it can survive on.</li>
+ *   <li>Smelting: a furnace, a blast furnace and a smoker, each with something to smelt but no
+ *       fuel, and a chest for the output.</li>
+ *   <li>Crops: one of each, fully grown, with a sign naming it: every vanilla crop (pumpkins and
+ *       melons with their fruit, cocoa on a log, glow berries hanging from a post), every Cobblemon
+ *       crop block, and every berry bush with its berries. The Cobblemon ones are found from the
+ *       block registry, so new ones show up by themselves; each one's soil is whichever of a few
+ *       candidates it can survive on. Each row of plants has a water channel behind it, so its
+ *       farmland stays wet.</li>
  *   <li>Trees: every vanilla tree and Cobblemon's apricorn and saccharine trees, grown with the
  *       game's own features (so they're natural trees workers will chop), apricorns ripe.</li>
  * </ol>
- * Crop beds have a water channel down the middle so their farmland stays wet. Sections are
- * separated by stone brick walkways, with a sign at each section and on each plot. Everything in
- * the area is cleared first. What couldn't be placed is reported in the result instead of failing.
+ * Sections are separated by stone brick walkways, with a sign at each. Everything in the area is
+ * cleared first. What couldn't be placed is reported in the result instead of failing.
  */
 public final class TestArea {
     /** What was built, and anything that couldn't be. */
@@ -77,19 +77,21 @@ public final class TestArea {
     }
 
     private static final int WALK = 3;          // walkway width
-    private static final int BED = 5;           // a crop bed is BED x 3
-    // A crop cell: the bed with a block of margin each side, a sign in front of it, and a gap
-    private static final Grid CROPS = new Grid(BED + 2, 5, 8);
+    private static final int CONTENT_WIDTH = 56; // between the walkways down each side
+    // Crops: a plant every other block (the block between is for a pumpkin, a cocoa pod...), in rows
+    // of a water channel, the plants, and their signs
+    private static final int PLANT_SPACING = 2;
+    private static final int PLANTS_PER_ROW = CONTENT_WIDTH / PLANT_SPACING - 1;
+    private static final int CROP_ROW_DEPTH = 3;
     // Trees: logs can reach about 4 blocks from the trunk, so a 9 cell keeps neighbours apart; ones
     // with wide branches or a 2x2 trunk get 12. Checked: a tree with a log on its cell's edge is a
     // problem (see growTree).
     private static final Grid SMALL_TREES = new Grid(9, 9, 6);
     private static final Grid BIG_TREES = new Grid(12, 12, 4);
-    private static final int SMELTING_DEPTH = 3;
+    private static final int SMELTING_DEPTH = 2;
     private static final int FARM_CLEAR_HEIGHT = 10;
     private static final int SMALL_TREE_CLEAR_HEIGHT = 24;
     private static final int TREE_CLEAR_HEIGHT = 40;
-    private static final int BERRIES_PER_PLOT = 2 * BED;
     private static final int TREE_SEEDS = 30;
 
     private static final int FLAGS = Block.UPDATE_CLIENTS;
@@ -98,8 +100,6 @@ public final class TestArea {
     private static final List<Block> SOILS = List.of(Blocks.FARMLAND, Blocks.GRASS_BLOCK, Blocks.DIRT, Blocks.MUD,
             Blocks.SAND, Blocks.GRAVEL, Blocks.SOUL_SAND, Blocks.MOSS_BLOCK, Blocks.WATER);
 
-    private record Crop(String label, BlockState state) {}
-
     private record Tree(String label, ResourceKey<ConfiguredFeature<?, ?>> feature, Block floor, boolean big) {}
 
     private interface CellBuilder {
@@ -107,6 +107,9 @@ public final class TestArea {
     }
 
     private record Plot(String label, CellBuilder builder) {}
+
+    /** One crop plant: its sign's label, and how to place it at a spot. */
+    private record Plant(String label, java.util.function.Consumer<BlockPos> placer) {}
 
     private final ServerLevel level;
     private final BlockPos origin;
@@ -123,17 +126,15 @@ public final class TestArea {
     }
 
     private Result build() {
-        List<Plot> vanilla = vanillaCropPlots();
-        List<Plot> cobblemon = new ArrayList<>(cobblemonCropPlots());
-        cobblemon.addAll(berryPlots());
+        List<List<Plant>> crops = List.of(vanillaPlants(), cobblemonPlants(), berryPlants());
+        int cropRows = crops.stream().mapToInt(group -> plantRows(group.size())).sum();
         List<Plot> smallTrees = trees().stream().filter(t -> !t.big()).map(this::treePlot).toList();
         List<Plot> bigTrees = trees().stream().filter(Tree::big).map(this::treePlot).toList();
 
-        int width = WALK + CROPS.columns() * CROPS.cellWidth() + WALK;
+        int width = WALK + CONTENT_WIDTH + WALK;
         int smeltingZ = WALK + 1;
-        int vanillaZ = smeltingZ + SMELTING_DEPTH + WALK;
-        int cobblemonZ = vanillaZ + CROPS.depth(vanilla.size()) + WALK;
-        int smallTreesZ = cobblemonZ + CROPS.depth(cobblemon.size()) + WALK;
+        int cropsZ = smeltingZ + SMELTING_DEPTH + WALK;
+        int smallTreesZ = cropsZ + cropRows * CROP_ROW_DEPTH + WALK;
         int bigTreesZ = smallTreesZ + SMALL_TREES.depth(smallTrees.size()) + WALK;
         int depth = bigTreesZ + BIG_TREES.depth(bigTrees.size()) + 1 + WALK;
 
@@ -141,11 +142,10 @@ public final class TestArea {
         clearAndFloor(0, width, 0, smallTreesZ, FARM_CLEAR_HEIGHT);
         clearAndFloor(0, width, smallTreesZ, bigTreesZ, SMALL_TREE_CLEAR_HEIGHT);
         clearAndFloor(0, width, bigTreesZ, depth, TREE_CLEAR_HEIGHT);
-        walkways(width, depth, List.of(vanillaZ - WALK, cobblemonZ - WALK, smallTreesZ - WALK, bigTreesZ - WALK));
+        walkways(width, depth, List.of(cropsZ - WALK, smallTreesZ - WALK, bigTreesZ - WALK));
 
         smelting(smeltingZ);
-        section("Vanilla crops", vanillaZ, vanilla, CROPS);
-        section("Cobblemon crops", cobblemonZ, cobblemon, CROPS);
+        crops(cropsZ, crops);
         section("Trees", smallTreesZ, smallTrees, SMALL_TREES);
         section("Big trees", bigTreesZ, bigTrees, BIG_TREES);
 
@@ -271,37 +271,67 @@ public final class TestArea {
 
     // ---- Smelting ----
 
+    /** A furnace, a blast furnace and a smoker facing south, each with 32 of an input and no fuel, and a chest. */
     private void smelting(int z) {
         sign(at(1, 0, z - 1), "== Smelting ==");
-        stations(WALK + 2, z, Blocks.FURNACE, "Furnaces", Items.RAW_IRON, Items.SAND, Items.COBBLESTONE);
-        stations(WALK + 2 + 8, z, Blocks.BLAST_FURNACE, "Blast furnaces", Items.RAW_IRON, Items.RAW_GOLD, Items.RAW_COPPER);
-        stations(WALK + 2 + 16, z, Blocks.SMOKER, "Smokers", Items.BEEF, Items.PORKCHOP, Items.CHICKEN);
+        for (int x = WALK + 1; x <= WALK + 9; x++) {
+            for (int dz = 0; dz < SMELTING_DEPTH; dz++) {
+                set(x, -1, z + dz, Blocks.SMOOTH_STONE);
+            }
+        }
+        station(at(WALK + 2, 0, z), Blocks.FURNACE, Items.RAW_IRON, "Furnace");
+        station(at(WALK + 4, 0, z), Blocks.BLAST_FURNACE, Items.RAW_GOLD, "Blast furnace");
+        station(at(WALK + 6, 0, z), Blocks.SMOKER, Items.BEEF, "Smoker");
+        set(at(WALK + 8, 0, z), Blocks.CHEST.defaultBlockState()
+                .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH));
+        sign(at(WALK + 8, 0, z + 1), "Output");
     }
 
-    /** Three stations facing south, each with 32 of an input and no fuel, a chest, and a sign. */
-    private void stations(int x, int z, Block station, String label, Item... inputs) {
-        for (int dx = -1; dx <= inputs.length + 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                set(x + dx, -1, z + dz, Blocks.SMOOTH_STONE);
-            }
+    private void station(BlockPos pos, Block station, Item input, String label) {
+        set(pos, station.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH));
+        if (level.getBlockEntity(pos) instanceof AbstractFurnaceBlockEntity furnace) {
+            furnace.setItem(0, new ItemStack(input, 32)); // slot 0 = input; slot 1 (fuel) left empty
+            furnace.setChanged();
+        } else {
+            problems.add(label + ": no block entity at " + pos.toShortString());
         }
-        for (int i = 0; i < inputs.length; i++) {
-            BlockPos pos = at(x + i, 0, z);
-            set(pos, station.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH));
-            if (level.getBlockEntity(pos) instanceof AbstractFurnaceBlockEntity furnace) {
-                furnace.setItem(0, new ItemStack(inputs[i], 32)); // slot 0 = input; slot 1 (fuel) left empty
-                furnace.setChanged();
-            } else {
-                problems.add(label + ": no block entity at " + pos.toShortString());
-            }
-        }
-        set(at(x + inputs.length, 0, z), Blocks.CHEST.defaultBlockState()
-                .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH));
-        sign(at(x + 1, 0, z + 1), label, "(no fuel)");
+        sign(pos.south(), label, "(no fuel)");
         plots++;
     }
 
     // ---- Crops ----
+
+    private static int plantRows(int plants) {
+        return (plants + PLANTS_PER_ROW - 1) / PLANTS_PER_ROW;
+    }
+
+    /** Each group of plants in rows of its own: a water channel, the plants, a sign in front of each. */
+    private void crops(int z, List<List<Plant>> groups) {
+        sign(at(1, 0, z - 1), "== Crops ==");
+        int rowZ = z;
+        for (List<Plant> group : groups) {
+            for (int i = 0; i < group.size(); i++) {
+                if (i % PLANTS_PER_ROW == 0) {
+                    if (i > 0) {
+                        rowZ += CROP_ROW_DEPTH;
+                    }
+                    for (int x = WALK; x < WALK + CONTENT_WIDTH; x++) {
+                        set(at(x, -1, rowZ), Blocks.WATER.defaultBlockState());
+                    }
+                }
+                BlockPos pos = at(WALK + 1 + (i % PLANTS_PER_ROW) * PLANT_SPACING, 0, rowZ + 1);
+                Plant plant = group.get(i);
+                try {
+                    plant.placer().accept(pos);
+                    plots++;
+                } catch (RuntimeException e) {
+                    problems.add(plant.label() + ": " + e.getMessage());
+                }
+                sign(pos.south(), signLines(plant.label()));
+            }
+            rowZ += CROP_ROW_DEPTH;
+        }
+    }
 
     /** Fully grown: the crop's own last stage (a torchflower crop's is the flower), else max "age". */
     private static BlockState grown(BlockState state) {
@@ -316,41 +346,41 @@ public final class TestArea {
         return state;
     }
 
-    private List<Plot> vanillaCropPlots() {
-        List<Plot> list = new ArrayList<>();
+    private List<Plant> vanillaPlants() {
+        List<Plant> list = new ArrayList<>();
         for (Block block : List.of(Blocks.WHEAT, Blocks.CARROTS, Blocks.POTATOES, Blocks.BEETROOTS,
                 Blocks.TORCHFLOWER_CROP, Blocks.PITCHER_CROP)) {
-            Crop crop = new Crop(blockName(block), grown(block.defaultBlockState()));
-            list.add(new Plot(crop.label(), (cell, grid) -> bed(cell, crop)));
+            list.add(cropPlant(block));
         }
-        list.add(new Plot("Pumpkins", (cell, grid) -> stemBed(cell, Blocks.PUMPKIN, Blocks.ATTACHED_PUMPKIN_STEM, "Pumpkins")));
-        list.add(new Plot("Melons", (cell, grid) -> stemBed(cell, Blocks.MELON, Blocks.ATTACHED_MELON_STEM, "Melons")));
-        list.add(new Plot("Nether wart", (cell, grid) -> netherWart(cell)));
-        list.add(new Plot("Cocoa", (cell, grid) -> cocoa(cell)));
-        list.add(new Plot("Sweet berries", (cell, grid) -> sweetBerries(cell)));
-        list.add(new Plot("Glow berries", (cell, grid) -> glowBerries(cell)));
+        list.add(new Plant("Pumpkin", pos -> stem(pos, Blocks.PUMPKIN, Blocks.ATTACHED_PUMPKIN_STEM)));
+        list.add(new Plant("Melon", pos -> stem(pos, Blocks.MELON, Blocks.ATTACHED_MELON_STEM)));
+        list.add(new Plant("Nether wart", pos -> {
+            set(pos.below(), Blocks.SOUL_SAND.defaultBlockState());
+            set(pos, grown(Blocks.NETHER_WART.defaultBlockState()));
+        }));
+        list.add(new Plant("Cocoa", this::cocoa));
+        list.add(new Plant("Sweet berries", pos -> set(pos, grown(Blocks.SWEET_BERRY_BUSH.defaultBlockState()))));
+        list.add(new Plant("Glow berries", this::glowBerries));
         return list;
     }
 
-    /** Every Cobblemon crop block other than berry bushes (which get their own section). */
-    private List<Plot> cobblemonCropPlots() {
-        List<Plot> list = new ArrayList<>();
+    /** Every Cobblemon crop block other than berry bushes (which get rows of their own). */
+    private List<Plant> cobblemonPlants() {
+        List<Plant> list = new ArrayList<>();
         for (Block block : cobblemonBlocks()) {
             if (block instanceof CropBlock || block instanceof NutBushBlock) {
-                Crop crop = new Crop(blockName(block), grown(block.defaultBlockState()));
-                list.add(new Plot(crop.label(), (cell, grid) -> bed(cell, crop)));
+                list.add(cropPlant(block));
             }
         }
         return list;
     }
 
-    private List<Plot> berryPlots() {
-        List<Block> berries = cobblemonBlocks().stream().filter(b -> b instanceof BerryBlock).toList();
-        List<Plot> list = new ArrayList<>();
-        for (int i = 0; i < berries.size(); i += BERRIES_PER_PLOT) {
-            List<Block> batch = berries.subList(i, Math.min(berries.size(), i + BERRIES_PER_PLOT));
-            String label = shortName(batch.get(0)) + " to " + shortName(batch.get(batch.size() - 1));
-            list.add(new Plot("Berries " + label, (cell, grid) -> berryBed(cell, batch, label)));
+    private List<Plant> berryPlants() {
+        List<Plant> list = new ArrayList<>();
+        for (Block berry : cobblemonBlocks()) {
+            if (berry instanceof BerryBlock) {
+                list.add(new Plant(shortName(berry), pos -> berryBush(pos, berry)));
+            }
         }
         return list;
     }
@@ -374,6 +404,22 @@ public final class TestArea {
     private static String shortName(Block berry) {
         String name = blockName(berry);
         return name.endsWith(" Berry") ? name.substring(0, name.length() - " Berry".length()) : name;
+    }
+
+    /** A crop on the first soil it can survive on. */
+    private Plant cropPlant(Block block) {
+        BlockState state = grown(block.defaultBlockState());
+        String label = blockName(block);
+        return new Plant(label, pos -> {
+            Block soil = soilFor(pos, state);
+            if (soil == null) {
+                throw new IllegalStateException("no soil it can grow on");
+            }
+            soil(pos.below(), soil);
+            if (!plant(pos, state)) {
+                throw new IllegalStateException("can't stay where it was put");
+            }
+        });
     }
 
     /** Place a plant (and its top half, for a two-tall one); whether it can stay there. */
@@ -410,135 +456,46 @@ public final class TestArea {
         return null;
     }
 
-    /**
-     * A 5x3 bed of a crop with a sign in front. On farmland: two rows of crop either side of a water
-     * channel. In water (medicinal leek): a pond with the crop on every block. Any other soil: three
-     * rows of it.
-     */
-    private void bed(BlockPos cell, Crop crop) {
-        BlockPos first = cell.offset(1, 0, 0);
-        Block soil = soilFor(first, crop.state());
-        if (soil == null) {
-            throw new IllegalStateException("no soil it can grow on");
-        }
-        int failed = 0;
-        for (int dx = 0; dx < BED; dx++) {
-            for (int row = 0; row < 3; row++) {
-                BlockPos pos = first.offset(dx, 0, row);
-                if (soil == Blocks.FARMLAND && row == 1) {
-                    set(pos.below(), Blocks.WATER.defaultBlockState());
-                    continue;
-                }
-                soil(pos.below(), soil);
-                if (!plant(pos, crop.state())) {
-                    failed++;
-                }
-            }
-        }
-        if (failed > 0) {
-            problems.add(crop.label() + ": " + failed + " plants can't stay where they were put");
-        }
-        sign(cell.offset(3, 0, 3), signLines(crop.label()));
+    /** A stem on farmland, attached to its fruit beside it. */
+    private void stem(BlockPos pos, Block fruit, Block attachedStem) {
+        soil(pos.below(), Blocks.FARMLAND);
+        set(pos, attachedStem.defaultBlockState().setValue(AttachedStemBlock.FACING, Direction.EAST));
+        set(pos.east(), fruit.defaultBlockState());
     }
 
-    /** Stems on farmland (water behind them), each attached to its fruit in front. */
-    private void stemBed(BlockPos cell, Block fruit, Block attachedStem, String label) {
-        BlockPos first = cell.offset(1, 0, 0);
-        for (int dx = 0; dx < BED; dx++) {
-            BlockPos fruitPos = first.offset(dx, 0, 0);
-            BlockPos stemPos = fruitPos.south();
-            set(fruitPos.below(), Blocks.GRASS_BLOCK.defaultBlockState());
-            set(fruitPos, fruit.defaultBlockState());
-            soil(stemPos.below(), Blocks.FARMLAND);
-            set(stemPos, attachedStem.defaultBlockState().setValue(AttachedStemBlock.FACING, Direction.NORTH));
-            set(stemPos.south().below(), Blocks.WATER.defaultBlockState());
-        }
-        sign(cell.offset(3, 0, 3), label);
+    /** A two-high jungle log with a ripe pod on its east side. */
+    private void cocoa(BlockPos pos) {
+        set(pos, Blocks.JUNGLE_LOG.defaultBlockState());
+        set(pos.above(), Blocks.JUNGLE_LOG.defaultBlockState());
+        // A pod faces the log it hangs on
+        set(pos.east(), Blocks.COCOA.defaultBlockState()
+                .setValue(CocoaBlock.FACING, Direction.WEST).setValue(CocoaBlock.AGE, CocoaBlock.MAX_AGE));
     }
 
-    private void netherWart(BlockPos cell) {
-        BlockPos first = cell.offset(1, 0, 0);
-        BlockState wart = grown(Blocks.NETHER_WART.defaultBlockState());
-        for (int dx = 0; dx < BED; dx++) {
-            for (int row = 0; row < 3; row++) {
-                BlockPos pos = first.offset(dx, 0, row);
-                set(pos.below(), Blocks.SOUL_SAND.defaultBlockState());
-                set(pos, wart.setValue(NetherWartBlock.AGE, NetherWartBlock.MAX_AGE));
-            }
+    /** A post with an arm over the spot, glow berry vines hanging from it to the ground. */
+    private void glowBerries(BlockPos pos) {
+        for (int y = 0; y < 3; y++) {
+            set(pos.east().above(y), Blocks.DARK_OAK_LOG.defaultBlockState());
         }
-        sign(cell.offset(3, 0, 3), "Nether wart");
+        set(pos.above(2), Blocks.DARK_OAK_PLANKS.defaultBlockState());
+        set(pos.above(), Blocks.CAVE_VINES_PLANT.defaultBlockState().setValue(CaveVines.BERRIES, true));
+        set(pos, Blocks.CAVE_VINES.defaultBlockState()
+                .setValue(CaveVines.BERRIES, true).setValue(CaveVinesBlock.AGE, CaveVinesBlock.MAX_AGE));
     }
 
-    /** Two jungle log pillars, ripe cocoa on every side. */
-    private void cocoa(BlockPos cell) {
-        for (int i = 0; i < 2; i++) {
-            BlockPos base = cell.offset(2 + 3 * i, 0, 1);
-            for (int y = 0; y < 3; y++) {
-                set(base.above(y), Blocks.JUNGLE_LOG.defaultBlockState());
-            }
-            for (int y = 0; y < 2; y++) {
-                for (Direction side : Direction.Plane.HORIZONTAL) {
-                    // A pod faces the log it hangs on
-                    set(base.above(y).relative(side), Blocks.COCOA.defaultBlockState()
-                            .setValue(CocoaBlock.FACING, side.getOpposite()).setValue(CocoaBlock.AGE, CocoaBlock.MAX_AGE));
-                }
-            }
+    /** A berry bush on farmland, with berries on it (as on a wild bush). */
+    private void berryBush(BlockPos pos, Block berry) {
+        soil(pos.below(), Blocks.FARMLAND);
+        set(pos, grown(berry.defaultBlockState()));
+        if (!level.getBlockState(pos).canSurvive(level, pos)) {
+            throw new IllegalStateException("can't stay on farmland");
         }
-        sign(cell.offset(3, 0, 3), "Cocoa");
-    }
-
-    private void sweetBerries(BlockPos cell) {
-        BlockPos first = cell.offset(1, 0, 0);
-        for (int dx = 0; dx < BED; dx++) {
-            for (int row = 0; row < 3; row++) {
-                set(first.offset(dx, 0, row), Blocks.SWEET_BERRY_BUSH.defaultBlockState()
-                        .setValue(SweetBerryBushBlock.AGE, SweetBerryBushBlock.MAX_AGE));
-            }
+        if (!(level.getBlockEntity(pos) instanceof BerryBlockEntity bush)) {
+            throw new IllegalStateException("no berry block entity");
         }
-        sign(cell.offset(3, 0, 3), "Sweet berries");
-    }
-
-    /** A little pergola: two log posts, a plank beam, vines with berries hanging from it. */
-    private void glowBerries(BlockPos cell) {
-        BlockPos west = cell.offset(0, 0, 1);
-        for (int y = 0; y < 5; y++) {
-            set(west.above(y), Blocks.DARK_OAK_LOG.defaultBlockState());
-            set(west.offset(BED + 1, y, 0), Blocks.DARK_OAK_LOG.defaultBlockState());
-        }
-        for (int dx = 1; dx <= BED; dx++) {
-            BlockPos column = west.offset(dx, 0, 0);
-            set(column.above(4), Blocks.DARK_OAK_PLANKS.defaultBlockState());
-            set(column.above(3), Blocks.CAVE_VINES_PLANT.defaultBlockState().setValue(CaveVines.BERRIES, true));
-            set(column.above(2), Blocks.CAVE_VINES.defaultBlockState()
-                    .setValue(CaveVines.BERRIES, true).setValue(CaveVinesBlock.AGE, CaveVinesBlock.MAX_AGE));
-        }
-        sign(cell.offset(3, 0, 3), "Glow berries");
-    }
-
-    /** Berry bushes on farmland, two rows of them either side of a water channel. */
-    private void berryBed(BlockPos cell, List<Block> berries, String label) {
-        BlockPos first = cell.offset(1, 0, 0);
-        for (int dx = 0; dx < BED; dx++) {
-            soil(first.offset(dx, -1, 0), Blocks.FARMLAND);
-            set(first.offset(dx, -1, 1), Blocks.WATER.defaultBlockState());
-            soil(first.offset(dx, -1, 2), Blocks.FARMLAND);
-        }
-        for (int i = 0; i < berries.size(); i++) {
-            BlockPos pos = first.offset(i % BED, 0, (i / BED) * 2);
-            Block berry = berries.get(i);
-            set(pos, grown(berry.defaultBlockState()));
-            if (!level.getBlockState(pos).canSurvive(level, pos)) {
-                problems.add(blockName(berry) + ": can't stay on farmland");
-            }
-            if (level.getBlockEntity(pos) instanceof BerryBlockEntity bush) {
-                bush.generateSimpleYields(); // the berries on it, as on a wild bush
-                bush.setChanged();
-                level.sendBlockUpdated(pos, level.getBlockState(pos), level.getBlockState(pos), Block.UPDATE_ALL);
-            } else {
-                problems.add(blockName(berry) + ": no berry block entity");
-            }
-        }
-        sign(cell.offset(3, 0, 3), "Berries", label);
+        bush.generateSimpleYields();
+        bush.setChanged();
+        level.sendBlockUpdated(pos, level.getBlockState(pos), level.getBlockState(pos), Block.UPDATE_ALL);
     }
 
     // ---- Trees ----
