@@ -23,12 +23,17 @@ public final class WorkActivitySync {
 
     private WorkActivitySync() {}
 
-    public static void update(Pokemon pokemon, Mob entity, WorkerState state, long gameTime) {
-        WorkActivity activity = WorkActivity.of(
+    /** What this worker is doing now. */
+    public static WorkActivity activityOf(Mob entity, WorkerState state) {
+        return WorkActivity.of(
                 state.isEnabled(),
                 state.getCurrentReservation() == null ? null : state.getCurrentReservation().getJobType(),
                 WorkerEligibility.isBusy(entity),
                 state.isWorking());
+    }
+
+    public static void update(Pokemon pokemon, Mob entity, WorkerState state, long gameTime) {
+        WorkActivity activity = activityOf(entity, state);
 
         UUID uuid = pokemon.getUuid();
         Sent last = LAST_SENT.get(uuid);

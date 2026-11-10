@@ -119,6 +119,13 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
 - **Namespaced keys.** Persistent data and identifiers are namespaced `palworks:*`.
 - **Debug logging** is gated behind a single flag and is off by default. Launch with
   `-Dpalworks.debug=true` to enable verbose logging while developing.
+- **Seeing what workers do in game** (op commands):
+  - `/palworks debug` toggles worker debugging for you. It posts job activity (assignments,
+    completions) in chat, and shows every worker within 48 blocks in the world: its job icon and a
+    label like `chop_tree · walking` above its head (through walls), the path it's walking, and a
+    box around its job's block. Colours: yellow walking, green working, grey paused, red off, white
+    idle.
+  - `/palworks inspect worker` and `/palworks jobs` dump the nearest worker's state and the job pool.
 - **Data-driven where possible.** Things like which blocks count as work are controlled by
   datapack tags — prefer editing tags over hard-coding in Java.
 

@@ -1,5 +1,6 @@
 package dev.palworks.fabric;
 
+import dev.palworks.client.debug.WorkerDebugRenderer;
 import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.fabric.inventory.FabricModMenuTypes;
@@ -9,6 +10,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.Event;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.resources.ResourceLocation;
@@ -31,6 +33,10 @@ public class PalworksFabricClient implements ClientModInitializer {
         ResourceLocation afterCobblemon = PalworksResource.of("after_cobblemon_hud");
         HudRenderCallback.EVENT.addPhaseOrdering(Event.DEFAULT_PHASE, afterCobblemon);
         HudRenderCallback.EVENT.register(afterCobblemon, (graphics, deltaTracker) -> WorkStatusHud.render(graphics));
+
+        // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
+        WorldRenderEvents.AFTER_ENTITIES.register(context -> WorkerDebugRenderer.render(
+                context.camera(), context.tickCounter().getGameTimeDeltaPartialTick(false)));
 
         PalworksFabric.LOGGER.info("Palworks Fabric Client initialized!");
     }

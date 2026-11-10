@@ -4,37 +4,41 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tracks which players have opted in (via {@code /palworks debug}) to seeing worker job activity
- * — assignments, completions, etc. — broadcast in chat. Off by default.
- *
- * <p>This is the only live debug state. The old per-player render flags, the worker/station info
- * caches, and the geometry renderer were never wired to anything and have been removed.
+ * Tracks which players have worker debugging on ({@code /palworks debug}), off by default. It shows
+ * them:
+ * <ul>
+ *   <li>job activity (assignments, completions, etc.) in chat;</li>
+ *   <li>an overlay in the world: each nearby worker's job icon above its head, its path and its
+ *       job's block (sent by {@link WorkerDebugSync}).</li>
+ * </ul>
  */
 public class DebugManager {
-    private static final Map<UUID, Boolean> workerActivityChat = new HashMap<>();
+    private static final Set<UUID> debugging = ConcurrentHashMap.newKeySet();
 
-    /** Whether this player currently sees worker activity in chat. */
-    public static boolean showsWorkerActivity(UUID playerUUID) {
-        return workerActivityChat.getOrDefault(playerUUID, false);
+    /** Whether this player has worker debugging on. */
+    public static boolean isDebugging(UUID playerUUID) {
+        return debugging.contains(playerUUID);
     }
 
-    /** Toggle worker-activity chat for a player; returns the new state. */
-    public static boolean toggleWorkerActivity(UUID playerUUID) {
-        boolean next = !showsWorkerActivity(playerUUID);
-        workerActivityChat.put(playerUUID, next);
-        return next;
+    /** Toggle worker debugging for a player; returns the new state. */
+    public static boolean toggleDebugging(UUID playerUUID) {
+        if (debugging.remove(playerUUID)) {
+            return false;
+        }
+        debugging.add(playerUUID);
+        return true;
     }
 
     /** Send a worker-activity line to every player in the level who has opted in. */
     public static void broadcastActivity(ServerLevel level, String message) {
         Component line = Component.literal("§7[Palworks] §f" + message);
         for (ServerPlayer player : level.players()) {
-            if (showsWorkerActivity(player.getUUID())) {
+            if (isDebugging(player.getUUID())) {
                 player.sendSystemMessage(line);
             }
         }

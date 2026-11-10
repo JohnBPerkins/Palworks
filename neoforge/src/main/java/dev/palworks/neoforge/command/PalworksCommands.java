@@ -20,7 +20,8 @@ public class PalworksCommands {
         event.getDispatcher().register(Commands.literal("palworks")
             .requires(source -> source.hasPermission(2))
 
-            // Toggle worker-activity chat for this player
+            // Toggle worker debugging for this player: activity in chat, and the in-world overlay
+            // (job icons above workers' heads, their paths and job blocks)
             .then(Commands.literal("debug")
                 .executes(ctx -> run(ctx, DebugCommand::toggleDebug)))
 
