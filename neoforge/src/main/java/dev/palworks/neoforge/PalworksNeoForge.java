@@ -30,8 +30,8 @@ public class PalworksNeoForge {
         MenuOpener.Holder.setInstance(new NeoForgeMenuOpener());
 
         // Load work suitabilities from datapacks (data/<namespace>/palworks/suitability)
-        NeoForge.EVENT_BUS.addListener(AddReloadListenerEvent.class,
-                event -> event.addListener(new SuitabilityReloadListener()));
+        NeoForge.EVENT_BUS.addListener(
+                AddReloadListenerEvent.class, event -> event.addListener(new SuitabilityReloadListener()));
 
         // Register command handler (WorkerTickHandler is auto-registered via @EventBusSubscriber)
         NeoForge.EVENT_BUS.register(new PalworksCommands());

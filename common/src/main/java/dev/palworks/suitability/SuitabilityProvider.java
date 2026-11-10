@@ -1,7 +1,6 @@
 package dev.palworks.suitability;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
-
 import java.util.Set;
 
 /**

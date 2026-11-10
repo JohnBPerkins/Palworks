@@ -5,13 +5,15 @@ import com.cobblemon.mod.common.CobblemonItems;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -23,9 +25,6 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Fruit hanging off the side of a block: cocoa pods on jungle logs, Cobblemon's apricorns on
  * apricorn leaves. They're harvested in place, and picked from the ground beneath them.
@@ -35,18 +34,22 @@ public class HangingFruitGameTests {
     private static final BlockPos START = new BlockPos(3, 1, 1);
 
     private static BlockState ripeApricorn(Direction facing) {
-        return CobblemonBlocks.RED_APRICORN.defaultBlockState()
-            .setValue(BlockStateProperties.AGE_3, BlockStateProperties.MAX_AGE_3)
-            .setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
+        return CobblemonBlocks.RED_APRICORN
+                .defaultBlockState()
+                .setValue(BlockStateProperties.AGE_3, BlockStateProperties.MAX_AGE_3)
+                .setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
     }
 
     private static BlockState cocoa(Direction facing, int age) {
-        return Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, facing).setValue(CocoaBlock.AGE, age);
+        return Blocks.COCOA
+                .defaultBlockState()
+                .setValue(CocoaBlock.FACING, facing)
+                .setValue(CocoaBlock.AGE, age);
     }
 
     /** Persistent, so it doesn't decay with no apricorn log near it during the test. */
     private static final BlockState LEAVES =
-        CobblemonBlocks.APRICORN_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+            CobblemonBlocks.APRICORN_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
 
     // ---- Harvesting ----
 
@@ -62,7 +65,8 @@ public class HangingFruitGameTests {
         BlockState after = helper.getBlockState(fruit);
         helper.assertTrue(after.is(CobblemonBlocks.RED_APRICORN), "still there, got " + after);
         helper.assertTrue(after.getValue(BlockStateProperties.AGE_3) == 0, "back to its first stage");
-        helper.assertTrue(after.getValue(BlockStateProperties.HORIZONTAL_FACING) == Direction.NORTH, "on the same leaves");
+        helper.assertTrue(
+                after.getValue(BlockStateProperties.HORIZONTAL_FACING) == Direction.NORTH, "on the same leaves");
         // It used to go through the crops' "pay one seed for the replant" path, which took the one
         // apricorn it dropped (its pick item is the apricorn)
         helper.assertItemEntityPresent(CobblemonItems.RED_APRICORN, fruit, 3.0);
@@ -106,8 +110,9 @@ public class HangingFruitGameTests {
             helper.assertFalse(WorkPositions.isDirectional(level, at), fruit + " isn't a station");
             BlockPos stand = WorkPositions.standingPosFor(level, at, JobType.HARVEST_CROPS, mob);
             helper.assertTrue(stand != null, "somewhere to stand for " + fruit);
-            helper.assertTrue(stand.getY() == helper.absolutePos(START).getY(),
-                "on the ground for " + fruit + ", got " + helper.relativePos(stand));
+            helper.assertTrue(
+                    stand.getY() == helper.absolutePos(START).getY(),
+                    "on the ground for " + fruit + ", got " + helper.relativePos(stand));
             helper.assertTrue(WorkPositions.fits(level, stand, mob), "a spot it fits on for " + fruit);
         }
         helper.succeed();
@@ -143,8 +148,12 @@ public class HangingFruitGameTests {
     public void grassTypeHarvestsARealApricornTree(GameTestHelper helper) {
         Workers.isolate(helper);
         RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
-        RealTreeGameTests.grow(helper, ResourceKey.create(Registries.CONFIGURED_FEATURE,
-            ResourceLocation.fromNamespaceAndPath("cobblemon", "red_apricorn_tree")), 1);
+        RealTreeGameTests.grow(
+                helper,
+                ResourceKey.create(
+                        Registries.CONFIGURED_FEATURE,
+                        ResourceLocation.fromNamespaceAndPath("cobblemon", "red_apricorn_tree")),
+                1);
         // A tree grown outside worldgen has unripe apricorns: ripen them
         List<BlockPos> apricorns = new ArrayList<>();
         for (BlockPos rel : BlockPos.betweenClosed(BlockPos.ZERO, new BlockPos(15, 12, 15))) {
@@ -161,18 +170,20 @@ public class HangingFruitGameTests {
             for (BlockPos rel : apricorns) {
                 BlockState state = helper.getBlockState(rel);
                 helper.assertTrue(CropAdapter.isApricorn(state), "the apricorn at " + rel + " is still on the tree");
-                helper.assertFalse(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(rel)),
-                    "the apricorn at " + rel + " was picked");
+                helper.assertFalse(
+                        CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(rel)),
+                        "the apricorn at " + rel + " was picked");
             }
             int dropped = itemsInArena(helper, CobblemonItems.RED_APRICORN);
-            helper.assertTrue(dropped >= apricorns.size(),
-                "one apricorn each (" + apricorns.size() + "), got " + dropped);
+            helper.assertTrue(
+                    dropped >= apricorns.size(), "one apricorn each (" + apricorns.size() + "), got " + dropped);
         });
     }
 
     private static int itemsInArena(GameTestHelper helper, Item item) {
         int total = 0;
-        for (ItemEntity entity : helper.getLevel().getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(2))) {
+        for (ItemEntity entity : helper.getLevel()
+                .getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(2))) {
             if (entity.getItem().is(item)) {
                 total += entity.getItem().getCount();
             }

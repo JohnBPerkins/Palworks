@@ -41,9 +41,10 @@ public class WorkerGameTests {
     private static void assertWheatRow(GameTestHelper helper, int age, String what) {
         for (int x = 2; x <= 4; x++) {
             BlockPos crop = new BlockPos(x, 1, 5);
-            helper.assertTrue(helper.getBlockState(crop).equals(WHEAT.getStateForAge(age)),
-                "wheat at x=" + x + " should be " + what + ", but there's " + helper.getBlockState(crop)
-                    + " on " + helper.getBlockState(crop.below()));
+            helper.assertTrue(
+                    helper.getBlockState(crop).equals(WHEAT.getStateForAge(age)),
+                    "wheat at x=" + x + " should be " + what + ", but there's " + helper.getBlockState(crop) + " on "
+                            + helper.getBlockState(crop.below()));
         }
     }
 
@@ -81,8 +82,8 @@ public class WorkerGameTests {
         Workers.isolate(helper);
         RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
         // From where it starts, and then from each tree in turn, the next is the nearest one left
-        java.util.List<BlockPos> nearestFirst = java.util.List.of(
-            new BlockPos(8, 1, 4), new BlockPos(12, 1, 9), new BlockPos(3, 1, 13));
+        java.util.List<BlockPos> nearestFirst =
+                java.util.List.of(new BlockPos(8, 1, 4), new BlockPos(12, 1, 9), new BlockPos(3, 1, 13));
         for (BlockPos trunk : nearestFirst) {
             Scenes.tree(helper, trunk.getX(), trunk.getZ(), 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
         }
@@ -91,14 +92,16 @@ public class WorkerGameTests {
         java.util.List<BlockPos> chopped = new java.util.ArrayList<>();
         helper.onEachTick(() -> {
             for (BlockPos trunk : nearestFirst) {
-                if (!chopped.contains(trunk) && !helper.getBlockState(trunk.above()).is(Blocks.OAK_LOG)) {
+                if (!chopped.contains(trunk)
+                        && !helper.getBlockState(trunk.above()).is(Blocks.OAK_LOG)) {
                     chopped.add(trunk);
                 }
             }
         });
         helper.succeedWhen(() -> {
             helper.assertTrue(chopped.size() == nearestFirst.size(), "all chopped so far: " + chopped);
-            helper.assertTrue(chopped.equals(nearestFirst), "nearest first: expected " + nearestFirst + ", got " + chopped);
+            helper.assertTrue(
+                    chopped.equals(nearestFirst), "nearest first: expected " + nearestFirst + ", got " + chopped);
         });
     }
 
@@ -107,13 +110,14 @@ public class WorkerGameTests {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.STONE);
         BlockPos furnacePos = new BlockPos(3, 1, 6);
-        helper.setBlock(furnacePos, Blocks.FURNACE.defaultBlockState().setValue(AbstractFurnaceBlock.FACING, Direction.NORTH));
+        helper.setBlock(
+                furnacePos, Blocks.FURNACE.defaultBlockState().setValue(AbstractFurnaceBlock.FACING, Direction.NORTH));
         var furnace = (AbstractFurnaceBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(furnacePos));
         furnace.setItem(0, new ItemStack(Items.RAW_IRON, 2));
         Workers.sendOut(helper, "charmander level=20", START); // Fire: Kindling
 
         helper.succeedWhen(() -> helper.assertTrue(
-            helper.getBlockState(furnacePos).getValue(AbstractFurnaceBlock.LIT), "the furnace should be lit"));
+                helper.getBlockState(furnacePos).getValue(AbstractFurnaceBlock.LIT), "the furnace should be lit"));
     }
 
     // ---- Planting ----
@@ -132,7 +136,8 @@ public class WorkerGameTests {
 
         helper.succeedWhen(() -> {
             assertWheatRow(helper, 0, "planted");
-            helper.assertTrue(pouch.getTotalItemCount() == 13, "one seed per tile, got " + pouch.getTotalItemCount() + " left");
+            helper.assertTrue(
+                    pouch.getTotalItemCount() == 13, "one seed per tile, got " + pouch.getTotalItemCount() + " left");
         });
     }
 
@@ -146,7 +151,7 @@ public class WorkerGameTests {
         BlockPos chestPos = new BlockPos(6, 1, 2);
         helper.setBlock(chestPos, Blocks.CHEST);
         ((ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos)))
-            .setItem(0, new ItemStack(Items.WHEAT_SEEDS, 8));
+                .setItem(0, new ItemStack(Items.WHEAT_SEEDS, 8));
         Workers.sendOut(helper, "bulbasaur level=20", START);
 
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "planted with seeds from the chest"));
@@ -164,8 +169,10 @@ public class WorkerGameTests {
 
         helper.runAfterDelay(200, () -> {
             WorkerState state = WorkerStateManager.get(worker.getPokemon());
-            helper.assertTrue(state == null || state.getCurrentReservation() == null,
-                "with no seeds anywhere it takes no planting job, has " + (state == null ? null : state.getCurrentReservation()));
+            helper.assertTrue(
+                    state == null || state.getCurrentReservation() == null,
+                    "with no seeds anywhere it takes no planting job, has "
+                            + (state == null ? null : state.getCurrentReservation()));
             helper.succeed();
         });
     }
@@ -238,8 +245,9 @@ public class WorkerGameTests {
                     Thread.currentThread().interrupt();
                 }
             } else if (pausedAt[0] >= 0 && helper.getTick() <= pausedAt[0] + 5) {
-                helper.assertTrue(held != null && held.getTimestamp() == heldSince[0],
-                    "it should still have the job it had before the pause, has " + held);
+                helper.assertTrue(
+                        held != null && held.getTimestamp() == heldSince[0],
+                        "it should still have the job it had before the pause, has " + held);
             }
         });
         helper.succeedWhen(() -> {
@@ -261,7 +269,8 @@ public class WorkerGameTests {
             assertWheatRow(helper, 7, "left alone while the worker is busy");
             worker.getBusyLocks().remove("palworks-test");
         });
-        helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's free")));
+        helper.runAfterDelay(
+                201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's free")));
     }
 
     // ---- Evolving ----
@@ -279,7 +288,8 @@ public class WorkerGameTests {
             assertWheatRow(helper, 7, "left alone by an Eevee");
             worker.getPokemon().setSpecies(PokemonSpecies.INSTANCE.getByName("leafeon"));
         });
-        helper.runAfterDelay(101, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's a Leafeon")));
+        helper.runAfterDelay(
+                101, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's a Leafeon")));
     }
 
     // ---- Reachability ----
@@ -311,7 +321,8 @@ public class WorkerGameTests {
             }
         });
         // Well under the 600-tick memory backstop, so this only passes if opening the box was noticed
-        helper.runAfterDelay(151, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once reachable")));
+        helper.runAfterDelay(
+                151, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once reachable")));
     }
 
     @GameTest(template = Templates.EMPTY, batch = "worker_party_owner", timeoutTicks = 1000)
@@ -332,7 +343,8 @@ public class WorkerGameTests {
             assertWheatRow(helper, 7, "left alone while its owner is out of range");
             owner.moveTo(home.getX() + 0.5, home.getY(), home.getZ() + 0.5);
         });
-        helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once its owner is back")));
+        helper.runAfterDelay(
+                201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once its owner is back")));
     }
 
     // ---- Nether trees need Lumbering and Nether ----
@@ -395,8 +407,9 @@ public class WorkerGameTests {
         Workers.sendOut(helper, "ivysaur level=20", START); // Grass/Poison: Gathering, no Nether
 
         helper.runAfterDelay(300, () -> {
-            helper.assertTrue(helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 3,
-                "a Grass type shouldn't harvest nether wart");
+            helper.assertTrue(
+                    helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 3,
+                    "a Grass type shouldn't harvest nether wart");
             helper.succeed();
         });
     }
@@ -408,7 +421,7 @@ public class WorkerGameTests {
         Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether
 
         helper.succeedWhen(() -> helper.assertTrue(
-            helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, "harvested and reset"));
+                helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, "harvested and reset"));
     }
 
     // ---- Handing a job over ----
@@ -477,12 +490,15 @@ public class WorkerGameTests {
         }
         BlockPos open = new BlockPos(6, 1, 7);
         helper.setBlock(open, Blocks.CHEST);
-        PokemonEntity worker = Workers.sendOut(helper, "drowzee level=20", new BlockPos(1, 1, 6)); // Psychic: Transporting
+        PokemonEntity worker =
+                Workers.sendOut(helper, "drowzee level=20", new BlockPos(1, 1, 6)); // Psychic: Transporting
         WorkerInventoryManager.getOrCreate(worker.getPokemon()).addItem(new ItemStack(Items.WHEAT, 20));
 
         helper.succeedWhen(() -> {
             var chest = (ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(open));
-            helper.assertTrue(chest.countItem(Items.WHEAT) == 20, "all 20 wheat in the reachable chest, got " + chest.countItem(Items.WHEAT));
+            helper.assertTrue(
+                    chest.countItem(Items.WHEAT) == 20,
+                    "all 20 wheat in the reachable chest, got " + chest.countItem(Items.WHEAT));
         });
     }
 
@@ -501,7 +517,11 @@ public class WorkerGameTests {
         helper.onEachTick(() -> {
             WorkerState state = WorkerStateManager.get(worker.getPokemon());
             boolean onItsWay = state != null && state.getCurrentReservation() != null && !state.isWorking();
-            if (harvestedAt[0] < 0 && onItsWay && worker.blockPosition().getZ() - helper.absolutePos(BlockPos.ZERO).getZ() >= 4) {
+            if (harvestedAt[0] < 0
+                    && onItsWay
+                    && worker.blockPosition().getZ()
+                                    - helper.absolutePos(BlockPos.ZERO).getZ()
+                            >= 4) {
                 harvestedAt[0] = helper.getTick();
                 helper.setBlock(crop, WHEAT.getStateForAge(0)); // a player got there first
             }
@@ -510,8 +530,10 @@ public class WorkerGameTests {
             helper.assertTrue(harvestedAt[0] >= 0, "the worker set off for the crop");
             WorkerState state = WorkerStateManager.get(worker.getPokemon());
             helper.assertTrue(state.getCurrentReservation() == null, "it should have dropped the job");
-            helper.assertTrue(helper.getTick() - harvestedAt[0] <= 30,
-                "within a second and a half of the crop going, took " + (helper.getTick() - harvestedAt[0]) + " ticks");
+            helper.assertTrue(
+                    helper.getTick() - harvestedAt[0] <= 30,
+                    "within a second and a half of the crop going, took " + (helper.getTick() - harvestedAt[0])
+                            + " ticks");
         });
     }
 
@@ -529,11 +551,13 @@ public class WorkerGameTests {
 
         helper.succeedWhen(() -> {
             for (int x = 1; x <= 6; x++) {
-                helper.assertTrue(helper.getBlockState(new BlockPos(x, 1, 5)).equals(WHEAT.getStateForAge(0)),
-                    "wheat at x=" + x + " should be harvested");
+                helper.assertTrue(
+                        helper.getBlockState(new BlockPos(x, 1, 5)).equals(WHEAT.getStateForAge(0)),
+                        "wheat at x=" + x + " should be harvested");
             }
-            helper.assertTrue(Scenes.itemsOnGround(helper, Items.WHEAT) == 6,
-                "each crop harvested exactly once: 6 wheat, got " + Scenes.itemsOnGround(helper, Items.WHEAT));
+            helper.assertTrue(
+                    Scenes.itemsOnGround(helper, Items.WHEAT) == 6,
+                    "each crop harvested exactly once: 6 wheat, got " + Scenes.itemsOnGround(helper, Items.WHEAT));
         });
     }
 }

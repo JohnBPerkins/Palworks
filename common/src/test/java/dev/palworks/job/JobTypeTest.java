@@ -1,9 +1,9 @@
 package dev.palworks.job;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import org.junit.jupiter.api.Test;
 
 /** Pure-logic tests for the JobType enum and its suitability mapping (no running game needed). */
 class JobTypeTest {

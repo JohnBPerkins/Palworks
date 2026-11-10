@@ -1,5 +1,7 @@
 package dev.palworks.gametest;
 
+import static dev.palworks.gametest.Scenes.abs;
+
 import com.cobblemon.mod.common.CobblemonBlocks;
 import com.cobblemon.mod.common.CobblemonItems;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
@@ -7,6 +9,7 @@ import dev.palworks.crop.CropAdapter;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.manager.JobManager;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -20,10 +23,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Property;
-
-import java.util.List;
-
-import static dev.palworks.gametest.Scenes.abs;
 
 /**
  * Cobblemon's field crops (mints, vivichoke, revival herb, medicinal leek, hearty grains):
@@ -40,8 +39,9 @@ public class CobblemonCropGameTests {
      */
     private static Block redMint() {
         return net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
-            net.minecraft.resources.ResourceLocation.parse("cobblemon:red_mint"));
+                net.minecraft.resources.ResourceLocation.parse("cobblemon:red_mint"));
     }
+
     private static final BlockPos START = new BlockPos(3, 1, 1);
 
     private static BlockState ripe(Block crop) {
@@ -66,7 +66,8 @@ public class CobblemonCropGameTests {
     }
 
     /** Harvest a ripe crop at {@code pos}: it drops {@code produce} and is back to age 0, in place. */
-    private static void assertHarvestsInPlace(GameTestHelper helper, BlockPos pos, Block soil, Block crop, Item produce) {
+    private static void assertHarvestsInPlace(
+            GameTestHelper helper, BlockPos pos, Block soil, Block crop, Item produce) {
         helper.setBlock(pos.below(), soil);
         helper.setBlock(pos, ripe(crop));
         var level = helper.getLevel();
@@ -81,12 +82,27 @@ public class CobblemonCropGameTests {
 
     @GameTest(template = Templates.EMPTY)
     public void mintsGiveTheirLeaves(GameTestHelper helper) {
-        List<Block> mints = List.of(redMint(), CobblemonBlocks.BLUE_MINT, CobblemonBlocks.CYAN_MINT,
-            CobblemonBlocks.PINK_MINT, CobblemonBlocks.GREEN_MINT, CobblemonBlocks.WHITE_MINT);
-        List<Item> leaves = List.of(CobblemonItems.RED_MINT_LEAF, CobblemonItems.BLUE_MINT_LEAF, CobblemonItems.CYAN_MINT_LEAF,
-            CobblemonItems.PINK_MINT_LEAF, CobblemonItems.GREEN_MINT_LEAF, CobblemonItems.WHITE_MINT_LEAF);
+        List<Block> mints = List.of(
+                redMint(),
+                CobblemonBlocks.BLUE_MINT,
+                CobblemonBlocks.CYAN_MINT,
+                CobblemonBlocks.PINK_MINT,
+                CobblemonBlocks.GREEN_MINT,
+                CobblemonBlocks.WHITE_MINT);
+        List<Item> leaves = List.of(
+                CobblemonItems.RED_MINT_LEAF,
+                CobblemonItems.BLUE_MINT_LEAF,
+                CobblemonItems.CYAN_MINT_LEAF,
+                CobblemonItems.PINK_MINT_LEAF,
+                CobblemonItems.GREEN_MINT_LEAF,
+                CobblemonItems.WHITE_MINT_LEAF);
         for (int i = 0; i < mints.size(); i++) {
-            assertHarvestsInPlace(helper, new BlockPos(1 + i % 3 * 3, 1, 1 + i / 3 * 4), Blocks.FARMLAND, mints.get(i), leaves.get(i));
+            assertHarvestsInPlace(
+                    helper,
+                    new BlockPos(1 + i % 3 * 3, 1, 1 + i / 3 * 4),
+                    Blocks.FARMLAND,
+                    mints.get(i),
+                    leaves.get(i));
         }
         helper.succeed();
     }
@@ -106,7 +122,8 @@ public class CobblemonCropGameTests {
 
     @GameTest(template = Templates.EMPTY)
     public void medicinalLeeksAreHarvestedOnTheirWater(GameTestHelper helper) {
-        assertHarvestsInPlace(helper, CROP, Blocks.WATER, CobblemonBlocks.MEDICINAL_LEEK, CobblemonItems.MEDICINAL_LEEK);
+        assertHarvestsInPlace(
+                helper, CROP, Blocks.WATER, CobblemonBlocks.MEDICINAL_LEEK, CobblemonItems.MEDICINAL_LEEK);
         helper.succeed();
     }
 
@@ -135,8 +152,8 @@ public class CobblemonCropGameTests {
 
         helper.assertTrue(CropAdapter.harvestCrop(helper.getLevel(), helper.absolutePos(CROP)), "it harvests");
         BlockState after = helper.getBlockState(CROP);
-        helper.assertTrue(after.is(redMint()) && valueOf(after, "is_wild").equals("true"),
-            "still wild mint, got " + after);
+        helper.assertTrue(
+                after.is(redMint()) && valueOf(after, "is_wild").equals("true"), "still wild mint, got " + after);
         helper.succeed();
     }
 
@@ -154,19 +171,24 @@ public class CobblemonCropGameTests {
         helper.assertTrue(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP)), "the lower half is ripe");
         // The top used to be a harvest job of its own: harvested first, it was cut to a stub on a
         // still-ripe base
-        helper.assertFalse(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP.above())), "the top isn't a crop of its own");
-        helper.assertFalse(JobManager.isJobStillThere(level, JobType.HARVEST_CROPS, helper.absolutePos(CROP.above())),
-            "no harvest job on the top");
+        helper.assertFalse(
+                CropAdapter.isFullyGrown(level, helper.absolutePos(CROP.above())), "the top isn't a crop of its own");
+        helper.assertFalse(
+                JobManager.isJobStillThere(level, JobType.HARVEST_CROPS, helper.absolutePos(CROP.above())),
+                "no harvest job on the top");
 
         helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), "it harvests");
         helper.assertBlockNotPresent(CobblemonBlocks.HEARTY_GRAINS, CROP.above());
         BlockState after = helper.getBlockState(CROP);
-        helper.assertTrue(after.is(CobblemonBlocks.HEARTY_GRAINS) && age(after) == 3
-                && after.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.LOWER,
-            "the lower half is back to its last one-block stage, got " + after);
+        helper.assertTrue(
+                after.is(CobblemonBlocks.HEARTY_GRAINS)
+                        && age(after) == 3
+                        && after.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.LOWER,
+                "the lower half is back to its last one-block stage, got " + after);
         // The top's own loot: 2-3 grains (it used to be a made-up 1-3)
-        helper.assertTrue(Scenes.itemsOnGround(helper, CobblemonItems.HEARTY_GRAINS) >= 2,
-            "the top's grains, got " + Scenes.itemsOnGround(helper, CobblemonItems.HEARTY_GRAINS));
+        helper.assertTrue(
+                Scenes.itemsOnGround(helper, CobblemonItems.HEARTY_GRAINS) >= 2,
+                "the top's grains, got " + Scenes.itemsOnGround(helper, CobblemonItems.HEARTY_GRAINS));
         helper.succeed();
     }
 
@@ -191,8 +213,9 @@ public class CobblemonCropGameTests {
 
         helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(CROP)), "it harvests");
         helper.assertItemEntityNotPresent(CobblemonItems.ORAN_BERRY, CROP, 3.0);
-        helper.assertTrue(helper.getBlockState(CROP).is(CobblemonBlocks.ORAN_BERRY) && age(helper.getBlockState(CROP)) == 3,
-            "back to growing (age 3), got " + helper.getBlockState(CROP));
+        helper.assertTrue(
+                helper.getBlockState(CROP).is(CobblemonBlocks.ORAN_BERRY) && age(helper.getBlockState(CROP)) == 3,
+                "back to growing (age 3), got " + helper.getBlockState(CROP));
         helper.succeed();
     }
 
@@ -206,14 +229,19 @@ public class CobblemonCropGameTests {
         BlockPos farmland = abs(helper, 1, 0, 1);
         BlockPos soulSand = abs(helper, 3, 0, 3);
 
-        for (Item seed : List.of(CobblemonItems.RED_MINT_SEEDS, CobblemonItems.WHITE_MINT_SEEDS, CobblemonItems.VIVICHOKE_SEEDS,
-                CobblemonItems.REVIVAL_HERB, CobblemonItems.HEARTY_GRAINS)) {
+        for (Item seed : List.of(
+                CobblemonItems.RED_MINT_SEEDS,
+                CobblemonItems.WHITE_MINT_SEEDS,
+                CobblemonItems.VIVICHOKE_SEEDS,
+                CobblemonItems.REVIVAL_HERB,
+                CobblemonItems.HEARTY_GRAINS)) {
             helper.assertTrue(CropAdapter.isSeed(seed), seed + " is a seed (goes in a seed pouch)");
             helper.assertTrue(CropAdapter.canPlantSeed(seed, level, farmland), seed + " on farmland");
             helper.assertFalse(CropAdapter.canPlantSeed(seed, level, soulSand), seed + " not on soul sand");
         }
         // Grows in water, not on farmland
-        helper.assertFalse(CropAdapter.canPlantSeed(CobblemonItems.MEDICINAL_LEEK, level, farmland), "no leeks on farmland");
+        helper.assertFalse(
+                CropAdapter.canPlantSeed(CobblemonItems.MEDICINAL_LEEK, level, farmland), "no leeks on farmland");
         // Not seeds at all
         helper.assertFalse(CropAdapter.isSeed(CobblemonItems.RED_MINT_LEAF), "mint leaves aren't seeds");
         helper.assertFalse(CropAdapter.isSeed(CobblemonItems.VIVICHOKE), "a vivichoke isn't a seed");
@@ -225,11 +253,16 @@ public class CobblemonCropGameTests {
         helper.setBlock(CROP.below(), Blocks.FARMLAND);
         var level = helper.getLevel();
 
-        helper.assertTrue(CropAdapter.plantSeed(CobblemonItems.REVIVAL_HERB, level, helper.absolutePos(CROP.below())), "it plants");
+        helper.assertTrue(
+                CropAdapter.plantSeed(CobblemonItems.REVIVAL_HERB, level, helper.absolutePos(CROP.below())),
+                "it plants");
         BlockState planted = helper.getBlockState(CROP);
-        helper.assertTrue(planted.is(CobblemonBlocks.REVIVAL_HERB) && age(planted) == 0
-                && valueOf(planted, "mutation").equals("none") && valueOf(planted, "is_wild").equals("false"),
-            "a young, plain, farmed revival herb, got " + planted);
+        helper.assertTrue(
+                planted.is(CobblemonBlocks.REVIVAL_HERB)
+                        && age(planted) == 0
+                        && valueOf(planted, "mutation").equals("none")
+                        && valueOf(planted, "is_wild").equals("false"),
+                "a young, plain, farmed revival herb, got " + planted);
         helper.succeed();
     }
 
@@ -250,7 +283,8 @@ public class CobblemonCropGameTests {
             for (int x = 2; x <= 4; x++) {
                 helper.assertBlockPresent(redMint(), new BlockPos(x, 1, 5));
             }
-            helper.assertTrue(pouch.getTotalItemCount() == 13, "one seed per tile, got " + pouch.getTotalItemCount() + " left");
+            helper.assertTrue(
+                    pouch.getTotalItemCount() == 13, "one seed per tile, got " + pouch.getTotalItemCount() + " left");
         });
     }
 
@@ -274,8 +308,10 @@ public class CobblemonCropGameTests {
             for (int x = 2; x <= 4; x++) {
                 helper.assertBlockPresent(CobblemonBlocks.VIVICHOKE_SEEDS, new BlockPos(x, 1, 5));
             }
-            helper.assertTrue(chest.getItem(0).is(CobblemonItems.MEDICINAL_LEEK) && chest.getItem(0).getCount() == 8,
-                "the leeks are left in the chest, got " + chest.getItem(0));
+            helper.assertTrue(
+                    chest.getItem(0).is(CobblemonItems.MEDICINAL_LEEK)
+                            && chest.getItem(0).getCount() == 8,
+                    "the leeks are left in the chest, got " + chest.getItem(0));
         });
     }
 }

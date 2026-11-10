@@ -4,11 +4,10 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import net.minecraft.nbt.CompoundTag;
-
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.nbt.CompoundTag;
 
 /**
  * Manages worker inventories, storing them in the Pokemon's persistent data.

@@ -6,6 +6,11 @@ import com.cobblemon.mod.common.block.NutBushBlock;
 import com.cobblemon.mod.common.block.RootBlock;
 import com.cobblemon.mod.common.block.entity.BerryBlockEntity;
 import dev.palworks.tree.TreeDetector;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -28,11 +33,8 @@ import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.LeavesBlock;
-import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.StandingSignBlock;
-import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
@@ -42,12 +44,6 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * Builds a flat test area for trying workers out ({@code /palworks testarea}), from {@code origin}
@@ -79,7 +75,7 @@ public final class TestArea {
         }
     }
 
-    private static final int WALK = 3;          // walkway width
+    private static final int WALK = 3; // walkway width
     private static final int CONTENT_WIDTH = 56; // between the walkways down each side
     // Crops: a plant every other block (the block between is for a pumpkin, a cocoa pod...), in rows
     // of a water channel, the plants, and their signs
@@ -102,8 +98,16 @@ public final class TestArea {
     private static final int FLAGS = Block.UPDATE_CLIENTS;
 
     // Soils tried for a crop, in order: the first it can survive on is used
-    private static final List<Block> SOILS = List.of(Blocks.FARMLAND, Blocks.GRASS_BLOCK, Blocks.DIRT, Blocks.MUD,
-            Blocks.SAND, Blocks.GRAVEL, Blocks.SOUL_SAND, Blocks.MOSS_BLOCK, Blocks.WATER);
+    private static final List<Block> SOILS = List.of(
+            Blocks.FARMLAND,
+            Blocks.GRASS_BLOCK,
+            Blocks.DIRT,
+            Blocks.MUD,
+            Blocks.SAND,
+            Blocks.GRAVEL,
+            Blocks.SOUL_SAND,
+            Blocks.MOSS_BLOCK,
+            Blocks.WATER);
 
     private record Tree(String label, ResourceKey<ConfiguredFeature<?, ?>> feature, Block floor, boolean big) {}
 
@@ -133,8 +137,10 @@ public final class TestArea {
     private Result build() {
         List<List<Plant>> crops = List.of(vanillaPlants(), cobblemonPlants(), berryPlants());
         int cropRows = crops.stream().mapToInt(group -> plantRows(group.size())).sum();
-        List<Plot> smallTrees = trees().stream().filter(t -> !t.big()).map(this::treePlot).toList();
-        List<Plot> bigTrees = trees().stream().filter(Tree::big).map(this::treePlot).toList();
+        List<Plot> smallTrees =
+                trees().stream().filter(t -> !t.big()).map(this::treePlot).toList();
+        List<Plot> bigTrees =
+                trees().stream().filter(Tree::big).map(this::treePlot).toList();
 
         int width = WALK + CONTENT_WIDTH + WALK;
         int smeltingZ = WALK + 1;
@@ -264,8 +270,8 @@ public final class TestArea {
     private void section(String title, int z, List<Plot> sectionPlots, Grid grid) {
         sign(at(1, 0, z - 1), "== " + title + " ==");
         for (int i = 0; i < sectionPlots.size(); i++) {
-            BlockPos cell = at(WALK + (i % grid.columns()) * grid.cellWidth(), 0,
-                    z + (i / grid.columns()) * grid.cellDepth());
+            BlockPos cell =
+                    at(WALK + (i % grid.columns()) * grid.cellWidth(), 0, z + (i / grid.columns()) * grid.cellDepth());
             Plot plot = sectionPlots.get(i);
             try {
                 plot.builder().build(cell, grid);
@@ -289,8 +295,9 @@ public final class TestArea {
         station(at(WALK + 2, 0, z), Blocks.FURNACE, Items.RAW_IRON, "Furnace");
         station(at(WALK + 4, 0, z), Blocks.BLAST_FURNACE, Items.RAW_GOLD, "Blast furnace");
         station(at(WALK + 6, 0, z), Blocks.SMOKER, Items.BEEF, "Smoker");
-        set(at(WALK + 8, 0, z), Blocks.CHEST.defaultBlockState()
-                .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH));
+        set(
+                at(WALK + 8, 0, z),
+                Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH));
         sign(at(WALK + 8, 0, z + 1), "Output");
     }
 
@@ -355,8 +362,13 @@ public final class TestArea {
 
     private List<Plant> vanillaPlants() {
         List<Plant> list = new ArrayList<>();
-        for (Block block : List.of(Blocks.WHEAT, Blocks.CARROTS, Blocks.POTATOES, Blocks.BEETROOTS,
-                Blocks.TORCHFLOWER_CROP, Blocks.PITCHER_CROP)) {
+        for (Block block : List.of(
+                Blocks.WHEAT,
+                Blocks.CARROTS,
+                Blocks.POTATOES,
+                Blocks.BEETROOTS,
+                Blocks.TORCHFLOWER_CROP,
+                Blocks.PITCHER_CROP)) {
             list.add(cropPlant(block));
         }
         list.add(new Plant("Pumpkin", pos -> stem(pos, Blocks.PUMPKIN, Blocks.ATTACHED_PUMPKIN_STEM)));
@@ -449,7 +461,8 @@ public final class TestArea {
     /** Place a plant (and its top half, for a two-tall one); whether it can stay there. */
     private boolean plant(BlockPos pos, BlockState state) {
         BlockState placed = state.hasProperty(BlockStateProperties.WATERLOGGED)
-                ? state.setValue(BlockStateProperties.WATERLOGGED, false) : state;
+                ? state.setValue(BlockStateProperties.WATERLOGGED, false)
+                : state;
         set(pos, placed);
         if (placed.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)) {
             set(pos.above(), placed.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
@@ -492,8 +505,12 @@ public final class TestArea {
         set(pos, Blocks.JUNGLE_LOG.defaultBlockState());
         set(pos.above(), Blocks.JUNGLE_LOG.defaultBlockState());
         // A pod faces the log it hangs on
-        set(pos.east(), Blocks.COCOA.defaultBlockState()
-                .setValue(CocoaBlock.FACING, Direction.WEST).setValue(CocoaBlock.AGE, CocoaBlock.MAX_AGE));
+        set(
+                pos.east(),
+                Blocks.COCOA
+                        .defaultBlockState()
+                        .setValue(CocoaBlock.FACING, Direction.WEST)
+                        .setValue(CocoaBlock.AGE, CocoaBlock.MAX_AGE));
     }
 
     /** A post with an arm over the spot, glow berry vines hanging from it to the ground. */
@@ -503,8 +520,12 @@ public final class TestArea {
         }
         set(pos.above(2), Blocks.DARK_OAK_PLANKS.defaultBlockState());
         set(pos.above(), Blocks.CAVE_VINES_PLANT.defaultBlockState().setValue(CaveVines.BERRIES, true));
-        set(pos, Blocks.CAVE_VINES.defaultBlockState()
-                .setValue(CaveVines.BERRIES, true).setValue(CaveVinesBlock.AGE, CaveVinesBlock.MAX_AGE));
+        set(
+                pos,
+                Blocks.CAVE_VINES
+                        .defaultBlockState()
+                        .setValue(CaveVines.BERRIES, true)
+                        .setValue(CaveVinesBlock.AGE, CaveVinesBlock.MAX_AGE));
     }
 
     /** A berry bush on farmland, with berries on it (as on a wild bush). */
@@ -546,15 +567,19 @@ public final class TestArea {
                 new Tree("Crimson fungus", TreeFeatures.CRIMSON_FUNGUS_PLANTED, Blocks.CRIMSON_NYLIUM, false),
                 new Tree("Warped fungus", TreeFeatures.WARPED_FUNGUS_PLANTED, Blocks.WARPED_NYLIUM, false)));
         for (String colour : List.of("black", "blue", "green", "pink", "red", "white", "yellow")) {
-            list.add(new Tree(capitalise(colour) + " apricorn", cobblemonFeature(colour + "_apricorn_tree"),
-                    Blocks.GRASS_BLOCK, false));
+            list.add(new Tree(
+                    capitalise(colour) + " apricorn",
+                    cobblemonFeature(colour + "_apricorn_tree"),
+                    Blocks.GRASS_BLOCK,
+                    false));
         }
         list.add(new Tree("Saccharine", cobblemonFeature("saccharine_tree"), Blocks.GRASS_BLOCK, false));
         return list;
     }
 
     private static ResourceKey<ConfiguredFeature<?, ?>> cobblemonFeature(String path) {
-        return ResourceKey.create(Registries.CONFIGURED_FEATURE, ResourceLocation.fromNamespaceAndPath("cobblemon", path));
+        return ResourceKey.create(
+                Registries.CONFIGURED_FEATURE, ResourceLocation.fromNamespaceAndPath("cobblemon", path));
     }
 
     private static String capitalise(String word) {
@@ -574,7 +599,8 @@ public final class TestArea {
      * (azalea and mangrove scatter a few) are taken away, as they'd decay soon anyway.
      */
     private void growTree(BlockPos cell, Grid grid, Tree tree) {
-        Optional<ConfiguredFeature<?, ?>> feature = level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE)
+        Optional<ConfiguredFeature<?, ?>> feature = level.registryAccess()
+                .registryOrThrow(Registries.CONFIGURED_FEATURE)
                 .getOptional(tree.feature());
         if (feature.isEmpty()) {
             throw new IllegalStateException("no feature " + tree.feature().location());
@@ -587,8 +613,8 @@ public final class TestArea {
 
         boolean fits = false;
         for (long seed = 1; seed <= TREE_SEEDS && !fits; seed++) {
-            Snapshot before = new Snapshot(cell.offset(-CANOPY_MARGIN, -2, -CANOPY_MARGIN),
-                    top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN));
+            Snapshot before = new Snapshot(
+                    cell.offset(-CANOPY_MARGIN, -2, -CANOPY_MARGIN), top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN));
             fits = feature.get().place(level, level.getChunkSource().getGenerator(), RandomSource.create(seed), trunk)
                     && !reachesEdge(cell, top);
             if (!fits) {
@@ -596,15 +622,16 @@ public final class TestArea {
             }
         }
         if (!fits) {
-            throw new IllegalStateException("no seed of " + TREE_SEEDS + " grew one that fits its "
-                    + w + "x" + d + " plot");
+            throw new IllegalStateException(
+                    "no seed of " + TREE_SEEDS + " grew one that fits its " + w + "x" + d + " plot");
         }
-        for (BlockPos pos : BlockPos.betweenClosed(cell.offset(-CANOPY_MARGIN, 0, -CANOPY_MARGIN),
-                top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN))) {
+        for (BlockPos pos : BlockPos.betweenClosed(
+                cell.offset(-CANOPY_MARGIN, 0, -CANOPY_MARGIN), top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN))) {
             BlockState state = level.getBlockState(pos);
             if (state.getBlock() instanceof ApricornBlock) {
                 set(pos.immutable(), grown(state));
-            } else if (state.getBlock() instanceof LeavesBlock && !state.getValue(LeavesBlock.PERSISTENT)
+            } else if (state.getBlock() instanceof LeavesBlock
+                    && !state.getValue(LeavesBlock.PERSISTENT)
                     && state.getValue(LeavesBlock.DISTANCE) == LeavesBlock.DECAY_DISTANCE) {
                 // Too far from a log to stay: azalea and mangrove trees scatter a few leaves like this,
                 // which decay soon after. Take them away now, so nothing floats.
@@ -649,8 +676,10 @@ public final class TestArea {
     /** Whether any log (or other tree block) is on the outer ring of the cell, at any height. */
     private boolean reachesEdge(BlockPos cell, BlockPos top) {
         for (BlockPos pos : BlockPos.betweenClosed(cell.below(1), top)) {
-            boolean ring = pos.getX() == cell.getX() || pos.getX() == top.getX()
-                    || pos.getZ() == cell.getZ() || pos.getZ() == top.getZ();
+            boolean ring = pos.getX() == cell.getX()
+                    || pos.getX() == top.getX()
+                    || pos.getZ() == cell.getZ()
+                    || pos.getZ() == top.getZ();
             if (ring && TreeDetector.isTreeBlock(level.getBlockState(pos))) {
                 return true;
             }

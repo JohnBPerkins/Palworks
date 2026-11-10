@@ -18,8 +18,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-
 /**
  * Implements the /palworks commands: a worker-activity chat toggle, worker inspection/control,
  * inventory access, and the job-state dump.
@@ -29,9 +27,8 @@ public class DebugCommand {
     /** Toggle worker debugging for this player: job activity in chat, and the overlay in the world. */
     public static void toggleDebug(ServerPlayer player) {
         boolean on = DebugManager.toggleDebugging(player.getUUID());
-        player.sendSystemMessage(Component.literal("Worker debug: " + (on
-                ? "ON (activity in chat; job icons, paths and job blocks shown in the world)"
-                : "OFF")));
+        player.sendSystemMessage(Component.literal("Worker debug: "
+                + (on ? "ON (activity in chat; job icons, paths and job blocks shown in the world)" : "OFF")));
     }
 
     /**
@@ -50,7 +47,8 @@ public class DebugCommand {
         if (result.problems().isEmpty()) {
             player.sendSystemMessage(Component.literal("Everything was placed."));
         } else {
-            player.sendSystemMessage(Component.literal("§eCouldn't place " + result.problems().size() + ":"));
+            player.sendSystemMessage(
+                    Component.literal("§eCouldn't place " + result.problems().size() + ":"));
             for (String problem : result.problems()) {
                 player.sendSystemMessage(Component.literal("§e- " + problem));
             }
@@ -101,16 +99,19 @@ public class DebugCommand {
             for (int i = 0; i < inventory.getContainerSize(); i++) {
                 ItemStack stack = inventory.getItem(i);
                 if (!stack.isEmpty()) {
-                    player.sendSystemMessage(Component.literal(String.format("  Slot %d: %dx %s",
-                        i, stack.getCount(), stack.getItem().toString())));
+                    player.sendSystemMessage(Component.literal(String.format(
+                            "  Slot %d: %dx %s",
+                            i, stack.getCount(), stack.getItem().toString())));
                 }
             }
             player.sendSystemMessage(Component.literal("Total: " + inventory.getTotalItemCount() + " items"));
         }
 
         if (state.getCurrentReservation() != null) {
-            player.sendSystemMessage(Component.literal("Current Job: " + state.getCurrentReservation().getJobType()));
-            player.sendSystemMessage(Component.literal("Job Step: " + state.getJobStep() + " (" + state.getStepTicks() + " ticks in)"));
+            player.sendSystemMessage(Component.literal(
+                    "Current Job: " + state.getCurrentReservation().getJobType()));
+            player.sendSystemMessage(
+                    Component.literal("Job Step: " + state.getJobStep() + " (" + state.getStepTicks() + " ticks in)"));
         } else {
             player.sendSystemMessage(Component.literal("Current Job: IDLE"));
         }
@@ -133,7 +134,8 @@ public class DebugCommand {
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         inventory.clearContent();
 
-        player.sendSystemMessage(Component.literal("Cleared " + pokemon.getSpecies().getName() + "'s inventory"));
+        player.sendSystemMessage(
+                Component.literal("Cleared " + pokemon.getSpecies().getName() + "'s inventory"));
     }
 
     /** Open the inventory GUI for the nearest worker. */
@@ -149,8 +151,13 @@ public class DebugCommand {
     /** Show worker info for the nearest Pokémon worker to the player. */
     public static void showNearestWorkerInfo(ServerPlayer player) {
         Vec3 playerPos = player.position();
-        AABB searchBox = new AABB(playerPos.x - 10, playerPos.y - 10, playerPos.z - 10,
-                                  playerPos.x + 10, playerPos.y + 10, playerPos.z + 10);
+        AABB searchBox = new AABB(
+                playerPos.x - 10,
+                playerPos.y - 10,
+                playerPos.z - 10,
+                playerPos.x + 10,
+                playerPos.y + 10,
+                playerPos.z + 10);
 
         for (Entity entity : player.level().getEntities(player, searchBox)) {
             Pokemon pokemon = getPokemonFromEntity(entity);
@@ -207,7 +214,8 @@ public class DebugCommand {
         }
 
         WorkerStateManager.setEnabled(pokemon, true);
-        player.sendSystemMessage(Component.literal("Enabled " + pokemon.getSpecies().getName() + " as a worker!"));
+        player.sendSystemMessage(
+                Component.literal("Enabled " + pokemon.getSpecies().getName() + " as a worker!"));
     }
 
     /** Disable the nearest Pokemon worker. */
@@ -225,16 +233,18 @@ public class DebugCommand {
         }
 
         WorkerStateManager.setEnabled(pokemon, false);
-        player.sendSystemMessage(Component.literal("Disabled " + pokemon.getSpecies().getName() + " as a worker"));
+        player.sendSystemMessage(
+                Component.literal("Disabled " + pokemon.getSpecies().getName() + " as a worker"));
     }
 
     /** Find the nearest owned Pokemon to the player. */
     @Nullable
     private static Pokemon findNearestOwnedPokemon(ServerPlayer player) {
-        for (Entity entity : player.level().getEntities(player,
-                player.getBoundingBox().inflate(10.0))) {
+        for (Entity entity :
+                player.level().getEntities(player, player.getBoundingBox().inflate(10.0))) {
             Pokemon pokemon = getPokemonFromEntity(entity);
-            if (pokemon != null && pokemon.getOwnerUUID() != null
+            if (pokemon != null
+                    && pokemon.getOwnerUUID() != null
                     && pokemon.getOwnerUUID().equals(player.getUUID())) {
                 return pokemon;
             }

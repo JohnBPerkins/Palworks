@@ -3,12 +3,11 @@ package dev.palworks.worker;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
+import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
-
 import org.jetbrains.annotations.Nullable;
-import java.util.*;
 
 /**
  * Persistent data for a Pokémon worker.
@@ -393,10 +392,12 @@ public class WorkerState {
             } else {
                 // Old format: packed long (may be corrupted)
                 stationPos = BlockPos.of(reservationTag.getLong("stationPos"));
-                dev.palworks.Palworks.LOGGER.warn("Loaded reservation from OLD format (asLong): {} - this may be corrupted!", stationPos);
+                dev.palworks.Palworks.LOGGER.warn(
+                        "Loaded reservation from OLD format (asLong): {} - this may be corrupted!", stationPos);
                 // Clear corrupted reservations immediately during migration
                 if (Math.abs(stationPos.getY()) > 300) {
-                    dev.palworks.Palworks.LOGGER.warn("Old reservation has suspicious Y coordinate {}, clearing it!", stationPos.getY());
+                    dev.palworks.Palworks.LOGGER.warn(
+                            "Old reservation has suspicious Y coordinate {}, clearing it!", stationPos.getY());
                     currentReservation = null;
                     return; // Skip rest of deserialization
                 }
@@ -423,7 +424,8 @@ public class WorkerState {
         // Deserialize work inventory
         if (tag.contains("workInventory")) {
             CompoundTag inventoryTag = tag.getCompound("workInventory");
-            workInventory = ItemStack.parse(net.minecraft.core.RegistryAccess.EMPTY, inventoryTag).orElse(ItemStack.EMPTY);
+            workInventory = ItemStack.parse(net.minecraft.core.RegistryAccess.EMPTY, inventoryTag)
+                    .orElse(ItemStack.EMPTY);
         } else {
             workInventory = ItemStack.EMPTY;
         }
@@ -445,9 +447,8 @@ public class WorkerState {
 
         if (currentReservation != null) {
             BlockPos pos = currentReservation.getStationPos();
-            return String.format("§e%s §7[%d, %d, %d]",
-                currentReservation.getJobType().name(),
-                pos.getX(), pos.getY(), pos.getZ());
+            return String.format(
+                    "§e%s §7[%d, %d, %d]", currentReservation.getJobType().name(), pos.getX(), pos.getY(), pos.getZ());
         }
 
         return "§aIDLE";

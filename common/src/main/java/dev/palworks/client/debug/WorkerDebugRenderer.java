@@ -8,6 +8,7 @@ import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkerState;
+import java.util.List;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -23,8 +24,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
-
-import java.util.List;
 
 /**
  * The {@code /palworks debug} overlay, drawn in the world for each worker near the player:
@@ -51,7 +50,8 @@ public final class WorkerDebugRenderer {
     private static final int WARNING_COLOUR = 0xFFFF6A50;
     private static final int UNREACHABLE_COLOUR = 0xFFB02A20;
 
-    private static final MultiBufferSource.BufferSource BUFFERS = MultiBufferSource.immediate(new ByteBufferBuilder(1 << 12));
+    private static final MultiBufferSource.BufferSource BUFFERS =
+            MultiBufferSource.immediate(new ByteBufferBuilder(1 << 12));
 
     @Nullable
     private static ClientLevel lastLevel;
@@ -96,7 +96,8 @@ public final class WorkerDebugRenderer {
         };
     }
 
-    private static void drawPathAndTarget(PoseStack pose, Vec3 cam, Vec3 feet, WorkerDebugPacket.Entry entry, int colour) {
+    private static void drawPathAndTarget(
+            PoseStack pose, Vec3 cam, Vec3 feet, WorkerDebugPacket.Entry entry, int colour) {
         VertexConsumer lines = BUFFERS.getBuffer(RenderType.lines());
         int pathColour = WorkerDebugText.pathFallsShort(entry.details()) ? WARNING_COLOUR : colour;
         Vec3 previous = feet.add(0, 0.1, 0);
@@ -115,21 +116,30 @@ public final class WorkerDebugRenderer {
 
     private static void box(PoseStack pose, VertexConsumer lines, Vec3 cam, BlockPos pos, double grow, int colour) {
         AABB box = new AABB(pos).inflate(grow).move(-cam.x, -cam.y, -cam.z);
-        LevelRenderer.renderLineBox(pose, lines, box,
-                red(colour) / 255F, green(colour) / 255F, blue(colour) / 255F, 1F);
+        LevelRenderer.renderLineBox(
+                pose, lines, box, red(colour) / 255F, green(colour) / 255F, blue(colour) / 255F, 1F);
     }
 
     private static void line(PoseStack pose, VertexConsumer lines, Vec3 from, Vec3 to, int colour) {
         Vec3 normal = to.subtract(from).normalize();
         PoseStack.Pose last = pose.last();
         lines.addVertex(last, (float) from.x, (float) from.y, (float) from.z)
-                .setColor(colour).setNormal(last, (float) normal.x, (float) normal.y, (float) normal.z);
+                .setColor(colour)
+                .setNormal(last, (float) normal.x, (float) normal.y, (float) normal.z);
         lines.addVertex(last, (float) to.x, (float) to.y, (float) to.z)
-                .setColor(colour).setNormal(last, (float) normal.x, (float) normal.y, (float) normal.z);
+                .setColor(colour)
+                .setNormal(last, (float) normal.x, (float) normal.y, (float) normal.z);
     }
 
-    private static void drawLabel(PoseStack pose, Camera camera, Vec3 cam, Font font, Entity entity,
-                                  Vec3 feet, WorkerDebugPacket.Entry entry, int colour) {
+    private static void drawLabel(
+            PoseStack pose,
+            Camera camera,
+            Vec3 cam,
+            Font font,
+            Entity entity,
+            Vec3 feet,
+            WorkerDebugPacket.Entry entry,
+            int colour) {
         WorkActivity activity = entry.activity();
         pose.pushPose();
         pose.translate(feet.x - cam.x, feet.y - cam.y + entity.getBbHeight() + 0.5, feet.z - cam.z);
@@ -150,13 +160,26 @@ public final class WorkerDebugRenderer {
         }
 
         // The first line (job and phase) in the phase's colour; the rest grey, or red for warnings
-        List<WorkerDebugText.Line> lines = WorkerDebugText.lines(activity, entry.details(), entry.unreachable().size(),
-                WorkerState.STUCK_AFTER_PATH_FAILURES, WorkerAI.STEP_IN_TICKS);
+        List<WorkerDebugText.Line> lines = WorkerDebugText.lines(
+                activity,
+                entry.details(),
+                entry.unreachable().size(),
+                WorkerState.STUCK_AFTER_PATH_FAILURES,
+                WorkerAI.STEP_IN_TICKS);
         for (int i = 0; i < lines.size(); i++) {
             WorkerDebugText.Line line = lines.get(i);
             int lineColour = i == 0 ? colour : line.warning() ? WARNING_COLOUR : INFO_COLOUR;
-            font.drawInBatch(line.text(), -font.width(line.text()) / 2F, i * LINE_HEIGHT, lineColour, false, matrix,
-                    BUFFERS, Font.DisplayMode.SEE_THROUGH, 0x40000000, LightTexture.FULL_BRIGHT);
+            font.drawInBatch(
+                    line.text(),
+                    -font.width(line.text()) / 2F,
+                    i * LINE_HEIGHT,
+                    lineColour,
+                    false,
+                    matrix,
+                    BUFFERS,
+                    Font.DisplayMode.SEE_THROUGH,
+                    0x40000000,
+                    LightTexture.FULL_BRIGHT);
         }
         pose.popPose();
     }

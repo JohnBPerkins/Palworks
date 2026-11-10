@@ -42,9 +42,9 @@ public enum JobType {
     COOL_CONTAINER(Suitability.COOLING),
 
     // Transporting jobs
-    GET_SEEDS(Suitability.PLANTING),          // Get seeds from chest for planting
-    COLLECT_DROPS(Suitability.TRANSPORTING),  // Pick up dropped items from ground
-    DELIVER_ITEMS(Suitability.TRANSPORTING),  // Deliver items to destination
+    GET_SEEDS(Suitability.PLANTING), // Get seeds from chest for planting
+    COLLECT_DROPS(Suitability.TRANSPORTING), // Pick up dropped items from ground
+    DELIVER_ITEMS(Suitability.TRANSPORTING), // Deliver items to destination
 
     // Farming jobs (ranch)
     PRODUCE_RANCH_ITEMS(Suitability.FARMING);

@@ -2,13 +2,12 @@ package dev.palworks.worker;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
-import net.minecraft.nbt.CompoundTag;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import net.minecraft.nbt.CompoundTag;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Manages WorkerState storage and retrieval for Pokemon entities.
@@ -39,15 +38,18 @@ public class WorkerStateManager {
             WorkerState state = WorkerState.fromNBT(persistentData.getCompound(WORKER_STATE_KEY));
 
             if (state.getCurrentReservation() != null) {
-                Palworks.LOGGER.debug("Loaded state for {} with reservation: {}",
-                    pokemon.getSpecies().getName(), state.getCurrentReservation().getJobType());
+                Palworks.LOGGER.debug(
+                        "Loaded state for {} with reservation: {}",
+                        pokemon.getSpecies().getName(),
+                        state.getCurrentReservation().getJobType());
             }
 
             CACHE.put(pokemon.getUuid(), state);
             return state;
         }
 
-        Palworks.LOGGER.debug("Creating new WorkerState for {}", pokemon.getSpecies().getName());
+        Palworks.LOGGER.debug(
+                "Creating new WorkerState for {}", pokemon.getSpecies().getName());
         WorkerState state = new WorkerState();
         save(pokemon, state); // writes NBT + caches
         return state;
@@ -100,7 +102,7 @@ public class WorkerStateManager {
      */
     public static boolean hasWorkerState(Pokemon pokemon) {
         return CACHE.containsKey(pokemon.getUuid())
-            || pokemon.getPersistentData().contains(WORKER_STATE_KEY);
+                || pokemon.getPersistentData().contains(WORKER_STATE_KEY);
     }
 
     /**

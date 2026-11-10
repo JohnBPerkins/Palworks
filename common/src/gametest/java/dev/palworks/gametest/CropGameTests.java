@@ -1,5 +1,7 @@
 package dev.palworks.gametest;
 
+import static dev.palworks.gametest.Scenes.abs;
+
 import dev.palworks.crop.CropAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -19,8 +21,6 @@ import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
-import static dev.palworks.gametest.Scenes.abs;
-
 /** Harvesting (real loot, minus one seed, reset in place), gourds, berries, and planting. */
 public class CropGameTests {
 
@@ -36,14 +36,15 @@ public class CropGameTests {
     }
 
     /** Harvest a mature crop: it drops its crop item and is reset to age 0, in place. */
-    private static void assertHarvestsInPlace(GameTestHelper helper, Block soil, BlockState mature,
-                                              Item drop, BlockState reset) {
+    private static void assertHarvestsInPlace(
+            GameTestHelper helper, Block soil, BlockState mature, Item drop, BlockState reset) {
         crop(helper, soil, mature);
         helper.assertTrue(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), mature + " is ripe");
 
         helper.assertTrue(harvest(helper), "it harvests");
-        helper.assertTrue(helper.getBlockState(CROP).equals(reset),
-            "it's reset in place to " + reset + ", got " + helper.getBlockState(CROP));
+        helper.assertTrue(
+                helper.getBlockState(CROP).equals(reset),
+                "it's reset in place to " + reset + ", got " + helper.getBlockState(CROP));
         helper.assertItemEntityPresent(drop, CROP, 2.0);
     }
 
@@ -60,30 +61,40 @@ public class CropGameTests {
     @GameTest(template = Templates.EMPTY)
     public void carrotsResetAndDropCarrots(GameTestHelper helper) {
         CropBlock carrots = (CropBlock) Blocks.CARROTS;
-        assertHarvestsInPlace(helper, Blocks.FARMLAND, carrots.getStateForAge(7), Items.CARROT, carrots.getStateForAge(0));
+        assertHarvestsInPlace(
+                helper, Blocks.FARMLAND, carrots.getStateForAge(7), Items.CARROT, carrots.getStateForAge(0));
         helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY)
     public void potatoesResetAndDropPotatoes(GameTestHelper helper) {
         CropBlock potatoes = (CropBlock) Blocks.POTATOES;
-        assertHarvestsInPlace(helper, Blocks.FARMLAND, potatoes.getStateForAge(7), Items.POTATO, potatoes.getStateForAge(0));
+        assertHarvestsInPlace(
+                helper, Blocks.FARMLAND, potatoes.getStateForAge(7), Items.POTATO, potatoes.getStateForAge(0));
         helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY)
     public void beetrootDropsBeetrootAndResets(GameTestHelper helper) {
         CropBlock beetroot = (CropBlock) Blocks.BEETROOTS;
-        assertHarvestsInPlace(helper, Blocks.FARMLAND, beetroot.getStateForAge(beetroot.getMaxAge()),
-            Items.BEETROOT, beetroot.getStateForAge(0));
+        assertHarvestsInPlace(
+                helper,
+                Blocks.FARMLAND,
+                beetroot.getStateForAge(beetroot.getMaxAge()),
+                Items.BEETROOT,
+                beetroot.getStateForAge(0));
         helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY)
     public void netherWartResetsOnSoulSand(GameTestHelper helper) {
         BlockState wart = Blocks.NETHER_WART.defaultBlockState();
-        assertHarvestsInPlace(helper, Blocks.SOUL_SAND, wart.setValue(NetherWartBlock.AGE, 3),
-            Items.NETHER_WART, wart.setValue(NetherWartBlock.AGE, 0));
+        assertHarvestsInPlace(
+                helper,
+                Blocks.SOUL_SAND,
+                wart.setValue(NetherWartBlock.AGE, 3),
+                Items.NETHER_WART,
+                wart.setValue(NetherWartBlock.AGE, 0));
         helper.succeed();
     }
 
@@ -96,7 +107,8 @@ public class CropGameTests {
         helper.assertTrue(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), "the pod is ripe");
 
         helper.assertTrue(harvest(helper), "it harvests");
-        helper.assertTrue(helper.getBlockState(CROP).equals(pod.setValue(CocoaBlock.AGE, 0)), "reset, still on its log");
+        helper.assertTrue(
+                helper.getBlockState(CROP).equals(pod.setValue(CocoaBlock.AGE, 0)), "reset, still on its log");
         helper.assertItemEntityPresent(Items.COCOA_BEANS, CROP, 2.0);
         helper.succeed();
     }
@@ -114,14 +126,16 @@ public class CropGameTests {
         // One in a flower bed is decoration, not a crop
         helper.setBlock(new BlockPos(5, 0, 5), Blocks.GRASS_BLOCK);
         helper.setBlock(new BlockPos(5, 1, 5), Blocks.TORCHFLOWER);
-        helper.assertFalse(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(new BlockPos(5, 1, 5))),
-            "a torchflower on grass isn't harvested");
+        helper.assertFalse(
+                CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(new BlockPos(5, 1, 5))),
+                "a torchflower on grass isn't harvested");
         helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY)
     public void pitcherPlantsArePickedNotReplanted(GameTestHelper helper) {
-        BlockState lower = Blocks.PITCHER_CROP.defaultBlockState().setValue(PitcherCropBlock.AGE, PitcherCropBlock.MAX_AGE);
+        BlockState lower =
+                Blocks.PITCHER_CROP.defaultBlockState().setValue(PitcherCropBlock.AGE, PitcherCropBlock.MAX_AGE);
         crop(helper, Blocks.FARMLAND, lower);
         helper.setBlock(CROP.above(), lower.setValue(PitcherCropBlock.HALF, DoubleBlockHalf.UPPER));
         var level = helper.getLevel();
@@ -162,8 +176,9 @@ public class CropGameTests {
         int wheatDropped = Scenes.itemsOnGround(helper, Items.WHEAT);
         int seedsDropped = Scenes.itemsOnGround(helper, Items.WHEAT_SEEDS);
         helper.assertTrue(wheatDropped == harvests, "one wheat per harvest, got " + wheatDropped);
-        helper.assertTrue(seedsDropped >= 250 && seedsDropped <= 440,
-            "about 1.71 seeds per harvest (one fewer than by hand), got " + seedsDropped + " from " + harvests);
+        helper.assertTrue(
+                seedsDropped >= 250 && seedsDropped <= 440,
+                "about 1.71 seeds per harvest (one fewer than by hand), got " + seedsDropped + " from " + harvests);
         helper.succeed();
     }
 
@@ -174,15 +189,19 @@ public class CropGameTests {
         // A stem that has grown its pumpkin is "attached" to it
         helper.setBlock(3, 0, 3, Blocks.FARMLAND);
         helper.setBlock(4, 0, 3, Blocks.DIRT);
-        helper.setBlock(CROP, Blocks.ATTACHED_PUMPKIN_STEM.defaultBlockState()
-            .setValue(AttachedStemBlock.FACING, Direction.EAST));
+        helper.setBlock(
+                CROP,
+                Blocks.ATTACHED_PUMPKIN_STEM.defaultBlockState().setValue(AttachedStemBlock.FACING, Direction.EAST));
         BlockPos pumpkin = new BlockPos(4, 1, 3);
         helper.setBlock(pumpkin, Blocks.PUMPKIN);
         var level = helper.getLevel();
 
-        helper.assertFalse(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP)), "the stem itself isn't harvested");
-        helper.assertTrue(helper.absolutePos(pumpkin).equals(CropAdapter.attachedFruitPos(
-            helper.getBlockState(CROP), helper.absolutePos(CROP))), "the stem points at its pumpkin");
+        helper.assertFalse(
+                CropAdapter.isFullyGrown(level, helper.absolutePos(CROP)), "the stem itself isn't harvested");
+        helper.assertTrue(
+                helper.absolutePos(pumpkin)
+                        .equals(CropAdapter.attachedFruitPos(helper.getBlockState(CROP), helper.absolutePos(CROP))),
+                "the stem points at its pumpkin");
         helper.assertTrue(CropAdapter.isAttachedFruit(level, helper.absolutePos(pumpkin)), "the pumpkin is its fruit");
 
         helper.assertTrue(CropAdapter.harvestCrop(level, helper.absolutePos(pumpkin)), "harvesting the pumpkin works");
@@ -196,8 +215,9 @@ public class CropGameTests {
     public void melonsDropSlices(GameTestHelper helper) {
         helper.setBlock(3, 0, 3, Blocks.FARMLAND);
         helper.setBlock(3, 0, 4, Blocks.DIRT);
-        helper.setBlock(CROP, Blocks.ATTACHED_MELON_STEM.defaultBlockState()
-            .setValue(AttachedStemBlock.FACING, Direction.SOUTH));
+        helper.setBlock(
+                CROP,
+                Blocks.ATTACHED_MELON_STEM.defaultBlockState().setValue(AttachedStemBlock.FACING, Direction.SOUTH));
         BlockPos melon = new BlockPos(3, 1, 4);
         helper.setBlock(melon, Blocks.MELON);
 
@@ -208,18 +228,23 @@ public class CropGameTests {
 
     @GameTest(template = Templates.EMPTY)
     public void aFullyGrownStemWithNoFruitIsLeftAlone(GameTestHelper helper) {
-        crop(helper, Blocks.FARMLAND, Blocks.PUMPKIN_STEM.defaultBlockState().setValue(StemBlock.AGE, StemBlock.MAX_AGE));
+        crop(
+                helper,
+                Blocks.FARMLAND,
+                Blocks.PUMPKIN_STEM.defaultBlockState().setValue(StemBlock.AGE, StemBlock.MAX_AGE));
 
-        helper.assertFalse(CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), "nothing to pick yet");
-        helper.assertTrue(CropAdapter.attachedFruitPos(helper.getBlockState(CROP), helper.absolutePos(CROP)) == null,
-            "no fruit");
+        helper.assertFalse(
+                CropAdapter.isFullyGrown(helper.getLevel(), helper.absolutePos(CROP)), "nothing to pick yet");
+        helper.assertTrue(
+                CropAdapter.attachedFruitPos(helper.getBlockState(CROP), helper.absolutePos(CROP)) == null, "no fruit");
         helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY)
     public void aPumpkinWithNoStemIsNotACrop(GameTestHelper helper) {
         helper.setBlock(CROP, Blocks.PUMPKIN);
-        helper.assertFalse(CropAdapter.isAttachedFruit(helper.getLevel(), helper.absolutePos(CROP)), "a placed pumpkin");
+        helper.assertFalse(
+                CropAdapter.isAttachedFruit(helper.getLevel(), helper.absolutePos(CROP)), "a placed pumpkin");
         helper.succeed();
     }
 
@@ -250,9 +275,12 @@ public class CropGameTests {
     @GameTest(template = Templates.EMPTY)
     public void glowBerriesGiveOneAndLeaveTheVineBare(GameTestHelper helper) {
         helper.setBlock(CROP.above(), Blocks.STONE);
-        BlockState ripe = Blocks.CAVE_VINES.defaultBlockState().setValue(net.minecraft.world.level.block.CaveVines.BERRIES, true);
+        BlockState ripe =
+                Blocks.CAVE_VINES.defaultBlockState().setValue(net.minecraft.world.level.block.CaveVines.BERRIES, true);
         assertEachHarvestGives(helper, ripe, Items.GLOW_BERRIES, 1, 1);
-        helper.assertFalse(helper.getBlockState(CROP).getValue(net.minecraft.world.level.block.CaveVines.BERRIES), "no berries left");
+        helper.assertFalse(
+                helper.getBlockState(CROP).getValue(net.minecraft.world.level.block.CaveVines.BERRIES),
+                "no berries left");
         helper.succeed();
     }
 
@@ -268,7 +296,8 @@ public class CropGameTests {
             helper.setBlock(CROP, ripe);
             helper.assertTrue(harvest(helper), "it harvests");
             int got = Scenes.itemsOnGround(helper, item);
-            helper.assertTrue(got >= min && got <= max, "each harvest gives " + min + "-" + max + " " + item + ", got " + got);
+            helper.assertTrue(
+                    got >= min && got <= max, "each harvest gives " + min + "-" + max + " " + item + ", got " + got);
             sawMin |= got == min;
             sawMax |= got == max;
         }
@@ -284,12 +313,16 @@ public class CropGameTests {
         helper.setBlock(3, 0, 3, Blocks.SOUL_SAND);
         var level = helper.getLevel();
 
-        helper.assertTrue(CropAdapter.canPlantSeed(Items.WHEAT_SEEDS, level, abs(helper, 1, 0, 1)), "seeds on farmland");
+        helper.assertTrue(
+                CropAdapter.canPlantSeed(Items.WHEAT_SEEDS, level, abs(helper, 1, 0, 1)), "seeds on farmland");
         helper.assertTrue(CropAdapter.canPlantSeed(Items.CARROT, level, abs(helper, 1, 0, 1)), "carrots on farmland");
         helper.assertFalse(CropAdapter.canPlantSeed(Items.WHEAT_SEEDS, level, abs(helper, 2, 0, 2)), "not on dirt");
-        helper.assertTrue(CropAdapter.canPlantSeed(Items.NETHER_WART, level, abs(helper, 3, 0, 3)), "wart on soul sand");
-        helper.assertFalse(CropAdapter.canPlantSeed(Items.NETHER_WART, level, abs(helper, 1, 0, 1)), "wart not on farmland");
-        helper.assertFalse(CropAdapter.canPlantSeed(Items.WHEAT_SEEDS, level, abs(helper, 3, 0, 3)), "seeds not on soul sand");
+        helper.assertTrue(
+                CropAdapter.canPlantSeed(Items.NETHER_WART, level, abs(helper, 3, 0, 3)), "wart on soul sand");
+        helper.assertFalse(
+                CropAdapter.canPlantSeed(Items.NETHER_WART, level, abs(helper, 1, 0, 1)), "wart not on farmland");
+        helper.assertFalse(
+                CropAdapter.canPlantSeed(Items.WHEAT_SEEDS, level, abs(helper, 3, 0, 3)), "seeds not on soul sand");
         helper.succeed();
     }
 
@@ -297,11 +330,14 @@ public class CropGameTests {
     public void plantingPutsAYoungCropOnTheFarmland(GameTestHelper helper) {
         helper.setBlock(CROP.below(), Blocks.FARMLAND);
 
-        helper.assertTrue(CropAdapter.plantSeed(Items.WHEAT_SEEDS, helper.getLevel(), helper.absolutePos(CROP.below())),
-            "it plants");
-        helper.assertTrue(helper.getBlockState(CROP).equals(((CropBlock) Blocks.WHEAT).getStateForAge(0)), "a young wheat");
-        helper.assertFalse(CropAdapter.plantSeed(Items.WHEAT_SEEDS, helper.getLevel(), helper.absolutePos(CROP.below())),
-            "not again on top of it");
+        helper.assertTrue(
+                CropAdapter.plantSeed(Items.WHEAT_SEEDS, helper.getLevel(), helper.absolutePos(CROP.below())),
+                "it plants");
+        helper.assertTrue(
+                helper.getBlockState(CROP).equals(((CropBlock) Blocks.WHEAT).getStateForAge(0)), "a young wheat");
+        helper.assertFalse(
+                CropAdapter.plantSeed(Items.WHEAT_SEEDS, helper.getLevel(), helper.absolutePos(CROP.below())),
+                "not again on top of it");
         helper.succeed();
     }
 

@@ -2,10 +2,13 @@ package dev.palworks.crop;
 
 import com.cobblemon.mod.common.block.ApricornBlock;
 import com.cobblemon.mod.common.block.HeartyGrainsBlock;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.BlockItem;
@@ -19,14 +22,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
-import net.minecraft.world.level.storage.loot.LootParams;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Adapter layer for crop detection and interaction.
@@ -35,10 +31,8 @@ import java.util.List;
  */
 public class CropAdapter {
     // Cobblemon berry tag for modded berry support
-    private static final TagKey<Block> COBBLEMON_BERRIES = TagKey.create(
-        Registries.BLOCK,
-        new ResourceLocation("cobblemon", "berries")
-    );
+    private static final TagKey<Block> COBBLEMON_BERRIES =
+            TagKey.create(Registries.BLOCK, new ResourceLocation("cobblemon", "berries"));
 
     // Galarica nut bush - special berry that harvests at age 3 and resets to age 1
     private static final ResourceLocation GALARICA_NUT_BUSH_ID = new ResourceLocation("cobblemon", "galarica_nut_bush");
@@ -71,9 +65,7 @@ public class CropAdapter {
         Block block = state.getBlock();
 
         // Vanilla berries
-        if (block instanceof SweetBerryBushBlock ||
-            block == Blocks.CAVE_VINES ||
-            block == Blocks.CAVE_VINES_PLANT) {
+        if (block instanceof SweetBerryBushBlock || block == Blocks.CAVE_VINES || block == Blocks.CAVE_VINES_PLANT) {
             return true;
         }
 
@@ -208,8 +200,9 @@ public class CropAdapter {
             return level.getBlockState(pos.below()).is(Blocks.FARMLAND);
         }
         if (state.is(Blocks.PITCHER_CROP)) {
-            return state.getValue(PitcherCropBlock.HALF) == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
-                && state.getValue(PitcherCropBlock.AGE) >= PitcherCropBlock.MAX_AGE;
+            return state.getValue(PitcherCropBlock.HALF)
+                            == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
+                    && state.getValue(PitcherCropBlock.AGE) >= PitcherCropBlock.MAX_AGE;
         }
         return false;
     }
@@ -246,15 +239,15 @@ public class CropAdapter {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
 
-        return block instanceof CropBlock ||
-               block instanceof StemBlock ||
-               block instanceof NetherWartBlock ||
-               block instanceof CocoaBlock ||
-               isApricorn(state) ||
-               block instanceof SweetBerryBushBlock ||
-               block == Blocks.CAVE_VINES ||
-               block == Blocks.CAVE_VINES_PLANT ||
-               state.is(COBBLEMON_BERRIES);
+        return block instanceof CropBlock
+                || block instanceof StemBlock
+                || block instanceof NetherWartBlock
+                || block instanceof CocoaBlock
+                || isApricorn(state)
+                || block instanceof SweetBerryBushBlock
+                || block == Blocks.CAVE_VINES
+                || block == Blocks.CAVE_VINES_PLANT
+                || state.is(COBBLEMON_BERRIES);
     }
 
     /**
@@ -353,8 +346,13 @@ public class CropAdapter {
         // apricorn itself, so that left the worker nothing.
         if (block instanceof ApricornBlock apricorn) {
             apricorn.harvest(level, state, pos);
-            level.playSound(null, pos, net.minecraft.sounds.SoundEvents.ITEM_PICKUP,
-                net.minecraft.sounds.SoundSource.BLOCKS, 0.7f, 1.4f);
+            level.playSound(
+                    null,
+                    pos,
+                    net.minecraft.sounds.SoundEvents.ITEM_PICKUP,
+                    net.minecraft.sounds.SoundSource.BLOCKS,
+                    0.7f,
+                    1.4f);
             return true;
         }
 
@@ -373,16 +371,24 @@ public class CropAdapter {
                         Block.popResource(level, pos, drop);
                     }
                 }
-                level.playSound(null, pos, com.cobblemon.mod.common.CobblemonSounds.BERRY_HARVEST,
-                    net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 1.0f);
+                level.playSound(
+                        null,
+                        pos,
+                        com.cobblemon.mod.common.CobblemonSounds.BERRY_HARVEST,
+                        net.minecraft.sounds.SoundSource.BLOCKS,
+                        1.0f,
+                        1.0f);
                 return true;
             }
 
             // Galarica nut bush: as NutBushBlock.useWithoutItem, 1-2 nuts, back to age 1
             if (isGalaricaNutBush(block)) {
                 IntegerProperty age = ageProperty(state);
-                Block.popResource(level, pos,
-                    new ItemStack(com.cobblemon.mod.common.CobblemonItems.GALARICA_NUTS, 1 + level.random.nextInt(2)));
+                Block.popResource(
+                        level,
+                        pos,
+                        new ItemStack(
+                                com.cobblemon.mod.common.CobblemonItems.GALARICA_NUTS, 1 + level.random.nextInt(2)));
                 playPickSound(level, pos, net.minecraft.sounds.SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES);
                 if (age != null) {
                     level.setBlock(pos, state.setValue(age, 1), 2);
@@ -440,7 +446,9 @@ public class CropAdapter {
         if (ageProperty != null) {
             // This crop has an age property - harvest and reset to age 0
             int currentAge = state.getValue(ageProperty);
-            int maxAge = ageProperty.getPossibleValues().stream().max(Integer::compareTo).orElse(7);
+            int maxAge = ageProperty.getPossibleValues().stream()
+                    .max(Integer::compareTo)
+                    .orElse(7);
 
             // Only harvest if at max age
             if (currentAge >= maxAge) {
@@ -449,8 +457,8 @@ public class CropAdapter {
                 // replanting, and reset it to age 0. This used to drop block.asItem() instead, which
                 // for wheat and beetroot is the seed, so those fields never produced any crop.
                 List<ItemStack> drops = level instanceof ServerLevel serverLevel
-                    ? Block.getDrops(state, serverLevel, pos, level.getBlockEntity(pos))
-                    : new ArrayList<>();
+                        ? Block.getDrops(state, serverLevel, pos, level.getBlockEntity(pos))
+                        : new ArrayList<>();
 
                 // Every vanilla and Cobblemon crop drops at least one of its seed when mature (wheat
                 // and beetroot 1-4 seeds, cocoa 3 beans, carrots, potatoes, wart, mint seeds...), so
@@ -470,8 +478,8 @@ public class CropAdapter {
 
                 level.setBlock(pos, asReplanted(state.setValue(ageProperty, 0)), 3);
 
-                dev.palworks.Palworks.LOGGER.debug("Harvested crop at {}: was age {}, dropped {}, reset to age 0",
-                    pos, currentAge, drops);
+                dev.palworks.Palworks.LOGGER.debug(
+                        "Harvested crop at {}: was age {}, dropped {}, reset to age 0", pos, currentAge, drops);
                 return true;
             }
         }
@@ -524,8 +532,13 @@ public class CropAdapter {
 
     /** A picking sound as the game plays it: full volume, pitch 0.8-1.2. */
     private static void playPickSound(Level level, BlockPos pos, net.minecraft.sounds.SoundEvent sound) {
-        level.playSound(null, pos, sound, net.minecraft.sounds.SoundSource.BLOCKS, 1.0f,
-            0.8f + level.random.nextFloat() * 0.4f);
+        level.playSound(
+                null,
+                pos,
+                sound,
+                net.minecraft.sounds.SoundSource.BLOCKS,
+                1.0f,
+                0.8f + level.random.nextFloat() * 0.4f);
     }
 
     /**

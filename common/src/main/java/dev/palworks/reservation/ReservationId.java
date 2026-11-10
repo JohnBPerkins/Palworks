@@ -1,9 +1,8 @@
 package dev.palworks.reservation;
 
 import dev.palworks.job.JobType;
-import net.minecraft.core.BlockPos;
-
 import java.util.Objects;
+import net.minecraft.core.BlockPos;
 
 /**
  * Identifies a reservation for a job at a station.
@@ -59,8 +58,7 @@ public class ReservationId {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ReservationId that = (ReservationId) o;
-        return Objects.equals(stationPos, that.stationPos) &&
-                jobType == that.jobType;
+        return Objects.equals(stationPos, that.stationPos) && jobType == that.jobType;
     }
 
     @Override
@@ -70,10 +68,6 @@ public class ReservationId {
 
     @Override
     public String toString() {
-        return "ReservationId{" +
-                "station=" + stationPos +
-                ", job=" + jobType +
-                ", time=" + timestamp +
-                '}';
+        return "ReservationId{" + "station=" + stationPos + ", job=" + jobType + ", time=" + timestamp + '}';
     }
 }

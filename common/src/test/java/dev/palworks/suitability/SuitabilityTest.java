@@ -1,9 +1,9 @@
 package dev.palworks.suitability;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+
+import org.junit.jupiter.api.Test;
 
 /** Pure-logic tests for the Suitability enum and its id round-trip (no running game needed). */
 class SuitabilityTest {

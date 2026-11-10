@@ -1,13 +1,12 @@
 package dev.palworks.station;
 
 import dev.palworks.job.JobType;
+import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-
 import org.jetbrains.annotations.Nullable;
-import java.util.*;
 
 /**
  * Persistent state for a work station.

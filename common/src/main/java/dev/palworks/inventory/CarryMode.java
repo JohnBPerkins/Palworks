@@ -1,7 +1,6 @@
 package dev.palworks.inventory;
 
 import dev.palworks.suitability.Suitability;
-
 import java.util.Set;
 
 /**

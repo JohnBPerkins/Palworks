@@ -1,5 +1,12 @@
 package dev.palworks.tree;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Map;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.Item;
@@ -8,14 +15,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Finding a tree's sapling by name against the real registries, and the block checks that don't
@@ -33,28 +32,28 @@ class SaplingLookupTest {
     @Test
     void everyVanillaTreeBlockFindsItsSapling() {
         Map<Block, Item> expected = Map.ofEntries(
-            Map.entry(Blocks.OAK_LOG, Items.OAK_SAPLING),
-            Map.entry(Blocks.STRIPPED_OAK_LOG, Items.OAK_SAPLING),
-            Map.entry(Blocks.OAK_WOOD, Items.OAK_SAPLING),
-            Map.entry(Blocks.OAK_LEAVES, Items.OAK_SAPLING),
-            Map.entry(Blocks.SPRUCE_LOG, Items.SPRUCE_SAPLING),
-            Map.entry(Blocks.BIRCH_LOG, Items.BIRCH_SAPLING),
-            Map.entry(Blocks.JUNGLE_LOG, Items.JUNGLE_SAPLING),
-            Map.entry(Blocks.ACACIA_LOG, Items.ACACIA_SAPLING),
-            Map.entry(Blocks.DARK_OAK_LOG, Items.DARK_OAK_SAPLING),
-            Map.entry(Blocks.STRIPPED_DARK_OAK_WOOD, Items.DARK_OAK_SAPLING),
-            Map.entry(Blocks.CHERRY_LOG, Items.CHERRY_SAPLING),
-            Map.entry(Blocks.CHERRY_LEAVES, Items.CHERRY_SAPLING),
-            Map.entry(Blocks.MANGROVE_LOG, Items.MANGROVE_PROPAGULE),
-            Map.entry(Blocks.MANGROVE_ROOTS, Items.MANGROVE_PROPAGULE),
-            Map.entry(Blocks.MANGROVE_LEAVES, Items.MANGROVE_PROPAGULE),
-            Map.entry(Blocks.CRIMSON_STEM, Items.CRIMSON_FUNGUS),
-            Map.entry(Blocks.STRIPPED_CRIMSON_HYPHAE, Items.CRIMSON_FUNGUS),
-            Map.entry(Blocks.WARPED_STEM, Items.WARPED_FUNGUS),
-            Map.entry(Blocks.WARPED_HYPHAE, Items.WARPED_FUNGUS));
+                Map.entry(Blocks.OAK_LOG, Items.OAK_SAPLING),
+                Map.entry(Blocks.STRIPPED_OAK_LOG, Items.OAK_SAPLING),
+                Map.entry(Blocks.OAK_WOOD, Items.OAK_SAPLING),
+                Map.entry(Blocks.OAK_LEAVES, Items.OAK_SAPLING),
+                Map.entry(Blocks.SPRUCE_LOG, Items.SPRUCE_SAPLING),
+                Map.entry(Blocks.BIRCH_LOG, Items.BIRCH_SAPLING),
+                Map.entry(Blocks.JUNGLE_LOG, Items.JUNGLE_SAPLING),
+                Map.entry(Blocks.ACACIA_LOG, Items.ACACIA_SAPLING),
+                Map.entry(Blocks.DARK_OAK_LOG, Items.DARK_OAK_SAPLING),
+                Map.entry(Blocks.STRIPPED_DARK_OAK_WOOD, Items.DARK_OAK_SAPLING),
+                Map.entry(Blocks.CHERRY_LOG, Items.CHERRY_SAPLING),
+                Map.entry(Blocks.CHERRY_LEAVES, Items.CHERRY_SAPLING),
+                Map.entry(Blocks.MANGROVE_LOG, Items.MANGROVE_PROPAGULE),
+                Map.entry(Blocks.MANGROVE_ROOTS, Items.MANGROVE_PROPAGULE),
+                Map.entry(Blocks.MANGROVE_LEAVES, Items.MANGROVE_PROPAGULE),
+                Map.entry(Blocks.CRIMSON_STEM, Items.CRIMSON_FUNGUS),
+                Map.entry(Blocks.STRIPPED_CRIMSON_HYPHAE, Items.CRIMSON_FUNGUS),
+                Map.entry(Blocks.WARPED_STEM, Items.WARPED_FUNGUS),
+                Map.entry(Blocks.WARPED_HYPHAE, Items.WARPED_FUNGUS));
 
         expected.forEach((block, sapling) ->
-            assertSame(sapling, TreeDetector.saplingFor(block), block + " should find " + sapling));
+                assertSame(sapling, TreeDetector.saplingFor(block), block + " should find " + sapling));
     }
 
     @Test
@@ -76,8 +75,9 @@ class SaplingLookupTest {
     @Test
     void mangroveRootsArePartOfTheTreeButMuddyRootsAreNot() {
         assertTrue(TreeDetector.isMangroveRoots(Blocks.MANGROVE_ROOTS.defaultBlockState()));
-        assertFalse(TreeDetector.isMangroveRoots(Blocks.MUDDY_MANGROVE_ROOTS.defaultBlockState()),
-            "muddy roots are ground, not tree");
+        assertFalse(
+                TreeDetector.isMangroveRoots(Blocks.MUDDY_MANGROVE_ROOTS.defaultBlockState()),
+                "muddy roots are ground, not tree");
     }
 
     @Test

@@ -1,9 +1,9 @@
 package dev.palworks.tree;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 class SaplingNamesTest {
 
@@ -49,11 +49,14 @@ class SaplingNamesTest {
     @Test
     void unrecognisedNamesStillGiveCandidates() {
         // No known suffix: the whole name is used, and the registry check simply finds nothing
-        assertEquals("mystery_block_sapling", SaplingNames.saplingCandidates("mystery_block").get(0));
+        assertEquals(
+                "mystery_block_sapling",
+                SaplingNames.saplingCandidates("mystery_block").get(0));
     }
 
     private static void assertCandidate(String blockPath, String sapling) {
-        assertTrue(SaplingNames.saplingCandidates(blockPath).contains(sapling),
-            blockPath + " should give " + sapling + ", got " + SaplingNames.saplingCandidates(blockPath));
+        assertTrue(
+                SaplingNames.saplingCandidates(blockPath).contains(sapling),
+                blockPath + " should give " + sapling + ", got " + SaplingNames.saplingCandidates(blockPath));
     }
 }

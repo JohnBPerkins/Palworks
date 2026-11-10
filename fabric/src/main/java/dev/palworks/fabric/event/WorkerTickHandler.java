@@ -18,7 +18,7 @@ import net.minecraft.world.entity.Mob;
  * Hooks into Cobblemon entity tick events.
  */
 public class WorkerTickHandler {
-    private static final boolean DEBUG = false;  // Reduced debug spam
+    private static final boolean DEBUG = false; // Reduced debug spam
     private static long lastDebugLog = 0;
 
     public static void register() {
@@ -59,7 +59,8 @@ public class WorkerTickHandler {
 
         // Debug log every 5 seconds
         if (DEBUG && System.currentTimeMillis() - lastDebugLog > 5000) {
-            PalworksFabric.LOGGER.debug("Fabric tick handler called for {}", pokemon.getSpecies().getName());
+            PalworksFabric.LOGGER.debug(
+                    "Fabric tick handler called for {}", pokemon.getSpecies().getName());
             lastDebugLog = System.currentTimeMillis();
         }
 
@@ -72,7 +73,9 @@ public class WorkerTickHandler {
             WorkerAI.tick(pokemon, mob, serverLevel);
         } else {
             if (DEBUG && System.currentTimeMillis() - lastDebugLog > 5000) {
-                PalworksFabric.LOGGER.warn("PokemonEntity is not a Mob! Class: {}", pokemonEntity.getClass().getName());
+                PalworksFabric.LOGGER.warn(
+                        "PokemonEntity is not a Mob! Class: {}",
+                        pokemonEntity.getClass().getName());
             }
         }
     }

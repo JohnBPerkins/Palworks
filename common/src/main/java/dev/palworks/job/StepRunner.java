@@ -1,7 +1,6 @@
 package dev.palworks.job;
 
 import dev.palworks.worker.WorkerState;
-
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -33,7 +32,9 @@ public final class StepRunner {
          * Whether there's anything for this step to do, asked when it's reached (before its first
          * tick). If not, it's skipped straight away, taking no time and having no effect.
          */
-        default boolean needed(C ctx) { return true; }
+        default boolean needed(C ctx) {
+            return true;
+        }
     }
 
     public enum Outcome {
@@ -46,8 +47,8 @@ public final class StepRunner {
     }
 
     /** Advance the job by one tick. */
-    public static <C> Outcome tick(List<? extends TimedStep<C>> steps, WorkerState progress, C ctx,
-                                   Predicate<C> repeat) {
+    public static <C> Outcome tick(
+            List<? extends TimedStep<C>> steps, WorkerState progress, C ctx, Predicate<C> repeat) {
         skipUnneeded(steps, progress, ctx);
         if (progress.getJobStep() >= steps.size()) {
             progress.resetJobProgress();
@@ -83,7 +84,8 @@ public final class StepRunner {
      * is skipped: one already under way runs to its end.
      */
     private static <C> void skipUnneeded(List<? extends TimedStep<C>> steps, WorkerState progress, C ctx) {
-        while (progress.getJobStep() < steps.size() && progress.getStepTicks() == 0
+        while (progress.getJobStep() < steps.size()
+                && progress.getStepTicks() == 0
                 && !steps.get(progress.getJobStep()).needed(ctx)) {
             progress.nextStep();
         }

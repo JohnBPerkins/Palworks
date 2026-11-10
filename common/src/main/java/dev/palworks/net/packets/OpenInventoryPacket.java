@@ -2,11 +2,10 @@ package dev.palworks.net.packets;
 
 import com.cobblemon.mod.common.api.net.NetworkPacket;
 import dev.palworks.net.PalworksResource;
+import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.UUID;
 
 /**
  * Packet sent from client to server to request opening a Pokemon's inventory.

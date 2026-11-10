@@ -1,13 +1,13 @@
 package dev.palworks.reservation;
 
-import dev.palworks.job.JobType;
-import net.minecraft.core.BlockPos;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import dev.palworks.job.JobType;
+import net.minecraft.core.BlockPos;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests that ReservationId identity is the (station, job) pair and ignores the timestamp,

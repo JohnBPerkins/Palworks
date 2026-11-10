@@ -1,9 +1,11 @@
 package dev.palworks.suitability;
 
+import static dev.palworks.suitability.Suitability.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,10 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-
-import static dev.palworks.suitability.Suitability.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 /** Tests how the per-job suitability files are parsed and combined, and the files the mod ships. */
 class SuitabilityDataTest {
@@ -45,7 +44,8 @@ class SuitabilityDataTest {
         SuitabilityData data = load(Map.of(
                 "palworks:transporting", "{\"types\": {\"flying\": 1, \"psychic\": 1}}",
                 "palworks:medicine_production", "{\"types\": {\"psychic\": 1}}"));
-        assertEquals(Map.of(TRANSPORTING, 2, MEDICINE_PRODUCTION, 1),
+        assertEquals(
+                Map.of(TRANSPORTING, 2, MEDICINE_PRODUCTION, 1),
                 data.levels(List.of("psychic", "flying"), "cobblemon:xatu"));
     }
 
@@ -65,23 +65,25 @@ class SuitabilityDataTest {
 
     @Test
     void speciesNeverLowerATypeLevel() {
-        SuitabilityData data = load(Map.of(
-                "palworks:kindling", "{\"types\": {\"fire\": 4}, \"species\": {\"cobblemon:charmander\": 2}}"));
+        SuitabilityData data = load(
+                Map.of("palworks:kindling", "{\"types\": {\"fire\": 4}, \"species\": {\"cobblemon:charmander\": 2}}"));
         assertEquals(Map.of(KINDLING, 4), data.levels(List.of("fire"), "cobblemon:charmander"));
     }
 
     @Test
     void speciesLevelZeroTakesTheJobAway() {
-        SuitabilityData data = load(Map.of(
-                "palworks:kindling", "{\"types\": {\"fire\": 1}, \"species\": {\"cobblemon:charmander\": 0}}"));
+        SuitabilityData data = load(
+                Map.of("palworks:kindling", "{\"types\": {\"fire\": 1}, \"species\": {\"cobblemon:charmander\": 0}}"));
         assertEquals(Map.of(), data.levels(List.of("fire"), "cobblemon:charmander"));
     }
 
     @Test
     void filesForTheSameJobFromDifferentNamespacesMerge() {
-        SuitabilityData data = load(Map.of(
-                "palworks:kindling", "{\"types\": {\"fire\": 1}, \"species\": {\"cobblemon:magmar\": 2}}",
-                "someaddon:kindling", "{\"types\": {\"fire\": 3, \"dragon\": 1}, \"species\": {\"someaddon:sparky\": 2, \"cobblemon:magmar\": 1}}"));
+        SuitabilityData data = load(
+                Map.of(
+                        "palworks:kindling", "{\"types\": {\"fire\": 1}, \"species\": {\"cobblemon:magmar\": 2}}",
+                        "someaddon:kindling",
+                                "{\"types\": {\"fire\": 3, \"dragon\": 1}, \"species\": {\"someaddon:sparky\": 2, \"cobblemon:magmar\": 1}}"));
         assertEquals(Map.of(KINDLING, 3), data.levels(List.of("fire"), "cobblemon:charmander"));
         assertEquals(Map.of(KINDLING, 1), data.levels(List.of("dragon"), "cobblemon:dratini"));
         assertEquals(Map.of(KINDLING, 2), data.levels(List.of(), "someaddon:sparky"));
@@ -116,12 +118,14 @@ class SuitabilityDataTest {
     @Test
     void badFilesAndEntriesAreSkippedWithAWarning() {
         List<String> warnings = new ArrayList<>();
-        SuitabilityData data = load(Map.of(
-                "palworks:kindling", "{\"types\": {\"fire\": 9, \"water\": \"lots\"}, \"pokemon\": {}}",
-                "palworks:juggling", "{\"types\": {\"normal\": 1}}",
-                "palworks:cooling", "[1, 2]",
-                "palworks:watering", "{\"types\": [\"water\"]}",
-                "palworks:mining", "{\"types\": {\"rock\": 0}}"), warnings);
+        SuitabilityData data = load(
+                Map.of(
+                        "palworks:kindling", "{\"types\": {\"fire\": 9, \"water\": \"lots\"}, \"pokemon\": {}}",
+                        "palworks:juggling", "{\"types\": {\"normal\": 1}}",
+                        "palworks:cooling", "[1, 2]",
+                        "palworks:watering", "{\"types\": [\"water\"]}",
+                        "palworks:mining", "{\"types\": {\"rock\": 0}}"),
+                warnings);
 
         assertEquals(Map.of(KINDLING, SuitabilityData.MAX_LEVEL), data.levels(List.of("fire"), "x:y"));
         assertEquals(Map.of(), data.levels(List.of("water"), "x:y"));
@@ -144,9 +148,11 @@ class SuitabilityDataTest {
                     continue;
                 }
                 try (Stream<Path> jobFiles = Files.list(dir)) {
-                    for (Path file : jobFiles.filter(p -> p.toString().endsWith(".json")).toList()) {
+                    for (Path file :
+                            jobFiles.filter(p -> p.toString().endsWith(".json")).toList()) {
                         String name = file.getFileName().toString();
-                        files.put(namespace.getFileName() + ":" + name.substring(0, name.length() - ".json".length()),
+                        files.put(
+                                namespace.getFileName() + ":" + name.substring(0, name.length() - ".json".length()),
                                 JsonParser.parseString(Files.readString(file)));
                     }
                 }
@@ -197,10 +203,13 @@ class SuitabilityDataTest {
         assertEquals(Map.of(LUMBERING, 3), data.levels(List.of("bug", "steel"), "cobblemon:scizor"));
         assertEquals(Map.of(LUMBERING, 2, TRANSPORTING, 1), data.levels(List.of("bug", "flying"), "cobblemon:scyther"));
         assertEquals(Map.of(LUMBERING, 2), data.levels(List.of("bug"), "cobblemon:pinsir"));
-        assertEquals(Map.of(PLANTING, 1, GATHERING, 1, LUMBERING, 3), data.levels(List.of("grass", "steel"), "cobblemon:kartana"));
+        assertEquals(
+                Map.of(PLANTING, 1, GATHERING, 1, LUMBERING, 3),
+                data.levels(List.of("grass", "steel"), "cobblemon:kartana"));
         assertEquals(Map.of(FARMING, 3), data.levels(List.of("normal"), "cobblemon:miltank"));
         assertEquals(Map.of(FARMING, 2), data.levels(List.of("normal"), "cobblemon:chansey"));
-        assertEquals(Map.of(PLANTING, 1, GATHERING, 3, TRANSPORTING, 1, FARMING, 1),
+        assertEquals(
+                Map.of(PLANTING, 1, GATHERING, 3, TRANSPORTING, 1, FARMING, 1),
                 data.levels(List.of("grass", "flying"), "cobblemon:tropius"));
         assertTrue(data.levels(List.of("water"), "cobblemon:lucario").containsKey(HANDIWORK));
     }

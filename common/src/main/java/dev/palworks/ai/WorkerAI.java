@@ -19,10 +19,16 @@ import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
-import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.tree.TreeDetector;
+import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -31,13 +37,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Main AI controller for Pokémon workers.
@@ -137,8 +136,11 @@ public class WorkerAI {
         ReservationId reservation = state.getCurrentReservation();
         if (reservation != null) {
             if (DEBUG) {
-                Palworks.LOGGER.debug("{} has active reservation: {} at {}",
-                    pokemon.getSpecies().getName(), reservation.getJobType(), reservation.getStationPos());
+                Palworks.LOGGER.debug(
+                        "{} has active reservation: {} at {}",
+                        pokemon.getSpecies().getName(),
+                        reservation.getJobType(),
+                        reservation.getStationPos());
             }
 
             // CRITICAL FIX: Check if reservation is impossibly far away (likely corrupted Y coordinate)
@@ -146,8 +148,12 @@ public class WorkerAI {
             BlockPos entityPos = entity.blockPosition();
             double distanceSq = entityPos.distSqr(reservation.getStationPos());
             if (distanceSq > 100 * 100) { // 100 block radius check
-                Palworks.LOGGER.warn("{} has impossible reservation distance {} blocks (entity at {}, job at {}) - clearing corrupted reservation!",
-                    pokemon.getSpecies().getName(), Math.sqrt(distanceSq), entityPos, reservation.getStationPos());
+                Palworks.LOGGER.warn(
+                        "{} has impossible reservation distance {} blocks (entity at {}, job at {}) - clearing corrupted reservation!",
+                        pokemon.getSpecies().getName(),
+                        Math.sqrt(distanceSq),
+                        entityPos,
+                        reservation.getStationPos());
                 entity.getNavigation().stop(); // dropping the job: don't keep walking to it
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
@@ -162,16 +168,16 @@ public class WorkerAI {
             // instead of reading a clock time as game time (it would never expire)
             long now = level.getGameTime();
             if (reservation.isFromTheFuture(now)) {
-                ReservationId refreshedReservation = new ReservationId(
-                    reservation.getStationPos(), reservation.getJobType(), now);
+                ReservationId refreshedReservation =
+                        new ReservationId(reservation.getStationPos(), reservation.getJobType(), now);
                 state.setCurrentReservation(refreshedReservation);
                 WorkerStateManager.save(pokemon, state);
                 reservation = refreshedReservation;
             }
 
             if (!isActivelyWorking && reservation.isExpired(now, RESERVATION_TIMEOUT_TICKS)) {
-                Palworks.LOGGER.info("{} reservation expired for {}",
-                    pokemon.getSpecies().getName(), reservation.getJobType());
+                Palworks.LOGGER.info(
+                        "{} reservation expired for {}", pokemon.getSpecies().getName(), reservation.getJobType());
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                     JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                 }
@@ -205,8 +211,8 @@ public class WorkerAI {
         }
         BlockPos heading = entity.getNavigation().getTargetPos();
         if (heading != null) {
-            BlockPos standPos = WorkPositions.standingPosFor(
-                level, reservation.getStationPos(), reservation.getJobType(), entity);
+            BlockPos standPos =
+                    WorkPositions.standingPosFor(level, reservation.getStationPos(), reservation.getJobType(), entity);
             if (heading.equals(standPos)) {
                 entity.getNavigation().stop();
             }
@@ -217,12 +223,7 @@ public class WorkerAI {
      * Execute the current reserved job.
      */
     private static boolean executeJob(
-            Pokemon pokemon,
-            Mob entity,
-            Level level,
-            WorkerState state,
-            ReservationId reservation
-    ) {
+            Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         BlockPos targetPos = reservation.getStationPos();
 
         // Resolve the exact tile to stand on (e.g. in front of a furnace's face), sized to this mon.
@@ -242,8 +243,11 @@ public class WorkerAI {
             }
             // No valid place to stand to do this job (front blocked / no standable tile). Give up.
             if (DEBUG) {
-                Palworks.LOGGER.warn("{} found no valid stand position for {} at {} - abandoning",
-                    pokemon.getSpecies().getName(), reservation.getJobType(), targetPos);
+                Palworks.LOGGER.warn(
+                        "{} found no valid stand position for {} at {} - abandoning",
+                        pokemon.getSpecies().getName(),
+                        reservation.getJobType(),
+                        targetPos);
             }
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                 JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
@@ -271,8 +275,11 @@ public class WorkerAI {
                 && !state.hasJobProgress()
                 && !JobManager.isJobStillThere(level, reservation.getJobType(), targetPos)) {
             if (DEBUG) {
-                Palworks.LOGGER.info("{}'s {} job at {} no longer valid (station removed/emptied) - dropping",
-                    pokemon.getSpecies().getName(), reservation.getJobType(), targetPos);
+                Palworks.LOGGER.info(
+                        "{}'s {} job at {} no longer valid (station removed/emptied) - dropping",
+                        pokemon.getSpecies().getName(),
+                        reservation.getJobType(),
+                        targetPos);
             }
             JobManager.getInstance(validationLevel).onJobInvalidated(pokemon, reservation, level);
             entity.getNavigation().stop(); // dropping the job: don't keep walking to it
@@ -293,8 +300,11 @@ public class WorkerAI {
                 && (level.getGameTime() + entity.getId()) % JOB_RECHECK_INTERVAL == 0
                 && !dev.palworks.worker.WorkerEligibility.withinOwnerLeash(pokemon, level, targetPos)) {
             if (DEBUG) {
-                Palworks.LOGGER.info("{}'s owner moved away from its {} job at {} - dropping",
-                    pokemon.getSpecies().getName(), reservation.getJobType(), targetPos);
+                Palworks.LOGGER.info(
+                        "{}'s owner moved away from its {} job at {} - dropping",
+                        pokemon.getSpecies().getName(),
+                        reservation.getJobType(),
+                        targetPos);
             }
             entity.getNavigation().stop(); // dropping the job: don't keep walking to it
             state.clearReservation();
@@ -319,26 +329,32 @@ public class WorkerAI {
             boolean walkEndedNextToIt = navDone && state.hasWalkedToJob() && distanceSq <= SETTLED_DISTSQ;
             if (!onTile && walkEndedNextToIt && state.getStepInTicks() < STEP_IN_TICKS) {
                 state.addStepInTick();
-                entity.getMoveControl().setWantedPosition(
-                    standPos.getX() + 0.5, standPos.getY(), standPos.getZ() + 0.5, 0.6);
+                entity.getMoveControl()
+                        .setWantedPosition(standPos.getX() + 0.5, standPos.getY(), standPos.getZ() + 0.5, 0.6);
                 return true;
             }
-            arrived = onTile || walkEndedNextToIt
-                || (navDone && state.hasWalkedToJob() && WorkPositions.withinChoppingReach(level, entity, targetPos));
+            arrived = onTile
+                    || walkEndedNextToIt
+                    || (navDone
+                            && state.hasWalkedToJob()
+                            && WorkPositions.withinChoppingReach(level, entity, targetPos));
         } else {
-            boolean closeEnough = navDone && state.hasWalkedToJob()
-                && !WorkPositions.isDirectional(level, targetPos) && WorkPositions.withinWorkReach(entity, targetPos);
+            boolean closeEnough = navDone
+                    && state.hasWalkedToJob()
+                    && !WorkPositions.isDirectional(level, targetPos)
+                    && WorkPositions.withinWorkReach(entity, targetPos);
             arrived = distanceSq <= ARRIVAL_DISTSQ || (navDone && distanceSq <= SETTLED_DISTSQ) || closeEnough;
         }
         if (arrived) {
             // Only log on first tick of work
             if (DEBUG && !state.isWorking()) {
                 WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
-                String inventoryInfo = inventory.isEmpty()
-                    ? "empty"
-                    : inventory.getTotalItemCount() + " items";
-                Palworks.LOGGER.info("{} arrived at {} job, starting work (inventory: {})",
-                    pokemon.getSpecies().getName(), reservation.getJobType(), inventoryInfo);
+                String inventoryInfo = inventory.isEmpty() ? "empty" : inventory.getTotalItemCount() + " items";
+                Palworks.LOGGER.info(
+                        "{} arrived at {} job, starting work (inventory: {})",
+                        pokemon.getSpecies().getName(),
+                        reservation.getJobType(),
+                        inventoryInfo);
             }
 
             // Keep worker stationary while working (for animations). Only horizontally: zeroing its
@@ -366,8 +382,10 @@ public class WorkerAI {
 
                 // Opt-in activity message (only players who ran /palworks debug see it)
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                    DebugManager.broadcastActivity(serverLevel,
-                        pokemon.getSpecies().getName() + " completed " + reservation.getJobType().name());
+                    DebugManager.broadcastActivity(
+                            serverLevel,
+                            pokemon.getSpecies().getName() + " completed "
+                                    + reservation.getJobType().name());
                 }
             }
 
@@ -382,9 +400,12 @@ public class WorkerAI {
             // Only log when starting navigation (not every tick)
             if (DEBUG && !state.isWorking() && entity.getNavigation().isDone()) {
                 double distance = Math.sqrt(distanceSq);
-                Palworks.LOGGER.info("{} navigating to {} job at {} (distance: {} blocks)",
-                    pokemon.getSpecies().getName(), reservation.getJobType(), targetPos,
-                    String.format("%.1f", distance));
+                Palworks.LOGGER.info(
+                        "{} navigating to {} job at {} (distance: {} blocks)",
+                        pokemon.getSpecies().getName(),
+                        reservation.getJobType(),
+                        targetPos,
+                        String.format("%.1f", distance));
             }
 
             // A step only counts while standing at the job: if the worker was moved off it (pushed,
@@ -404,8 +425,10 @@ public class WorkerAI {
 
                 if (state.isStuck()) {
                     // Give up on this job and clear reservation
-                    Palworks.LOGGER.warn("{} is stuck, giving up on job at {}",
-                        pokemon.getSpecies().getName(), targetPos);
+                    Palworks.LOGGER.warn(
+                            "{} is stuck, giving up on job at {}",
+                            pokemon.getSpecies().getName(),
+                            targetPos);
                     if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                         JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                     }
@@ -433,12 +456,7 @@ public class WorkerAI {
      * to the next step. Returns true when the last step is done (and the job doesn't repeat).
      */
     private static boolean performWork(
-            Pokemon pokemon,
-            Mob entity,
-            Level level,
-            WorkerState state,
-            ReservationId reservation
-    ) {
+            Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
         JobHandler handler = handlerFor(reservation.getJobType());
 
@@ -447,8 +465,8 @@ public class WorkerAI {
             case REPEATING -> {
                 // Some jobs (e.g. lighting a furnace that has more to smelt) go round again.
                 // Refresh the reservation with a new timestamp to prevent expiration.
-                state.setCurrentReservation(new ReservationId(
-                    reservation.getStationPos(), reservation.getJobType(), level.getGameTime()));
+                state.setCurrentReservation(
+                        new ReservationId(reservation.getStationPos(), reservation.getJobType(), level.getGameTime()));
                 yield false;
             }
             case FINISHED -> true;
@@ -467,7 +485,9 @@ public class WorkerAI {
         /** The job's steps, in order. The shared code walks the worker there and runs them. */
         List<Step> steps();
         /** If true when the last step is done, start the steps again instead of finishing. */
-        default boolean repeatAfterComplete(JobContext ctx) { return false; }
+        default boolean repeatAfterComplete(JobContext ctx) {
+            return false;
+        }
     }
 
     /**
@@ -478,12 +498,27 @@ public class WorkerAI {
      * reached is saved, so the job carries on from it, even with a different worker (handed over).
      * A step that isn't {@code isNeeded} when it's reached (nothing for it to do) is skipped.
      */
-    private record Step(String name, int ticks, StepStart onStart, StepFinish onFinish,
-                        java.util.function.Predicate<JobContext> isNeeded)
+    private record Step(
+            String name,
+            int ticks,
+            StepStart onStart,
+            StepFinish onFinish,
+            java.util.function.Predicate<JobContext> isNeeded)
             implements StepRunner.TimedStep<JobContext> {
-        @Override public void start(JobContext ctx) { onStart.run(ctx); }
-        @Override public boolean finish(JobContext ctx) { return onFinish.run(ctx); }
-        @Override public boolean needed(JobContext ctx) { return isNeeded.test(ctx); }
+        @Override
+        public void start(JobContext ctx) {
+            onStart.run(ctx);
+        }
+
+        @Override
+        public boolean finish(JobContext ctx) {
+            return onFinish.run(ctx);
+        }
+
+        @Override
+        public boolean needed(JobContext ctx) {
+            return isNeeded.test(ctx);
+        }
 
         /** A step that always runs (most do). */
         Step(String name, int ticks, StepStart onStart, StepFinish onFinish) {
@@ -499,10 +534,14 @@ public class WorkerAI {
         }
     }
 
-    private interface StepStart { void run(JobContext ctx); }
+    private interface StepStart {
+        void run(JobContext ctx);
+    }
 
     /** A step's effect. Return false to end the job here (e.g. there turned out to be nothing to do). */
-    private interface StepFinish { boolean run(JobContext ctx); }
+    private interface StepFinish {
+        boolean run(JobContext ctx);
+    }
 
     /** Wrap a void effect as a step finish that always lets the job continue. */
     private static StepFinish effect(java.util.function.Consumer<JobContext> action) {
@@ -513,13 +552,22 @@ public class WorkerAI {
     }
 
     /** Everything a {@link JobHandler} needs to act at the work site. */
-    private record JobContext(Pokemon pokemon, Mob entity, Level level,
-                              WorkerState state, ReservationId reservation) {
-        BlockPos pos() { return reservation.getStationPos(); }
-        WorkerInventory inventory() { return WorkerInventoryManager.getOrCreate(pokemon); }
-        String name() { return pokemon.getSpecies().getName(); }
+    private record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
+        BlockPos pos() {
+            return reservation.getStationPos();
+        }
+
+        WorkerInventory inventory() {
+            return WorkerInventoryManager.getOrCreate(pokemon);
+        }
+
+        String name() {
+            return pokemon.getSpecies().getName();
+        }
         /** Data steps leave for later steps (saved, and handed over with the job). */
-        net.minecraft.nbt.CompoundTag data() { return state.getJobData(); }
+        net.minecraft.nbt.CompoundTag data() {
+            return state.getJobData();
+        }
     }
 
     private static final Map<JobType, JobHandler> HANDLERS = new EnumMap<>(JobType.class);
@@ -560,19 +608,25 @@ public class WorkerAI {
         // One cycle matches one smelting operation (200 ticks): settle, then Ember (lighting the
         // furnace when its flames reach it), then wait out the rest of the smelt.
         private final List<Step> steps = List.of(
-            // Start the move a few ticks after arrival, not on the arrival tick: on the first cycle
-            // the worker has just stopped walking, and starting the move during the walk→idle
-            // transition gets the animation dropped. The brief settle fixes the first cycle.
-            Step.pause("settle", FURNACE_EFFECT_START_TICK),
-            // Swap which move by changing FURNACE_IGNITE_MOVE; no other code changes. The furnace
-            // lights FURNACE_IGNITE_DELAY_TICKS into the animation, when the flames reach it.
-            new Step("ember", FURNACE_IGNITE_DELAY_TICKS,
-                ctx -> playMoveActionEffect(ctx, FURNACE_IGNITE_MOVE),
-                effect(FuelFurnaceHandler::ignite)),
-            // Re-igniting once per cycle keeps it lit across repeats: the 201-tick burn covers the
-            // 200-tick gap to the next ignite.
-            Step.pause("smelt", 200 - FURNACE_EFFECT_START_TICK - FURNACE_IGNITE_DELAY_TICKS));
-        @Override public List<Step> steps() { return steps; }
+                // Start the move a few ticks after arrival, not on the arrival tick: on the first cycle
+                // the worker has just stopped walking, and starting the move during the walk→idle
+                // transition gets the animation dropped. The brief settle fixes the first cycle.
+                Step.pause("settle", FURNACE_EFFECT_START_TICK),
+                // Swap which move by changing FURNACE_IGNITE_MOVE; no other code changes. The furnace
+                // lights FURNACE_IGNITE_DELAY_TICKS into the animation, when the flames reach it.
+                new Step(
+                        "ember",
+                        FURNACE_IGNITE_DELAY_TICKS,
+                        ctx -> playMoveActionEffect(ctx, FURNACE_IGNITE_MOVE),
+                        effect(FuelFurnaceHandler::ignite)),
+                // Re-igniting once per cycle keeps it lit across repeats: the 201-tick burn covers the
+                // 200-tick gap to the next ignite.
+                Step.pause("smelt", 200 - FURNACE_EFFECT_START_TICK - FURNACE_IGNITE_DELAY_TICKS));
+
+        @Override
+        public List<Step> steps() {
+            return steps;
+        }
 
         private static void ignite(JobContext ctx) {
             int burnDuration = dev.palworks.station.FurnaceHelper.getBurnDuration();
@@ -582,7 +636,8 @@ public class WorkerAI {
             }
         }
 
-        @Override public boolean repeatAfterComplete(JobContext ctx) {
+        @Override
+        public boolean repeatAfterComplete(JobContext ctx) {
             // Keep going only if the furnace still has more than the item being smelted.
             if (dev.palworks.station.FurnaceHelper.hasQueuedItems(ctx.level(), ctx.pos())) {
                 if (DEBUG) {
@@ -596,15 +651,23 @@ public class WorkerAI {
 
     private static final class GetSeedsHandler implements JobHandler {
         private final List<Step> steps = List.of(Step.of("take seeds", 20, effect(this::work)));
-        @Override public List<Step> steps() { return steps; }
+
+        @Override
+        public List<Step> steps() {
+            return steps;
+        }
 
         private void work(JobContext ctx) {
             BlockPos targetPos = ctx.pos();
             WorkerInventory inventory = ctx.inventory();
 
             if (DEBUG) {
-                Palworks.LOGGER.info("{} starting GET_SEEDS at {} (inventory: {} items, has space: {})",
-                    ctx.name(), targetPos, inventory.getTotalItemCount(), inventory.hasSpace());
+                Palworks.LOGGER.info(
+                        "{} starting GET_SEEDS at {} (inventory: {} items, has space: {})",
+                        ctx.name(),
+                        targetPos,
+                        inventory.getTotalItemCount(),
+                        inventory.hasSpace());
             }
 
             // Skip extraction if inventory is full, but still complete the job
@@ -619,45 +682,66 @@ public class WorkerAI {
             if (suitabilities.contains(Suitability.PLANTING)) {
                 // A seed the open farmland around it can take (see JobManager.seedToFetch)
                 net.minecraft.world.item.Item seed = ctx.level() instanceof ServerLevel serverLevel
-                    ? JobManager.getInstance(serverLevel).seedToFetch(targetPos, ctx.entity().blockPosition())
-                    : null;
-                ItemStack extracted = seed == null ? ItemStack.EMPTY
-                    : dev.palworks.station.ChestHelper.extractItems(ctx.level(), targetPos, seed, 64);
+                        ? JobManager.getInstance(serverLevel)
+                                .seedToFetch(targetPos, ctx.entity().blockPosition())
+                        : null;
+                ItemStack extracted = seed == null
+                        ? ItemStack.EMPTY
+                        : dev.palworks.station.ChestHelper.extractItems(ctx.level(), targetPos, seed, 64);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
                     returnToChest(ctx.level(), targetPos, extracted, leftover);
                     if (DEBUG) {
-                        Palworks.LOGGER.info("{} got {} {} seeds from chest at {} ({} leftover)",
-                            ctx.name(), extracted.getCount() - leftover, extracted.getItem().toString(), targetPos, leftover);
+                        Palworks.LOGGER.info(
+                                "{} got {} {} seeds from chest at {} ({} leftover)",
+                                ctx.name(),
+                                extracted.getCount() - leftover,
+                                extracted.getItem().toString(),
+                                targetPos,
+                                leftover);
                     }
                 } else if (DEBUG) {
-                    Palworks.LOGGER.warn("{} FAILED to get seeds from chest at {} - chest might be empty, treating as complete",
-                        ctx.name(), targetPos);
+                    Palworks.LOGGER.warn(
+                            "{} FAILED to get seeds from chest at {} - chest might be empty, treating as complete",
+                            ctx.name(),
+                            targetPos);
                 }
             } else if (suitabilities.contains(Suitability.NETHER)) {
                 ItemStack extracted = dev.palworks.station.ChestHelper.extractItems(
-                    ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
+                        ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
                     returnToChest(ctx.level(), targetPos, extracted, leftover);
                     if (DEBUG) {
-                        Palworks.LOGGER.info("{} got {} nether wart from chest at {} ({} leftover)",
-                            ctx.name(), extracted.getCount() - leftover, targetPos, leftover);
+                        Palworks.LOGGER.info(
+                                "{} got {} nether wart from chest at {} ({} leftover)",
+                                ctx.name(),
+                                extracted.getCount() - leftover,
+                                targetPos,
+                                leftover);
                     }
                 } else if (DEBUG) {
-                    Palworks.LOGGER.warn("{} FAILED to get nether wart from chest at {} - chest might be empty, treating as complete",
-                        ctx.name(), targetPos);
+                    Palworks.LOGGER.warn(
+                            "{} FAILED to get nether wart from chest at {} - chest might be empty, treating as complete",
+                            ctx.name(),
+                            targetPos);
                 }
             } else if (DEBUG) {
-                Palworks.LOGGER.warn("{} has GET_SEEDS job but lacks PLANTING/NETHER suitability! Suitabilities: {}",
-                    ctx.name(), suitabilities);
+                Palworks.LOGGER.warn(
+                        "{} has GET_SEEDS job but lacks PLANTING/NETHER suitability! Suitabilities: {}",
+                        ctx.name(),
+                        suitabilities);
             }
         }
     }
 
     private static final class CollectDropsHandler implements JobHandler {
         private final List<Step> steps = List.of(Step.of("pick up", 20, effect(this::work)));
-        @Override public List<Step> steps() { return steps; }
+
+        @Override
+        public List<Step> steps() {
+            return steps;
+        }
 
         // Picks up whatever fits (into stacks of the same item first, then free slots). What doesn't
         // fit stays on the ground, and JobManager gives it a pickup job of its own again.
@@ -666,7 +750,8 @@ public class WorkerAI {
             WorkerInventory inventory = ctx.inventory();
 
             int pickedUp = 0;
-            for (net.minecraft.world.entity.item.ItemEntity itemEntity : JobManager.itemsToPickUp(ctx.level(), targetPos)) {
+            for (net.minecraft.world.entity.item.ItemEntity itemEntity :
+                    JobManager.itemsToPickUp(ctx.level(), targetPos)) {
                 ItemStack stack = itemEntity.getItem();
                 int leftover = inventory.addItem(stack);
                 if (leftover == stack.getCount()) {
@@ -682,15 +767,19 @@ public class WorkerAI {
             }
 
             if (DEBUG && pickedUp > 0) {
-                Palworks.LOGGER.info("{} collected {} dropped items from ground at {}",
-                    ctx.name(), pickedUp, targetPos);
+                Palworks.LOGGER.info(
+                        "{} collected {} dropped items from ground at {}", ctx.name(), pickedUp, targetPos);
             }
         }
     }
 
     private static final class DeliverItemsHandler implements JobHandler {
         private final List<Step> steps = List.of(Step.of("deliver", 20, effect(this::work)));
-        @Override public List<Step> steps() { return steps; }
+
+        @Override
+        public List<Step> steps() {
+            return steps;
+        }
 
         private void work(JobContext ctx) {
             BlockPos chestPos = ctx.pos();
@@ -725,7 +814,11 @@ public class WorkerAI {
 
     private static final class PlantSeedsHandler implements JobHandler {
         private final List<Step> steps = List.of(Step.of("plant", 20, effect(this::work)));
-        @Override public List<Step> steps() { return steps; }
+
+        @Override
+        public List<Step> steps() {
+            return steps;
+        }
 
         private void work(JobContext ctx) {
             BlockPos plantPos = ctx.pos();
@@ -755,8 +848,12 @@ public class WorkerAI {
                 seedStack.shrink(1);
                 inventory.setChanged();
                 if (DEBUG) {
-                    Palworks.LOGGER.info("{} planted {} at {} ({} items remaining)",
-                        ctx.name(), seed.toString(), plantPos, inventory.getTotalItemCount());
+                    Palworks.LOGGER.info(
+                            "{} planted {} at {} ({} items remaining)",
+                            ctx.name(),
+                            seed.toString(),
+                            plantPos,
+                            inventory.getTotalItemCount());
                 }
             } else if (DEBUG) {
                 Palworks.LOGGER.warn("{} failed to plant {} at {}", ctx.name(), seed.toString(), plantPos);
@@ -766,7 +863,11 @@ public class WorkerAI {
 
     private static final class HarvestCropsHandler implements JobHandler {
         private final List<Step> steps = List.of(Step.of("harvest", 20, effect(this::work)));
-        @Override public List<Step> steps() { return steps; }
+
+        @Override
+        public List<Step> steps() {
+            return steps;
+        }
 
         private void work(JobContext ctx) {
             BlockPos harvestPos = ctx.pos();
@@ -786,10 +887,19 @@ public class WorkerAI {
         // replant (1s later). The replant spots and sapling are saved in the job's data at the
         // chop, so a paused job, or one another lumberjack takes over, still replants.
         private final List<Step> steps = List.of(
-            new Step("clear leaves", 20, ctx -> {}, effect(ChopTreeHandler::clearLeaves), ChopTreeHandler::leavesInTheWay),
-            Step.of("chop", 60, ChopTreeHandler::chop),
-            Step.of("replant", 20, effect(ChopTreeHandler::replant)));
-        @Override public List<Step> steps() { return steps; }
+                new Step(
+                        "clear leaves",
+                        20,
+                        ctx -> {},
+                        effect(ChopTreeHandler::clearLeaves),
+                        ChopTreeHandler::leavesInTheWay),
+                Step.of("chop", 60, ChopTreeHandler::chop),
+                Step.of("replant", 20, effect(ChopTreeHandler::replant)));
+
+        @Override
+        public List<Step> steps() {
+            return steps;
+        }
 
         /** Whether leaves stand between the worker and the trunk (see WorkPositions.treeStandFor). */
         private static boolean leavesInTheWay(JobContext ctx) {
@@ -824,8 +934,11 @@ public class WorkerAI {
                 // Not a valid tree any more (partly chopped, or it's a player build). Leave it alone:
                 // breaking "just this log" is how builds that fail tree detection got griefed.
                 if (DEBUG) {
-                    Palworks.LOGGER.warn("{} found no valid tree at {} ({}), leaving it alone",
-                        ctx.name(), treePos, treeResult.getReason());
+                    Palworks.LOGGER.warn(
+                            "{} found no valid tree at {} ({}), leaving it alone",
+                            ctx.name(),
+                            treePos,
+                            treeResult.getReason());
                 }
                 return false;
             }
@@ -839,13 +952,13 @@ public class WorkerAI {
             // in the same spots, anything else one at its base. Worked out while the trunk is
             // still there to look at.
             java.util.List<BlockPos> saplingSpots =
-                TreeDetector.saplingPositions(level, treeResult.getLogPositions(), basePos);
+                    TreeDetector.saplingPositions(level, treeResult.getLogPositions(), basePos);
 
             // Huge fungus canopies never decay, so they come down with the stem (found before
             // anything is broken, while the tree is still intact)
             java.util.Set<BlockPos> canopy = TreeDetector.isNetherStem(level.getBlockState(treePos))
-                ? TreeDetector.findNetherCanopyToBreak(level, treeResult.getLogPositions(), treePos)
-                : java.util.Set.of();
+                    ? TreeDetector.findNetherCanopyToBreak(level, treeResult.getLogPositions(), treePos)
+                    : java.util.Set.of();
 
             int logsChopped = 0;
             for (BlockPos logPos : treeResult.getLogPositions()) {
@@ -858,14 +971,24 @@ public class WorkerAI {
             }
 
             if (DEBUG) {
-                Palworks.LOGGER.info("{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
-                    ctx.name(), treePos, logsChopped, canopy.size(), basePos, saplingItem);
+                Palworks.LOGGER.info(
+                        "{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
+                        ctx.name(),
+                        treePos,
+                        logsChopped,
+                        canopy.size(),
+                        basePos,
+                        saplingItem);
             }
 
             // For the replant step (saved with the job, so it survives a pause or a handover)
             if (saplingItem != null) {
-                ctx.data().putString(DATA_SAPLING,
-                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(saplingItem).toString());
+                ctx.data()
+                        .putString(
+                                DATA_SAPLING,
+                                net.minecraft.core.registries.BuiltInRegistries.ITEM
+                                        .getKey(saplingItem)
+                                        .toString());
                 int[] spots = new int[saplingSpots.size() * 3];
                 for (int i = 0; i < saplingSpots.size(); i++) {
                     BlockPos spot = saplingSpots.get(i);
@@ -887,9 +1010,12 @@ public class WorkerAI {
         /** Plant the saplings noted at the chop. The sapling is free (see onTreeChopped). */
         private static void replant(JobContext ctx) {
             net.minecraft.resources.ResourceLocation saplingId =
-                net.minecraft.resources.ResourceLocation.tryParse(ctx.data().getString(DATA_SAPLING));
-            net.minecraft.world.item.Item saplingItem = saplingId == null ? null
-                : net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(saplingId).orElse(null);
+                    net.minecraft.resources.ResourceLocation.tryParse(ctx.data().getString(DATA_SAPLING));
+            net.minecraft.world.item.Item saplingItem = saplingId == null
+                    ? null
+                    : net.minecraft.core.registries.BuiltInRegistries.ITEM
+                            .getOptional(saplingId)
+                            .orElse(null);
             int[] spots = ctx.data().getIntArray(DATA_SPOTS);
             if (saplingItem == null || spots.length % 3 != 0) {
                 return;
@@ -898,7 +1024,8 @@ public class WorkerAI {
             // nothing had dropped yet at the chop to pay with
             int replanted = 0;
             for (int i = 0; i < spots.length; i += 3) {
-                if (TreeDetector.plantSapling(ctx.level(), new BlockPos(spots[i], spots[i + 1], spots[i + 2]), saplingItem)) {
+                if (TreeDetector.plantSapling(
+                        ctx.level(), new BlockPos(spots[i], spots[i + 1], spots[i + 2]), saplingItem)) {
                     replanted++;
                 }
             }
@@ -943,7 +1070,8 @@ public class WorkerAI {
 
     /** Which Cobblemon move's action effect a Kindling worker performs to light a furnace. Swap this
      * one id to use a different move's animation/particles/sound — no other code changes. */
-    private static final ResourceLocation FURNACE_IGNITE_MOVE = ResourceLocation.fromNamespaceAndPath("cobblemon", "ember");
+    private static final ResourceLocation FURNACE_IGNITE_MOVE =
+            ResourceLocation.fromNamespaceAndPath("cobblemon", "ember");
     /** Ticks after arrival before the worker performs the move, to let it settle out of its walk
      * animation first (otherwise the move animation is dropped on the first smelt cycle). */
     private static final int FURNACE_EFFECT_START_TICK = 8;
@@ -978,7 +1106,7 @@ public class WorkerAI {
         GenericBedrockEntity targetMarker = null;
         try {
             ActionEffectTimeline timeline =
-                ActionEffects.INSTANCE.getActionEffects().get(actionEffectId);
+                    ActionEffects.INSTANCE.getActionEffects().get(actionEffectId);
             if (timeline == null) {
                 if (DEBUG) {
                     Palworks.LOGGER.warn("No Cobblemon action effect registered for {}", actionEffectId);
@@ -991,16 +1119,22 @@ public class WorkerAI {
             targetMarker.setSavesToWorld(false);
             targetMarker.setNoGravity(true);
             targetMarker.setScale(0.01f); // effectively invisible; just a position/locator anchor
-            targetMarker.moveTo(furnace.getX() + 0.5, furnace.getY() + FURNACE_TARGET_Y, furnace.getZ() + 0.5, 0.0f, 0.0f);
+            targetMarker.moveTo(
+                    furnace.getX() + 0.5, furnace.getY() + FURNACE_TARGET_Y, furnace.getZ() + 0.5, 0.0f, 0.0f);
             serverLevel.addFreshEntity(targetMarker);
 
             MoLangRuntime runtime = new MoLangRuntime();
             MoLangFunctions.INSTANCE.addStandardFunctions(runtime.getEnvironment().query);
-            List<Object> providers = List.of(
-                new UsersProvider(ctx.entity()), new TargetsProvider(targetMarker));
+            List<Object> providers = List.of(new UsersProvider(ctx.entity()), new TargetsProvider(targetMarker));
             ActionEffectContext context = new ActionEffectContext(
-                timeline, new HashSet<>(), providers, runtime,
-                /* canBeInterrupted */ true, /* interrupted */ false, new ArrayList<>(), serverLevel);
+                    timeline,
+                    new HashSet<>(),
+                    providers,
+                    runtime,
+                    /* canBeInterrupted */ true, /* interrupted */
+                    false,
+                    new ArrayList<>(),
+                    serverLevel);
 
             GenericBedrockEntity marker = targetMarker; // effectively final for the callback
             timeline.run(context).whenComplete((result, error) -> marker.discard());
@@ -1008,8 +1142,8 @@ public class WorkerAI {
             if (targetMarker != null) {
                 targetMarker.discard();
             }
-            Palworks.LOGGER.warn("Failed to play Cobblemon action effect {} on {}: {}",
-                actionEffectId, ctx.name(), e.toString());
+            Palworks.LOGGER.warn(
+                    "Failed to play Cobblemon action effect {} on {}: {}", actionEffectId, ctx.name(), e.toString());
         }
     }
 
@@ -1079,7 +1213,8 @@ public class WorkerAI {
         }
         int stillLeft = addItemsToChest(level, chestPos, extracted.copyWithCount(leftover));
         if (stillLeft > 0) {
-            net.minecraft.world.level.block.Block.popResource(level, chestPos.above(), extracted.copyWithCount(stillLeft));
+            net.minecraft.world.level.block.Block.popResource(
+                    level, chestPos.above(), extracted.copyWithCount(stillLeft));
         }
     }
 }

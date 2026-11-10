@@ -3,6 +3,8 @@ package dev.palworks.ai;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
 import dev.palworks.tree.TreeDetector;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
@@ -11,9 +13,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Resolves the exact tile a worker should stand on to perform a job, separate from the block the
@@ -229,7 +228,7 @@ public final class WorkPositions {
         List<BlockPos> trunk = trunkColumns(level, treePos);
         BlockPos at = entity.blockPosition();
         return Math.abs(at.getY() - treePos.getY()) <= 1
-            && chebyshevToTrunk(trunk, at.getX(), at.getZ()) <= closestChopRing(entity);
+                && chebyshevToTrunk(trunk, at.getX(), at.getZ()) <= closestChopRing(entity);
     }
 
     /**
@@ -431,7 +430,9 @@ public final class WorkPositions {
             for (int z = box[2]; z <= box[3]; z++) {
                 for (int y = 0; y < headroom; y++) {
                     space.set(x, pos.getY() + y, z);
-                    if (!level.getBlockState(space).getCollisionShape(level, space).isEmpty()) {
+                    if (!level.getBlockState(space)
+                            .getCollisionShape(level, space)
+                            .isEmpty()) {
                         return false;
                     }
                 }
@@ -441,7 +442,9 @@ public final class WorkPositions {
     }
 
     private static boolean hasFloor(Level level, BlockPos pos) {
-        return !level.getBlockState(pos.below()).getCollisionShape(level, pos.below()).isEmpty();
+        return !level.getBlockState(pos.below())
+                .getCollisionShape(level, pos.below())
+                .isEmpty();
     }
 
     /** The columns the worker's hitbox covers centred on this tile: {minX, maxX, minZ, maxZ}. */
@@ -508,7 +511,9 @@ public final class WorkPositions {
     /** Feet + head space clear (no floor requirement) - i.e. not a wall blocking the lane. */
     private static boolean isPassable(Level level, BlockPos pos) {
         return level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()
-            && level.getBlockState(pos.above()).getCollisionShape(level, pos.above()).isEmpty();
+                && level.getBlockState(pos.above())
+                        .getCollisionShape(level, pos.above())
+                        .isEmpty();
     }
 
     /** A tile is standable if feet + head space (two blocks) are clear and there's a solid floor below. */
@@ -518,7 +523,9 @@ public final class WorkPositions {
 
     /** A tile is standable if {@code headroom} blocks from the feet up are clear and the floor is solid. */
     public static boolean isStandable(Level level, BlockPos pos, int headroom) {
-        if (level.getBlockState(pos.below()).getCollisionShape(level, pos.below()).isEmpty()) {
+        if (level.getBlockState(pos.below())
+                .getCollisionShape(level, pos.below())
+                .isEmpty()) {
             return false;
         }
         for (int i = 0; i < headroom; i++) {

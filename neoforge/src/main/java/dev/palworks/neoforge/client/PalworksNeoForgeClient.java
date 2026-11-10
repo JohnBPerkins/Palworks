@@ -32,13 +32,16 @@ public class PalworksNeoForgeClient {
         });
         // Work icons on the party HUD's cards. Cobblemon draws the HUD from the same event at normal
         // priority; lowest runs after it, so the icons go on top.
-        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, RenderGuiEvent.Post.class,
+        NeoForge.EVENT_BUS.addListener(
+                EventPriority.LOWEST,
+                false,
+                RenderGuiEvent.Post.class,
                 renderEvent -> WorkStatusHud.render(renderEvent.getGuiGraphics()));
         // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
         NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, stageEvent -> {
             if (stageEvent.getStage() == RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
-                WorkerDebugRenderer.render(stageEvent.getCamera(),
-                        stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false));
+                WorkerDebugRenderer.render(
+                        stageEvent.getCamera(), stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false));
             }
         });
     }

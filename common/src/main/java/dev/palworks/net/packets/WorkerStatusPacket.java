@@ -3,11 +3,10 @@ package dev.palworks.net.packets;
 import com.cobblemon.mod.common.api.net.NetworkPacket;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.net.PalworksResource;
+import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.UUID;
 
 /**
  * Sent from server to the owner just before Cobblemon's own packet that opens a Pokemon's
@@ -54,7 +53,7 @@ public class WorkerStatusPacket implements NetworkPacket<WorkerStatusPacket> {
     }
 
     public static WorkerStatusPacket decode(RegistryFriendlyByteBuf buffer) {
-        return new WorkerStatusPacket(buffer.readUUID(), buffer.readBoolean(),
-                CarryMode.fromOrdinal(buffer.readVarInt()));
+        return new WorkerStatusPacket(
+                buffer.readUUID(), buffer.readBoolean(), CarryMode.fromOrdinal(buffer.readVarInt()));
     }
 }

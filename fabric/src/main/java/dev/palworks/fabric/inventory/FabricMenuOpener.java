@@ -6,14 +6,13 @@ import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.inventory.WorkerInventoryMenu;
+import java.util.UUID;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-
-import java.util.UUID;
 
 /**
  * Fabric implementation of MenuOpener using Fabric API's ExtendedScreenHandlerFactory.
@@ -40,12 +39,7 @@ public class FabricMenuOpener implements MenuOpener {
             @Override
             public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player p) {
                 return new WorkerInventoryMenu(
-                        ModMenuTypes.WORKER_INVENTORY.get(),
-                        containerId,
-                        playerInventory,
-                        inventory,
-                        pokemonUUID
-                );
+                        ModMenuTypes.WORKER_INVENTORY.get(), containerId, playerInventory, inventory, pokemonUUID);
             }
         });
     }

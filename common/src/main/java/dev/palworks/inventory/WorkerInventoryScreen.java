@@ -13,7 +13,8 @@ import net.minecraft.world.entity.player.Inventory;
  */
 public class WorkerInventoryScreen extends AbstractContainerScreen<WorkerInventoryMenu> {
     // Use the hopper texture as base - it has a similar compact layout
-    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/gui/container/hopper.png");
+    private static final ResourceLocation TEXTURE =
+            ResourceLocation.withDefaultNamespace("textures/gui/container/hopper.png");
 
     public WorkerInventoryScreen(WorkerInventoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -81,7 +82,13 @@ public class WorkerInventoryScreen extends AbstractContainerScreen<WorkerInvento
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         // Draw title centered
-        graphics.drawString(this.font, this.title, (this.imageWidth - this.font.width(this.title)) / 2, this.titleLabelY, 0x404040, false);
+        graphics.drawString(
+                this.font,
+                this.title,
+                (this.imageWidth - this.font.width(this.title)) / 2,
+                this.titleLabelY,
+                0x404040,
+                false);
 
         // Draw player inventory label
         graphics.drawString(this.font, this.playerInventoryTitle, 8, this.inventoryLabelY, 0x404040, false);

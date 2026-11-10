@@ -1,14 +1,13 @@
 package dev.palworks.inventory;
 
-import dev.palworks.suitability.Suitability;
-import org.junit.jupiter.api.Test;
-
-import java.util.EnumSet;
-import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import dev.palworks.suitability.Suitability;
+import java.util.EnumSet;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
 
 class CarryModeTest {
 
@@ -16,22 +15,27 @@ class CarryModeTest {
     void transportingGetsTheFullInventory() {
         assertEquals(CarryMode.FULL, CarryMode.forSuitabilities(EnumSet.of(Suitability.TRANSPORTING)));
         // Transporting wins even when the Pokémon can also plant (e.g. Tropius)
-        assertEquals(CarryMode.FULL, CarryMode.forSuitabilities(
-            EnumSet.of(Suitability.TRANSPORTING, Suitability.PLANTING, Suitability.GATHERING)));
+        assertEquals(
+                CarryMode.FULL,
+                CarryMode.forSuitabilities(
+                        EnumSet.of(Suitability.TRANSPORTING, Suitability.PLANTING, Suitability.GATHERING)));
     }
 
     @Test
     void plantersGetASeedPouch() {
-        assertEquals(CarryMode.SEED_POUCH, CarryMode.forSuitabilities(
-            EnumSet.of(Suitability.PLANTING, Suitability.GATHERING)));
+        assertEquals(
+                CarryMode.SEED_POUCH,
+                CarryMode.forSuitabilities(EnumSet.of(Suitability.PLANTING, Suitability.GATHERING)));
         // Nether (Ghost types) plants nether wart
         assertEquals(CarryMode.SEED_POUCH, CarryMode.forSuitabilities(EnumSet.of(Suitability.NETHER)));
     }
 
     @Test
     void everyoneElseCarriesNothing() {
-        assertEquals(CarryMode.NONE, CarryMode.forSuitabilities(
-            EnumSet.of(Suitability.KINDLING, Suitability.LUMBERING, Suitability.MINING)));
+        assertEquals(
+                CarryMode.NONE,
+                CarryMode.forSuitabilities(
+                        EnumSet.of(Suitability.KINDLING, Suitability.LUMBERING, Suitability.MINING)));
         assertEquals(CarryMode.NONE, CarryMode.forSuitabilities(Set.of()));
     }
 

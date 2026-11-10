@@ -12,6 +12,10 @@ import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerStateManager;
 import io.netty.buffer.Unpooled;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -19,11 +23,6 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.phys.AABB;
-
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 /**
  * What workers report doing (the party HUD's work icons and the debug overlay), and the packets
@@ -38,7 +37,9 @@ public class WorkStatusGameTests {
     @GameTest(template = Templates.EMPTY)
     public void packetsDecodeToWhatWasSent(GameTestHelper helper) {
         UUID uuid = UUID.randomUUID();
-        for (WorkActivity activity : List.of(WorkActivity.OFF, WorkActivity.IDLE,
+        for (WorkActivity activity : List.of(
+                WorkActivity.OFF,
+                WorkActivity.IDLE,
                 new WorkActivity(WorkActivity.Phase.WALKING, JobType.CHOP_TREE),
                 new WorkActivity(WorkActivity.Phase.PAUSED, JobType.DELIVER_ITEMS))) {
             RegistryFriendlyByteBuf buf = buffer(helper);
@@ -50,17 +51,24 @@ public class WorkStatusGameTests {
         }
 
         List<WorkerDebugPacket.Entry> entries = List.of(
-                new WorkerDebugPacket.Entry(42, new WorkActivity(WorkActivity.Phase.WALKING, JobType.HARVEST_CROPS),
-                        new BlockPos(10, 64, -3), List.of(new BlockPos(1, 64, 1), new BlockPos(2, 65, 1)),
-                        new WorkerDebugPacket.Details(120, 480, "", 0, 0, 0, 0,
-                                WorkerDebugPacket.PathStatus.PARTIAL, 2, 7, 35),
+                new WorkerDebugPacket.Entry(
+                        42,
+                        new WorkActivity(WorkActivity.Phase.WALKING, JobType.HARVEST_CROPS),
+                        new BlockPos(10, 64, -3),
+                        List.of(new BlockPos(1, 64, 1), new BlockPos(2, 65, 1)),
+                        new WorkerDebugPacket.Details(
+                                120, 480, "", 0, 0, 0, 0, WorkerDebugPacket.PathStatus.PARTIAL, 2, 7, 35),
                         List.of(new BlockPos(-5, 70, 9))),
-                new WorkerDebugPacket.Entry(7, new WorkActivity(WorkActivity.Phase.WORKING, JobType.CHOP_TREE),
-                        new BlockPos(0, 0, 0), List.of(),
-                        new WorkerDebugPacket.Details(900, -1, "chop", 1, 3, 34, 60,
-                                WorkerDebugPacket.PathStatus.NONE, 0, 0, 0),
+                new WorkerDebugPacket.Entry(
+                        7,
+                        new WorkActivity(WorkActivity.Phase.WORKING, JobType.CHOP_TREE),
+                        new BlockPos(0, 0, 0),
+                        List.of(),
+                        new WorkerDebugPacket.Details(
+                                900, -1, "chop", 1, 3, 34, 60, WorkerDebugPacket.PathStatus.NONE, 0, 0, 0),
                         List.of()),
-                new WorkerDebugPacket.Entry(8, WorkActivity.IDLE, null, List.of(), WorkerDebugPacket.Details.NONE, List.of()));
+                new WorkerDebugPacket.Entry(
+                        8, WorkActivity.IDLE, null, List.of(), WorkerDebugPacket.Details.NONE, List.of()));
         RegistryFriendlyByteBuf debugBuf = buffer(helper);
         new WorkerDebugPacket(entries).encode(debugBuf);
         helper.assertValueEqual(WorkerDebugPacket.decode(debugBuf).getEntries(), entries, "debug entries");
@@ -98,15 +106,18 @@ public class WorkStatusGameTests {
                 WorkerDebugPacket.Details d = entry.details();
                 if (entry.activity().phase() == WorkActivity.Phase.WALKING) {
                     // Counting down from the 30s timeout as the job gets older
-                    if (d.jobAgeTicks() < 0 || d.expiresInTicks() + d.jobAgeTicks() != WorkerAI.RESERVATION_TIMEOUT_TICKS) {
+                    if (d.jobAgeTicks() < 0
+                            || d.expiresInTicks() + d.jobAgeTicks() != WorkerAI.RESERVATION_TIMEOUT_TICKS) {
                         badTimer[0] = "age " + d.jobAgeTicks() + ", gives up in " + d.expiresInTicks();
                     }
                     sawReachingPath[0] |= d.pathStatus() == WorkerDebugPacket.PathStatus.REACHES;
                 }
-                if (entry.activity().phase() == WorkActivity.Phase.WORKING && d.stepName().equals("chop")) {
+                if (entry.activity().phase() == WorkActivity.Phase.WORKING
+                        && d.stepName().equals("chop")) {
                     sawChopStep[0] = d.stepCount() > 0 && d.stepLength() > 0;
                 }
-                if (entry.activity().phase() == WorkActivity.Phase.WALKING && !entry.path().isEmpty()
+                if (entry.activity().phase() == WorkActivity.Phase.WALKING
+                        && !entry.path().isEmpty()
                         && helper.absolutePos(trunk).equals(entry.target())) {
                     sawPathToTree[0] = true;
                 }
@@ -119,7 +130,8 @@ public class WorkStatusGameTests {
         helper.succeedWhen(() -> {
             helper.assertTrue(sawPathToTree[0], "walking to the tree, with a path and the trunk as its target");
             helper.assertTrue(seen.contains(WorkActivity.Phase.WORKING), "then chopping it");
-            helper.assertTrue(badTimer[0] == null, "job timer while walking should add up to the timeout: " + badTimer[0]);
+            helper.assertTrue(
+                    badTimer[0] == null, "job timer while walking should add up to the timeout: " + badTimer[0]);
             helper.assertTrue(sawReachingPath[0], "its path to the tree reported as reaching it");
             helper.assertTrue(sawChopStep[0], "the chop step named while it chopped");
             for (int y = 1; y <= 4; y++) {
@@ -138,7 +150,8 @@ public class WorkStatusGameTests {
 
         helper.succeedWhen(() -> helper.assertValueEqual(
                 WorkActivitySync.activityOf(bulbasaur, WorkerStateManager.getOrCreate(bulbasaur.getPokemon())),
-                WorkActivity.OFF, "activity"));
+                WorkActivity.OFF,
+                "activity"));
     }
 
     @GameTest(template = Templates.EMPTY, batch = "work_status_unreachable", timeoutTicks = 300)
@@ -165,9 +178,12 @@ public class WorkStatusGameTests {
 
         helper.succeedWhen(() -> {
             WorkerDebugPacket.Entry entry = WorkerDebugSync.entriesIn(helper.getLevel(), area).stream()
-                    .filter(e -> e.entityId() == bulbasaur.getId()).findFirst().orElse(null);
+                    .filter(e -> e.entityId() == bulbasaur.getId())
+                    .findFirst()
+                    .orElse(null);
             helper.assertTrue(entry != null, "the worker is in the overlay");
-            helper.assertTrue(entry.unreachable().contains(cropAbs),
+            helper.assertTrue(
+                    entry.unreachable().contains(cropAbs),
                     "the wheat reported as unreachable, got " + entry.unreachable());
         });
     }

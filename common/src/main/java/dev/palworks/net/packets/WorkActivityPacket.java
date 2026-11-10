@@ -4,11 +4,10 @@ import com.cobblemon.mod.common.api.net.NetworkPacket;
 import dev.palworks.job.JobType;
 import dev.palworks.net.PalworksResource;
 import dev.palworks.worker.WorkActivity;
+import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.UUID;
 
 /**
  * Sent from server to a worker's owner when what it's doing changes (and now and then anyway), so

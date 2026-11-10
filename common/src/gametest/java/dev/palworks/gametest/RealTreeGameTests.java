@@ -3,6 +3,8 @@ package dev.palworks.gametest;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.tree.TreeDetector;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
@@ -20,9 +22,6 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Trees grown by Minecraft's own worldgen tree features (real shapes: branches, low leaves,
  * diagonal trunks, big canopies), instead of the tidy hand-built trees in TreeGameTests, with a
@@ -36,9 +35,12 @@ public class RealTreeGameTests {
     /** Grow a worldgen tree at TREE. Fails the test if the feature couldn't be placed. */
     static void grow(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree, long seed) {
         var level = helper.getLevel();
-        var feature = level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE).getHolderOrThrow(tree).value();
-        boolean placed = feature.place(level, level.getChunkSource().getGenerator(), RandomSource.create(seed),
-            helper.absolutePos(TREE));
+        var feature = level.registryAccess()
+                .registryOrThrow(Registries.CONFIGURED_FEATURE)
+                .getHolderOrThrow(tree)
+                .value();
+        boolean placed = feature.place(
+                level, level.getChunkSource().getGenerator(), RandomSource.create(seed), helper.absolutePos(TREE));
         if (!placed) {
             helper.fail("couldn't grow " + tree.location() + " (seed " + seed + ")");
         }
@@ -115,20 +117,35 @@ public class RealTreeGameTests {
      * time a chop should take (walk + clearing + 60-tick swing + 20-tick replant). A lumberjack
      * that reaches the tree but never starts chopping, or chops from a few blocks away, fails this.
      */
-    private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
-                                     long seed, String lumberjack, Block sapling) {
+    private static void chopRealTree(
+            GameTestHelper helper,
+            ResourceKey<ConfiguredFeature<?, ?>> tree,
+            long seed,
+            String lumberjack,
+            Block sapling) {
         chopRealTree(helper, tree, seed, lumberjack, sapling, () -> {});
     }
 
     /** {@link #chopRealTree}, with {@code dressTree} run once the tree has grown. */
-    private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
-                                     long seed, String lumberjack, Block sapling, Runnable dressTree) {
+    private static void chopRealTree(
+            GameTestHelper helper,
+            ResourceKey<ConfiguredFeature<?, ?>> tree,
+            long seed,
+            String lumberjack,
+            Block sapling,
+            Runnable dressTree) {
         chopRealTree(helper, tree, seed, lumberjack, sapling, Blocks.GRASS_BLOCK, dressTree);
     }
 
     /** {@link #chopRealTree}, on a floor of {@code floor} (mud for mangroves). */
-    private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
-                                     long seed, String lumberjack, Block sapling, Block floor, Runnable dressTree) {
+    private static void chopRealTree(
+            GameTestHelper helper,
+            ResourceKey<ConfiguredFeature<?, ?>> tree,
+            long seed,
+            String lumberjack,
+            Block sapling,
+            Block floor,
+            Runnable dressTree) {
         Workers.isolate(helper);
         arenaFloor(helper, floor);
         grow(helper, tree, seed);
@@ -153,9 +170,11 @@ public class RealTreeGameTests {
             helper.assertTrue(left.isEmpty(), "tree should be fully chopped, " + left.size() + " logs left");
             helper.assertTrue(chopGap[0] >= 0, "the chop was seen");
             // (A mangrove has only roots at its base, so no trunk there to measure from)
-            helper.assertTrue(trunk.isEmpty() || chopGap[0] <= maxChopGap(worker), String.format(
-                "%s should chop right by the trunk (at most %.2f away), but chopped from %.2f blocks away",
-                lumberjack, maxChopGap(worker), chopGap[0]));
+            helper.assertTrue(
+                    trunk.isEmpty() || chopGap[0] <= maxChopGap(worker),
+                    String.format(
+                            "%s should chop right by the trunk (at most %.2f away), but chopped from %.2f blocks away",
+                            lumberjack, maxChopGap(worker), chopGap[0]));
             helper.assertBlockPresent(sapling, TREE);
         });
     }
@@ -205,10 +224,18 @@ public class RealTreeGameTests {
         // Cocoa pods grow on jungle trunks and are solid, which used to get the tree skipped. One
         // at head height on the side facing the worker (it can't stand there), one above it.
         chopRealTree(helper, TreeFeatures.JUNGLE_TREE, 8, "machop", Blocks.JUNGLE_SAPLING, () -> {
-            helper.setBlock(TREE.offset(0, 1, -1),
-                Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, Direction.SOUTH).setValue(CocoaBlock.AGE, 2));
-            helper.setBlock(TREE.offset(1, 2, 0),
-                Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, Direction.WEST).setValue(CocoaBlock.AGE, 1));
+            helper.setBlock(
+                    TREE.offset(0, 1, -1),
+                    Blocks.COCOA
+                            .defaultBlockState()
+                            .setValue(CocoaBlock.FACING, Direction.SOUTH)
+                            .setValue(CocoaBlock.AGE, 2));
+            helper.setBlock(
+                    TREE.offset(1, 2, 0),
+                    Blocks.COCOA
+                            .defaultBlockState()
+                            .setValue(CocoaBlock.FACING, Direction.WEST)
+                            .setValue(CocoaBlock.AGE, 1));
             helper.assertBlockPresent(Blocks.COCOA, TREE.offset(0, 1, -1));
         });
     }
@@ -241,11 +268,13 @@ public class RealTreeGameTests {
             if (chopAt == null) {
                 chopAt = at;
             }
-            helper.assertTrue(at.equals(chopAt), "one job spot whichever base it's found from: " + at + " and " + chopAt);
+            helper.assertTrue(
+                    at.equals(chopAt), "one job spot whichever base it's found from: " + at + " and " + chopAt);
             helper.assertTrue(TreeDetector.getSaplingForTree(level, tree) == Items.MANGROVE_PROPAGULE, "a propagule");
             List<BlockPos> spots = TreeDetector.saplingPositions(level, tree.getLogPositions(), tree.getBasePosition());
-            helper.assertTrue(spots.equals(List.of(helper.absolutePos(TREE))),
-                "replanted where it grew from, " + helper.absolutePos(TREE) + ", got " + spots);
+            helper.assertTrue(
+                    spots.equals(List.of(helper.absolutePos(TREE))),
+                    "replanted where it grew from, " + helper.absolutePos(TREE) + ", got " + spots);
         }
         helper.assertTrue(bases > 1, "the test mangrove should stand on several roots, got " + bases);
         helper.succeed();
@@ -260,8 +289,9 @@ public class RealTreeGameTests {
         TreeDetector.TreeValidationResult tree = TreeDetector.validateTree(level, helper.absolutePos(TREE));
         helper.assertTrue(tree.isValid(), "a real azalea is a tree: " + tree.getReason());
         Item sapling = TreeDetector.getSaplingForTree(level, tree);
-        helper.assertTrue(sapling == Items.AZALEA || sapling == Items.FLOWERING_AZALEA,
-            "an azalea is replanted with an azalea, got " + sapling);
+        helper.assertTrue(
+                sapling == Items.AZALEA || sapling == Items.FLOWERING_AZALEA,
+                "an azalea is replanted with an azalea, got " + sapling);
         helper.succeed();
     }
 
@@ -331,13 +361,17 @@ public class RealTreeGameTests {
         Workers.sendOut(helper, "machop level=30", new BlockPos(8, 1, 3));
 
         helper.runAfterDelay(250, () -> {
-            helper.assertTrue(treeBlocks(helper).size() == logs,
-                "the tree should be left alone, but " + (logs - treeBlocks(helper).size()) + " of " + logs + " logs are gone");
+            helper.assertTrue(
+                    treeBlocks(helper).size() == logs,
+                    "the tree should be left alone, but "
+                            + (logs - treeBlocks(helper).size()) + " of " + logs + " logs are gone");
             for (BlockPos pos : fenceAt) {
                 // (leaves work out their own distance property, so compare the block, and persistence)
                 BlockState now = helper.getBlockState(pos);
-                helper.assertTrue(now.is(fence.getBlock()) && (!now.hasProperty(LeavesBlock.PERSISTENT)
-                    || now.getValue(LeavesBlock.PERSISTENT)), "the fence at " + pos + " should be untouched, but it's " + now);
+                helper.assertTrue(
+                        now.is(fence.getBlock())
+                                && (!now.hasProperty(LeavesBlock.PERSISTENT) || now.getValue(LeavesBlock.PERSISTENT)),
+                        "the fence at " + pos + " should be untouched, but it's " + now);
             }
             helper.succeed();
         });

@@ -20,7 +20,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  */
 @EventBusSubscriber(modid = "palworks")
 public class WorkerTickHandler {
-    private static final boolean DEBUG = false;  // Reduced debug spam
+    private static final boolean DEBUG = false; // Reduced debug spam
     private static long lastDebugLog = 0;
     private static int tickCounter = 0;
 
