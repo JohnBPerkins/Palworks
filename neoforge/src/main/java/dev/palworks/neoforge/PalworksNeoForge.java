@@ -1,5 +1,6 @@
 package dev.palworks.neoforge;
 
+import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.inventory.MenuOpener;
 import dev.palworks.neoforge.command.PalworksCommands;
 import dev.palworks.neoforge.inventory.NeoForgeMenuOpener;
@@ -37,6 +38,9 @@ public class PalworksNeoForge {
 
         // Register command handler (WorkerTickHandler is auto-registered via @EventBusSubscriber)
         NeoForge.EVENT_BUS.register(new PalworksCommands());
+
+        // Show what workers are doing as aspects, for posers to animate from
+        WorkAspectSync.register();
 
         LOGGER.info("WorkerTickHandler will be auto-registered via @EventBusSubscriber");
         LOGGER.info(BANNER);

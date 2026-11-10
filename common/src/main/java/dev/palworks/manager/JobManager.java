@@ -4,6 +4,8 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.ai.WorkPositions;
+import dev.palworks.animation.WorkAnimator;
+import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.WorkerDebugSync;
@@ -211,6 +213,8 @@ public class JobManager {
         byLevel.clear();
         WorkActivitySync.clear();
         WorkerDebugSync.clear();
+        WorkAnimator.clear();
+        WorkAspectSync.clear();
     }
 
     /**

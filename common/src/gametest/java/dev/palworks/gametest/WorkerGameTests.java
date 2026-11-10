@@ -2,6 +2,7 @@ package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import dev.palworks.animation.WorkAnimator;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.worker.WorkerState;
@@ -11,6 +12,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
@@ -63,6 +65,38 @@ public class WorkerGameTests {
         Workers.sendOut(helper, BULBASAUR, START);
 
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested and reset"));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_play_out", timeoutTicks = 800)
+    public void workerFacesItsWorkUntilItsAnimationIsOver(GameTestHelper helper) {
+        // The next crop along is close enough to start on where it stands: it still mustn't turn
+        // to it while the last one's animation is playing out (it used to, straight away)
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+
+        boolean[] playedOut = {false};
+        helper.onEachTick(() -> {
+            BlockPos target = WorkAnimator.playingOutAt(worker);
+            if (target == null) {
+                return;
+            }
+            playedOut[0] = true;
+            double dx = target.getX() + 0.5 - worker.getX();
+            double dz = target.getZ() + 0.5 - worker.getZ();
+            float facing = (float) (Mth.atan2(dz, dx) * Mth.RAD_TO_DEG) - 90.0f;
+            float off = Math.abs(Mth.wrapDegrees(worker.getYRot() - facing));
+            helper.assertTrue(
+                    off < 1.0f,
+                    "while its animation at " + target + " plays out it faces it, but it's turned " + off
+                            + " degrees away");
+        });
+        helper.succeedWhen(() -> {
+            assertWheatRow(helper, 0, "harvested and reset");
+            helper.assertTrue(playedOut[0], "its harvest animation played out");
+            helper.assertTrue(WorkAnimator.playingOutAt(worker) == null, "its last animation is over");
+        });
     }
 
     @GameTest(template = Templates.EMPTY, batch = "worker_chop", timeoutTicks = 800)
