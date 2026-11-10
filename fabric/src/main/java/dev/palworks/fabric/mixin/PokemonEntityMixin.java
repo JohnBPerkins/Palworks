@@ -1,7 +1,7 @@
 package dev.palworks.fabric.mixin;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
-import dev.palworks.fabric.event.WorkerTickHandler;
+import dev.palworks.worker.WorkerTicking;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,6 +16,6 @@ public class PokemonEntityMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         PokemonEntity entity = (PokemonEntity) (Object) this;
-        WorkerTickHandler.tickPokemonWorker(entity);
+        WorkerTicking.onPokemonTick(entity);
     }
 }
