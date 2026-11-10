@@ -32,6 +32,7 @@ class StepRunnerTest {
         final int ticks;
         final boolean keepGoing;
         boolean needed = true;
+        int startTick;
 
         FakeStep(String name, int ticks, boolean keepGoing) {
             this.name = name;
@@ -42,6 +43,16 @@ class StepRunnerTest {
         FakeStep notNeeded() {
             needed = false;
             return this;
+        }
+
+        FakeStep startingAt(int tick) {
+            startTick = tick;
+            return this;
+        }
+
+        @Override
+        public int startTick() {
+            return startTick;
         }
 
         FakeStep(String name, int ticks) {
@@ -210,5 +221,34 @@ class StepRunnerTest {
         assertEquals(Outcome.FINISHED, tick(steps), "chop done; tidy has nothing to do");
         assertEquals(List.of("start chop", "finish chop"), log);
         assertEquals(0, state.getJobStep(), "progress reset for the next job");
+    }
+
+    @Test
+    void aStepCanStartPartWayThroughSoItsAnimationLandsAsItsEffectHappens() {
+        // e.g. Ember plays 8 ticks in (once the worker has settled), and the furnace lights at its end
+        List<FakeStep> steps = List.of(new FakeStep("ember", 4).startingAt(2));
+
+        tick(steps);
+        tick(steps);
+        assertTrue(log.isEmpty(), "nothing has started for the first two ticks");
+        tick(steps);
+        assertEquals(List.of("start ember"), log, "starts on its third tick");
+        assertEquals(Outcome.FINISHED, tick(steps));
+        assertEquals(List.of("start ember", "finish ember"), log, "the step still takes its 4 ticks");
+    }
+
+    @Test
+    void restartingADelayedStepWaitsAgainBeforeItStarts() {
+        List<FakeStep> steps = List.of(new FakeStep("ember", 4).startingAt(2));
+        tick(steps);
+        tick(steps);
+        tick(steps); // started
+        state.restartStep();
+
+        tick(steps);
+        tick(steps);
+        assertEquals(List.of("start ember"), log, "not started again yet: the worker settles first");
+        tick(steps);
+        assertEquals(List.of("start ember", "start ember"), log);
     }
 }

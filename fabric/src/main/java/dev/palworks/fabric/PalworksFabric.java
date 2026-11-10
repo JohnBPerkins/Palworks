@@ -1,5 +1,6 @@
 package dev.palworks.fabric;
 
+import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.fabric.command.PalworksCommands;
 import dev.palworks.fabric.data.FabricSuitabilityReloadListener;
 import dev.palworks.fabric.event.WorkerTickHandler;
@@ -37,6 +38,9 @@ public class PalworksFabric implements ModInitializer {
 
         // Register worker tick handler
         WorkerTickHandler.register();
+
+        // Show what workers are doing as aspects, for posers to animate from
+        WorkAspectSync.register();
 
         LOGGER.info("Palworks Fabric initialized!");
     }

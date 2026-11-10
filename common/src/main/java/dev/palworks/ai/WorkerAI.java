@@ -1,15 +1,11 @@
 package dev.palworks.ai;
 
-import com.bedrockk.molang.runtime.MoLangRuntime;
-import com.cobblemon.mod.common.api.molang.MoLangFunctions;
-import com.cobblemon.mod.common.api.moves.animations.ActionEffectContext;
-import com.cobblemon.mod.common.api.moves.animations.ActionEffectTimeline;
-import com.cobblemon.mod.common.api.moves.animations.ActionEffects;
-import com.cobblemon.mod.common.api.moves.animations.TargetsProvider;
-import com.cobblemon.mod.common.api.moves.animations.UsersProvider;
-import com.cobblemon.mod.common.entity.generic.GenericBedrockEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.animation.WorkAnimation;
+import dev.palworks.animation.WorkAnimations;
+import dev.palworks.animation.WorkAnimator;
+import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -20,17 +16,15 @@ import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
+import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
@@ -90,8 +84,13 @@ public class WorkerAI {
      */
     public static boolean tick(Pokemon pokemon, Mob entity, Level level) {
         boolean handled = tickWork(pokemon, entity, level);
-        // After the tick, so the owner sees where it ended up (e.g. a job dropped this tick).
-        WorkActivitySync.update(pokemon, entity, WorkerStateManager.getOrCreate(pokemon), level.getGameTime());
+        // After the tick, so they reflect where it ended up (e.g. a job dropped this tick): what
+        // its owner is shown, the aspects its poser animates from, and whether the animation it's
+        // playing still belongs to a step it's on.
+        WorkerState state = WorkerStateManager.getOrCreate(pokemon);
+        WorkActivity activity = WorkActivitySync.update(pokemon, entity, state, level.getGameTime());
+        WorkAspectSync.update(pokemon, activity, level.getGameTime());
+        WorkAnimator.update(entity, state);
         return handled;
     }
 
@@ -445,9 +444,9 @@ public class WorkerAI {
 
     /**
      * Perform one tick of work at the job location: runs the current step of the job's
-     * {@link JobHandler#steps()}. A step's {@code start} runs on its first tick (where its animation
-     * goes), and its {@code finish} (its effect) once it has lasted its ticks; then the job moves on
-     * to the next step. Returns true when the last step is done (and the job doesn't repeat).
+     * {@link JobHandler#steps()}. A step's animation, if it has one, plays timed to land on the
+     * step's last tick, where its {@code finish} (its effect) runs; then the job moves on to the
+     * next step. Returns true when the last step is done (and the job doesn't repeat).
      */
     private static boolean performWork(
             Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
@@ -486,27 +485,42 @@ public class WorkerAI {
     }
 
     /**
-     * One timed step of a job. The worker spends {@code ticks} on it at the job: {@code start} runs
-     * on the first tick (where the step's animation goes), and {@code finish} when it's over: the
-     * step's effect. Effects only happen in {@code finish}, so a step is all-or-nothing: if the
-     * worker leaves (pushed away, paused, the game reloads) the step simply restarts. The step
-     * reached is saved, so the job carries on from it, even with a different worker (handed over).
-     * A step that isn't {@code isNeeded} when it's reached (nothing for it to do) is skipped.
+     * One timed step of a job. The worker spends {@code ticks} on it at the job, and {@code finish}
+     * runs when it's over: the step's effect. Effects only happen in {@code finish}, so a step is
+     * all-or-nothing: if the worker leaves (pushed away, paused, the game reloads) the step simply
+     * restarts, its animation with it. The step reached is saved, so the job carries on from it,
+     * even with a different worker (handed over). A step that isn't {@code isNeeded} when it's
+     * reached (nothing for it to do) is skipped.
+     *
+     * <p>A step with an {@code animation} plays it aimed at the job's block, timed so it lands as
+     * {@code finish} runs; its {@code ticks} are at least long enough for that (see
+     * {@link WorkAnimation#stepTicks}). Build one with {@link #animated}.
      */
     private record Step(
             String name,
             int ticks,
-            StepStart onStart,
+            @Nullable WorkAnimation animation,
             StepFinish onFinish,
             java.util.function.Predicate<JobContext> isNeeded)
             implements StepRunner.TimedStep<JobContext> {
         @Override
+        public int startTick() {
+            return animation() == null ? 0 : animation().playAt(ticks);
+        }
+
+        @Override
         public void start(JobContext ctx) {
-            onStart.run(ctx);
+            // Through the accessor: PMD's NonThreadSafeSingleton crashes on a null check of a
+            // record component read directly (PMD 7.28.0)
+            if (animation() != null) {
+                WorkAnimator.play(ctx.entity(), animation(), ctx.pos());
+            }
         }
 
         @Override
         public boolean finish(JobContext ctx) {
+            // The step's work happens now, as its animation lands: let the animation play out
+            WorkAnimator.release(ctx.entity());
             return onFinish.run(ctx);
         }
 
@@ -515,23 +529,28 @@ public class WorkerAI {
             return isNeeded.test(ctx);
         }
 
-        /** A step that always runs (most do). */
-        Step(String name, int ticks, StepStart onStart, StepFinish onFinish) {
-            this(name, ticks, onStart, onFinish, ctx -> true);
+        /** A step that takes time and then has its effect, with no animation. */
+        static Step of(String name, int ticks, StepFinish finish) {
+            return new Step(name, ticks, null, finish, ctx -> true);
         }
 
-        static Step of(String name, int ticks, StepFinish finish) {
-            return new Step(name, ticks, ctx -> {}, finish);
+        /**
+         * A step that plays an animation and has its effect as it lands. It takes {@code minTicks},
+         * or longer if the worker needs it to settle and the animation to land.
+         */
+        static Step animated(String name, int minTicks, WorkAnimation animation, StepFinish finish) {
+            return new Step(name, animation.stepTicks(minTicks), animation, finish, ctx -> true);
         }
+
         /** A step that only takes time (e.g. a pause), with no effect. */
         static Step pause(String name, int ticks) {
             return of(name, ticks, ctx -> true);
         }
-    }
 
-    @FunctionalInterface
-    private interface StepStart {
-        void run(JobContext ctx);
+        /** This step, skipped when it's reached if there's nothing for it to do. */
+        Step onlyIf(java.util.function.Predicate<JobContext> needed) {
+            return new Step(name, ticks, animation, onFinish, needed);
+        }
     }
 
     /** A step's effect. Return false to end the job here (e.g. there turned out to be nothing to do). */
@@ -602,23 +621,15 @@ public class WorkerAI {
     }
 
     private static final class FuelFurnaceHandler implements JobHandler {
-        // One cycle matches one smelting operation (200 ticks): settle, then Ember (lighting the
-        // furnace when its flames reach it), then wait out the rest of the smelt.
+        // One cycle matches one smelting operation (200 ticks): Ember, lighting the furnace as its
+        // flames reach it, then wait out the rest of the smelt.
+        private final Step ember =
+                Step.animated("ember", 0, WorkAnimations.IGNITE_FURNACE, effect(FuelFurnaceHandler::ignite));
         private final List<Step> steps = List.of(
-                // Start the move a few ticks after arrival, not on the arrival tick: on the first cycle
-                // the worker has just stopped walking, and starting the move during the walk→idle
-                // transition gets the animation dropped. The brief settle fixes the first cycle.
-                Step.pause("settle", FURNACE_EFFECT_START_TICK),
-                // Swap which move by changing FURNACE_IGNITE_MOVE; no other code changes. The furnace
-                // lights FURNACE_IGNITE_DELAY_TICKS into the animation, when the flames reach it.
-                new Step(
-                        "ember",
-                        FURNACE_IGNITE_DELAY_TICKS,
-                        ctx -> playMoveActionEffect(ctx, FURNACE_IGNITE_MOVE),
-                        effect(FuelFurnaceHandler::ignite)),
+                ember,
                 // Re-igniting once per cycle keeps it lit across repeats: the 201-tick burn covers the
                 // 200-tick gap to the next ignite.
-                Step.pause("smelt", 200 - FURNACE_EFFECT_START_TICK - FURNACE_IGNITE_DELAY_TICKS));
+                Step.pause("smelt", 200 - ember.ticks()));
 
         @Override
         public List<Step> steps() {
@@ -810,7 +821,7 @@ public class WorkerAI {
     }
 
     private static final class PlantSeedsHandler implements JobHandler {
-        private final List<Step> steps = List.of(Step.of("plant", 20, effect(this::work)));
+        private final List<Step> steps = List.of(Step.animated("plant", 20, WorkAnimations.PLANT, effect(this::work)));
 
         @Override
         public List<Step> steps() {
@@ -859,7 +870,8 @@ public class WorkerAI {
     }
 
     private static final class HarvestCropsHandler implements JobHandler {
-        private final List<Step> steps = List.of(Step.of("harvest", 20, effect(this::work)));
+        private final List<Step> steps =
+                List.of(Step.animated("harvest", 20, WorkAnimations.HARVEST, effect(this::work)));
 
         @Override
         public List<Step> steps() {
@@ -884,13 +896,9 @@ public class WorkerAI {
         // replant (1s later). The replant spots and sapling are saved in the job's data at the
         // chop, so a paused job, or one another lumberjack takes over, still replants.
         private final List<Step> steps = List.of(
-                new Step(
-                        "clear leaves",
-                        20,
-                        ctx -> {},
-                        effect(ChopTreeHandler::clearLeaves),
-                        ChopTreeHandler::leavesInTheWay),
-                Step.of("chop", 60, ChopTreeHandler::chop),
+                Step.of("clear leaves", 20, effect(ChopTreeHandler::clearLeaves))
+                        .onlyIf(ChopTreeHandler::leavesInTheWay),
+                Step.animated("chop", 60, WorkAnimations.CHOP, ChopTreeHandler::chop),
                 Step.of("replant", 20, effect(ChopTreeHandler::replant)));
 
         @Override
@@ -1063,86 +1071,6 @@ public class WorkerAI {
         entity.setYRot(yaw);
         entity.setYBodyRot(yaw);
         entity.setYHeadRot(yaw);
-    }
-
-    /** Which Cobblemon move's action effect a Kindling worker performs to light a furnace. Swap this
-     * one id to use a different move's animation/particles/sound — no other code changes. */
-    private static final ResourceLocation FURNACE_IGNITE_MOVE =
-            ResourceLocation.fromNamespaceAndPath("cobblemon", "ember");
-    /** Ticks after arrival before the worker performs the move, to let it settle out of its walk
-     * animation first (otherwise the move animation is dropped on the first smelt cycle). */
-    private static final int FURNACE_EFFECT_START_TICK = 8;
-    /** Ticks into the move animation at which the furnace lights, tuned so the fire starts when the
-     * flames reach it (Ember's impact is ~1.75s in). Re-tune if you change FURNACE_IGNITE_MOVE. */
-    private static final int FURNACE_IGNITE_DELAY_TICKS = 35;
-    /** Height within the furnace block (0=bottom, 1=top) the flames aim at — low so they hit the
-     * fire chamber near the base rather than the block's center. */
-    private static final double FURNACE_TARGET_Y = 0.125;
-
-    /**
-     * Play a Cobblemon move's full action-effect presentation (animation + particles + sound, with
-     * the move's own timing) on the worker, by driving Cobblemon's {@code ActionEffectTimeline}
-     * exactly as a battle does — minus the battle context. {@code run()} broadcasts the S2C packets
-     * server-side to nearby players itself, reading the user/target entities from the providers, so
-     * there's nothing else to send. Move-agnostic: pass any action-effect id (the data lives in
-     * Cobblemon's datapack, keyed by move name) — swap the move by changing the id at the call site.
-     *
-     * <p>The move's particle keyframes are built around a <em>target</em> entity (the flames travel
-     * to and land on it), and a furnace is a block. So we spawn a tiny, invisible, non-saving posable
-     * marker at the furnace to stand in as the target, and remove it as soon as the effect's timeline
-     * finishes. This is what makes the breath aim at the furnace and the impact land there.
-     *
-     * <p>Fragile only in that it leans on Cobblemon internals (the {@code ActionEffects} registry,
-     * {@code ActionEffectContext} shape, {@code GenericBedrockEntity}); guarded with try/catch so an
-     * internals change can't break a worker tick. See .references/worker-ai.md.
-     */
-    private static void playMoveActionEffect(JobContext ctx, ResourceLocation actionEffectId) {
-        if (!(ctx.level() instanceof ServerLevel serverLevel)) {
-            return;
-        }
-        GenericBedrockEntity targetMarker = null;
-        try {
-            ActionEffectTimeline timeline =
-                    ActionEffects.INSTANCE.getActionEffects().get(actionEffectId);
-            if (timeline == null) {
-                if (DEBUG) {
-                    Palworks.LOGGER.warn("No Cobblemon action effect registered for {}", actionEffectId);
-                }
-                return;
-            }
-
-            BlockPos furnace = ctx.pos();
-            targetMarker = new GenericBedrockEntity(serverLevel);
-            targetMarker.setSavesToWorld(false);
-            targetMarker.setNoGravity(true);
-            targetMarker.setScale(0.01f); // effectively invisible; just a position/locator anchor
-            targetMarker.moveTo(
-                    furnace.getX() + 0.5, furnace.getY() + FURNACE_TARGET_Y, furnace.getZ() + 0.5, 0.0f, 0.0f);
-            serverLevel.addFreshEntity(targetMarker);
-
-            MoLangRuntime runtime = new MoLangRuntime();
-            MoLangFunctions.INSTANCE.addStandardFunctions(runtime.getEnvironment().query);
-            List<Object> providers = List.of(new UsersProvider(ctx.entity()), new TargetsProvider(targetMarker));
-            ActionEffectContext context = new ActionEffectContext(
-                    timeline,
-                    new HashSet<>(),
-                    providers,
-                    runtime,
-                    /* canBeInterrupted */ true, /* interrupted */
-                    false,
-                    new ArrayList<>(),
-                    serverLevel);
-
-            GenericBedrockEntity marker = targetMarker; // effectively final for the callback
-            // Only the cleanup matters; the completion future itself isn't needed.
-            var unused = timeline.run(context).whenComplete((result, error) -> marker.discard());
-        } catch (Exception e) { // NOPMD - Cobblemon's effect code can throw anything; it's only a visual
-            if (targetMarker != null) {
-                targetMarker.discard();
-            }
-            Palworks.LOGGER.warn(
-                    "Failed to play Cobblemon action effect {} on {}: {}", actionEffectId, ctx.name(), e.toString());
-        }
     }
 
     /**

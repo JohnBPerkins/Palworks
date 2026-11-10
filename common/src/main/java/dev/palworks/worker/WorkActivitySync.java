@@ -33,20 +33,22 @@ public final class WorkActivitySync {
                 state.isWorking());
     }
 
-    public static void update(Pokemon pokemon, Mob entity, WorkerState state, long gameTime) {
+    /** Tell its owner what this worker is doing, if that's changed. Returns what it's doing. */
+    public static WorkActivity update(Pokemon pokemon, Mob entity, WorkerState state, long gameTime) {
         WorkActivity activity = activityOf(entity, state);
 
         UUID uuid = pokemon.getUuid();
         Sent last = LAST_SENT.get(uuid);
         if (last != null && last.activity().equals(activity) && gameTime - last.gameTime() < REFRESH_TICKS) {
-            return;
+            return activity;
         }
         ServerPlayer owner = pokemon.getOwnerPlayer();
         if (owner == null) {
-            return;
+            return activity;
         }
         new WorkActivityPacket(uuid, activity).sendToPlayer(owner);
         LAST_SENT.put(uuid, new Sent(activity, gameTime));
+        return activity;
     }
 
     /** Forget a worker that's gone (recalled, unloaded), so it's sent afresh when it's back. */
