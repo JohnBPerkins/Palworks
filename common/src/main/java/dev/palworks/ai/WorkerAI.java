@@ -13,6 +13,7 @@ import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
+import dev.palworks.manager.JobChecks;
 import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
@@ -579,10 +580,10 @@ public class WorkerAI {
      *
      * <p>Every step checks its job is still there ({@code isThere}): when it's reached, while it goes
      * on, and right before its effect (see {@link StepRunner}); the worker also checks it on its way.
-     * By default that's {@link JobManager#isJobStillThere}, the same check that found the job. A step
+     * By default that's {@link JobChecks#isJobStillThere}, the same check that found the job. A step
      * that comes after its job's target is gone by design (replanting a chopped tree) doesn't (see
      * {@link #outlivesItsTarget}). At the same points it checks the worker can do it
-     * ({@link #canDo}): {@link JobManager#canWorkerDo}, the check jobs are handed out by.
+     * ({@link #canDo}): {@link JobChecks#canWorkerDo}, the check jobs are handed out by.
      */
     private record Step(
             String name,
@@ -645,17 +646,17 @@ public class WorkerAI {
         /**
          * The same check its job was handed out by, so a worker that gives a job back isn't handed
          * it again until it can do it. A job type that needs something of its worker adds it to
-         * {@link JobManager#canWorkerDo}, not here.
+         * {@link JobChecks#canWorkerDo}, not here.
          */
         @Override
         public boolean canDo(JobContext ctx) {
-            return JobManager.canWorkerDo(
+            return JobChecks.canWorkerDo(
                     ctx.level(), ctx.pokemon(), ctx.reservation().getJobType(), ctx.pos());
         }
 
         /** Whether the job a step is for is still there, as the scan that found it sees it. */
         private static boolean jobInTheWorld(JobContext ctx) {
-            return JobManager.isJobStillThere(ctx.level(), ctx.reservation().getJobType(), ctx.pos());
+            return JobChecks.isJobStillThere(ctx.level(), ctx.reservation().getJobType(), ctx.pos());
         }
 
         /** A step that takes time and then has its effect, with no animation. */
@@ -929,7 +930,7 @@ public class WorkerAI {
 
             int pickedUp = 0;
             for (net.minecraft.world.entity.item.ItemEntity itemEntity :
-                    JobManager.itemsToPickUp(ctx.level(), targetPos)) {
+                    JobChecks.itemsToPickUp(ctx.level(), targetPos)) {
                 ItemStack stack = itemEntity.getItem();
                 int leftover = inventory.addItem(stack);
                 if (leftover == stack.getCount()) {

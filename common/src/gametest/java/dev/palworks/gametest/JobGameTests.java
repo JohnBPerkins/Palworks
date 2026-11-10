@@ -4,7 +4,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
-import dev.palworks.manager.JobManager;
+import dev.palworks.manager.JobChecks;
 import dev.palworks.station.FurnaceHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -18,13 +18,13 @@ import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 /**
- * Whether each kind of job still exists in the world (JobManager.isJobStillThere): what workers
+ * Whether each kind of job still exists in the world (JobChecks.isJobStillThere): what workers
  * re-check on their way to a job and as they work it, so they drop jobs that disappeared.
  */
 public class JobGameTests {
 
     private static boolean there(GameTestHelper helper, JobType type, BlockPos rel) {
-        return JobManager.isJobStillThere(helper.getLevel(), type, helper.absolutePos(rel));
+        return JobChecks.isJobStillThere(helper.getLevel(), type, helper.absolutePos(rel));
     }
 
     @GameTest(template = Templates.EMPTY)
@@ -144,7 +144,7 @@ public class JobGameTests {
         helper.succeed();
     }
 
-    // ---- Whether a worker can do a job (JobManager.canWorkerDo) ----
+    // ---- Whether a worker can do a job (JobChecks.canWorkerDo) ----
 
     @GameTest(template = Templates.EMPTY, batch = "can_worker_do")
     public void aPlanterCanPlantWhereItCarriesASeedForTheSoil(GameTestHelper helper) {
@@ -183,6 +183,6 @@ public class JobGameTests {
     }
 
     private static boolean canDo(GameTestHelper helper, Pokemon worker, JobType type, BlockPos rel) {
-        return JobManager.canWorkerDo(helper.getLevel(), worker, type, helper.absolutePos(rel));
+        return JobChecks.canWorkerDo(helper.getLevel(), worker, type, helper.absolutePos(rel));
     }
 }
