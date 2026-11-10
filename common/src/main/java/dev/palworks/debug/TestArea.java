@@ -3,6 +3,7 @@ package dev.palworks.debug;
 import com.cobblemon.mod.common.block.ApricornBlock;
 import com.cobblemon.mod.common.block.BerryBlock;
 import com.cobblemon.mod.common.block.NutBushBlock;
+import com.cobblemon.mod.common.block.RootBlock;
 import com.cobblemon.mod.common.block.entity.BerryBlockEntity;
 import dev.palworks.tree.TreeDetector;
 import net.minecraft.core.BlockPos;
@@ -26,6 +27,7 @@ import net.minecraft.world.level.block.CaveVinesBlock;
 import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.FarmBlock;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.StandingSignBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
@@ -55,7 +57,8 @@ import java.util.Optional;
  *       fuel, and a chest for the output.</li>
  *   <li>Crops: one of each, fully grown, with a sign naming it: every vanilla crop (pumpkins and
  *       melons with their fruit, cocoa on a log, glow berries hanging from a post), every Cobblemon
- *       crop block, and every berry bush with its berries. The Cobblemon ones are found from the
+ *       crop block and root (big and energy root, hanging under a block), and every berry bush with
+ *       its berries. The Cobblemon ones are found from the
  *       block registry, so new ones show up by themselves; each one's soil is whichever of a few
  *       candidates it can survive on. Each row of plants has a water channel behind it, so its
  *       farmland stays wet.</li>
@@ -93,6 +96,8 @@ public final class TestArea {
     private static final int SMALL_TREE_CLEAR_HEIGHT = 24;
     private static final int TREE_CLEAR_HEIGHT = 40;
     private static final int TREE_SEEDS = 30;
+    // How far past its cell a tree's leaves can reach (and a failed try is undone)
+    private static final int CANOPY_MARGIN = 8;
 
     private static final int FLAGS = Block.UPDATE_CLIENTS;
 
@@ -364,15 +369,32 @@ public final class TestArea {
         return list;
     }
 
-    /** Every Cobblemon crop block other than berry bushes (which get rows of their own). */
+    /**
+     * Every Cobblemon crop block other than berry bushes (which get rows of their own), and its
+     * roots (big root, energy root), which hang under a block.
+     */
     private List<Plant> cobblemonPlants() {
         List<Plant> list = new ArrayList<>();
         for (Block block : cobblemonBlocks()) {
             if (block instanceof CropBlock || block instanceof NutBushBlock) {
                 list.add(cropPlant(block));
+            } else if (block instanceof RootBlock) {
+                list.add(new Plant(blockName(block), pos -> hangingRoot(pos, block)));
             }
         }
         return list;
+    }
+
+    /** A little rooted dirt arch, the root hanging from it. */
+    private void hangingRoot(BlockPos pos, Block root) {
+        for (int y = 0; y < 3; y++) {
+            set(pos.east().above(y), Blocks.ROOTED_DIRT.defaultBlockState());
+        }
+        set(pos.above(2), Blocks.ROOTED_DIRT.defaultBlockState());
+        set(pos.above(), root.defaultBlockState());
+        if (!level.getBlockState(pos.above()).canSurvive(level, pos.above())) {
+            throw new IllegalStateException("can't hang there");
+        }
     }
 
     private List<Plant> berryPlants() {
@@ -544,7 +566,10 @@ public final class TestArea {
     /**
      * Grow a tree in the middle of its cell, apricorns ripe. A tree's shape depends on a seed: seeds
      * are tried until one grows a tree that fits its cell, with no log on the cell's edge (where it
-     * could join its neighbour's), clearing the cell between tries.
+     * could join its neighbour's). A try that doesn't fit is undone block for block, wherever it
+     * reached: its leaves can spread past the cell, and clearing only the cell left them floating
+     * (and cut into the neighbours' leaves). Leaves the game marks as too far from a log to stay
+     * (azalea and mangrove scatter a few) are taken away, as they'd decay soon anyway.
      */
     private void growTree(BlockPos cell, Grid grid, Tree tree) {
         Optional<ConfiguredFeature<?, ?>> feature = level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE)
@@ -556,39 +581,66 @@ public final class TestArea {
         int d = grid.cellDepth();
         BlockPos trunk = cell.offset((w - 1) / 2, 0, (d - 1) / 2);
         BlockPos top = cell.offset(w - 1, TREE_CLEAR_HEIGHT - 1, d - 1);
+        layTreeFloor(cell, top, tree.floor());
+
         boolean fits = false;
         for (long seed = 1; seed <= TREE_SEEDS && !fits; seed++) {
-            clearCell(cell, top, tree.floor());
+            Snapshot before = new Snapshot(cell.offset(-CANOPY_MARGIN, -2, -CANOPY_MARGIN),
+                    top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN));
             fits = feature.get().place(level, level.getChunkSource().getGenerator(), RandomSource.create(seed), trunk)
                     && !reachesEdge(cell, top);
+            if (!fits) {
+                before.restore();
+            }
         }
         if (!fits) {
             throw new IllegalStateException("no seed of " + TREE_SEEDS + " grew one that fits its "
                     + w + "x" + d + " plot");
         }
-        for (BlockPos pos : BlockPos.betweenClosed(cell, top)) {
+        for (BlockPos pos : BlockPos.betweenClosed(cell.offset(-CANOPY_MARGIN, 0, -CANOPY_MARGIN),
+                top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN))) {
             BlockState state = level.getBlockState(pos);
             if (state.getBlock() instanceof ApricornBlock) {
                 set(pos.immutable(), grown(state));
+            } else if (state.getBlock() instanceof LeavesBlock && !state.getValue(LeavesBlock.PERSISTENT)
+                    && state.getValue(LeavesBlock.DISTANCE) == LeavesBlock.DECAY_DISTANCE) {
+                // Too far from a log to stay: azalea and mangrove trees scatter a few leaves like this,
+                // which decay soon after. Take them away now, so nothing floats.
+                set(pos.immutable(), Blocks.AIR.defaultBlockState());
             }
         }
         sign(cell.offset((w - 1) / 2, 0, d - 1), signLines(tree.label()));
     }
 
-    /** Empty the cell above ground (and just below it, where roots go) and lay its floor. */
-    private void clearCell(BlockPos cell, BlockPos top, Block floor) {
-        for (BlockPos pos : BlockPos.betweenClosed(cell.below(2), top)) {
-            Block block;
-            if (pos.getY() >= cell.getY()) {
-                block = Blocks.AIR;
-            } else if (pos.getY() < cell.getY() - 1) {
-                block = Blocks.DIRT;
-            } else {
-                boolean ring = pos.getX() == cell.getX() || pos.getX() == top.getX()
-                        || pos.getZ() == cell.getZ() || pos.getZ() == top.getZ();
-                block = ring ? Blocks.GRASS_BLOCK : floor;
+    /** The tree's floor inside the cell, grass round its edge. */
+    private void layTreeFloor(BlockPos cell, BlockPos top, Block floor) {
+        for (int x = cell.getX(); x <= top.getX(); x++) {
+            for (int z = cell.getZ(); z <= top.getZ(); z++) {
+                boolean ring = x == cell.getX() || x == top.getX() || z == cell.getZ() || z == top.getZ();
+                set(new BlockPos(x, cell.getY() - 1, z), (ring ? Blocks.GRASS_BLOCK : floor).defaultBlockState());
             }
-            set(pos.immutable(), block.defaultBlockState());
+        }
+    }
+
+    /** The blocks in a box, to put back exactly as they were. */
+    private final class Snapshot {
+        private final BlockPos min;
+        private final BlockPos max;
+        private final List<BlockState> states = new ArrayList<>();
+
+        Snapshot(BlockPos min, BlockPos max) {
+            this.min = min;
+            this.max = max;
+            for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+                states.add(level.getBlockState(pos));
+            }
+        }
+
+        void restore() {
+            int i = 0;
+            for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+                set(pos.immutable(), states.get(i++));
+            }
         }
     }
 

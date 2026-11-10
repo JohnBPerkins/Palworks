@@ -2,24 +2,31 @@ package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.block.BerryBlock;
 import com.cobblemon.mod.common.block.NutBushBlock;
+import com.cobblemon.mod.common.block.RootBlock;
 import com.cobblemon.mod.common.block.entity.BerryBlockEntity;
 import dev.palworks.debug.TestArea;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** The /palworks testarea build: everything placed, fully grown, and still there a moment later. */
@@ -56,6 +63,7 @@ public class TestAreaGameTests {
                 }
             }
             boolean plant = block instanceof CropBlock || block instanceof BerryBlock || block instanceof NutBushBlock
+                    || block instanceof RootBlock
                     || block == Blocks.NETHER_WART || block == Blocks.COCOA || block == Blocks.SWEET_BERRY_BUSH
                     || block == Blocks.PITCHER_CROP || block == Blocks.TORCHFLOWER || block == Blocks.CAVE_VINES
                     || block == Blocks.ATTACHED_PUMPKIN_STEM || block == Blocks.ATTACHED_MELON_STEM;
@@ -92,20 +100,68 @@ public class TestAreaGameTests {
         return bare;
     }
 
+    /**
+     * Natural leaves that aren't attached to a log the way the game requires (within 6 steps of one
+     * through leaves; any further and they decay): leftovers that would float in the air.
+     */
+    private static List<String> floatingLeaves(GameTestHelper helper, TestArea.Result area) {
+        var level = helper.getLevel();
+        BlockPos min = area.min().below(2);
+        BlockPos max = area.max();
+        Map<BlockPos, Integer> distance = new HashMap<>();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        List<BlockPos> leaves = new ArrayList<>();
+        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(BlockTags.LEAVES) && state.hasProperty(LeavesBlock.PERSISTENT)
+                    && !state.getValue(LeavesBlock.PERSISTENT)) {
+                leaves.add(pos.immutable());
+            } else if (state.is(BlockTags.LOGS)) {
+                distance.put(pos.immutable(), 0);
+                queue.add(pos.immutable());
+            }
+        }
+        while (!queue.isEmpty()) {
+            BlockPos pos = queue.poll();
+            int next = distance.get(pos) + 1;
+            if (next > 6) {
+                continue;
+            }
+            for (Direction direction : Direction.values()) {
+                BlockPos neighbour = pos.relative(direction);
+                if (!distance.containsKey(neighbour) && level.getBlockState(neighbour).is(BlockTags.LEAVES)) {
+                    distance.put(neighbour, next);
+                    queue.add(neighbour);
+                }
+            }
+        }
+        List<String> floating = new ArrayList<>();
+        for (BlockPos leaf : leaves) {
+            if (!distance.containsKey(leaf)) {
+                floating.add(leaf.toShortString());
+            }
+        }
+        return floating;
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "test_area", timeoutTicks = 200)
     public void theTestAreaHasEverythingFullyGrown(GameTestHelper helper) {
         // Well away from the other tests' areas
         BlockPos origin = helper.absolutePos(new BlockPos(0, 1, 0)).offset(600, 0, 0);
         TestArea.Result area = TestArea.build(helper.getLevel(), origin);
         helper.assertTrue(area.problems().isEmpty(), "problems: " + area.problems());
+        List<String> floating = floatingLeaves(helper, area);
+        helper.assertTrue(floating.isEmpty(), floating.size() + " leaves not attached to a tree, e.g. "
+                + floating.subList(0, Math.min(5, floating.size())));
 
-        // Every vanilla crop, and every Cobblemon crop and berry bush in the registry
+        // Every vanilla crop, and every Cobblemon crop, root and berry bush in the registry
         Set<Block> expected = new HashSet<>(Set.of(Blocks.WHEAT, Blocks.CARROTS, Blocks.POTATOES, Blocks.BEETROOTS,
                 Blocks.TORCHFLOWER, Blocks.PITCHER_CROP, Blocks.ATTACHED_PUMPKIN_STEM, Blocks.ATTACHED_MELON_STEM,
                 Blocks.NETHER_WART, Blocks.COCOA, Blocks.SWEET_BERRY_BUSH, Blocks.CAVE_VINES));
         for (Block block : BuiltInRegistries.BLOCK) {
             if (BuiltInRegistries.BLOCK.getKey(block).getNamespace().equals("cobblemon")
-                    && (block instanceof CropBlock || block instanceof BerryBlock || block instanceof NutBushBlock)) {
+                    && (block instanceof CropBlock || block instanceof BerryBlock || block instanceof NutBushBlock
+                        || block instanceof RootBlock)) {
                 expected.add(block);
             }
         }

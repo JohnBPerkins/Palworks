@@ -140,8 +140,8 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
   - `/palworks testarea` builds a flat test area from where you stand, east and south (about
     62 x 94 blocks; everything in it is cleared first). Its sections are:
     - smelting: a furnace, a blast furnace and a smoker with input but no fuel;
-    - crops: one of each vanilla crop, Cobblemon crop and berry bush (with berries), with a sign
-      naming it;
+    - crops: one of each vanilla crop, Cobblemon crop, root (hanging from a little arch) and berry
+      bush (with berries), with a sign naming it;
     - every vanilla and Cobblemon tree.
 
     Everything is fully grown. Anything it couldn't place is listed in chat.
