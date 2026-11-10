@@ -1,8 +1,8 @@
 package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
-import dev.palworks.ai.WorkerAI;
 import dev.palworks.job.JobType;
+import dev.palworks.job.handler.JobHandlers;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,7 +110,7 @@ public class RealTreeGameTests {
      */
     static double maxChopGap(PokemonEntity worker) {
         double half = worker.getBbWidth() / 2.0;
-        return WorkerAI.stanceFor(JobType.CHOP_TREE, worker).maxGap(half) + 0.05;
+        return JobHandlers.stanceFor(JobType.CHOP_TREE, worker).maxGap(half) + 0.05;
     }
 
     /**

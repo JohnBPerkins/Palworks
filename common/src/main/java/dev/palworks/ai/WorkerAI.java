@@ -1,11 +1,8 @@
 package dev.palworks.ai;
 
-import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.ai.path.WorkerNavigator;
-import dev.palworks.animation.WorkAnimation;
-import dev.palworks.animation.WorkAnimations;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.debug.DebugManager;
@@ -13,28 +10,23 @@ import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
-import dev.palworks.manager.JobChecks;
+import dev.palworks.job.handler.JobContext;
+import dev.palworks.job.handler.JobHandler;
+import dev.palworks.job.handler.JobHandlers;
+import dev.palworks.job.handler.Step;
 import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
-import dev.palworks.suitability.Suitability;
-import dev.palworks.suitability.SuitabilityDetector;
-import dev.palworks.tree.TreeDetector;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.ToIntFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Main AI controller for Pokémon workers.
@@ -152,10 +144,7 @@ public class WorkerAI {
                         Math.sqrt(distanceSq),
                         entityPos,
                         reservation.getStationPos());
-                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
-                WorkerNavigator.forget(entity);
-                state.clearReservation();
-                WorkerStateManager.save(pokemon, state);
+                dropJob(pokemon, entity, state);
                 return false;
             }
 
@@ -170,10 +159,7 @@ public class WorkerAI {
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                     JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                 }
-                entity.getNavigation().stop(); // dropping the job: don't keep walking to it
-                WorkerNavigator.forget(entity);
-                state.clearReservation();
-                WorkerStateManager.save(pokemon, state);
+                dropJob(pokemon, entity, state);
                 return false;
             }
 
@@ -220,7 +206,7 @@ public class WorkerAI {
         // Where it stands, from the job's stance (from its animation, which can be its species' own),
         // sized to this mon: the exact tile (e.g. in front of a furnace's face)
         JobType jobType = reservation.getJobType();
-        WorkStance stance = stanceFor(jobType, entity);
+        WorkStance stance = JobHandlers.stanceFor(jobType, entity);
         BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, jobType, entity, stance);
         if (standPos == null) {
             // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by),
@@ -240,11 +226,8 @@ public class WorkerAI {
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                 JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
             }
-            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
-            WorkerNavigator.forget(entity);
-            state.clearReservation();
             state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
-            WorkerStateManager.save(pokemon, state);
+            dropJob(pokemon, entity, state);
             return false;
         }
 
@@ -279,11 +262,8 @@ public class WorkerAI {
                         reservation.getJobType(),
                         targetPos);
             }
-            entity.getNavigation().stop(); // dropping the job: don't keep walking to it
-            WorkerNavigator.forget(entity);
-            state.clearReservation();
             state.resetPathFailures();
-            WorkerStateManager.save(pokemon, state);
+            dropJob(pokemon, entity, state);
             return false;
         }
 
@@ -412,12 +392,9 @@ public class WorkerAI {
                     if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                         JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                     }
-                    entity.getNavigation().stop(); // dropping the job: don't keep walking to it
-                    WorkerNavigator.forget(entity);
-                    state.clearReservation();
                     state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
                     state.resetPathFailures();
-                    WorkerStateManager.save(pokemon, state);
+                    dropJob(pokemon, entity, state);
                     return false;
                 }
             }
@@ -450,7 +427,7 @@ public class WorkerAI {
             ReservationId reservation,
             boolean readyToAnimate) {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
-        JobHandler handler = handlerFor(reservation.getJobType());
+        JobHandler handler = JobHandlers.forJob(reservation.getJobType());
 
         // A step's animation waits (just before starting) until the worker is ready for it: turned
         // to face its work, and done playing out the last one. Steps without one carry on, so a
@@ -484,8 +461,8 @@ public class WorkerAI {
     private static boolean stopIfItCantGoOn(
             Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
-        StepRunner.Outcome reason =
-                StepRunner.stopReason(handlerFor(reservation.getJobType()).steps(), state, ctx);
+        StepRunner.Outcome reason = StepRunner.stopReason(
+                JobHandlers.forJob(reservation.getJobType()).steps(), state, ctx);
         if (reason == null) {
             return false;
         }
@@ -525,701 +502,20 @@ public class WorkerAI {
                 jobs.onJobGivenBack(pokemon, reservation); // before its progress is cleared
             }
         }
-        entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+        state.resetPathFailures();
+        dropJob(pokemon, entity, state);
+    }
+
+    /**
+     * Drop the worker's job: stop walking to it and clear its reservation (and with it, its
+     * progress), then save. Whatever else dropping it means (a cooldown, forgetting path
+     * failures, telling JobManager) is the caller's, before this.
+     */
+    private static void dropJob(Pokemon pokemon, Mob entity, WorkerState state) {
+        entity.getNavigation().stop(); // don't keep walking to it
         WorkerNavigator.forget(entity);
         state.clearReservation();
-        state.resetPathFailures();
         WorkerStateManager.save(pokemon, state);
-    }
-
-    // ============================================================
-    // Job handlers (strategy per JobType)
-    // ============================================================
-
-    /**
-     * Strategy for executing one {@link JobType} at the work site: a list of timed {@link Step}s.
-     * Add a job type by registering a handler in {@link #HANDLERS} rather than editing performWork().
-     */
-    @FunctionalInterface
-    private interface JobHandler {
-        /** The job's steps, in order. The shared code walks the worker there and runs them. */
-        List<Step> steps();
-        /** If true when the last step is done, start the steps again instead of finishing. */
-        default boolean repeatAfterComplete(JobContext ctx) {
-            return false;
-        }
-        /**
-         * Where a worker of this species stands for the whole job: the stance its animation is
-         * played from (the first, if it has more than one), or {@link WorkStance#NEAR} if it has
-         * none.
-         */
-        default WorkStance stance(@Nullable String speciesId) {
-            for (Step step : steps()) {
-                WorkAnimation animation = step.animationFor(speciesId);
-                if (animation != null) {
-                    return animation.stance();
-                }
-            }
-            return WorkStance.NEAR;
-        }
-    }
-
-    /**
-     * One timed step of a job. The worker spends {@code ticks} on it at the job, and {@code finish}
-     * runs when it's over: the step's effect. Effects only happen in {@code finish}, so a step is
-     * all-or-nothing: if the worker leaves (pushed away, paused, the game reloads) the step simply
-     * restarts, its animation with it. The step reached is saved, so the job carries on from it,
-     * even with a different worker (handed over). A step that isn't {@code isNeeded} when it's
-     * reached (nothing for it to do) is skipped.
-     *
-     * <p>A step with an {@code animation} plays it aimed at the job's block, timed so it lands as
-     * {@code finish} runs; it takes at least long enough for that (see
-     * {@link WorkAnimation#stepTicks}). A species can have its own version of the animation, with
-     * its own timing (see {@link WorkAnimations#forSpecies}), so how long a step takes, its
-     * {@code length}, is by species. Build one with {@link #animated}.
-     *
-     * <p>Every step checks its job is still there ({@code isThere}): when it's reached, while it goes
-     * on, and right before its effect (see {@link StepRunner}); the worker also checks it on its way.
-     * By default that's {@link JobChecks#isJobStillThere}, the same check that found the job. A step
-     * that comes after its job's target is gone by design (replanting a chopped tree) doesn't (see
-     * {@link #outlivesItsTarget}). At the same points it checks the worker can do it
-     * ({@link #canDo}): {@link JobChecks#canWorkerDo}, the check jobs are handed out by.
-     */
-    private record Step(
-            String name,
-            ToIntFunction<String> length,
-            @Nullable WorkAnimation animation,
-            StepFinish onFinish,
-            java.util.function.Predicate<JobContext> isNeeded,
-            java.util.function.Predicate<JobContext> isThere)
-            implements StepRunner.TimedStep<JobContext> {
-
-        /** This step's animation as a worker of this species plays it, or null if it has none. */
-        @Nullable
-        WorkAnimation animationFor(@Nullable String speciesId) {
-            // Through the accessor: PMD's NonThreadSafeSingleton crashes on a null check of a
-            // record component read directly (PMD 7.28.0)
-            return animation() == null ? null : WorkAnimations.forSpecies(animation(), speciesId);
-        }
-
-        /** How long this step takes a worker of this species. */
-        int ticksFor(@Nullable String speciesId) {
-            return length.applyAsInt(speciesId);
-        }
-
-        @Override
-        public int ticks(JobContext ctx) {
-            return ticksFor(ctx.species());
-        }
-
-        @Override
-        public int startTick(JobContext ctx) {
-            WorkAnimation played = animationFor(ctx.species());
-            return played == null ? 0 : played.playAt(ticks(ctx));
-        }
-
-        @Override
-        public void start(JobContext ctx) {
-            WorkAnimation played = animationFor(ctx.species());
-            if (played != null) {
-                WorkAnimator.play(ctx.entity(), played, ctx.pos());
-            }
-        }
-
-        @Override
-        public boolean finish(JobContext ctx) {
-            // The step's work happens now, as its animation lands: let the animation play out
-            WorkAnimator.release(ctx.entity());
-            return onFinish.run(ctx);
-        }
-
-        @Override
-        public boolean needed(JobContext ctx) {
-            return isNeeded.test(ctx);
-        }
-
-        @Override
-        public boolean stillThere(JobContext ctx) {
-            return isThere.test(ctx);
-        }
-
-        /**
-         * The same check its job was handed out by, so a worker that gives a job back isn't handed
-         * it again until it can do it. A job type that needs something of its worker adds it to
-         * {@link JobChecks#canWorkerDo}, not here.
-         */
-        @Override
-        public boolean canDo(JobContext ctx) {
-            return JobChecks.canWorkerDo(
-                    ctx.level(), ctx.pokemon(), ctx.reservation().getJobType(), ctx.pos());
-        }
-
-        /** Whether the job a step is for is still there, as the scan that found it sees it. */
-        private static boolean jobInTheWorld(JobContext ctx) {
-            return JobChecks.isJobStillThere(ctx.level(), ctx.reservation().getJobType(), ctx.pos());
-        }
-
-        /** A step that takes time and then has its effect, with no animation. */
-        static Step of(String name, int ticks, StepFinish finish) {
-            return new Step(name, species -> ticks, null, finish, ctx -> true, Step::jobInTheWorld);
-        }
-
-        /**
-         * A step that plays an animation and has its effect as it lands. It takes {@code minTicks},
-         * or longer if the worker needs it to settle and its animation to land.
-         */
-        static Step animated(String name, int minTicks, WorkAnimation animation, StepFinish finish) {
-            return new Step(
-                    name,
-                    species -> WorkAnimations.forSpecies(animation, species).stepTicks(minTicks),
-                    animation,
-                    finish,
-                    ctx -> true,
-                    Step::jobInTheWorld);
-        }
-
-        /**
-         * A step that only takes time (e.g. a pause), with no effect. It still ends the job if that
-         * goes meanwhile: a furnace emptied during its smelt isn't waited out.
-         */
-        static Step pause(String name, ToIntFunction<String> length) {
-            return new Step(name, length, null, ctx -> true, ctx -> true, Step::jobInTheWorld);
-        }
-
-        /** This step, skipped when it's reached if there's nothing for it to do. */
-        Step onlyIf(java.util.function.Predicate<JobContext> needed) {
-            return new Step(name, length, animation, onFinish, needed, isThere);
-        }
-
-        /**
-         * This step, done even though its job's target is gone: it comes after a step that does
-         * away with it (a chopped tree's replant). Its effect has to cope with what it finds.
-         */
-        Step outlivesItsTarget() {
-            return new Step(name, length, animation, onFinish, isNeeded, ctx -> true);
-        }
-    }
-
-    /** A step's effect. Return false to end the job here (e.g. there turned out to be nothing to do). */
-    @FunctionalInterface
-    private interface StepFinish {
-        boolean run(JobContext ctx);
-    }
-
-    /** Wrap a void effect as a step finish that always lets the job continue. */
-    private static StepFinish effect(java.util.function.Consumer<JobContext> action) {
-        return ctx -> {
-            action.accept(ctx);
-            return true;
-        };
-    }
-
-    /** Everything a {@link JobHandler} needs to act at the work site. */
-    private record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
-        BlockPos pos() {
-            return reservation.getStationPos();
-        }
-
-        WorkerInventory inventory() {
-            return WorkerInventoryManager.getOrCreate(pokemon);
-        }
-
-        String name() {
-            return pokemon.getSpecies().getName();
-        }
-
-        /** The worker's species id, which its animations can be particular to. */
-        String species() {
-            return speciesOf(pokemon);
-        }
-        /** Data steps leave for later steps (saved, and handed over with the job). */
-        net.minecraft.nbt.CompoundTag data() {
-            return state.getJobData();
-        }
-    }
-
-    private static final Map<JobType, JobHandler> HANDLERS = new EnumMap<>(JobType.class);
-    // Unknown/unimplemented jobs: stand for 2s and do nothing.
-    private static final JobHandler DEFAULT_HANDLER = () -> List.of(Step.pause("wait", species -> 40));
-
-    static {
-        HANDLERS.put(JobType.FUEL_FURNACE, new FuelFurnaceHandler());
-        HANDLERS.put(JobType.GET_SEEDS, new GetSeedsHandler());
-        HANDLERS.put(JobType.COLLECT_DROPS, new CollectDropsHandler());
-        HANDLERS.put(JobType.DELIVER_ITEMS, new DeliverItemsHandler());
-        HANDLERS.put(JobType.PLANT_SEEDS, new PlantSeedsHandler());
-        HANDLERS.put(JobType.HARVEST_CROPS, new HarvestCropsHandler());
-        HANDLERS.put(JobType.CHOP_TREE, new ChopTreeHandler());
-        // MINE_RESOURCE: worker stands 4s but does not yet break the ore (pre-existing TODO).
-        HANDLERS.put(JobType.MINE_RESOURCE, () -> List.of(Step.pause("wait", species -> 80)));
-    }
-
-    private static JobHandler handlerFor(JobType type) {
-        return HANDLERS.getOrDefault(type, DEFAULT_HANDLER);
-    }
-
-    /** A job's step, for the debug overlay: its name, which of how many it is, and its length. */
-    public record StepView(String name, int index, int count, int ticks) {}
-
-    /** The step at this index of a job's steps, as a worker of this species does it, or null if there's none there. */
-    @Nullable
-    public static StepView stepView(JobType job, int index, @Nullable String speciesId) {
-        List<Step> steps = handlerFor(job).steps();
-        if (index < 0 || index >= steps.size()) {
-            return null;
-        }
-        Step step = steps.get(index);
-        return new StepView(step.name(), index, steps.size(), step.ticksFor(speciesId));
-    }
-
-    /**
-     * Where this worker stands to do this job: the stance its species plays the job's animation
-     * from (see {@link JobHandler#stance}). {@link WorkPositions} finds the tile from it.
-     */
-    public static WorkStance stanceFor(JobType job, Mob worker) {
-        return handlerFor(job).stance(speciesOf(worker));
-    }
-
-    /** A worker's species id ({@code cobblemon:scizor}), or null if it isn't a Pokémon. */
-    @Nullable
-    public static String speciesOf(Mob worker) {
-        return worker instanceof PokemonEntity pokemonEntity ? speciesOf(pokemonEntity.getPokemon()) : null;
-    }
-
-    private static String speciesOf(Pokemon pokemon) {
-        return pokemon.getSpecies().getResourceIdentifier().toString();
-    }
-
-    private static final class FuelFurnaceHandler implements JobHandler {
-        // One cycle matches one smelting operation: Ember, lighting the furnace as its flames reach
-        // it, then wait out the rest of the smelt.
-        private static final int CYCLE_TICKS = 200;
-        private final Step ember =
-                Step.animated("ember", 0, WorkAnimations.IGNITE_FURNACE, effect(FuelFurnaceHandler::ignite));
-        private final List<Step> steps = List.of(
-                ember,
-                // Re-igniting once per cycle keeps it lit across repeats: the 201-tick burn covers the
-                // 200-tick gap to the next ignite, however long the species' ember takes.
-                Step.pause("smelt", species -> Math.max(0, CYCLE_TICKS - ember.ticksFor(species))));
-
-        @Override
-        public List<Step> steps() {
-            return steps;
-        }
-
-        private static void ignite(JobContext ctx) {
-            int burnDuration = dev.palworks.station.FurnaceHelper.getBurnDuration();
-            dev.palworks.station.FurnaceHelper.igniteFurnace(ctx.level(), ctx.pos(), burnDuration);
-            if (DEBUG) {
-                Palworks.LOGGER.info("{} ignited furnace at {} for {} ticks", ctx.name(), ctx.pos(), burnDuration);
-            }
-        }
-
-        @Override
-        public boolean repeatAfterComplete(JobContext ctx) {
-            // Keep going only if the furnace still has more than the item being smelted.
-            if (dev.palworks.station.FurnaceHelper.hasQueuedItems(ctx.level(), ctx.pos())) {
-                if (DEBUG) {
-                    Palworks.LOGGER.info("{} continuing - furnace still has items to smelt", ctx.name());
-                }
-                return true;
-            }
-            return false;
-        }
-    }
-
-    private static final class GetSeedsHandler implements JobHandler {
-        private final List<Step> steps = List.of(Step.of("take seeds", 20, effect(this::work)));
-
-        @Override
-        public List<Step> steps() {
-            return steps;
-        }
-
-        private void work(JobContext ctx) {
-            BlockPos targetPos = ctx.pos();
-            WorkerInventory inventory = ctx.inventory();
-
-            if (DEBUG) {
-                Palworks.LOGGER.info(
-                        "{} starting GET_SEEDS at {} (inventory: {} items, has space: {})",
-                        ctx.name(),
-                        targetPos,
-                        inventory.getTotalItemCount(),
-                        inventory.hasSpace());
-            }
-
-            // Skip extraction if inventory is full, but still complete the job
-            if (!inventory.hasSpace()) {
-                if (DEBUG) {
-                    Palworks.LOGGER.info("{} skipping GET_SEEDS extraction - inventory already full", ctx.name());
-                }
-                return;
-            }
-
-            Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
-            if (suitabilities.contains(Suitability.PLANTING)) {
-                // A seed the open farmland around it can take (see JobManager.seedToFetch)
-                net.minecraft.world.item.Item seed = ctx.level() instanceof ServerLevel serverLevel
-                        ? JobManager.getInstance(serverLevel)
-                                .seedToFetch(targetPos, ctx.entity().blockPosition())
-                        : null;
-                ItemStack extracted = seed == null
-                        ? ItemStack.EMPTY
-                        : dev.palworks.station.ChestHelper.extractItems(ctx.level(), targetPos, seed, 64);
-                if (!extracted.isEmpty()) {
-                    int leftover = inventory.addItem(extracted);
-                    returnToChest(ctx.level(), targetPos, extracted, leftover);
-                    if (DEBUG) {
-                        Palworks.LOGGER.info(
-                                "{} got {} {} seeds from chest at {} ({} leftover)",
-                                ctx.name(),
-                                extracted.getCount() - leftover,
-                                extracted.getItem().toString(),
-                                targetPos,
-                                leftover);
-                    }
-                } else if (DEBUG) {
-                    Palworks.LOGGER.warn(
-                            "{} FAILED to get seeds from chest at {} - chest might be empty, treating as complete",
-                            ctx.name(),
-                            targetPos);
-                }
-            } else if (suitabilities.contains(Suitability.NETHER)) {
-                ItemStack extracted = dev.palworks.station.ChestHelper.extractItems(
-                        ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
-                if (!extracted.isEmpty()) {
-                    int leftover = inventory.addItem(extracted);
-                    returnToChest(ctx.level(), targetPos, extracted, leftover);
-                    if (DEBUG) {
-                        Palworks.LOGGER.info(
-                                "{} got {} nether wart from chest at {} ({} leftover)",
-                                ctx.name(),
-                                extracted.getCount() - leftover,
-                                targetPos,
-                                leftover);
-                    }
-                } else if (DEBUG) {
-                    Palworks.LOGGER.warn(
-                            "{} FAILED to get nether wart from chest at {} - chest might be empty, treating as complete",
-                            ctx.name(),
-                            targetPos);
-                }
-            } else if (DEBUG) {
-                Palworks.LOGGER.warn(
-                        "{} has GET_SEEDS job but lacks PLANTING/NETHER suitability! Suitabilities: {}",
-                        ctx.name(),
-                        suitabilities);
-            }
-        }
-    }
-
-    private static final class CollectDropsHandler implements JobHandler {
-        private final List<Step> steps = List.of(Step.of("pick up", 20, effect(this::work)));
-
-        @Override
-        public List<Step> steps() {
-            return steps;
-        }
-
-        // Picks up whatever fits (into stacks of the same item first, then free slots). What doesn't
-        // fit stays on the ground, and JobManager gives it a pickup job of its own again.
-        private void work(JobContext ctx) {
-            BlockPos targetPos = ctx.pos();
-            WorkerInventory inventory = ctx.inventory();
-
-            int pickedUp = 0;
-            for (net.minecraft.world.entity.item.ItemEntity itemEntity :
-                    JobChecks.itemsToPickUp(ctx.level(), targetPos)) {
-                ItemStack stack = itemEntity.getItem();
-                int leftover = inventory.addItem(stack);
-                if (leftover == stack.getCount()) {
-                    continue; // none of it fits
-                }
-                pickedUp += stack.getCount() - leftover;
-                if (leftover == 0) {
-                    itemEntity.discard();
-                } else {
-                    // Only part of it fit: leave the rest on the ground (it used to be deleted)
-                    itemEntity.setItem(stack.copyWithCount(leftover));
-                }
-            }
-
-            if (DEBUG && pickedUp > 0) {
-                Palworks.LOGGER.info(
-                        "{} collected {} dropped items from ground at {}", ctx.name(), pickedUp, targetPos);
-            }
-        }
-    }
-
-    private static final class DeliverItemsHandler implements JobHandler {
-        private final List<Step> steps = List.of(Step.of("deliver", 20, effect(this::work)));
-
-        @Override
-        public List<Step> steps() {
-            return steps;
-        }
-
-        private void work(JobContext ctx) {
-            BlockPos chestPos = ctx.pos();
-            WorkerInventory inventory = ctx.inventory();
-            if (inventory.isEmpty()) {
-                return;
-            }
-
-            // A worker that plants keeps its seeds to plant with; everything else goes in the chest
-            Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
-            int totalDelivered = 0;
-            for (int i = 0; i < inventory.getContainerSize(); i++) {
-                ItemStack stack = inventory.getItem(i);
-                if (WorkerInventory.isCargo(stack, suitabilities)) {
-                    int count = stack.getCount();
-                    int left = addItemsToChest(ctx.level(), chestPos, stack);
-                    totalDelivered += count - left;
-                    // Keep whatever didn't fit (it used to be deleted when a stack only partly fit)
-                    inventory.setItem(i, left == 0 ? ItemStack.EMPTY : stack.copyWithCount(left));
-                }
-            }
-
-            if (DEBUG) {
-                if (totalDelivered > 0) {
-                    Palworks.LOGGER.info("{} delivered {} items to chest at {}", ctx.name(), totalDelivered, chestPos);
-                } else {
-                    Palworks.LOGGER.warn("{} failed to deliver items to chest at {}", ctx.name(), chestPos);
-                }
-            }
-        }
-    }
-
-    private static final class PlantSeedsHandler implements JobHandler {
-        private final List<Step> steps = List.of(Step.animated("plant", 20, WorkAnimations.PLANT, effect(this::work)));
-
-        @Override
-        public List<Step> steps() {
-            return steps;
-        }
-
-        private void work(JobContext ctx) {
-            BlockPos plantPos = ctx.pos();
-            WorkerInventory inventory = ctx.inventory();
-
-            // Plant a carried seed: the first held item that can be planted on this block (not just
-            // the first item, which may be something else, like a harvested crop).
-            ItemStack seedStack = ItemStack.EMPTY;
-            for (int i = 0; i < inventory.getContainerSize(); i++) {
-                ItemStack stack = inventory.getItem(i);
-                if (!stack.isEmpty()
-                        && dev.palworks.crop.CropAdapter.canPlantSeed(stack.getItem(), ctx.level(), plantPos.below())) {
-                    seedStack = stack;
-                    break;
-                }
-            }
-            if (seedStack.isEmpty()) {
-                if (DEBUG) {
-                    Palworks.LOGGER.warn("{} has no seeds to plant at {}", ctx.name(), plantPos);
-                }
-                return;
-            }
-
-            net.minecraft.world.item.Item seed = seedStack.getItem();
-            boolean planted = dev.palworks.crop.CropAdapter.plantSeed(seed, ctx.level(), plantPos.below());
-            if (planted) {
-                seedStack.shrink(1);
-                inventory.setChanged();
-                if (DEBUG) {
-                    Palworks.LOGGER.info(
-                            "{} planted {} at {} ({} items remaining)",
-                            ctx.name(),
-                            seed.toString(),
-                            plantPos,
-                            inventory.getTotalItemCount());
-                }
-            } else if (DEBUG) {
-                Palworks.LOGGER.warn("{} failed to plant {} at {}", ctx.name(), seed.toString(), plantPos);
-            }
-        }
-    }
-
-    private static final class HarvestCropsHandler implements JobHandler {
-        private final List<Step> steps =
-                List.of(Step.animated("harvest", 20, WorkAnimations.HARVEST, effect(this::work)));
-
-        @Override
-        public List<Step> steps() {
-            return steps;
-        }
-
-        private void work(JobContext ctx) {
-            BlockPos harvestPos = ctx.pos();
-            boolean harvested = dev.palworks.crop.CropAdapter.harvestCrop(ctx.level(), harvestPos);
-            if (DEBUG) {
-                if (harvested) {
-                    Palworks.LOGGER.info("{} harvested crop at {}", ctx.name(), harvestPos);
-                } else {
-                    Palworks.LOGGER.warn("{} failed to harvest crop at {}", ctx.name(), harvestPos);
-                }
-            }
-        }
-    }
-
-    private static final class ChopTreeHandler implements JobHandler {
-        // Clear the leaves in the way to the trunk (1s, skipped if there are none), chop (3s), then
-        // replant (1s later). The replant spots and sapling are saved in the job's data at the
-        // chop, so a paused job, or one another lumberjack takes over, still replants.
-        private final List<Step> steps = List.of(
-                Step.of("clear leaves", 20, effect(ChopTreeHandler::clearLeaves))
-                        .onlyIf(ChopTreeHandler::leavesInTheWay),
-                Step.animated("chop", 60, WorkAnimations.CHOP, ChopTreeHandler::chop),
-                // The tree's gone by now: it was just chopped
-                Step.of("replant", 20, effect(ChopTreeHandler::replant)).outlivesItsTarget());
-
-        @Override
-        public List<Step> steps() {
-            return steps;
-        }
-
-        /** Where the worker stands by this tree, and the leaves in its way (see WorkPositions.treeStandFor). */
-        @Nullable
-        private static WorkPositions.TreeStand treeStand(JobContext ctx) {
-            return WorkPositions.treeStandFor(
-                    ctx.level(), ctx.pos(), ctx.entity(), stanceFor(JobType.CHOP_TREE, ctx.entity()));
-        }
-
-        /** Whether leaves stand between the worker and the trunk. */
-        private static boolean leavesInTheWay(JobContext ctx) {
-            WorkPositions.TreeStand stand = treeStand(ctx);
-            return stand != null && stand.needsClearing();
-        }
-
-        /**
-         * Break the leaves between the worker and the trunk (with their usual drops, as when they
-         * decay), so it can walk in and chop right up against it. Its stand spot then moves in to the
-         * trunk, and it walks there before the chop starts.
-         */
-        private static void clearLeaves(JobContext ctx) {
-            WorkPositions.TreeStand stand = treeStand(ctx);
-            if (stand == null) {
-                return;
-            }
-            for (BlockPos leaf : stand.leavesToClear()) {
-                ctx.level().destroyBlock(leaf, true, ctx.entity());
-            }
-            // It hasn't walked to its new spot yet: don't let "close enough" chop from out here
-            ctx.state().setWalkedToJob(false);
-        }
-
-        /** Bring the tree down and note where to replant. Ends the job if there's no valid tree. */
-        private static boolean chop(JobContext ctx) {
-            Level level = ctx.level();
-            BlockPos treePos = ctx.pos();
-            TreeDetector.TreeValidationResult treeResult = TreeDetector.validateTree(level, treePos);
-
-            if (!treeResult.isValid() || treeResult.getLogPositions().isEmpty()) {
-                // Not a valid tree any more (partly chopped, or it's a player build). Leave it alone:
-                // breaking "just this log" is how builds that fail tree detection got griefed.
-                if (DEBUG) {
-                    Palworks.LOGGER.warn(
-                            "{} found no valid tree at {} ({}), leaving it alone",
-                            ctx.name(),
-                            treePos,
-                            treeResult.getReason());
-                }
-                return false;
-            }
-
-            // Get sapling type BEFORE destroying the tree (found by name from its logs or leaves;
-            // null for a tree with no recognisable sapling, which is chopped but not replanted)
-            net.minecraft.world.item.Item saplingItem = TreeDetector.getSaplingForTree(level, treeResult);
-            BlockPos basePos = treeResult.getBasePosition();
-
-            // Where to replant: a 2x2 trunk (dark oak, giant spruce/jungle) gets a 2x2 of saplings
-            // in the same spots, anything else one at its base. Worked out while the trunk is
-            // still there to look at.
-            java.util.List<BlockPos> saplingSpots =
-                    TreeDetector.saplingPositions(level, treeResult.getLogPositions(), basePos);
-
-            // Huge fungus canopies never decay, so they come down with the stem (found before
-            // anything is broken, while the tree is still intact)
-            java.util.Set<BlockPos> canopy = TreeDetector.isNetherStem(level.getBlockState(treePos))
-                    ? TreeDetector.findNetherCanopyToBreak(level, treeResult.getLogPositions(), treePos)
-                    : java.util.Set.of();
-
-            int logsChopped = 0;
-            for (BlockPos logPos : treeResult.getLogPositions()) {
-                if (level.destroyBlock(logPos, true)) {
-                    logsChopped++;
-                }
-            }
-            for (BlockPos canopyPos : canopy) {
-                level.destroyBlock(canopyPos, true);
-            }
-
-            if (DEBUG) {
-                Palworks.LOGGER.info(
-                        "{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
-                        ctx.name(),
-                        treePos,
-                        logsChopped,
-                        canopy.size(),
-                        basePos,
-                        saplingItem);
-            }
-
-            // For the replant step (saved with the job, so it survives a pause or a handover)
-            if (saplingItem != null) {
-                ctx.data()
-                        .putString(
-                                DATA_SAPLING,
-                                net.minecraft.core.registries.BuiltInRegistries.ITEM
-                                        .getKey(saplingItem)
-                                        .toString());
-                int[] spots = new int[saplingSpots.size() * 3];
-                for (int i = 0; i < saplingSpots.size(); i++) {
-                    BlockPos spot = saplingSpots.get(i);
-                    spots[i * 3] = spot.getX();
-                    spots[i * 3 + 1] = spot.getY();
-                    spots[i * 3 + 2] = spot.getZ();
-                }
-                ctx.data().putIntArray(DATA_SPOTS, spots);
-            }
-
-            // Queue a job to collect the drops
-            if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                JobManager.getInstance(serverLevel).onTreeChopped(ctx.pokemon(), basePos, level);
-            }
-            // No sapling found: chopped, but nothing to replant
-            return saplingItem != null;
-        }
-
-        /** Plant the saplings noted at the chop. The sapling is free (see onTreeChopped). */
-        private static void replant(JobContext ctx) {
-            net.minecraft.resources.ResourceLocation saplingId =
-                    net.minecraft.resources.ResourceLocation.tryParse(ctx.data().getString(DATA_SAPLING));
-            net.minecraft.world.item.Item saplingItem = saplingId == null
-                    ? null
-                    : net.minecraft.core.registries.BuiltInRegistries.ITEM
-                            .getOptional(saplingId)
-                            .orElse(null);
-            int[] spots = ctx.data().getIntArray(DATA_SPOTS);
-            if (saplingItem == null || spots.length % 3 != 0) {
-                return;
-            }
-            // The sapling is free: the leaves still drop their usual saplings as they decay, and
-            // nothing had dropped yet at the chop to pay with
-            int replanted = 0;
-            for (int i = 0; i < spots.length; i += 3) {
-                if (TreeDetector.plantSapling(
-                        ctx.level(), new BlockPos(spots[i], spots[i + 1], spots[i + 2]), saplingItem)) {
-                    replanted++;
-                }
-            }
-            if (DEBUG) {
-                Palworks.LOGGER.info("{} replanted {} of {} {}", ctx.name(), replanted, spots.length / 3, saplingItem);
-            }
-        }
-
-        private static final String DATA_SAPLING = "sapling";
-        private static final String DATA_SPOTS = "spots";
     }
 
     /**
@@ -1279,56 +575,5 @@ public class WorkerAI {
         // The copy is purely visual: it must never drop (on death, or when vanilla swaps a mob's
         // equipment), or it would duplicate the item that's still in the worker's inventory.
         entity.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
-    }
-
-    /**
-     * Add as much of a stack to a chest as fits: first onto matching stacks, then into empty slots.
-     * Doesn't modify {@code stack}. Returns how many items didn't fit (the whole count if the block
-     * isn't a container).
-     */
-    private static int addItemsToChest(Level level, BlockPos chestPos, ItemStack stack) {
-        net.minecraft.world.level.block.entity.BlockEntity blockEntity = level.getBlockEntity(chestPos);
-        if (!(blockEntity instanceof net.minecraft.world.Container container)) {
-            return stack.getCount();
-        }
-
-        int remaining = stack.getCount();
-        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
-            ItemStack slotStack = container.getItem(i);
-            if (!slotStack.isEmpty() && ItemStack.isSameItemSameComponents(slotStack, stack)) {
-                int toAdd = Math.min(slotStack.getMaxStackSize() - slotStack.getCount(), remaining);
-                if (toAdd > 0) {
-                    slotStack.grow(toAdd);
-                    remaining -= toAdd;
-                }
-            }
-        }
-        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
-            if (container.getItem(i).isEmpty()) {
-                int toAdd = Math.min(remaining, stack.getMaxStackSize());
-                container.setItem(i, stack.copyWithCount(toAdd));
-                remaining -= toAdd;
-            }
-        }
-
-        if (remaining < stack.getCount()) {
-            container.setChanged();
-        }
-        return remaining;
-    }
-
-    /**
-     * Put back the part of an extracted stack the worker couldn't carry (it used to be deleted),
-     * dropping it next to the chest if the chest has since filled up.
-     */
-    private static void returnToChest(Level level, BlockPos chestPos, ItemStack extracted, int leftover) {
-        if (leftover <= 0) {
-            return;
-        }
-        int stillLeft = addItemsToChest(level, chestPos, extracted.copyWithCount(leftover));
-        if (stillLeft > 0) {
-            net.minecraft.world.level.block.Block.popResource(
-                    level, chestPos.above(), extracted.copyWithCount(stillLeft));
-        }
     }
 }
