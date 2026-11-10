@@ -19,6 +19,7 @@ import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
+import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
@@ -94,6 +95,13 @@ public class WorkerAI {
      * @return true if the AI handled this tick, false otherwise
      */
     public static boolean tick(Pokemon pokemon, Mob entity, Level level) {
+        boolean handled = tickWork(pokemon, entity, level);
+        // After the tick, so the owner sees where it ended up (e.g. a job dropped this tick).
+        WorkActivitySync.update(pokemon, entity, WorkerStateManager.getOrCreate(pokemon), level.getGameTime());
+        return handled;
+    }
+
+    private static boolean tickWork(Pokemon pokemon, Mob entity, Level level) {
         // Skip eligibility check - if the entity exists and we're calling this, it's eligible enough
         // The commands already filter for owned Pokemon
 

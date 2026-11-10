@@ -4,9 +4,11 @@ import com.cobblemon.mod.common.CobblemonNetwork;
 import com.cobblemon.mod.common.net.PacketRegisterInfo;
 import dev.palworks.net.handlers.OpenInventoryHandler;
 import dev.palworks.net.handlers.ToggleWorkerHandler;
+import dev.palworks.net.handlers.WorkActivityHandler;
 import dev.palworks.net.handlers.WorkerStatusHandler;
 import dev.palworks.net.packets.OpenInventoryPacket;
 import dev.palworks.net.packets.ToggleWorkerPacket;
+import dev.palworks.net.packets.WorkActivityPacket;
 import dev.palworks.net.packets.WorkerStatusPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -53,6 +55,12 @@ public abstract class CobblemonNetworkMixin {
                 WorkerStatusPacket.ID,
                 WorkerStatusPacket::decode,
                 new WorkerStatusHandler(),
+                null
+        ));
+        cir.getReturnValue().add(new PacketRegisterInfo<>(
+                WorkActivityPacket.ID,
+                WorkActivityPacket::decode,
+                new WorkActivityHandler(),
                 null
         ));
     }

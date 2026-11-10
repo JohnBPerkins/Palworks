@@ -1,12 +1,15 @@
 package dev.palworks.fabric;
 
 import dev.palworks.fabric.command.PalworksCommands;
+import dev.palworks.fabric.data.FabricSuitabilityReloadListener;
 import dev.palworks.fabric.event.WorkerTickHandler;
 import dev.palworks.fabric.inventory.FabricMenuOpener;
 import dev.palworks.fabric.inventory.FabricModMenuTypes;
 import dev.palworks.inventory.MenuOpener;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.minecraft.server.packs.PackType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +31,9 @@ public class PalworksFabric implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             PalworksCommands.register(dispatcher);
         });
+
+        // Load work suitabilities from datapacks (data/<namespace>/palworks/suitability)
+        ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new FabricSuitabilityReloadListener());
 
         // Register worker tick handler
         WorkerTickHandler.register();
