@@ -6,8 +6,9 @@ import com.cobblemon.mod.common.client.storage.ClientParty;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.activestate.SentOutState;
 import com.mojang.blaze3d.systems.RenderSystem;
+import dev.palworks.Palworks;
+import dev.palworks.client.ClientWorkerData;
 import dev.palworks.job.JobType;
-import dev.palworks.net.PalworksResource;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
 import java.util.Objects;
@@ -56,7 +57,7 @@ public final class WorkStatusHud {
     private WorkStatusHud() {}
 
     private static ResourceLocation icon(String name) {
-        return PalworksResource.of("textures/gui/hud/work_" + name + ".png");
+        return Palworks.id("textures/gui/hud/work_" + name + ".png");
     }
 
     /** The icon for a job, by its id (e.g. {@code work_chop_tree.png}); a generic one for no job. */
@@ -69,7 +70,7 @@ public final class WorkStatusHud {
         // A new world or server: what we were told about the old one's workers no longer applies.
         if (!Objects.equals(minecraft.level, lastLevel)) {
             lastLevel = minecraft.level;
-            WorkActivityCache.clear();
+            ClientWorkerData.clearActivity();
         }
         if (minecraft.level == null || !PartyOverlay.Companion.canRender()) {
             return;
@@ -105,7 +106,7 @@ public final class WorkStatusHud {
     /** What to show for a party member, or null for nothing (no news, or no job). */
     @Nullable
     private static WorkActivity shownActivity(Pokemon pokemon) {
-        WorkActivity activity = WorkActivityCache.get(pokemon.getUuid());
+        WorkActivity activity = ClientWorkerData.activity(pokemon.getUuid());
         return activity == null || activity.phase() == WorkActivity.Phase.IDLE ? null : activity;
     }
 

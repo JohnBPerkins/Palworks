@@ -6,7 +6,6 @@ import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.fabric.inventory.FabricModMenuTypes;
 import dev.palworks.inventory.WorkerInventoryScreen;
-import dev.palworks.net.PalworksResource;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -31,7 +30,7 @@ public class PalworksFabricClient implements ClientModInitializer {
 
         // Work icons on the party HUD's cards. Cobblemon draws the HUD from the same event, in the
         // default phase; this phase runs after it, so the icons go on top.
-        ResourceLocation afterCobblemon = PalworksResource.of("after_cobblemon_hud");
+        ResourceLocation afterCobblemon = Palworks.id("after_cobblemon_hud");
         HudRenderCallback.EVENT.addPhaseOrdering(Event.DEFAULT_PHASE, afterCobblemon);
         HudRenderCallback.EVENT.register(afterCobblemon, (graphics, deltaTracker) -> WorkStatusHud.render(graphics));
 

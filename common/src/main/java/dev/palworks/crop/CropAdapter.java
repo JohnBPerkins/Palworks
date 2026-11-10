@@ -46,10 +46,11 @@ public class CropAdapter {
 
     // Cobblemon berry tag for modded berry support
     private static final TagKey<Block> COBBLEMON_BERRIES =
-            TagKey.create(Registries.BLOCK, new ResourceLocation("cobblemon", "berries"));
+            TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("cobblemon", "berries"));
 
     // Galarica nut bush - special berry that harvests at age 3 and resets to age 1
-    private static final ResourceLocation GALARICA_NUT_BUSH_ID = new ResourceLocation("cobblemon", "galarica_nut_bush");
+    private static final ResourceLocation GALARICA_NUT_BUSH_ID =
+            ResourceLocation.fromNamespaceAndPath("cobblemon", "galarica_nut_bush");
 
     /**
      * Check if a block is a plantable crop surface (e.g., farmland).

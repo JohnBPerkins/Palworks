@@ -7,7 +7,7 @@ import dev.palworks.debug.TestArea;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
-import dev.palworks.manager.JobManager;
+import dev.palworks.job.JobManager;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.network.chat.Component;

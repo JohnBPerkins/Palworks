@@ -1,7 +1,7 @@
 package dev.palworks.net.handlers;
 
 import com.cobblemon.mod.common.api.net.ClientNetworkPacketHandler;
-import dev.palworks.client.hud.WorkActivityCache;
+import dev.palworks.client.ClientWorkerData;
 import dev.palworks.net.packets.WorkActivityPacket;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.NotNull;
@@ -11,6 +11,6 @@ public class WorkActivityHandler implements ClientNetworkPacketHandler<WorkActiv
 
     @Override
     public void handle(@NotNull WorkActivityPacket packet, @NotNull Minecraft client) {
-        WorkActivityCache.put(packet.getPokemonUUID(), packet.getActivity());
+        ClientWorkerData.putActivity(packet.getPokemonUUID(), packet.getActivity());
     }
 }

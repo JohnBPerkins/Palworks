@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.palworks.ai.WorkerAI;
+import dev.palworks.client.ClientWorkerData;
 import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.worker.WorkActivity;
@@ -65,9 +66,9 @@ public final class WorkerDebugRenderer {
         // A new world or server: the entity ids we were sent belong to the old one.
         if (!Objects.equals(level, lastLevel)) {
             lastLevel = level;
-            WorkerDebugCache.set(List.of());
+            ClientWorkerData.setDebugEntries(List.of());
         }
-        List<WorkerDebugPacket.Entry> entries = WorkerDebugCache.get();
+        List<WorkerDebugPacket.Entry> entries = ClientWorkerData.debugEntries();
         if (level == null || entries.isEmpty()) {
             return;
         }

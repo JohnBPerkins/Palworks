@@ -1,4 +1,4 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;

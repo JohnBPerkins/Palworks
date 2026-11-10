@@ -3,8 +3,8 @@ package dev.palworks.job.handler;
 import dev.palworks.animation.WorkAnimation;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.animation.WorkAnimator;
+import dev.palworks.job.JobChecks;
 import dev.palworks.job.StepRunner;
-import dev.palworks.manager.JobChecks;
 import java.util.function.ToIntFunction;
 import org.jetbrains.annotations.Nullable;
 

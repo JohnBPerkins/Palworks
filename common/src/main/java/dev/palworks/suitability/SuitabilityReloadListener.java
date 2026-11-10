@@ -3,7 +3,6 @@ package dev.palworks.suitability;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import dev.palworks.Palworks;
-import dev.palworks.net.PalworksResource;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.resources.ResourceLocation;
@@ -17,7 +16,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
  * NeoForge's AddReloadListenerEvent).
  */
 public class SuitabilityReloadListener extends SimpleJsonResourceReloadListener {
-    public static final ResourceLocation ID = PalworksResource.of("suitability");
+    public static final ResourceLocation ID = Palworks.id("suitability");
     public static final String DIRECTORY = "palworks/suitability";
 
     public SuitabilityReloadListener() {

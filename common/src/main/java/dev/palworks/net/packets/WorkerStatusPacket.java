@@ -1,8 +1,8 @@
 package dev.palworks.net.packets;
 
 import com.cobblemon.mod.common.api.net.NetworkPacket;
+import dev.palworks.Palworks;
 import dev.palworks.inventory.CarryMode;
-import dev.palworks.net.PalworksResource;
 import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +15,7 @@ import org.jetbrains.annotations.NotNull;
  * Only a display hint: the worker state stays on the server, in the Pokemon's persistent data.
  */
 public class WorkerStatusPacket implements NetworkPacket<WorkerStatusPacket> {
-    public static final ResourceLocation ID = PalworksResource.of("worker_status");
+    public static final ResourceLocation ID = Palworks.id("worker_status");
 
     private final UUID entityUUID;
     private final boolean enabled;

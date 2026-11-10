@@ -1,7 +1,7 @@
 package dev.palworks.net.packets;
 
 import com.cobblemon.mod.common.api.net.NetworkPacket;
-import dev.palworks.net.PalworksResource;
+import dev.palworks.Palworks;
 import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -11,7 +11,7 @@ import org.jetbrains.annotations.NotNull;
  * Packet sent from client to server to request opening a Pokemon's inventory.
  */
 public class OpenInventoryPacket implements NetworkPacket<OpenInventoryPacket> {
-    public static final ResourceLocation ID = PalworksResource.of("open_inventory");
+    public static final ResourceLocation ID = Palworks.id("open_inventory");
 
     private final UUID pokemonUUID;
 

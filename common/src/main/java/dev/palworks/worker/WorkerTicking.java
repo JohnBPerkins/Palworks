@@ -4,7 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.inventory.WorkerInventoryManager;
-import dev.palworks.manager.JobManager;
+import dev.palworks.job.JobManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 

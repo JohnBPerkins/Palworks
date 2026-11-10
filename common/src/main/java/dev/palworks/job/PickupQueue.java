@@ -1,8 +1,7 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import dev.palworks.Palworks;
-import dev.palworks.job.JobType;
-import dev.palworks.manager.WorkerRegistry.WorkerInfo;
+import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
