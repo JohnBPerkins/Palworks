@@ -1,6 +1,7 @@
 package dev.palworks.job;
 
 import dev.palworks.Palworks;
+import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -118,4 +119,10 @@ final class PickupQueue {
             }
         }
     }
+
+    /**
+     * A pickup job waiting to be created: for the items lying round {@code pos}, once they've had
+     * time to spawn ({@code dueTime}, game time), offered first to {@code suggestedWorker} if given.
+     */
+    private record PickupRequest(BlockPos pos, @Nullable UUID suggestedWorker, long dueTime) {}
 }

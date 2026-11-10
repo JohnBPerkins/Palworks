@@ -2,12 +2,15 @@ package dev.palworks.job;
 
 import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
+import dev.palworks.job.JobPool.JobKey;
+import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -380,5 +383,49 @@ final class JobScanner {
             }
             return stale;
         });
+    }
+
+    /** What the last scan of one chunk found, so it isn't rescanned every tick. */
+    private static final class ChunkJobCache {
+        private final long scanTime;
+        private final Map<JobType, List<BlockPos>> jobs = new EnumMap<>(JobType.class);
+        private final List<BlockPos> chests = new ArrayList<>(); // delivery targets
+        private boolean dirty;
+
+        ChunkJobCache(long scanTime) {
+            this.scanTime = scanTime;
+        }
+
+        /** Game time of the scan. */
+        long scanTime() {
+            return scanTime;
+        }
+
+        /** Job positions found, by type. */
+        Map<JobType, List<BlockPos>> jobs() {
+            return jobs;
+        }
+
+        void addJob(JobType type, BlockPos pos) {
+            jobs.computeIfAbsent(type, k -> new ArrayList<>()).add(pos);
+        }
+
+        /** Chests seen in the scan. */
+        List<BlockPos> chests() {
+            return chests;
+        }
+
+        void addChest(BlockPos pos) {
+            chests.add(pos);
+        }
+
+        /** Whether something in the chunk changed since, so it needs scanning again. */
+        boolean isDirty() {
+            return dirty;
+        }
+
+        void markDirty() {
+            dirty = true;
+        }
     }
 }
