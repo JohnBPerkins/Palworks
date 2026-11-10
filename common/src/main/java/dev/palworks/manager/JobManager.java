@@ -1848,4 +1848,80 @@ public class JobManager {
             return new JobKey(reservation.getStationPos(), reservation.getJobType());
         }
     }
+
+    /**
+     * JobManager's view of an active worker, refreshed from the worker every tick it reports in
+     * ({@link JobManager#registerWorker}). Its WorkerState stays the source of truth for its job.
+     */
+    static final class WorkerInfo {
+        final UUID pokemonUUID;
+        BlockPos position;
+        boolean fromParty; // From its owner's party (not a pasture): works near its owner
+
+        @Nullable
+        BlockPos ownerPosition; // Where its owner is, for one from a party (null if not in this level)
+
+        Set<Suitability> suitabilities = EnumSet.noneOf(Suitability.class);
+
+        @Nullable
+        ReservationId currentReservation;
+
+        boolean idle = true;
+        long lastSeenTick; // Game tick of the worker's last registerWorker() call
+
+        WorkerInfo(UUID pokemonUUID, BlockPos position) {
+            this.pokemonUUID = pokemonUUID;
+            this.position = position;
+        }
+    }
+
+    /** What the last scan of one chunk found, so it isn't rescanned every tick. */
+    static final class ChunkJobCache {
+        private final long scanTime;
+        private final Map<JobType, List<BlockPos>> jobs = new EnumMap<>(JobType.class);
+        private final List<BlockPos> chests = new ArrayList<>(); // delivery targets
+        private boolean dirty;
+
+        ChunkJobCache(long scanTime) {
+            this.scanTime = scanTime;
+        }
+
+        /** Game time of the scan. */
+        long scanTime() {
+            return scanTime;
+        }
+
+        /** Job positions found, by type. */
+        Map<JobType, List<BlockPos>> jobs() {
+            return jobs;
+        }
+
+        void addJob(JobType type, BlockPos pos) {
+            jobs.computeIfAbsent(type, k -> new ArrayList<>()).add(pos);
+        }
+
+        /** Chests seen in the scan. */
+        List<BlockPos> chests() {
+            return chests;
+        }
+
+        void addChest(BlockPos pos) {
+            chests.add(pos);
+        }
+
+        /** Whether something in the chunk changed since, so it needs scanning again. */
+        boolean isDirty() {
+            return dirty;
+        }
+
+        void markDirty() {
+            dirty = true;
+        }
+    }
+
+    /**
+     * A pickup job waiting to be created: for the items lying round {@code pos}, once they've had
+     * time to spawn ({@code dueTime}, game time), offered first to {@code suggestedWorker} if given.
+     */
+    record PickupRequest(BlockPos pos, @Nullable UUID suggestedWorker, long dueTime) {}
 }
