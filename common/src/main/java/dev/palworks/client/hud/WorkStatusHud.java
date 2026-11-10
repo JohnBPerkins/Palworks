@@ -59,22 +59,9 @@ public final class WorkStatusHud {
         return PalworksResource.of("textures/gui/hud/work_" + name + ".png");
     }
 
-    /** The icon for a job, by its id (e.g. {@code work_chop_tree.png}); a generic one for jobs without their own. */
+    /** The icon for a job, by its id (e.g. {@code work_chop_tree.png}); a generic one for no job. */
     public static ResourceLocation iconFor(@Nullable JobType job) {
-        if (job == null) {
-            return icon("generic");
-        }
-        return switch (job) {
-            case CHOP_TREE,
-                    HARVEST_CROPS,
-                    PLANT_SEEDS,
-                    GET_SEEDS,
-                    FUEL_FURNACE,
-                    COLLECT_DROPS,
-                    DELIVER_ITEMS,
-                    MINE_RESOURCE -> icon(job.getId());
-            default -> icon("generic");
-        };
+        return icon(job == null ? "generic" : job.getId());
     }
 
     public static void render(GuiGraphics graphics) {
