@@ -21,9 +21,9 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
 - **Work toggle** — shift-right-click your Pokémon and use the bottom slot of the interact wheel
   to switch its work on (green check) or off (red cross).
-- **Work icons on the party HUD** — a badge on each sent-out party member's portrait: its job's icon
-  while it works, faded while it walks there, greyed out while it's in a battle, or a red cross if its
-  work is off.
+- **Work icons on the party HUD** — in the top-left corner of each sent-out party member's card: its
+  job's icon while it works, faded while it walks there, greyed out while it's in a battle, or a red
+  cross if its work is off.
 - **Data-driven** — which Pokémon can do which work, and what counts as "ore", come from datapack
   files, so modpacks can tune them without code changes (see
   [Customizing work skills](#customizing-work-skills)).

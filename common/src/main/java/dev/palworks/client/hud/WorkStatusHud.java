@@ -18,8 +18,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Draws a work icon on each sent-out party member's card on Cobblemon's party HUD, as a badge in
- * the bottom-right corner of its portrait:
+ * Draws a work icon on each sent-out party member's card on Cobblemon's party HUD, in the top-left
+ * corner where Cobblemon shows its "sent out" icon:
  * <ul>
  *   <li>the job's icon (axe, flame, wheat...) while it's working on it,</li>
  *   <li>the same icon faded while it's walking there,</li>
@@ -27,26 +27,30 @@ import java.util.List;
  *   <li>a red cross when its work is switched off,</li>
  *   <li>nothing while it has no job.</li>
  * </ul>
- * The rest of the card is taken (state icon, level, held item, HP/EXP/status bars, ball, name).
- * Called by each loader's HUD event (Fabric HudRenderCallback, NeoForge RenderGuiEvent.Post), the
- * same events Cobblemon draws the HUD from, registered to run after Cobblemon's so the badge is drawn
- * over the portrait. Its layout is copied from {@link PartyOverlay}.
+ * Only sent-out Pokémon work, so while one has something to show, the work icon takes the place of
+ * the "sent out" icon ({@code SentOutStateMixin} makes Cobblemon draw nothing there); the ball at the
+ * card's bottom right still shows it's out. The rest of the card is taken (level, held item,
+ * HP/EXP/status bars, ball, name) or would cover the Pokémon's portrait.
+ *
+ * <p>Called by each loader's HUD event (Fabric HudRenderCallback, NeoForge RenderGuiEvent.Post), the
+ * same events Cobblemon draws the HUD from, registered to run after Cobblemon's so the icon is drawn
+ * over the card. Its layout is copied from {@link PartyOverlay}.
  */
 public final class WorkStatusHud {
     // PartyOverlay's layout (private constants there)
     private static final int SLOT_HEIGHT = 30;
     private static final int SLOT_SPACING = 4;
     private static final int SELECTED_OFFSET_X = 6;
-    // The portrait spans x 22-43, y 2-23 of the card: the badge sits in its bottom-right corner
-    private static final int ICON_X = 34;
-    private static final int ICON_Y = 13;
-    // Above the portrait's 3D model, which is drawn with depth
-    private static final float ICON_Z = 300F;
+    // Cobblemon's state icon fills x 8-20, y 3-11.5 of the card: the work icon is centred in it
+    private static final int ICON_X = 10;
+    private static final int ICON_Y = 3;
 
     private static final int ICON_SIZE = 8;
     private static final int ICON_TEXTURE_SIZE = 16;
 
     private static final ResourceLocation OFF_ICON = icon("off");
+    /** Drawn by Cobblemon instead of its "sent out" icon while the work icon is shown. */
+    public static final ResourceLocation EMPTY_STATE_ICON = icon("empty");
 
     @Nullable
     private static ClientLevel lastLevel;
@@ -96,8 +100,8 @@ public final class WorkStatusHud {
             if (pokemon == null || !(pokemon.getState() instanceof SentOutState)) {
                 continue;
             }
-            WorkActivity activity = WorkActivityCache.get(pokemon.getUuid());
-            if (activity == null || activity.phase() == WorkActivity.Phase.IDLE) {
+            WorkActivity activity = shownActivity(pokemon);
+            if (activity == null) {
                 continue;
             }
 
@@ -105,6 +109,21 @@ public final class WorkStatusHud {
             int y = startY + (SLOT_HEIGHT + SLOT_SPACING) * index + ICON_Y;
             drawIcon(graphics, activity, x, y);
         }
+    }
+
+    /** What to show for a party member, or null for nothing (no news, or no job). */
+    @Nullable
+    private static WorkActivity shownActivity(Pokemon pokemon) {
+        WorkActivity activity = WorkActivityCache.get(pokemon.getUuid());
+        return activity == null || activity.phase() == WorkActivity.Phase.IDLE ? null : activity;
+    }
+
+    /**
+     * Whether the HUD shows a work icon for this sent-out Pokémon in place of Cobblemon's "sent out"
+     * icon. Only while the HUD is what's drawing (the party screen keeps Cobblemon's icon).
+     */
+    public static boolean replacesStateIcon(Pokemon pokemon) {
+        return PartyOverlay.Companion.canRender() && shownActivity(pokemon) != null;
     }
 
     private static void drawIcon(GuiGraphics graphics, WorkActivity activity, int x, int y) {
@@ -123,14 +142,11 @@ public final class WorkStatusHud {
             }
             default -> texture = iconFor(activity.job());
         }
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, 0, ICON_Z);
         RenderSystem.enableBlend();
         graphics.setColor(shade, shade, shade, alpha);
         graphics.blit(texture, x, y, ICON_SIZE, ICON_SIZE, 0, 0,
                 ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE);
         graphics.setColor(1F, 1F, 1F, 1F);
         RenderSystem.disableBlend();
-        graphics.pose().popPose();
     }
 }
