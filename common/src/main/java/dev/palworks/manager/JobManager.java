@@ -26,6 +26,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -712,12 +713,76 @@ public class JobManager {
     }
 
     private static boolean hasPlantableSeeds(Level level, BlockPos pos) {
-        return ChestHelper.hasItem(level, pos, Items.WHEAT_SEEDS) ||
-               ChestHelper.hasItem(level, pos, Items.CARROT) ||
-               ChestHelper.hasItem(level, pos, Items.POTATO) ||
-               ChestHelper.hasItem(level, pos, Items.BEETROOT_SEEDS) ||
-               ChestHelper.hasItem(level, pos, Items.PUMPKIN_SEEDS) ||
-               ChestHelper.hasItem(level, pos, Items.MELON_SEEDS);
+        return !ChestHelper.itemsMatching(level, pos, JobManager::isFarmlandSeed).isEmpty();
+    }
+
+    /**
+     * A seed a planter (Planting) plants on farmland: any item that plants a field crop (see
+     * CropAdapter.fieldCropOf), vanilla or modded, except nether wart, which is Nether work.
+     */
+    private static boolean isFarmlandSeed(Item item) {
+        return item != Items.NETHER_WART && CropAdapter.fieldCropOf(item) != null;
+    }
+
+    /**
+     * The open farmland planting spots within work range of {@code workerPos} (anywhere, if null):
+     * where seeds are wanted right now.
+     */
+    private List<BlockPos> openFarmlandSpots(@Nullable BlockPos workerPos) {
+        List<BlockPos> spots = new ArrayList<>();
+        for (JobRecord job : availableJobs.values()) {
+            if (job.type == JobType.PLANT_SEEDS && job.requiredSuitabilities.contains(Suitability.PLANTING)
+                    && (workerPos == null || WorkRange.contains(workerPos, job.position))) {
+                spots.add(job.position);
+            }
+        }
+        return spots;
+    }
+
+    /** Whether {@code seed} can be planted on one of {@code spots} (planting spots, above farmland). */
+    private boolean plantableOnAny(Item seed, List<BlockPos> spots) {
+        for (BlockPos spot : spots) {
+            if (CropAdapter.canPlantSeed(seed, level, spot.below())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The seed a planter at {@code workerPos} should take from the chest at {@code chestPos}: the
+     * first farmland seed in it that one of the open spots in its range can take, or null if none
+     * can. Seeds that grow somewhere else (medicinal leek grows in water), or that nothing in range
+     * is waiting for, are left in the chest: carried, they'd count as the seeds it has, and it
+     * would never go back for ones it can plant.
+     */
+    @Nullable
+    public Item seedToFetch(BlockPos chestPos, @Nullable BlockPos workerPos) {
+        return seedToFetch(chestPos, openFarmlandSpots(workerPos));
+    }
+
+    @Nullable
+    private Item seedToFetch(BlockPos chestPos, List<BlockPos> openSpots) {
+        if (openSpots.isEmpty()) {
+            return null;
+        }
+        for (Item seed : ChestHelper.itemsMatching(level, chestPos, JobManager::isFarmlandSeed)) {
+            if (plantableOnAny(seed, openSpots)) {
+                return seed;
+            }
+        }
+        return null;
+    }
+
+    /** Whether the worker carries a seed one of {@code openSpots} can take. */
+    private boolean carriesSeedForAny(WorkerInventory inventory, List<BlockPos> openSpots) {
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
+            if (!stack.isEmpty() && plantableOnAny(stack.getItem(), openSpots)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Ores are matched via the #palworks:ores block tag (see JobBlockTags + the datapack
@@ -901,6 +966,9 @@ public class JobManager {
         WorkerInventory inventory = pokemon != null ? WorkerInventoryManager.getOrCreate(pokemon) : null;
         boolean carriesSeeds = inventory != null && inventory.hasAnySeed();
 
+        // Open farmland in its range, worked out only if there's a seed chest to consider
+        List<BlockPos> openFarmland = null;
+
         // Collect viable candidates and score them cheaply (NO pathfinding in this pass).
         List<JobRecord> candidates = new ArrayList<>();
         for (JobRecord job : availableJobs.values()) {
@@ -911,10 +979,23 @@ public class JobManager {
             }
 
             // Planters fetch seeds only once they've run out (then plant until the stack is gone),
-            // and only if there's room to carry them
-            if (job.type == JobType.GET_SEEDS && inventory != null
-                    && (carriesSeeds || !inventory.hasSpace())) {
-                continue;
+            // and only if there's room to carry them. For farmland, "run out" means of seeds the
+            // open farmland in range can take, and it only goes for a chest with some of those:
+            // seeds that grow elsewhere (medicinal leek, cocoa beans) don't count either way.
+            if (job.type == JobType.GET_SEEDS && inventory != null) {
+                if (!inventory.hasSpace()) {
+                    continue;
+                }
+                if (job.requiredSuitabilities.contains(Suitability.PLANTING)) {
+                    if (openFarmland == null) {
+                        openFarmland = openFarmlandSpots(worker.position);
+                    }
+                    if (carriesSeedForAny(inventory, openFarmland) || seedToFetch(job.position, openFarmland) == null) {
+                        continue;
+                    }
+                } else if (carriesSeeds) {
+                    continue;
+                }
             }
 
             // Planting needs a seed the worker carries that can be planted there (wart on soul

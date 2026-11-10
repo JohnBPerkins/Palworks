@@ -236,6 +236,45 @@ public class CropGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = Templates.EMPTY)
+    public void sweetBerriesGiveWhatPickingThemDoes(GameTestHelper helper) {
+        // SweetBerryBushBlock.useWithoutItem on a ripe bush: 1 + 0-1, plus 1 for being ripe. Ours
+        // used to give 1-2.
+        BlockState ripe = Blocks.SWEET_BERRY_BUSH.defaultBlockState().setValue(SweetBerryBushBlock.AGE, 3);
+        helper.setBlock(CROP.below(), Blocks.GRASS_BLOCK);
+        assertEachHarvestGives(helper, ripe, Items.SWEET_BERRIES, 2, 3);
+        helper.assertTrue(helper.getBlockState(CROP).getValue(SweetBerryBushBlock.AGE) == 1, "back to age 1");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void glowBerriesGiveOneAndLeaveTheVineBare(GameTestHelper helper) {
+        helper.setBlock(CROP.above(), Blocks.STONE);
+        BlockState ripe = Blocks.CAVE_VINES.defaultBlockState().setValue(net.minecraft.world.level.block.CaveVines.BERRIES, true);
+        assertEachHarvestGives(helper, ripe, Items.GLOW_BERRIES, 1, 1);
+        helper.assertFalse(helper.getBlockState(CROP).getValue(net.minecraft.world.level.block.CaveVines.BERRIES), "no berries left");
+        helper.succeed();
+    }
+
+    /**
+     * Harvest {@code ripe} at CROP many times: every harvest gives between {@code min} and
+     * {@code max} of {@code item}, and over the run both ends turn up.
+     */
+    static void assertEachHarvestGives(GameTestHelper helper, BlockState ripe, Item item, int min, int max) {
+        boolean sawMin = false;
+        boolean sawMax = false;
+        for (int i = 0; i < 200; i++) {
+            Scenes.clearItems(helper);
+            helper.setBlock(CROP, ripe);
+            helper.assertTrue(harvest(helper), "it harvests");
+            int got = Scenes.itemsOnGround(helper, item);
+            helper.assertTrue(got >= min && got <= max, "each harvest gives " + min + "-" + max + " " + item + ", got " + got);
+            sawMin |= got == min;
+            sawMax |= got == max;
+        }
+        helper.assertTrue(sawMin && sawMax, "both " + min + " and " + max + " turn up over 200 harvests");
+    }
+
     // ---- Planting ----
 
     @GameTest(template = Templates.EMPTY)

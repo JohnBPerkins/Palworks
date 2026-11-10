@@ -596,7 +596,12 @@ public class WorkerAI {
 
             Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
             if (suitabilities.contains(Suitability.PLANTING)) {
-                ItemStack extracted = extractSeedsFromChest(ctx.level(), targetPos);
+                // A seed the open farmland around it can take (see JobManager.seedToFetch)
+                net.minecraft.world.item.Item seed = ctx.level() instanceof ServerLevel serverLevel
+                    ? JobManager.getInstance(serverLevel).seedToFetch(targetPos, ctx.entity().blockPosition())
+                    : null;
+                ItemStack extracted = seed == null ? ItemStack.EMPTY
+                    : dev.palworks.station.ChestHelper.extractItems(ctx.level(), targetPos, seed, 64);
                 if (!extracted.isEmpty()) {
                     int leftover = inventory.addItem(extracted);
                     returnToChest(ctx.level(), targetPos, extracted, leftover);
@@ -1005,36 +1010,6 @@ public class WorkerAI {
         // The copy is purely visual: it must never drop (on death, or when vanilla swaps a mob's
         // equipment), or it would duplicate the item that's still in the worker's inventory.
         entity.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
-    }
-
-    /**
-     * Extract plantable seeds from a chest.
-     * Returns the extracted ItemStack, or EMPTY if no seeds found.
-     */
-    private static ItemStack extractSeedsFromChest(Level level, BlockPos chestPos) {
-        // Try to extract each type of seed in priority order
-        net.minecraft.world.item.Item[] seedPriority = {
-            net.minecraft.world.item.Items.WHEAT_SEEDS,
-            net.minecraft.world.item.Items.CARROT,
-            net.minecraft.world.item.Items.POTATO,
-            net.minecraft.world.item.Items.BEETROOT_SEEDS,
-            net.minecraft.world.item.Items.PUMPKIN_SEEDS,
-            net.minecraft.world.item.Items.MELON_SEEDS,
-            net.minecraft.world.item.Items.NETHER_WART
-        };
-
-        for (net.minecraft.world.item.Item seed : seedPriority) {
-            if (dev.palworks.station.ChestHelper.hasItem(level, chestPos, seed)) {
-                // Extract up to 64 seeds (full stack)
-                ItemStack extracted = dev.palworks.station.ChestHelper.extractItems(level, chestPos, seed, 64);
-
-                if (!extracted.isEmpty()) {
-                    return extracted;
-                }
-            }
-        }
-
-        return ItemStack.EMPTY;
     }
 
     /**

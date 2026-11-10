@@ -1,17 +1,22 @@
 package dev.palworks.crop;
 
+import com.cobblemon.mod.common.block.ApricornBlock;
+import com.cobblemon.mod.common.block.HeartyGrainsBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.storage.loot.LootParams;
@@ -25,7 +30,7 @@ import java.util.List;
 
 /**
  * Adapter layer for crop detection and interaction.
- * Handles vanilla crops, stems, nether wart, cocoa, berries, etc.
+ * Handles vanilla crops, stems, nether wart, cocoa, berries, apricorns, etc.
  * Makes it easy to add modded crop support later.
  */
 public class CropAdapter {
@@ -82,6 +87,20 @@ public class CropAdapter {
         return state.is(COBBLEMON_BERRIES);
     }
 
+    /** Whether a block is one of Cobblemon's apricorns (the fruit hanging off apricorn leaves). */
+    public static boolean isApricorn(BlockState state) {
+        return state.getBlock() instanceof ApricornBlock;
+    }
+
+    /**
+     * A fruit hanging off the side of another block: a cocoa pod on a jungle log, an apricorn on
+     * apricorn leaves. Both have a horizontal facing (towards what they hang from), so they aren't
+     * stations to stand in front of, and they hang above the ground: up a trunk, or in a canopy.
+     */
+    public static boolean isHangingFruit(BlockState state) {
+        return state.getBlock() instanceof CocoaBlock || isApricorn(state);
+    }
+
     /**
      * Check if a block is a galarica nut bush.
      */
@@ -96,6 +115,14 @@ public class CropAdapter {
     public static boolean isFullyGrown(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
+
+        // A two-block crop (hearty grains, a pitcher plant) is harvested from its lower half, which
+        // takes the top with it. Its upper half is just as grown, and counted as a crop of its own it
+        // got a second job: harvesting it as if it were a whole plant left a stub on a ripe base.
+        if (state.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)
+                && state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.UPPER) {
+            return false;
+        }
 
         // Torchflowers and pitcher plants: harvested, but not replanted (see isPickedNotReplanted)
         if (isPickedNotReplanted(level, pos, state)) {
@@ -121,6 +148,11 @@ public class CropAdapter {
         // Cocoa beans
         if (block instanceof CocoaBlock) {
             return state.getValue(CocoaBlock.AGE) >= 2;
+        }
+
+        // Apricorns (Cobblemon): ripe at their last stage. Their age is AGE_3 (0-3).
+        if (isApricorn(state)) {
+            return state.getValue(BlockStateProperties.AGE_3) >= BlockStateProperties.MAX_AGE_3;
         }
 
         // Sweet berry bush
@@ -218,34 +250,11 @@ public class CropAdapter {
                block instanceof StemBlock ||
                block instanceof NetherWartBlock ||
                block instanceof CocoaBlock ||
+               isApricorn(state) ||
                block instanceof SweetBerryBushBlock ||
                block == Blocks.CAVE_VINES ||
                block == Blocks.CAVE_VINES_PLANT ||
                state.is(COBBLEMON_BERRIES);
-    }
-
-    /**
-     * Get the seed/item needed to plant this crop type.
-     * Returns null if the block at pos is not a plantable surface.
-     */
-    @Nullable
-    public static Item getSeedForSurface(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        Block block = state.getBlock();
-
-        // Most seeds are planted on farmland
-        if (block == Blocks.FARMLAND) {
-            // Default to wheat seeds - specific seed type would be
-            // determined by what's in the worker's inventory
-            return Items.WHEAT_SEEDS;
-        }
-
-        // Nether wart on soul sand
-        if (block == Blocks.SOUL_SAND) {
-            return Items.NETHER_WART;
-        }
-
-        return null;
     }
 
     /**
@@ -260,29 +269,35 @@ public class CropAdapter {
     }
 
     /**
-     * Check if a seed item can be planted on this surface.
+     * Whether a seed can be planted on this surface (farmland, or soul sand for nether wart): it
+     * plants a crop (see {@link #fieldCropOf}), and that crop can grow on top of it, by the crop's
+     * own rules, the ones that stop a player planting it there: wheat or mint on farmland, not on
+     * soul sand; nether wart only on soul sand; nothing in the dark; medicinal leek (which grows in
+     * water) never on farmland.
      */
     public static boolean canPlantSeed(Item seed, Level level, BlockPos surfacePos) {
-        BlockState state = level.getBlockState(surfacePos);
-        Block block = state.getBlock();
-
-        // Farmland crops
-        if (block == Blocks.FARMLAND) {
-            return seed == Items.WHEAT_SEEDS ||
-                   seed == Items.CARROT ||
-                   seed == Items.POTATO ||
-                   seed == Items.BEETROOT_SEEDS ||
-                   seed == Items.PUMPKIN_SEEDS ||
-                   seed == Items.MELON_SEEDS;
+        Block crop = fieldCropOf(seed);
+        if (crop == null || !isPlantableSurface(level, surfacePos)) {
+            return false;
         }
+        return crop.defaultBlockState().canSurvive(level, surfacePos.above());
+    }
 
-        // Nether wart on soul sand
-        if (block == Blocks.SOUL_SAND) {
-            return seed == Items.NETHER_WART;
+    /**
+     * The crop a seed plants in a field (on farmland, or soul sand), or null if it doesn't plant
+     * one: an item that places a crop block (wheat seeds, a carrot, pumpkin seeds, nether wart,
+     * Cobblemon's mint and vivichoke seeds, revival herbs, hearty grains, and modded crops' seeds
+     * too). Worked out from the item itself, so any mod's crop works without being listed.
+     */
+    @Nullable
+    public static Block fieldCropOf(Item seed) {
+        if (seed instanceof BlockItem blockItem) {
+            Block block = blockItem.getBlock();
+            if (block instanceof CropBlock || block instanceof StemBlock || block instanceof NetherWartBlock) {
+                return block;
+            }
         }
-
-        // Cocoa on jungle logs (checked at planting time)
-        return false;
+        return null;
     }
 
     /**
@@ -298,52 +313,12 @@ public class CropAdapter {
      */
     @Nullable
     public static Block getPlantedBlock(Item seed) {
-        if (seed == Items.WHEAT_SEEDS) return Blocks.WHEAT;
-        if (seed == Items.CARROT) return Blocks.CARROTS;
-        if (seed == Items.POTATO) return Blocks.POTATOES;
-        if (seed == Items.BEETROOT_SEEDS) return Blocks.BEETROOTS;
-        if (seed == Items.PUMPKIN_SEEDS) return Blocks.PUMPKIN_STEM;
-        if (seed == Items.MELON_SEEDS) return Blocks.MELON_STEM;
-        if (seed == Items.NETHER_WART) return Blocks.NETHER_WART;
+        Block crop = fieldCropOf(seed);
+        if (crop != null) return crop;
         if (seed == Items.COCOA_BEANS) return Blocks.COCOA;
         if (seed == Items.SWEET_BERRIES) return Blocks.SWEET_BERRY_BUSH;
 
         return null;
-    }
-
-    /**
-     * Get drops from harvesting a crop at the given position.
-     * This simulates what would drop when the crop is broken.
-     */
-    public static List<ItemStack> getHarvestDrops(Level level, BlockPos pos) {
-        List<ItemStack> drops = new ArrayList<>();
-        BlockState state = level.getBlockState(pos);
-        Block block = state.getBlock();
-
-        if (!isFullyGrown(level, pos)) {
-            return drops; // No drops if not fully grown
-        }
-
-        // Standard crops - simplified (real implementation would use loot tables)
-        if (block == Blocks.WHEAT) {
-            drops.add(new ItemStack(Items.WHEAT, 1));
-            drops.add(new ItemStack(Items.WHEAT_SEEDS, level.random.nextInt(3) + 1));
-        } else if (block == Blocks.CARROTS) {
-            drops.add(new ItemStack(Items.CARROT, level.random.nextInt(3) + 2));
-        } else if (block == Blocks.POTATOES) {
-            drops.add(new ItemStack(Items.POTATO, level.random.nextInt(3) + 2));
-        } else if (block == Blocks.BEETROOTS) {
-            drops.add(new ItemStack(Items.BEETROOT, 1));
-            drops.add(new ItemStack(Items.BEETROOT_SEEDS, level.random.nextInt(3) + 1));
-        } else if (block == Blocks.NETHER_WART) {
-            drops.add(new ItemStack(Items.NETHER_WART, level.random.nextInt(3) + 2));
-        } else if (block == Blocks.COCOA) {
-            drops.add(new ItemStack(Items.COCOA_BEANS, 3));
-        } else if (block == Blocks.SWEET_BERRY_BUSH) {
-            drops.add(new ItemStack(Items.SWEET_BERRIES, level.random.nextInt(2) + 2));
-        }
-
-        return drops;
     }
 
     /**
@@ -372,125 +347,85 @@ public class CropAdapter {
             return true;
         }
 
-        // Berries (vanilla and Cobblemon) are harvested and reset their age
+        // Apricorns: Cobblemon's own harvest, what picking one by hand does: its loot (the apricorn,
+        // sometimes a seed) and back to its first stage, still hanging there. Not the generic path
+        // below, which takes one "seed" back to pay for a replant: an apricorn's pick item is the
+        // apricorn itself, so that left the worker nothing.
+        if (block instanceof ApricornBlock apricorn) {
+            apricorn.harvest(level, state, pos);
+            level.playSound(null, pos, net.minecraft.sounds.SoundEvents.ITEM_PICKUP,
+                net.minecraft.sounds.SoundSource.BLOCKS, 0.7f, 1.4f);
+            return true;
+        }
+
+        // Berries (vanilla and Cobblemon): picked exactly as by hand, with the same yield, sound and
+        // resulting state as the game's own right-click code
         if (isBerry(state)) {
-            // Cobblemon berry blocks (incl. Galarica nut bush) carry a BerryBlockEntity. Delegate to
-            // Cobblemon's own harvest(level, state, pos): it computes the correct yield AND resets the
-            // growth timers + age stage. Previously we only lowered the blockstate `age` and left the
-            // block entity mature, so Cobblemon re-grew it to max next tick == infinite berries.
+            // Cobblemon berries: Cobblemon's own harvest. The bush's berries were worked out as it
+            // grew (its block entity's growth points); harvest() hands them over and takes the bush
+            // back to age 3 with fresh grow timers. (Lowering only the blockstate age left the block
+            // entity mature, so Cobblemon regrew it next tick: infinite berries.) A bush that never
+            // grew them (set ripe by a command or another mod) gives nothing, as it does by hand.
             net.minecraft.world.level.block.entity.BlockEntity berryBe = level.getBlockEntity(pos);
             if (berryBe instanceof com.cobblemon.mod.common.block.entity.BerryBlockEntity berryEntity) {
-                int dropped = 0;
                 for (ItemStack drop : berryEntity.harvest(level, state, pos)) {
                     if (!drop.isEmpty()) {
                         Block.popResource(level, pos, drop);
-                        dropped += drop.getCount();
                     }
                 }
-
-                // Safety net: if Cobblemon's harvest left the berry still fully grown, reset its grow
-                // timers so it can't instantly re-mature (the infinite-berry bug).
-                if (isFullyGrown(level, pos)) {
-                    berryEntity.resetGrowTimers(pos, level.getBlockState(pos));
-                }
-
-                // Some berries' harvest() yields nothing (e.g. no growth points generated); make sure
-                // the worker still gets a berry so harvesting never silently does nothing. (A player
-                // right-clicking these would also get nothing, so this is strictly more forgiving.)
-                if (dropped == 0) {
-                    Block.popResource(level, pos, new ItemStack(block.asItem(), 1 + level.random.nextInt(3)));
-                }
-
-                // Match the right-click harvest's sound for parity.
                 level.playSound(null, pos, com.cobblemon.mod.common.CobblemonSounds.BERRY_HARVEST,
                     net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 1.0f);
-
-                dev.palworks.Palworks.LOGGER.info("Harvested Cobblemon berry at {} ({} dropped from Cobblemon harvest)", pos, dropped);
                 return true;
             }
 
-            // Galarica nut bush - drop berries and reset to age 1
+            // Galarica nut bush: as NutBushBlock.useWithoutItem, 1-2 nuts, back to age 1
             if (isGalaricaNutBush(block)) {
-                Item berryItem = block.asItem();
-                int berryCount = 1 + level.random.nextInt(3); // 1-3 berries
-                Block.popResource(level, pos, new ItemStack(berryItem, berryCount));
-
-                // Find AGE property and reset to 1
-                IntegerProperty ageProperty = null;
-                for (Property<?> property : state.getProperties()) {
-                    if (property.getName().equals("age") && property instanceof IntegerProperty) {
-                        ageProperty = (IntegerProperty) property;
-                        break;
-                    }
+                IntegerProperty age = ageProperty(state);
+                Block.popResource(level, pos,
+                    new ItemStack(com.cobblemon.mod.common.CobblemonItems.GALARICA_NUTS, 1 + level.random.nextInt(2)));
+                playPickSound(level, pos, net.minecraft.sounds.SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES);
+                if (age != null) {
+                    level.setBlock(pos, state.setValue(age, 1), 2);
                 }
-
-                if (ageProperty != null) {
-                    int currentAge = state.getValue(ageProperty);
-                    level.setBlock(pos, state.setValue(ageProperty, 1), 3);
-
-                    dev.palworks.Palworks.LOGGER.info("Harvested Galarica nut at {}: was age {}, dropped {} x{}, reset to age 1",
-                        pos, currentAge, berryItem, berryCount);
-                }
-
                 return true;
             }
 
-            // Vanilla sweet berries - drop berries and reset to age 1
+            // Sweet berries: as SweetBerryBushBlock.useWithoutItem on a ripe (age 3) bush, 2-3
+            // berries, back to age 1
             if (block instanceof SweetBerryBushBlock) {
-                int berryCount = 1 + level.random.nextInt(2); // 1-2 berries
-                Block.popResource(level, pos, new ItemStack(Items.SWEET_BERRIES, berryCount));
+                int count = 1 + level.random.nextInt(2) + (state.getValue(SweetBerryBushBlock.AGE) == 3 ? 1 : 0);
+                Block.popResource(level, pos, new ItemStack(Items.SWEET_BERRIES, count));
+                playPickSound(level, pos, net.minecraft.sounds.SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES);
                 level.setBlock(pos, state.setValue(SweetBerryBushBlock.AGE, 1), 2);
-                dev.palworks.Palworks.LOGGER.info("Harvested sweet berries, dropped {}, reset to age 1 at {}", berryCount, pos);
                 return true;
             }
 
-            // Glow berries - drop berries and remove berries from vine
+            // Glow berries: as CaveVines.use, one berry, the vine left without
             if (block == Blocks.CAVE_VINES || block == Blocks.CAVE_VINES_PLANT) {
                 Block.popResource(level, pos, new ItemStack(Items.GLOW_BERRIES, 1));
+                playPickSound(level, pos, net.minecraft.sounds.SoundEvents.CAVE_VINES_PICK_BERRIES);
                 level.setBlock(pos, state.setValue(net.minecraft.world.level.block.CaveVines.BERRIES, false), 2);
-                dev.palworks.Palworks.LOGGER.info("Harvested glow berries at {}", pos);
                 return true;
             }
 
             return true;
         }
 
-        // Check if this is hearty grains (multi-block crop)
-        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
-        boolean isHeartyGrains = blockId.toString().contains("hearty_grain");
-
-        if (isHeartyGrains) {
-            // Hearty grains - two-block crop, reset bottom to age 3 and break top
-            IntegerProperty ageProperty = null;
-            for (Property<?> property : state.getProperties()) {
-                if (property.getName().equals("age") && property instanceof IntegerProperty) {
-                    ageProperty = (IntegerProperty) property;
-                    break;
-                }
+        // Hearty grains: harvested as Cobblemon has it by hand, by cutting the top half (its grains,
+        // with its own loot), leaving the lower half to grow it again. The lower half drops back to
+        // its last one-block stage by itself once its top is gone; it's set there too in case it
+        // had no top. (This used to drop a made-up 1-3 grains and break the top without its loot.)
+        if (block instanceof HeartyGrainsBlock) {
+            BlockPos top = pos.above();
+            if (level.getBlockState(top).is(block)) {
+                level.destroyBlock(top, true);
             }
-
-            if (ageProperty != null) {
-                int currentAge = state.getValue(ageProperty);
-
-                // Get the crop item and drop it
-                Item cropItem = block.asItem();
-                int dropCount = 1 + level.random.nextInt(3);
-                Block.popResource(level, pos, new ItemStack(cropItem, dropCount));
-
-                // Reset bottom block to age 3
-                level.setBlock(pos, state.setValue(ageProperty, 3), 3);
-
-                // Break the top block (one block above)
-                BlockPos topPos = pos.above();
-                BlockState topState = level.getBlockState(topPos);
-                if (topState.getBlock() == block) {
-                    level.destroyBlock(topPos, false); // Don't drop items from top block
-                }
-
-                dev.palworks.Palworks.LOGGER.info("Harvested hearty grains at {}: was age {}, dropped {} x{}, reset to age 3, broke top block",
-                    pos, currentAge, cropItem, dropCount);
-                return true;
+            BlockState lower = level.getBlockState(pos);
+            IntegerProperty age = ageProperty(lower);
+            if (lower.is(block) && age != null && lower.getValue(age) > HeartyGrainsBlock.AGE_AFTER_HARVEST) {
+                level.setBlock(pos, lower.setValue(age, HeartyGrainsBlock.AGE_AFTER_HARVEST), 3);
             }
+            return true;
         }
 
         // Other crops - check if they have an age property
@@ -516,16 +451,16 @@ public class CropAdapter {
                 List<ItemStack> drops = level instanceof ServerLevel serverLevel
                     ? Block.getDrops(state, serverLevel, pos, level.getBlockEntity(pos))
                     : new ArrayList<>();
-                if (drops.isEmpty()) {
-                    // No loot table result (some modded crops): keep the old behaviour
-                    drops = new ArrayList<>(List.of(new ItemStack(block.asItem(), 1 + level.random.nextInt(3))));
-                }
 
-                // Every vanilla crop drops at least one of its seed when mature, so there's always
-                // one to take (wheat/beetroot 1-4 seeds, cocoa 3 beans, carrots, potatoes, wart)
+                // Every vanilla and Cobblemon crop drops at least one of its seed when mature (wheat
+                // and beetroot 1-4 seeds, cocoa 3 beans, carrots, potatoes, wart, mint seeds...), so
+                // there's one to take. A crop whose loot has none can't pay for its replant: it's
+                // broken as by hand, with its normal drops, and the planters replant it. (It used to
+                // be replanted for free, and to drop made-up items when its loot gave nothing.)
                 Item seed = seedOf(level, pos, state);
-                if (seed != null) {
-                    takeOne(drops, seed);
+                if (seed == null || !takeOne(drops, seed)) {
+                    level.destroyBlock(pos, true);
+                    return true;
                 }
                 for (ItemStack drop : drops) {
                     if (!drop.isEmpty()) {
@@ -533,7 +468,7 @@ public class CropAdapter {
                     }
                 }
 
-                level.setBlock(pos, state.setValue(ageProperty, 0), 3);
+                level.setBlock(pos, asReplanted(state.setValue(ageProperty, 0)), 3);
 
                 dev.palworks.Palworks.LOGGER.debug("Harvested crop at {}: was age {}, dropped {}, reset to age 0",
                     pos, currentAge, drops);
@@ -546,14 +481,51 @@ public class CropAdapter {
         return true;
     }
 
-    /** Remove one of {@code item} from a list of drops, if there is one. */
-    private static void takeOne(List<ItemStack> drops, Item item) {
+    /**
+     * A crop reset to age 0 as if it had been replanted from its seed: a mutated revival herb
+     * (which drops a power, mental, mirror or white herb) is back to a plain one, as one replanted
+     * by hand would be. Kept mutated, it dropped its rare herb every time it regrew. Anything else
+     * about it (which way it faces, whether it's wild) stays as it was.
+     */
+    private static BlockState asReplanted(BlockState reset) {
+        for (Property<?> property : reset.getProperties()) {
+            if (property.getName().equals("mutation")) {
+                return withDefault(reset, property);
+            }
+        }
+        return reset;
+    }
+
+    private static <T extends Comparable<T>> BlockState withDefault(BlockState state, Property<T> property) {
+        return state.setValue(property, state.getBlock().defaultBlockState().getValue(property));
+    }
+
+    /** A block's integer "age" property, or null if it has none. */
+    @Nullable
+    private static IntegerProperty ageProperty(BlockState state) {
+        for (Property<?> property : state.getProperties()) {
+            if (property.getName().equals("age") && property instanceof IntegerProperty age) {
+                return age;
+            }
+        }
+        return null;
+    }
+
+    /** Remove one of {@code item} from a list of drops. Whether there was one to remove. */
+    private static boolean takeOne(List<ItemStack> drops, Item item) {
         for (ItemStack drop : drops) {
             if (!drop.isEmpty() && drop.is(item)) {
                 drop.shrink(1);
-                return;
+                return true;
             }
         }
+        return false;
+    }
+
+    /** A picking sound as the game plays it: full volume, pitch 0.8-1.2. */
+    private static void playPickSound(Level level, BlockPos pos, net.minecraft.sounds.SoundEvent sound) {
+        level.playSound(null, pos, sound, net.minecraft.sounds.SoundSource.BLOCKS, 1.0f,
+            0.8f + level.random.nextFloat() * 0.4f);
     }
 
     /**
@@ -573,21 +545,9 @@ public class CropAdapter {
             return false;
         }
 
-        // Get the block to plant
-        Block plantBlock = getPlantedBlock(seed);
-        if (plantBlock == null) {
-            return false;
-        }
-
-        // Special case: cocoa beans need jungle log
-        if (seed == Items.COCOA_BEANS) {
-            // Check adjacent blocks for jungle logs
-            // Simplified - real implementation would check all directions
-            return false; // TODO: Implement cocoa planting logic
-        }
-
-        // Plant the crop
-        level.setBlock(plantPos, plantBlock.defaultBlockState(), 3);
+        // Plant the crop (canPlantSeed only passes field crops, never cocoa or sweet berries). Its
+        // default state is what planting it by hand gives: age 0, not wild, not mutated.
+        level.setBlock(plantPos, fieldCropOf(seed).defaultBlockState(), 3);
         return true;
     }
 

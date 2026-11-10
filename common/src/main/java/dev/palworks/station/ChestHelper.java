@@ -8,6 +8,10 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.function.Predicate;
+
 /**
  * Helper for interacting with chests and other containers.
  */
@@ -30,6 +34,20 @@ public class ChestHelper {
         }
 
         return false;
+    }
+
+    /** The different items in a container that match {@code filter}, in slot order. */
+    public static Set<Item> itemsMatching(Level level, BlockPos pos, Predicate<Item> filter) {
+        Set<Item> items = new LinkedHashSet<>();
+        if (level.getBlockEntity(pos) instanceof Container container) {
+            for (int i = 0; i < container.getContainerSize(); i++) {
+                ItemStack stack = container.getItem(i);
+                if (!stack.isEmpty() && filter.test(stack.getItem())) {
+                    items.add(stack.getItem());
+                }
+            }
+        }
+        return items;
     }
 
     /**
