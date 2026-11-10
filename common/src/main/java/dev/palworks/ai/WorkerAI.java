@@ -3,6 +3,7 @@ package dev.palworks.ai;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimation;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.animation.WorkAnimator;
@@ -151,6 +152,7 @@ public class WorkerAI {
                         entityPos,
                         reservation.getStationPos());
                 entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+                WorkerNavigator.forget(entity);
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
                 return false;
@@ -178,6 +180,7 @@ public class WorkerAI {
                     JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                 }
                 entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+                WorkerNavigator.forget(entity);
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
                 return false;
@@ -205,13 +208,14 @@ public class WorkerAI {
         if (reservation.isExpired(now, PAUSED_RESERVATION_REFRESH_TICKS)) {
             state.setCurrentReservation(new ReservationId(reservation.getStationPos(), reservation.getJobType(), now));
         }
-        BlockPos heading = entity.getNavigation().getTargetPos();
-        if (heading != null) {
-            BlockPos standPos =
-                    WorkPositions.standingPosFor(level, reservation.getStationPos(), reservation.getJobType(), entity);
-            if (heading.equals(standPos)) {
-                entity.getNavigation().stop();
-            }
+        if (entity.getNavigation().isDone()) {
+            return;
+        }
+        BlockPos standPos =
+                WorkPositions.standingPosFor(level, reservation.getStationPos(), reservation.getJobType(), entity);
+        if (standPos != null && WorkerNavigator.isHeadingTo(entity, standPos)) {
+            entity.getNavigation().stop();
+            WorkerNavigator.forget(entity);
         }
     }
 
@@ -246,6 +250,7 @@ public class WorkerAI {
                 JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
             }
             entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+            WorkerNavigator.forget(entity);
             state.clearReservation();
             state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
             WorkerStateManager.save(pokemon, state);
@@ -284,6 +289,7 @@ public class WorkerAI {
                         targetPos);
             }
             entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+            WorkerNavigator.forget(entity);
             state.clearReservation();
             state.resetPathFailures();
             WorkerStateManager.save(pokemon, state);
@@ -396,7 +402,7 @@ public class WorkerAI {
             if (state.getStepTicks() > 0) {
                 state.restartStep();
             }
-            navigateToJob(entity, standPos, stance);
+            navigateToJob(entity, standPos);
             state.setWalkedToJob(true);
             state.resetStepIn();
 
@@ -416,6 +422,7 @@ public class WorkerAI {
                         JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                     }
                     entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+                    WorkerNavigator.forget(entity);
                     state.clearReservation();
                     state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
                     state.resetPathFailures();
@@ -528,6 +535,7 @@ public class WorkerAI {
             }
         }
         entity.getNavigation().stop(); // dropping the job: don't keep walking to it
+        WorkerNavigator.forget(entity);
         state.clearReservation();
         state.resetPathFailures();
         WorkerStateManager.save(pokemon, state);
@@ -1224,20 +1232,12 @@ public class WorkerAI {
     }
 
     /**
-     * Walk the worker to its stand tile, using built-in pathfinding. Normal walking speed.
+     * Walk the worker to its stand tile, at normal walking speed, along a path its whole body fits
+     * along (see {@link WorkerNavigator}). The path ends on the tile itself, so a stance only just
+     * off its tile (right up against a trunk) gets there too.
      */
-    private static void navigateToJob(Mob entity, BlockPos standPos, WorkStance stance) {
-        if (stance.needsItsTile()) {
-            // A stance only just off its tile (right up against a trunk) needs the tile itself:
-            // moveTo(x, y, z) plans to within a block of it, which from just outside a tree's
-            // cleared leaves is "there already", so it never stepped in to the trunk
-            var path = entity.getNavigation().createPath(standPos, 0);
-            if (path != null) {
-                entity.getNavigation().moveTo(path, 0.6);
-            }
-            return;
-        }
-        entity.getNavigation().moveTo(standPos.getX(), standPos.getY(), standPos.getZ(), 0.6);
+    private static void navigateToJob(Mob entity, BlockPos standPos) {
+        WorkerNavigator.walkTo(entity, standPos, 0.6);
     }
 
     /**

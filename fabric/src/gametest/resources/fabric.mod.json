@@ -16,7 +16,8 @@
       "dev.palworks.gametest.PickupGameTests",
       "dev.palworks.gametest.TestAreaGameTests",
       "dev.palworks.gametest.HangingFruitGameTests",
-      "dev.palworks.gametest.CobblemonCropGameTests"
+      "dev.palworks.gametest.CobblemonCropGameTests",
+      "dev.palworks.gametest.PathingGameTests"
     ]
   },
   "depends": {

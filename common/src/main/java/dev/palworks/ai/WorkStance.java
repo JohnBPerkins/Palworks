@@ -78,14 +78,6 @@ public record WorkStance(double gap, int minRing, int maxRing, double slack) {
         return Math.max(0.0, ringFor(halfWidth) - 0.5 - halfWidth) + slack;
     }
 
-    /**
-     * Whether a worker has to be on its tile itself to be in this stance, not just near it: when
-     * the slack doesn't stretch to the next tile.
-     */
-    public boolean needsItsTile() {
-        return slack < 1.0;
-    }
-
     /** Whether there's little enough space between this worker and its target block: see {@link #maxGap}. */
     public boolean reaches(double halfWidth, double gapNow) {
         return gapNow <= maxGap(halfWidth) + 1e-6;

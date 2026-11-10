@@ -4,3 +4,7 @@ accessWidener	v2	named
 # (Used by dev.palworks.station.FurnaceHelper.)
 accessible	field	net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity	litTime	I
 accessible	field	net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity	litDuration	I
+
+# A navigation's target, cleared while a worker walks one of Palworks' own paths so vanilla's
+# recomputing doesn't swap it for one of Cobblemon's. (Used by dev.palworks.ai.path.WorkerNavigator.)
+accessible	field	net/minecraft/world/entity/ai/navigation/PathNavigation	targetPos	Lnet/minecraft/core/BlockPos;

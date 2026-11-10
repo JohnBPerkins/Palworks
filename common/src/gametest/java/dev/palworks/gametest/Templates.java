@@ -26,5 +26,6 @@ public final class Templates {
             PickupGameTests.class,
             TestAreaGameTests.class,
             HangingFruitGameTests.class,
-            CobblemonCropGameTests.class);
+            CobblemonCropGameTests.class,
+            PathingGameTests.class);
 }

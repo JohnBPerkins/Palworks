@@ -4,6 +4,9 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.ai.WorkPositions;
+import dev.palworks.ai.path.WorkerNavigator;
+import dev.palworks.ai.path.WorkerPathfinder;
+import dev.palworks.ai.path.WorkerPathfinder.Reach;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.crop.CropAdapter;
@@ -1146,7 +1149,9 @@ public class JobManager {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position, job.type, entity);
-            Reach reach = standPos == null ? Reach.NO : canPathTo(entity, standPos);
+            WorkerPathfinder.Result path =
+                    standPos == null ? new WorkerPathfinder.Result(Reach.NO, null) : canPathTo(entity, standPos);
+            Reach reach = path.reach();
             if (reach == Reach.UNKNOWN) {
                 // The worker can't pathfind at all right now (e.g. it was just sent out and is still
                 // dropping to the ground, or is mid-step): that says nothing about the jobs, so
@@ -1158,6 +1163,9 @@ public class JobManager {
                 // in the pool, so this does nothing for one)
                 availableJobs.remove(JobKey.of(job), job);
                 assignJobToWorker(level, worker, job);
+                if (path.path() != null) {
+                    WorkerNavigator.offer(entity, standPos, path.path()); // its walk starts on it
+                }
                 return job;
             }
             // Remember it, so next time this worker checks other candidates instead of
@@ -1335,34 +1343,29 @@ public class JobManager {
         return cached != null && cached.isAlive() ? cached : null;
     }
 
-    /** Whether a path reaches a spot: yes, no, or unknown (no path could be computed right now). */
-    private enum Reach {
-        YES,
-        NO,
-        UNKNOWN
-    }
-
     /**
-     * Whether an entity can walk to a spot. {@link Reach#UNKNOWN} when its navigation can't compute
-     * a path at the moment: ground navigation returns no path at all while the mob isn't on the
-     * ground (just sent out and still dropping, mid-step, ...). That isn't "unreachable"; treating it
-     * as such made workers skip the jobs right next to them for up to 30 seconds.
+     * Whether an entity can walk to a spot, and the path there if it can. {@link Reach#UNKNOWN}
+     * when no path can be planned at the moment: it's in the air (just sent out and still dropping,
+     * mid-jump, ...). That isn't "unreachable"; treating it as such made workers skip the jobs right
+     * next to them for up to 30 seconds.
+     *
+     * <p>Walking workers are planned by {@link WorkerPathfinder}, which checks their whole body all
+     * the way there. No "close enough" shortcut: a job can be one block away yet blocked by a fence
+     * or ledge (common on farms). A flying or swimming one is left to its own navigation, which must
+     * reach the tile (standPos is a standable tile, not the worked block, so canReach() is right).
      */
-    private Reach canPathTo(Mob entity, BlockPos standPos) {
+    private WorkerPathfinder.Result canPathTo(Mob entity, BlockPos standPos) {
         if (entity == null) {
-            return Reach.UNKNOWN;
+            return new WorkerPathfinder.Result(Reach.UNKNOWN, null);
         }
-
-        // No "close enough" shortcut: a job can be one block away yet blocked by a fence or ledge
-        // (common on farms), so always build a real path and require it to actually reach the tile.
-        // standPos is a standable tile (not the worked block itself), so canReach() is the right,
-        // non-fragile test here - the old "any path object = reachable" let workers take jobs they
-        // couldn't actually get to.
+        if (WorkerPathfinder.handles(entity)) {
+            return WorkerPathfinder.find(entity, standPos);
+        }
         net.minecraft.world.level.pathfinder.Path path = entity.getNavigation().createPath(standPos, 1);
         if (path == null) {
-            return Reach.UNKNOWN;
+            return new WorkerPathfinder.Result(Reach.UNKNOWN, null);
         }
-        return path.canReach() ? Reach.YES : Reach.NO;
+        return new WorkerPathfinder.Result(path.canReach() ? Reach.YES : Reach.NO, null);
     }
 
     // ============================================
@@ -1908,7 +1911,8 @@ public class JobManager {
                 // Check pathfinding to the resolved stand position
                 BlockPos standPos =
                         entity != null ? WorkPositions.standingPosFor(level, job.position, job.type, entity) : null;
-                if (entity != null && (standPos == null || canPathTo(entity, standPos) != Reach.YES)) {
+                if (entity != null
+                        && (standPos == null || canPathTo(entity, standPos).reach() != Reach.YES)) {
                     noPath++;
                     noPathByType.merge(job.type, 1, Integer::sum);
                     continue;
