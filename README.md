@@ -21,8 +21,9 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
 - **Work toggle** — shift-right-click your Pokémon and use the bottom slot of the interact wheel
   to switch its work on (green check) or off (red cross).
-- **Data-driven work detection** — what counts as "ore" or other work is controlled by datapack
-  tags, so it can be tuned without code changes.
+- **Data-driven** — which Pokémon can do which work, and what counts as "ore", come from datapack
+  files, so modpacks can tune them without code changes (see
+  [Customizing work skills](#customizing-work-skills)).
 - **Multi-loader** — a shared core runs on both Fabric and NeoForge from the same codebase
   (built with [Architectury](https://architectury.dev)).
 
@@ -41,6 +42,33 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 2. Drop the matching Palworks jar (`palworks-fabric-*.jar` or `palworks-neoforge-*.jar`) into
    your `mods/` folder.
 3. Launch the game.
+
+## Customizing work skills
+
+Which work a Pokémon can do (its *suitabilities*) comes from JSON files in a datapack, under
+`data/<namespace>/palworks/suitability/`. Each file maps suitability ids to a level from 1 to 5:
+
+- **By type:** `types/<type>.json`, e.g. `data/palworks/palworks/suitability/types/fire.json`:
+  ```json
+  { "kindling": 1 }
+  ```
+  Every Pokémon of that type gets these. The file name is the type's id (`fire`, `fighting`, …). Files
+  for the same type in different namespaces add together, so an addon can give a type more work without
+  replacing the defaults.
+- **By species:** `species/<species>.json`, where the file's namespace and name are the species,
+  e.g. `data/cobblemon/palworks/suitability/species/scizor.json`:
+  ```json
+  { "lumbering": 3 }
+  ```
+  These add to what its types give, or raise the level. Level `0` takes a skill away, even if a
+  type gives it.
+
+A Pokémon's level is the highest its types give (+1 if both of its types give it), raised to its
+species' level if that's higher. To change a default, put a file at the same path in your own datapack;
+to remove one, replace it with `{}`. `/reload` applies changes. The ids are `kindling`, `watering`,
+`planting`, `generating_electricity`, `handiwork`, `gathering`, `lumbering`, `mining`,
+`medicine_production`, `cooling`, `transporting`, `nether` and `farming`. The defaults are in
+[`common/src/main/resources/data`](common/src/main/resources/data).
 
 ## Building from source
 
