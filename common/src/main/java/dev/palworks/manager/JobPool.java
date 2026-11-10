@@ -1,12 +1,14 @@
 package dev.palworks.manager;
 
 import dev.palworks.job.JobType;
+import dev.palworks.reservation.ReservationId;
 import dev.palworks.worker.WorkerState;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 /** A level's jobs: the ones waiting for a worker (available), and the ones a worker has (reserved). */
@@ -116,5 +118,21 @@ final class JobPool {
             }
         }
         return orphans;
+    }
+
+    /**
+     * What identifies a job: where it is and what it is. Keyed by position AND type, because several
+     * jobs can share a block, e.g. chopping a tree and picking up its drops both happen at its base.
+     * Keyed by position alone, one overwrote the other (a fainted lumberjack's half-done chop, still
+     * needing its replant, was lost that way).
+     */
+    record JobKey(BlockPos pos, JobType type) {
+        static JobKey of(JobRecord job) {
+            return new JobKey(job.position(), job.type());
+        }
+
+        static JobKey of(ReservationId reservation) {
+            return new JobKey(reservation.getStationPos(), reservation.getJobType());
+        }
     }
 }
