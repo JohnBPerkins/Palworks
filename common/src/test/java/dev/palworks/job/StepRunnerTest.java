@@ -2,6 +2,7 @@ package dev.palworks.job;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.palworks.job.StepRunner.Outcome;
@@ -32,6 +33,9 @@ class StepRunnerTest {
         final int ticks;
         final boolean keepGoing;
         boolean needed = true;
+        boolean there = true;
+        boolean canDo = true;
+        int checks;
         int startTick;
 
         FakeStep(String name, int ticks, boolean keepGoing) {
@@ -78,6 +82,17 @@ class StepRunnerTest {
         @Override
         public boolean needed(List<String> log) {
             return needed;
+        }
+
+        @Override
+        public boolean stillThere(List<String> log) {
+            checks++;
+            return there;
+        }
+
+        @Override
+        public boolean canDo(List<String> log) {
+            return canDo;
         }
     }
 
@@ -250,5 +265,163 @@ class StepRunnerTest {
         assertEquals(List.of("start ember"), log, "not started again yet: the worker settles first");
         tick(steps);
         assertEquals(List.of("start ember", "start ember"), log);
+    }
+
+    // ---- The job going away ----
+
+    @Test
+    void aJobThatsGoneWhenItsStepIsReachedEndsWithoutStarting() {
+        // e.g. the crop was harvested by someone else just as the worker got there
+        FakeStep harvest = new FakeStep("harvest", 3);
+        harvest.there = false;
+
+        assertEquals(Outcome.GONE, tick(List.of(harvest)));
+        assertTrue(log.isEmpty(), "its animation never starts, and there's no effect");
+        assertFalse(state.isWorking(), "progress reset");
+    }
+
+    @Test
+    void aJobThatGoesWhileItsStepGoesOnEndsWithinARecheck() {
+        // e.g. a furnace emptied during its smelt: the worker doesn't wait out the rest of it
+        FakeStep smelt = new FakeStep("smelt", 100);
+        List<FakeStep> steps = List.of(smelt);
+        tick(steps);
+        smelt.there = false;
+
+        int ticks = 0;
+        Outcome outcome;
+        do {
+            outcome = tick(steps);
+            ticks++;
+        } while (outcome == Outcome.WORKING);
+        assertEquals(Outcome.GONE, outcome);
+        assertTrue(ticks <= StepRunner.RECHECK_TICKS, "noticed within a recheck, took " + ticks);
+        assertEquals(List.of("start smelt"), log, "no effect");
+        assertEquals(0, state.getJobStep());
+    }
+
+    @Test
+    void aJobIsCheckedRightBeforeItsEffect() {
+        // Gone between rechecks, on the step's last tick: the effect mustn't happen on nothing
+        FakeStep plant = new FakeStep("plant", StepRunner.RECHECK_TICKS + 2);
+        List<FakeStep> steps = List.of(plant);
+        for (int i = 0; i < StepRunner.RECHECK_TICKS + 1; i++) {
+            assertEquals(Outcome.WORKING, tick(steps));
+        }
+        plant.there = false;
+
+        assertEquals(Outcome.GONE, tick(steps));
+        assertEquals(List.of("start plant"), log);
+    }
+
+    @Test
+    void aStepThatsThereTakesEffectAndIsCheckedOncePerCheckpoint() {
+        // Reached + started (one check, same tick), one recheck at 10 ticks in, and before its effect
+        FakeStep chop = new FakeStep("chop", StepRunner.RECHECK_TICKS + 2);
+        List<FakeStep> steps = List.of(chop);
+        Outcome outcome;
+        do {
+            outcome = tick(steps);
+        } while (outcome == Outcome.WORKING);
+
+        assertEquals(Outcome.FINISHED, outcome);
+        assertEquals(List.of("start chop", "finish chop"), log);
+        assertEquals(3, chop.checks);
+    }
+
+    @Test
+    void aOneTickStepIsOnlyCheckedOnce() {
+        FakeStep pickUp = new FakeStep("pick up", 1);
+
+        assertEquals(Outcome.FINISHED, tick(List.of(pickUp)));
+        assertEquals(1, pickUp.checks, "reached and finishing on the same tick: one check covers both");
+    }
+
+    @Test
+    void aDelayedStepIsCheckedAgainAsItStarts() {
+        // Ember waits for the worker to settle: the furnace may have been emptied meanwhile
+        FakeStep ember = new FakeStep("ember", 6).startingAt(3);
+        List<FakeStep> steps = List.of(ember);
+        tick(steps);
+        tick(steps);
+        tick(steps);
+        ember.there = false;
+
+        assertEquals(Outcome.GONE, tick(steps));
+        assertTrue(log.isEmpty(), "its animation doesn't start on a job that's gone");
+    }
+
+    @Test
+    void onlyTheStepReachedIsAsked() {
+        // A chopped tree's replant doesn't need the tree: once there, the gone trunk doesn't matter
+        FakeStep chop = new FakeStep("chop", 1);
+        FakeStep replant = new FakeStep("replant", 1);
+        List<FakeStep> steps = List.of(chop, replant);
+        tick(steps);
+        chop.there = false;
+
+        assertNull(StepRunner.stopReason(steps, state, log), "the replant is still there");
+        assertEquals(Outcome.FINISHED, tick(steps));
+        assertEquals(List.of("start chop", "finish chop", "start replant", "finish replant"), log);
+    }
+
+    @Test
+    void aJobOnItsWayIsCheckedForTheStepItsReached() {
+        FakeStep chop = new FakeStep("chop", 1);
+        List<FakeStep> steps = List.of(chop, new FakeStep("replant", 1));
+        assertNull(StepRunner.stopReason(steps, state, log));
+        chop.there = false;
+
+        assertEquals(Outcome.GONE, StepRunner.stopReason(steps, state, log), "the tree it's on its way to has gone");
+        assertTrue(log.isEmpty(), "asking doesn't run anything");
+    }
+
+    // ---- The worker not being able to do the job ----
+
+    @Test
+    void aWorkerThatCantDoItsJobStopsWithoutItsEffect() {
+        // e.g. a planter whose seeds were taken out of its pouch as it got there
+        FakeStep plant = new FakeStep("plant", 3);
+        plant.canDo = false;
+
+        assertEquals(Outcome.UNABLE, tick(List.of(plant)));
+        assertTrue(log.isEmpty(), "its animation never starts, and nothing's planted");
+        assertFalse(state.isWorking(), "progress reset");
+    }
+
+    @Test
+    void aWorkerIsCheckedRightBeforeItsEffect() {
+        FakeStep plant = new FakeStep("plant", StepRunner.RECHECK_TICKS + 2);
+        List<FakeStep> steps = List.of(plant);
+        for (int i = 0; i < StepRunner.RECHECK_TICKS + 1; i++) {
+            assertEquals(Outcome.WORKING, tick(steps));
+        }
+        plant.canDo = false;
+
+        assertEquals(Outcome.UNABLE, tick(steps));
+        assertEquals(List.of("start plant"), log);
+    }
+
+    @Test
+    void aJobThatsGoneIsGoneEvenIfTheWorkerCouldntDoItAnyway() {
+        // Gone is gone for every worker: it's dropped, not given back for another to try
+        FakeStep plant = new FakeStep("plant", 1);
+        plant.there = false;
+        plant.canDo = false;
+
+        assertEquals(Outcome.GONE, StepRunner.stopReason(List.of(plant), state, log));
+        assertEquals(Outcome.GONE, tick(List.of(plant)));
+    }
+
+    @Test
+    void aWorkerOnItsWayIsCheckedForTheStepItsReached() {
+        FakeStep chop = new FakeStep("chop", 1);
+        FakeStep replant = new FakeStep("replant", 1);
+        List<FakeStep> steps = List.of(chop, replant);
+        replant.canDo = false;
+        assertNull(StepRunner.stopReason(steps, state, log), "it can chop");
+        tick(steps);
+
+        assertEquals(Outcome.UNABLE, StepRunner.stopReason(steps, state, log), "it's reached the replant");
     }
 }
