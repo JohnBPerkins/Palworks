@@ -38,7 +38,7 @@ case "$loader" in
         "https://meta.fabricmc.net/v2/versions/loader/$MINECRAFT_VERSION/$FABRIC_LOADER_VERSION/$FABRIC_INSTALLER_VERSION/server/jar"
     fi
     server_cmd=(java -Xmx3G -jar fabric-server-launch.jar nogui)
-    init_marker="Palworks Fabric initialized!"
+    init_marker="Palworks initialized!"
     ;;
   neoforge)
     if [ ! -f run.sh ]; then
@@ -52,7 +52,7 @@ case "$loader" in
     fi
     echo "-Xmx3G" > user_jvm_args.txt
     server_cmd=(bash run.sh nogui)
-    init_marker="PALWORKS NEOFORGE INITIALIZED!"
+    init_marker="Palworks initialized!"
     ;;
   *)
     echo "Unknown loader: $loader" >&2
