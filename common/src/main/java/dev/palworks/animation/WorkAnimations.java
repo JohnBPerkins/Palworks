@@ -31,17 +31,20 @@ public final class WorkAnimations {
     public static final WorkAnimation HARVEST = WorkAnimation.move("harvest", "razorleaf", 30, 0.5, WorkStance.NEAR);
 
     /**
-     * Planting a seed: Leech Seed, a ranged move. The seed is thrown at 1.25s; it reaches the
-     * ground about half a second later, like Ember's flames (tune in game). Aimed at the ground
-     * it's planted in.
+     * Planting a seed: Leech Seed, a ranged move. Its seeds are thrown from 1.25s, over 0.6s, and
+     * each takes 0.6s to land and sprout, so the last lands at about 2.45s: the seed goes in then,
+     * as the sprouts appear, towards the end of the body animation. Aimed at the ground it's
+     * planted in.
      */
-    public static final WorkAnimation PLANT = WorkAnimation.move("plant", "leechseed", 35, 0.0, WorkStance.NEAR);
+    public static final WorkAnimation PLANT = WorkAnimation.move("plant", "leechseed", 48, 0.0, WorkStance.NEAR);
 
     /**
      * Chopping a tree: Scratch, a contact move, so the lumberjack stands right up against the
-     * trunk. It hits the target at 1.2s; aimed at the middle of the trunk.
+     * trunk. Its slash appears on the target at 1.2s and throws sparks for half a second; the tree
+     * comes down at 1.6s, as they fall, rather than the instant the slash appears. Aimed at the
+     * middle of the trunk.
      */
-    public static final WorkAnimation CHOP = WorkAnimation.move("chop", "scratch", 24, 0.5, WorkStance.AGAINST);
+    public static final WorkAnimation CHOP = WorkAnimation.move("chop", "scratch", 32, 0.5, WorkStance.AGAINST);
 
     /** All of them. */
     public static final List<WorkAnimation> ALL = List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP);
