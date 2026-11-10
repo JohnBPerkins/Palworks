@@ -34,7 +34,7 @@ final class ChopTreeHandler implements JobHandler {
     @Nullable
     private static WorkPositions.TreeStand treeStand(JobContext ctx) {
         return WorkPositions.treeStandFor(
-                ctx.level(), ctx.pos(), ctx.entity(), JobHandlers.stanceFor(JobType.CHOP_TREE, ctx.entity()));
+                ctx.level(), ctx.pos(), ctx.entity(), JobHandlerRegistry.stanceFor(JobType.CHOP_TREE, ctx.entity()));
     }
 
     /** Whether leaves stand between the worker and the trunk. */
