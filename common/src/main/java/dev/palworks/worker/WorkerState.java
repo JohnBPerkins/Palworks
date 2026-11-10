@@ -2,18 +2,15 @@ package dev.palworks.worker;
 
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
-import dev.palworks.suitability.Suitability;
-import java.util.EnumMap;
 import java.util.Locale;
-import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Persistent data for a Pokémon worker.
- * Stores: enabled state, assigned job and its reservation, progress through it, cooldowns and
- * path-failure tracking.
+ * Stores: enabled state, assigned job and its reservation, progress through it, and path-failure
+ * tracking.
  */
 public class WorkerState {
     // Path failures further apart than this start the count again
@@ -22,9 +19,6 @@ public class WorkerState {
     private boolean enabled;
     private JobType assignedJob;
     private ReservationId currentReservation;
-
-    // Cooldowns per suitability type
-    private final Map<Suitability, Long> cooldowns;
 
     // Path failure tracking for stuck detection
     private int pathFailCount;
@@ -46,7 +40,6 @@ public class WorkerState {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
         this.currentReservation = null;
-        this.cooldowns = new EnumMap<>(Suitability.class);
         this.pathFailCount = 0;
         this.lastPathFailTime = 0;
         this.jobStep = 0;
@@ -91,31 +84,6 @@ public class WorkerState {
     public void clearReservation() {
         this.currentReservation = null;
         resetJobProgress();
-    }
-
-    // Cooldowns
-    public void setCooldown(Suitability suitability, long cooldownTicks) {
-        cooldowns.put(suitability, System.currentTimeMillis() + (cooldownTicks * 50)); // Convert ticks to ms
-    }
-
-    public boolean isOnCooldown(Suitability suitability) {
-        Long cooldownEnd = cooldowns.get(suitability);
-        if (cooldownEnd == null) return false;
-
-        if (System.currentTimeMillis() < cooldownEnd) {
-            return true;
-        } else {
-            cooldowns.remove(suitability);
-            return false;
-        }
-    }
-
-    public long getRemainingCooldown(Suitability suitability) {
-        Long cooldownEnd = cooldowns.get(suitability);
-        if (cooldownEnd == null) return 0;
-
-        long remaining = cooldownEnd - System.currentTimeMillis();
-        return Math.max(0, remaining / 50); // Convert ms to ticks
     }
 
     // Path failure tracking
@@ -246,13 +214,6 @@ public class WorkerState {
         tag.putInt("jobStep", jobStep);
         tag.put("jobData", jobData.copy());
 
-        // Serialize cooldowns
-        CompoundTag cooldownsTag = new CompoundTag();
-        for (Map.Entry<Suitability, Long> entry : cooldowns.entrySet()) {
-            cooldownsTag.putLong(entry.getKey().getId(), entry.getValue());
-        }
-        tag.put("cooldowns", cooldownsTag);
-
         tag.putInt("pathFailCount", pathFailCount);
         tag.putLong("lastPathFailTime", lastPathFailTime);
 
@@ -281,18 +242,6 @@ public class WorkerState {
                 assignedJob = JobType.valueOf(jobId.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
                 assignedJob = null;
-            }
-        }
-
-        // Deserialize cooldowns
-        cooldowns.clear();
-        if (tag.contains("cooldowns")) {
-            CompoundTag cooldownsTag = tag.getCompound("cooldowns");
-            for (String key : cooldownsTag.getAllKeys()) {
-                Suitability suitability = Suitability.fromId(key);
-                if (suitability != null) {
-                    cooldowns.put(suitability, cooldownsTag.getLong(key));
-                }
             }
         }
 

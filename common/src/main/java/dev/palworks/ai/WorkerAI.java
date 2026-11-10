@@ -34,9 +34,6 @@ import net.minecraft.world.level.Level;
  */
 public class WorkerAI {
 
-    // Cooldown before finding new work after completing a job (in ticks)
-    private static final int JOB_COMPLETE_COOLDOWN = 60; // 3 seconds
-
     // Arrived once in its stance (see WorkStance) within this squared distance of the stand tile,
     // where it was headed (the tile, or one next to it): it doesn't fidget to hit the exact tile.
     // Anywhere else in its stance only counts once its walk has ended, so it doesn't stop short on
@@ -222,7 +219,6 @@ public class WorkerAI {
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                 JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
             }
-            state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
             dropJob(pokemon, entity, state);
             return false;
         }
@@ -336,9 +332,8 @@ public class WorkerAI {
                 JobManager.getInstance(serverLevel).onJobCompleted(pokemon, reservation, level);
             }
 
-            // Job complete - clear reservation and set cooldown
+            // Job complete - clear reservation
             state.clearReservation();
-            state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
             state.resetPathFailures();
 
             // Opt-in activity message (only players who ran /palworks debug see it)
@@ -413,7 +408,6 @@ public class WorkerAI {
                 if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
                     JobManager.getInstance(serverLevel).onJobAbandoned(pokemon, reservation, level);
                 }
-                state.setCooldown(reservation.getJobType().getRequiredSuitability(), JOB_COMPLETE_COOLDOWN);
                 state.resetPathFailures();
                 dropJob(pokemon, entity, state);
                 return false;
@@ -526,7 +520,7 @@ public class WorkerAI {
 
     /**
      * Drop the worker's job: stop walking to it and clear its reservation (and with it, its
-     * progress), then save. Whatever else dropping it means (a cooldown, forgetting path
+     * progress), then save. Whatever else dropping it means (forgetting path
      * failures, telling JobManager) is the caller's, before this.
      */
     private static void dropJob(Pokemon pokemon, Mob entity, WorkerState state) {

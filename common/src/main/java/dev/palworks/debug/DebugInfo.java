@@ -33,7 +33,6 @@ public class DebugInfo {
         public final String assignedJob;
         public final String currentReservation;
         public final List<String> suitabilities;
-        public final List<String> cooldowns;
         public final int pathFailCount;
         public final boolean isStuck;
         public final int jobStep;
@@ -58,17 +57,7 @@ public class DebugInfo {
             this.suitabilities = new ArrayList<>();
             Set<Suitability> suits = dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon);
             for (Suitability suit : suits) {
-                String cooldownInfo = state.isOnCooldown(suit)
-                        ? String.format(" (CD: %ds)", state.getRemainingCooldown(suit) / 20)
-                        : "";
-                this.suitabilities.add(suit.getId() + cooldownInfo);
-            }
-
-            this.cooldowns = new ArrayList<>();
-            for (Suitability suit : Suitability.values()) {
-                if (state.isOnCooldown(suit)) {
-                    this.cooldowns.add(String.format("%s: %ds", suit.getId(), state.getRemainingCooldown(suit) / 20));
-                }
+                this.suitabilities.add(suit.getId());
             }
 
             this.pathFailCount = state.getPathFailCount();
@@ -93,13 +82,6 @@ public class DebugInfo {
             lines.add("Suitabilities: " + (suitabilities.isEmpty() ? "None" : ""));
             for (String suit : suitabilities) {
                 lines.add("  - " + suit);
-            }
-
-            if (!cooldowns.isEmpty()) {
-                lines.add("Cooldowns:");
-                for (String cd : cooldowns) {
-                    lines.add("  - " + cd);
-                }
             }
 
             lines.add("Job Step: " + jobStep + " (" + stepTicks + " ticks in)");
