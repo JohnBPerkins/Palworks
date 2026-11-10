@@ -1,5 +1,6 @@
 package dev.palworks.neoforge;
 
+import dev.palworks.animation.WorkAnimationReloadListener;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.inventory.MenuOpener;
 import dev.palworks.neoforge.command.PalworksCommands;
@@ -35,6 +36,9 @@ public class PalworksNeoForge {
         // Load work suitabilities from datapacks (data/<namespace>/palworks/suitability)
         NeoForge.EVENT_BUS.addListener(
                 AddReloadListenerEvent.class, event -> event.addListener(new SuitabilityReloadListener()));
+        // And species' own work animations (data/<namespace>/palworks/work_animations)
+        NeoForge.EVENT_BUS.addListener(
+                AddReloadListenerEvent.class, event -> event.addListener(new WorkAnimationReloadListener()));
 
         // Register command handler (WorkerTickHandler is auto-registered via @EventBusSubscriber)
         NeoForge.EVENT_BUS.register(new PalworksCommands());

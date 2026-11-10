@@ -3,6 +3,7 @@ package dev.palworks.fabric;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.fabric.command.PalworksCommands;
 import dev.palworks.fabric.data.FabricSuitabilityReloadListener;
+import dev.palworks.fabric.data.FabricWorkAnimationReloadListener;
 import dev.palworks.fabric.event.WorkerTickHandler;
 import dev.palworks.fabric.inventory.FabricMenuOpener;
 import dev.palworks.fabric.inventory.FabricModMenuTypes;
@@ -35,6 +36,8 @@ public class PalworksFabric implements ModInitializer {
 
         // Load work suitabilities from datapacks (data/<namespace>/palworks/suitability)
         ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new FabricSuitabilityReloadListener());
+        // And species' own work animations (data/<namespace>/palworks/work_animations)
+        ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new FabricWorkAnimationReloadListener());
 
         // Register worker tick handler
         WorkerTickHandler.register();

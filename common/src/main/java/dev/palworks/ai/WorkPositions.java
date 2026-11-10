@@ -18,9 +18,12 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Resolves the exact tile a worker should stand on to perform a job, separate from the block the
- * job acts on. For a directional station (furnace, smoker, blast furnace, chest) that's the tile in
- * front of its facing — so the worker is correctly positioned for interaction animations/effects.
- * For non-directional targets (crops, ore, logs) it's the nearest standable adjacent tile.
+ * job acts on, from the job's {@link WorkStance} (how far from the block, for this size of
+ * Pokémon). For a directional station (furnace, smoker, blast furnace, chest) that's a tile in
+ * front of its facing, so the worker is correctly positioned for interaction animations/effects.
+ * For non-directional targets (crops, ore) it's the nearest tile it fits on that far away; for a
+ * tree, that far round the trunk, clearing leaves to get there. {@link #inStance} says whether
+ * it's there yet.
  *
  * <p>Stateless: callers (JobManager at assignment, WorkerAI each tick) recompute the same position
  * from the world + the entity, so nothing is persisted.
@@ -29,16 +32,24 @@ public final class WorkPositions {
     private WorkPositions() {}
 
     /**
-     * The tile the worker should stand on for this job, or {@code null} if there's no valid spot.
-     * Whether that tile is actually reachable is confirmed separately by the caller's path check.
+     * The tile the worker should stand on for this job, in the job's stance for it (see
+     * {@link WorkerAI#stanceFor}), or {@code null} if there's no valid spot. Whether that tile is
+     * actually reachable is confirmed separately by the caller's path check.
      */
     @Nullable
     public static BlockPos standingPosFor(Level level, BlockPos targetPos, JobType jobType, Mob entity) {
+        return standingPosFor(level, targetPos, jobType, entity, WorkerAI.stanceFor(jobType, entity));
+    }
+
+    /** The tile the worker should stand on for this job, in this stance: see {@link #standingPosFor}. */
+    @Nullable
+    public static BlockPos standingPosFor(
+            Level level, BlockPos targetPos, JobType jobType, Mob entity, WorkStance stance) {
         if (jobType == JobType.CHOP_TREE) {
-            TreeStand stand = treeStandFor(level, targetPos, entity);
+            TreeStand stand = treeStandFor(level, targetPos, entity, stance);
             return stand == null ? null : stand.stand();
         }
-        int distance = reachDistanceFor(entity);
+        int distance = stance.ringFor(entity);
 
         if (CropAdapter.isHangingFruit(level.getBlockState(targetPos))) {
             return hangingFruitStand(level, targetPos, entity, distance);
@@ -46,11 +57,11 @@ public final class WorkPositions {
 
         Direction facing = stationFacing(level, targetPos);
         if (facing != null) {
-            // Directional station: prefer standing a gap back from the face (not flush against it),
-            // but fall back closer if that's blocked. Try the ideal distance down to 2, requiring a
-            // clear lane to the block and a standable tile; if none work, use the tile directly in
-            // front (distance 1) and let the caller's path check validate it.
-            for (int d = distance; d >= 2; d--) {
+            // Directional station: prefer its stance's distance back from the face, but fall back
+            // closer if that's blocked. Try the ideal distance down to the stance's nearest ring,
+            // requiring a clear lane to the block and a standable tile; if none work, use the tile
+            // directly in front (distance 1) and let the caller's path check validate it.
+            for (int d = distance; d >= stance.minRing(); d--) {
                 boolean laneClear = true;
                 for (int i = 1; i < d; i++) {
                     if (!isPassable(level, targetPos.relative(facing, i))) {
@@ -155,20 +166,21 @@ public final class WorkPositions {
     }
 
     /**
-     * Where a lumberjack should stand to chop the tree at {@code treePos}: right up against the
-     * trunk. Real trees' lowest leaves often hang at head height all around the trunk, so where
-     * they're in the way it clears them first: it stands just outside them and clears a way in. A
-     * tile one further out is the fallback when nothing right by the trunk works even with leaves
-     * cleared (a slope, a branch, a wall). Null when even that's blocked by more than leaves: the
-     * job isn't for this worker (it used to chop from 4 or 5 blocks away instead).
+     * Where a lumberjack should stand to chop the tree at {@code treePos}: on its stance's ring
+     * round the trunk (right up against it, for a contact move). Real trees' lowest leaves often
+     * hang at head height all around the trunk, so where they're in the way it clears them first:
+     * it stands just outside them and clears a way in. A tile one further out is the fallback when
+     * nothing on that ring works even with leaves cleared (a slope, a branch, a wall). Null when
+     * even that's blocked by more than leaves: the job isn't for this worker (it used to chop from
+     * 4 or 5 blocks away instead).
      *
      * <p>Only natural leaves are cleared, never ones a player placed. In each ring, as-is spots come
      * before ones that need clearing, and the spot nearest the worker wins.
      */
     @Nullable
-    public static TreeStand treeStandFor(Level level, BlockPos treePos, Mob entity) {
+    public static TreeStand treeStandFor(Level level, BlockPos treePos, Mob entity, WorkStance stance) {
         List<BlockPos> trunk = trunkColumns(level, treePos);
-        int closest = closestChopRing(entity);
+        int closest = stance.ringFor(entity);
         Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
         Predicate<BlockPos> fitsIfCleared = spot -> fitsIfLeavesCleared(level, spot, entity);
         for (int d = closest; d <= closest + 1; d++) {
@@ -219,23 +231,65 @@ public final class WorkPositions {
     }
 
     /**
-     * Whether the worker is right up against the tree, close enough to chop it from where it
-     * stands: in the nearest ring round the trunk its hitbox fits in, level with the base give or
-     * take a block.
+     * Whether the worker is in its stance for this job, where it is: close enough to its target
+     * (the edge of its body no further from it than the stance allows, see
+     * {@link WorkStance#maxGap}), in front of it if it's a station, and about level with it (below
+     * a hanging fruit). For a tree the target is the whole trunk.
      */
-    public static boolean withinChoppingReach(Level level, Mob entity, BlockPos treePos) {
-        List<BlockPos> trunk = trunkColumns(level, treePos);
-        BlockPos at = entity.blockPosition();
-        return Math.abs(at.getY() - treePos.getY()) <= 1
-                && chebyshevToTrunk(trunk, at.getX(), at.getZ()) <= closestChopRing(entity);
+    public static boolean inStance(Level level, Mob entity, BlockPos targetPos, JobType jobType, WorkStance stance) {
+        double dy = entity.getY() - targetPos.getY();
+        List<BlockPos> target;
+        if (jobType == JobType.CHOP_TREE) {
+            if (Math.abs(entity.blockPosition().getY() - targetPos.getY()) > TREE_HEIGHT_REACH) {
+                return false;
+            }
+            target = trunkColumns(level, targetPos);
+        } else {
+            boolean hanging = CropAdapter.isHangingFruit(level.getBlockState(targetPos));
+            double below = hanging ? HANGING_FRUIT_REACH_DOWN + 1.0 : WORK_HEIGHT_REACH;
+            if (dy < -below || dy > WORK_HEIGHT_REACH) {
+                return false;
+            }
+            Direction facing = stationFacing(level, targetPos);
+            if (facing != null && !inFrontOf(entity, targetPos, facing)) {
+                return false;
+            }
+            target = List.of(targetPos);
+        }
+        return stance.reaches(entity.getBbWidth() / 2.0, gapTo(entity, target));
+    }
+
+    /** How many blocks above or below a tree's base a lumberjack can chop it from (a slope). */
+    private static final int TREE_HEIGHT_REACH = 1;
+    /** How far above or below its work a worker can do it from: a block either way, give or take. */
+    private static final double WORK_HEIGHT_REACH = 2.0;
+    /** How far to one side of a station's middle a worker in front of it may be, in blocks. */
+    private static final double STATION_SIDE_REACH = 1.5;
+
+    /** Whether the worker's middle is out in front of the station's face, not off to its side. */
+    private static boolean inFrontOf(Mob entity, BlockPos station, Direction facing) {
+        double dx = entity.getX() - (station.getX() + 0.5);
+        double dz = entity.getZ() - (station.getZ() + 0.5);
+        double ahead = dx * facing.getStepX() + dz * facing.getStepZ();
+        double aside = Math.abs(dx * facing.getStepZ() - dz * facing.getStepX());
+        return ahead > 0.5 && aside <= STATION_SIDE_REACH;
     }
 
     /**
-     * The nearest ring around the trunk a worker's hitbox fits in without overlapping it: 1 (the
-     * tiles touching the trunk) for most, 2 for one wider than about a block (Conkeldurr, Hariyama).
+     * The space between the worker's hitbox and the nearest of these blocks, across (the larger of
+     * the x and z gaps, as rings are measured): 0 when it's touching one.
      */
-    public static int closestChopRing(Mob entity) {
-        return Math.max(1, (int) Math.ceil(entity.getBbWidth() / 2.0 + 0.5 - 1e-3));
+    private static double gapTo(Mob entity, List<BlockPos> blocks) {
+        double half = entity.getBbWidth() / 2.0;
+        double best = Double.MAX_VALUE;
+        for (BlockPos block : blocks) {
+            double gapX = Math.max(
+                    0, Math.max(block.getX() - (entity.getX() + half), (entity.getX() - half) - (block.getX() + 1)));
+            double gapZ = Math.max(
+                    0, Math.max(block.getZ() - (entity.getZ() + half), (entity.getZ() - half) - (block.getZ() + 1)));
+            best = Math.min(best, Math.max(gapX, gapZ));
+        }
+        return best;
     }
 
     /**
@@ -473,38 +527,11 @@ public final class WorkPositions {
     }
 
     /**
-     * How many blocks in front of the worked block the Cobblemon should stand.
-     *
-     * <p>Rough first cut — <b>tune in-game</b>. Scales with the entity's (already size-scaled)
-     * hitbox width, clamped to [2, 4], so a larger Cobblemon stands further back and its animation
-     * lines up with the block; a small one stays at 2 (a one-block gap, not flush against it).
-     */
-    public static int reachDistanceFor(Mob entity) {
-        // Base of 2 leaves a one-block gap in front of the station (not flush); scales further for
-        // larger Cobblemon so their animation lines up. Clamped to [2, 4].
-        int d = 2 + (int) Math.floor(entity.getBbWidth() / 2.0);
-        return Math.max(2, Math.min(4, d));
-    }
-
-    /**
      * Whether the job's block is a directional station (furnace, chest, ...): the worker has to be in
      * front of it. Anything else (a crop, a tree, ore) can be worked from anywhere near it.
      */
     public static boolean isDirectional(Level level, BlockPos targetPos) {
         return stationFacing(level, targetPos) != null;
-    }
-
-    /**
-     * Whether the worker is near enough to a non-directional job to do it from where it stands: its
-     * reach distance plus two blocks across, and two blocks up or down. Used once its walk has ended
-     * short of its stand tile (the pathfinder planned a route, but a wide body got caught on the
-     * way). Trees have their own, tighter rule: {@link #withinChoppingReach}.
-     */
-    public static boolean withinWorkReach(Mob entity, BlockPos targetPos) {
-        double dx = entity.getX() - (targetPos.getX() + 0.5);
-        double dz = entity.getZ() - (targetPos.getZ() + 0.5);
-        double reach = reachDistanceFor(entity) + 2.0;
-        return dx * dx + dz * dz <= reach * reach && Math.abs(entity.getY() - targetPos.getY()) <= 2.0;
     }
 
     /** The front-facing direction of a directional station block, or null if it isn't directional. */

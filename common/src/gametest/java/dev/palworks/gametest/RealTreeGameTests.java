@@ -1,7 +1,8 @@
 package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
-import dev.palworks.ai.WorkPositions;
+import dev.palworks.ai.WorkerAI;
+import dev.palworks.job.JobType;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.List;
@@ -102,14 +103,14 @@ public class RealTreeGameTests {
     }
 
     /**
-     * How far from the trunk a lumberjack may chop: from the nearest tile round the trunk its
-     * hitbox fits on (the tile touching the trunk for most; one further out for Pokémon over a
-     * block wide), within 0.35 of that tile's middle, give or take a little. A tile further out
-     * than that is a whole block more.
+     * How far from the trunk a lumberjack may chop: as far as its stance allows (by default, right
+     * up against it: from the nearest tile round the trunk its hitbox fits on, the tile touching
+     * the trunk for most and one further out for Pokémon over a block wide, within 0.35 of that
+     * tile's middle), give or take a little. A tile further out than that is a whole block more.
      */
     static double maxChopGap(PokemonEntity worker) {
         double half = worker.getBbWidth() / 2.0;
-        return Math.max(0, WorkPositions.closestChopRing(worker) - 0.5 - half) + 0.35 + 0.05;
+        return WorkerAI.stanceFor(JobType.CHOP_TREE, worker).maxGap(half) + 0.05;
     }
 
     /**
