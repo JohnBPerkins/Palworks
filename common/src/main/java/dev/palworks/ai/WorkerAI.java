@@ -359,8 +359,11 @@ public class WorkerAI {
             entity.getNavigation().stop();
             entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
 
-            // Face the worked block so animations/effects line up (groundwork for furnace fx, etc.)
-            faceTarget(entity, targetPos);
+            // Face the worked block so animations/effects line up. While its last animation plays
+            // out, keep facing what that was aimed at: the next job may be one it can start on from
+            // where it stands (the next crop along), and it shouldn't turn to it mid-animation.
+            BlockPos playingOut = WorkAnimator.playingOutAt(entity);
+            faceTarget(entity, playingOut != null ? playingOut : targetPos);
 
             // At job location - perform work
             boolean workComplete = performWork(pokemon, entity, level, state, reservation);
