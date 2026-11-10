@@ -138,7 +138,7 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
     Lines about something going wrong are red, and so is a path that doesn't reach its job.
   - `/palworks inspect worker` and `/palworks jobs` dump the nearest worker's state and the job pool.
   - `/palworks testarea` builds a flat test area from where you stand, east and south (about
-    71 x 151 blocks; everything in it is cleared first). Its sections are:
+    62 x 108 blocks; everything in it is cleared first). Its sections are:
     - smelting: furnaces, blast furnaces and smokers with input but no fuel;
     - every vanilla crop;
     - every Cobblemon crop, and every berry bush with berries;
