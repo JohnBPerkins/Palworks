@@ -119,4 +119,55 @@ public class ChestHelper {
 
         return false;
     }
+
+    /**
+     * Add as much of a stack to a chest as fits: first onto matching stacks, then into empty slots.
+     * Doesn't modify {@code stack}. Returns how many items didn't fit (the whole count if the block
+     * isn't a container).
+     */
+    public static int insertItems(Level level, BlockPos chestPos, ItemStack stack) {
+        BlockEntity blockEntity = level.getBlockEntity(chestPos);
+        if (!(blockEntity instanceof Container container)) {
+            return stack.getCount();
+        }
+
+        int remaining = stack.getCount();
+        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
+            ItemStack slotStack = container.getItem(i);
+            if (!slotStack.isEmpty() && ItemStack.isSameItemSameComponents(slotStack, stack)) {
+                int toAdd = Math.min(slotStack.getMaxStackSize() - slotStack.getCount(), remaining);
+                if (toAdd > 0) {
+                    slotStack.grow(toAdd);
+                    remaining -= toAdd;
+                }
+            }
+        }
+        for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
+            if (container.getItem(i).isEmpty()) {
+                int toAdd = Math.min(remaining, stack.getMaxStackSize());
+                container.setItem(i, stack.copyWithCount(toAdd));
+                remaining -= toAdd;
+            }
+        }
+
+        if (remaining < stack.getCount()) {
+            container.setChanged();
+        }
+        return remaining;
+    }
+
+    /**
+     * Put back the part of an extracted stack the worker couldn't carry (it used to be deleted),
+     * dropping it next to the chest if the chest has since filled up.
+     */
+    public static void returnLeftover(Level level, BlockPos chestPos, ItemStack extracted, int leftover) {
+        if (leftover <= 0) {
+            return;
+        }
+        int stillLeft = insertItems(level, chestPos, extracted.copyWithCount(leftover));
+        if (stillLeft > 0) {
+            net.minecraft.world.level.block.Block.popResource(
+                    level, chestPos.above(), extracted.copyWithCount(stillLeft));
+        }
+    }
 }

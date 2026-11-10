@@ -2,6 +2,7 @@ package dev.palworks.ai;
 
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
+import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,12 +34,12 @@ public final class WorkPositions {
 
     /**
      * The tile the worker should stand on for this job, in the job's stance for it (see
-     * {@link WorkerAI#stanceFor}), or {@code null} if there's no valid spot. Whether that tile is
+     * {@link JobHandlerRegistry#stanceFor}), or {@code null} if there's no valid spot. Whether that tile is
      * actually reachable is confirmed separately by the caller's path check.
      */
     @Nullable
     public static BlockPos standingPosFor(Level level, BlockPos targetPos, JobType jobType, Mob entity) {
-        return standingPosFor(level, targetPos, jobType, entity, WorkerAI.stanceFor(jobType, entity));
+        return standingPosFor(level, targetPos, jobType, entity, JobHandlerRegistry.stanceFor(jobType, entity));
     }
 
     /** The tile the worker should stand on for this job, in this stance: see {@link #standingPosFor}. */
