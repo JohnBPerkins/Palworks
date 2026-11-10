@@ -1,6 +1,7 @@
 package dev.palworks.job.handler;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.animation.WorkAnimations;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.reservation.ReservationId;
@@ -25,7 +26,7 @@ public record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState s
 
     /** The worker's species id, which its animations can be particular to. */
     String species() {
-        return JobHandlers.speciesOf(pokemon);
+        return WorkAnimations.speciesOf(pokemon);
     }
     /** Data steps leave for later steps (saved, and handed over with the job). */
     net.minecraft.nbt.CompoundTag data() {

@@ -8,7 +8,7 @@ import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
-import dev.palworks.job.handler.JobHandlers;
+import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.core.BlockPos;
@@ -128,7 +128,7 @@ public class WorkerGameTests {
         Scenes.tree(helper, trunk.getX(), trunk.getZ(), 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
         PokemonEntity worker = Workers.sendOut(helper, "durant level=20", START);
         helper.assertTrue(
-                JobHandlers.stanceFor(JobType.CHOP_TREE, worker).equals(WorkStance.NEAR),
+                JobHandlerRegistry.stanceFor(JobType.CHOP_TREE, worker).equals(WorkStance.NEAR),
                 "the datapack's stance for Durant is loaded");
 
         // Where it was on the last tick the tree was still up: where it chopped from
