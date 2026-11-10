@@ -2,7 +2,7 @@ package dev.palworks.job.handler;
 
 import dev.palworks.Palworks;
 import dev.palworks.inventory.WorkerInventory;
-import dev.palworks.manager.JobManager;
+import dev.palworks.job.JobManager;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;

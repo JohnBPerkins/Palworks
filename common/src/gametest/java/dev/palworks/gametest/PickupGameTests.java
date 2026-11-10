@@ -3,7 +3,7 @@ package dev.palworks.gametest;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
-import dev.palworks.manager.JobManager;
+import dev.palworks.job.JobManager;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.core.BlockPos;

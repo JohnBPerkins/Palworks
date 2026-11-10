@@ -1,10 +1,7 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
-import dev.palworks.job.JobBlockTags;
-import dev.palworks.job.JobType;
-import dev.palworks.job.WorkRange;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.suitability.Suitability;

@@ -1,4 +1,4 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
@@ -11,8 +11,6 @@ import dev.palworks.crop.CropAdapter;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
-import dev.palworks.job.JobType;
-import dev.palworks.job.WorkRange;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;

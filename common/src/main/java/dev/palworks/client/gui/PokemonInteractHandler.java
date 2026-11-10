@@ -6,8 +6,8 @@ import com.cobblemon.mod.common.api.events.pokemon.interaction.PokemonInteractio
 import com.cobblemon.mod.common.client.gui.interact.wheel.InteractWheelOption;
 import com.cobblemon.mod.common.client.gui.interact.wheel.Orientation;
 import dev.palworks.Palworks;
+import dev.palworks.client.ClientWorkerData;
 import dev.palworks.inventory.CarryMode;
-import dev.palworks.net.PalworksResource;
 import dev.palworks.net.packets.OpenInventoryPacket;
 import dev.palworks.net.packets.ToggleWorkerPacket;
 import java.util.function.Consumer;
@@ -27,12 +27,12 @@ import org.joml.Vector3f;
  */
 public class PokemonInteractHandler {
     private static final ResourceLocation INVENTORY_ICON =
-            PalworksResource.of("textures/gui/interact/interact_wheel_icon_inventory.png");
+            Palworks.id("textures/gui/interact/interact_wheel_icon_inventory.png");
     // White icons, tinted green or red by the option's colour
     private static final ResourceLocation WORKING_ICON =
-            PalworksResource.of("textures/gui/interact/interact_wheel_icon_working.png");
+            Palworks.id("textures/gui/interact/interact_wheel_icon_working.png");
     private static final ResourceLocation NOT_WORKING_ICON =
-            PalworksResource.of("textures/gui/interact/interact_wheel_icon_not_working.png");
+            Palworks.id("textures/gui/interact/interact_wheel_icon_not_working.png");
     private static final Vector3f GREEN = new Vector3f(0.33F, 0.85F, 0.33F);
     private static final Vector3f RED = new Vector3f(0.95F, 0.3F, 0.3F);
 
@@ -42,7 +42,7 @@ public class PokemonInteractHandler {
         Consumer<PokemonInteractionGUICreationEvent> handler = event -> {
             // The server sends the Pokemon's status just before the wheel opens (see
             // PokemonEntityInteractMixin). None means it can't do any work: no work options.
-            WorkerStatusCache.Status status = WorkerStatusCache.take(event.getPokemonID());
+            ClientWorkerData.Status status = ClientWorkerData.takeStatus(event.getPokemonID());
             if (status == null) {
                 return;
             }

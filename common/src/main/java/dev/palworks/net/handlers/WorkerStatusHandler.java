@@ -1,7 +1,7 @@
 package dev.palworks.net.handlers;
 
 import com.cobblemon.mod.common.api.net.ClientNetworkPacketHandler;
-import dev.palworks.client.gui.WorkerStatusCache;
+import dev.palworks.client.ClientWorkerData;
 import dev.palworks.net.packets.WorkerStatusPacket;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +14,7 @@ public class WorkerStatusHandler implements ClientNetworkPacketHandler<WorkerSta
 
     @Override
     public void handle(@NotNull WorkerStatusPacket packet, @NotNull Minecraft client) {
-        WorkerStatusCache.put(
-                packet.getEntityUUID(), new WorkerStatusCache.Status(packet.isEnabled(), packet.getCarryMode()));
+        ClientWorkerData.putStatus(
+                packet.getEntityUUID(), new ClientWorkerData.Status(packet.isEnabled(), packet.getCarryMode()));
     }
 }

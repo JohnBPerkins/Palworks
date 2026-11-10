@@ -1,8 +1,8 @@
 package dev.palworks.net.packets;
 
 import com.cobblemon.mod.common.api.net.NetworkPacket;
+import dev.palworks.Palworks;
 import dev.palworks.job.JobType;
-import dev.palworks.net.PalworksResource;
 import dev.palworks.worker.WorkActivity;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +18,7 @@ import org.jetbrains.annotations.Nullable;
  * Replaces the previous one; an empty list clears the overlay.
  */
 public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
-    public static final ResourceLocation ID = PalworksResource.of("worker_debug");
+    public static final ResourceLocation ID = Palworks.id("worker_debug");
 
     /**
      * One worker's debug overlay: its job, path and timers.

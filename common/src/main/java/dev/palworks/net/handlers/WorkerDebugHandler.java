@@ -1,7 +1,7 @@
 package dev.palworks.net.handlers;
 
 import com.cobblemon.mod.common.api.net.ClientNetworkPacketHandler;
-import dev.palworks.client.debug.WorkerDebugCache;
+import dev.palworks.client.ClientWorkerData;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.NotNull;
@@ -11,6 +11,6 @@ public class WorkerDebugHandler implements ClientNetworkPacketHandler<WorkerDebu
 
     @Override
     public void handle(@NotNull WorkerDebugPacket packet, @NotNull Minecraft client) {
-        WorkerDebugCache.set(packet.getEntries());
+        ClientWorkerData.setDebugEntries(packet.getEntries());
     }
 }

@@ -1,6 +1,5 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
-import dev.palworks.job.JobType;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;

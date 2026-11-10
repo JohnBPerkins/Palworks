@@ -1,4 +1,4 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import java.util.UUID;
 import net.minecraft.core.BlockPos;

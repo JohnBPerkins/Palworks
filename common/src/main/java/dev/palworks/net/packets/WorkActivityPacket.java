@@ -1,8 +1,8 @@
 package dev.palworks.net.packets;
 
 import com.cobblemon.mod.common.api.net.NetworkPacket;
+import dev.palworks.Palworks;
 import dev.palworks.job.JobType;
-import dev.palworks.net.PalworksResource;
 import dev.palworks.worker.WorkActivity;
 import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -14,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
  * the party HUD can show it. Keyed by the Pokemon's own UUID, the one the client's party uses.
  */
 public class WorkActivityPacket implements NetworkPacket<WorkActivityPacket> {
-    public static final ResourceLocation ID = PalworksResource.of("work_activity");
+    public static final ResourceLocation ID = Palworks.id("work_activity");
 
     private final UUID pokemonUUID;
     private final WorkActivity activity;

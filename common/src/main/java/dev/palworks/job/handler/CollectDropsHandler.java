@@ -2,7 +2,7 @@ package dev.palworks.job.handler;
 
 import dev.palworks.Palworks;
 import dev.palworks.inventory.WorkerInventory;
-import dev.palworks.manager.JobChecks;
+import dev.palworks.job.JobChecks;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;

@@ -164,7 +164,7 @@ public final class TestArea {
 
         BlockPos max = origin.offset(width - 1, TREE_CLEAR_HEIGHT, depth - 1);
         // Workers already out look round again before taking any of it, so they start nearest first
-        dev.palworks.manager.JobManager.getInstance(level).rescanArea(origin, max);
+        dev.palworks.job.JobManager.getInstance(level).rescanArea(origin, max);
         return new Result(origin, max, plots, Collections.unmodifiableList(problems));
     }
 

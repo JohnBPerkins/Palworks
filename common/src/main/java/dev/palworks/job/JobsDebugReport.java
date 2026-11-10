@@ -1,9 +1,8 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.ai.path.WorkerPathfinder.Reach;
-import dev.palworks.job.JobType;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;

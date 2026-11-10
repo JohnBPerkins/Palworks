@@ -1,4 +1,4 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.palworks.job.JobType;
 import dev.palworks.suitability.Suitability;
 import java.util.EnumSet;
 import java.util.Set;

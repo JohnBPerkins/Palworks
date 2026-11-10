@@ -1,4 +1,4 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;

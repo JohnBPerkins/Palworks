@@ -1,6 +1,5 @@
-package dev.palworks.manager;
+package dev.palworks.job;
 
-import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
 import net.minecraft.core.BlockPos;
 
