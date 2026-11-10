@@ -3,7 +3,8 @@ package dev.palworks.debug;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkerAI;
-import dev.palworks.job.handler.JobHandlers;
+import dev.palworks.animation.WorkAnimations;
+import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.manager.JobManager;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.reservation.ReservationId;
@@ -120,8 +121,8 @@ public final class WorkerDebugSync {
         int stepCount = 0;
         int stepLength = 0;
         if (reservation != null && state.isWorking()) {
-            JobHandlers.StepView step =
-                    JobHandlers.stepView(reservation.getJobType(), state.getJobStep(), JobHandlers.speciesOf(entity));
+            JobHandlerRegistry.StepView step = JobHandlerRegistry.stepView(
+                    reservation.getJobType(), state.getJobStep(), WorkAnimations.speciesOf(entity));
             if (step != null) {
                 stepName = step.name();
                 stepIndex = step.index();

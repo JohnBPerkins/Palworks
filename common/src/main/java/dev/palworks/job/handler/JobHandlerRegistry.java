@@ -1,9 +1,8 @@
 package dev.palworks.job.handler;
 
-import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
-import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.ai.WorkStance;
+import dev.palworks.animation.WorkAnimations;
 import dev.palworks.job.JobType;
 import java.util.EnumMap;
 import java.util.List;
@@ -14,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Every job's {@link JobHandler}, by {@link JobType}: how a worker does it once it's there.
  */
-public final class JobHandlers {
+public final class JobHandlerRegistry {
     private static final Map<JobType, JobHandler> HANDLERS = new EnumMap<>(JobType.class);
 
     static {
@@ -23,7 +22,7 @@ public final class JobHandlers {
         }
     }
 
-    private JobHandlers() {}
+    private JobHandlerRegistry() {}
 
     // Exhaustive (no default), so a new JobType doesn't compile until it has a handler
     private static JobHandler create(JobType type) {
@@ -64,17 +63,6 @@ public final class JobHandlers {
      * from (see {@link JobHandler#stance}). {@link WorkPositions} finds the tile from it.
      */
     public static WorkStance stanceFor(JobType job, Mob worker) {
-        return forJob(job).stance(speciesOf(worker));
-    }
-
-    /** A worker's species id ({@code cobblemon:scizor}), or null if it isn't a Pokémon. */
-    @Nullable
-    public static String speciesOf(Mob worker) {
-        return worker instanceof PokemonEntity pokemonEntity ? speciesOf(pokemonEntity.getPokemon()) : null;
-    }
-
-    /** A Pokémon's species id ({@code cobblemon:scizor}). */
-    public static String speciesOf(Pokemon pokemon) {
-        return pokemon.getSpecies().getResourceIdentifier().toString();
+        return forJob(job).stance(WorkAnimations.speciesOf(worker));
     }
 }

@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Strategy for executing one {@link JobType} at the work site: a list of timed {@link Step}s.
- * Add a job type by giving it a handler in {@link JobHandlers#forJob} rather than editing WorkerAI.
+ * Add a job type by giving it a handler in {@link JobHandlerRegistry#forJob} rather than editing WorkerAI.
  */
 @FunctionalInterface
 public interface JobHandler {

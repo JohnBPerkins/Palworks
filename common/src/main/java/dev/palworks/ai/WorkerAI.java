@@ -12,7 +12,7 @@ import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobContext;
 import dev.palworks.job.handler.JobHandler;
-import dev.palworks.job.handler.JobHandlers;
+import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.job.handler.Step;
 import dev.palworks.manager.JobManager;
 import dev.palworks.reservation.ReservationId;
@@ -206,7 +206,7 @@ public class WorkerAI {
         // Where it stands, from the job's stance (from its animation, which can be its species' own),
         // sized to this mon: the exact tile (e.g. in front of a furnace's face)
         JobType jobType = reservation.getJobType();
-        WorkStance stance = JobHandlers.stanceFor(jobType, entity);
+        WorkStance stance = JobHandlerRegistry.stanceFor(jobType, entity);
         BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, jobType, entity, stance);
         if (standPos == null) {
             // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by),
@@ -452,7 +452,7 @@ public class WorkerAI {
             ReservationId reservation,
             boolean readyToAnimate) {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
-        JobHandler handler = JobHandlers.forJob(reservation.getJobType());
+        JobHandler handler = JobHandlerRegistry.forJob(reservation.getJobType());
 
         // A step's animation waits (just before starting) until the worker is ready for it: turned
         // to face its work, and done playing out the last one. Steps without one carry on, so a
@@ -487,7 +487,7 @@ public class WorkerAI {
             Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         JobContext ctx = new JobContext(pokemon, entity, level, state, reservation);
         StepRunner.Outcome reason = StepRunner.stopReason(
-                JobHandlers.forJob(reservation.getJobType()).steps(), state, ctx);
+                JobHandlerRegistry.forJob(reservation.getJobType()).steps(), state, ctx);
         if (reason == null) {
             return false;
         }
