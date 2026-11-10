@@ -12,16 +12,15 @@ import java.util.Objects;
 public class ReservationId {
     private final BlockPos stationPos;
     private final JobType jobType;
+    // Game time (ticks) when it was taken or last refreshed. Game time, not the clock: the game
+    // doesn't tick while paused, so a pause doesn't use up a reservation's time.
     private final long timestamp;
 
-    public ReservationId(BlockPos stationPos, JobType jobType, long timestamp) {
+    /** @param gameTime the level's game time now ({@code level.getGameTime()}) */
+    public ReservationId(BlockPos stationPos, JobType jobType, long gameTime) {
         this.stationPos = stationPos;
         this.jobType = jobType;
-        this.timestamp = timestamp;
-    }
-
-    public ReservationId(BlockPos stationPos, JobType jobType) {
-        this(stationPos, jobType, System.currentTimeMillis());
+        this.timestamp = gameTime;
     }
 
     public BlockPos getStationPos() {
@@ -37,11 +36,19 @@ public class ReservationId {
     }
 
     /**
-     * Check if this reservation has expired.
-     * @param timeoutMillis How long before a reservation expires
+     * Whether more than {@code timeoutTicks} of game time have passed since it was taken.
+     * @param gameTime the level's game time now
      */
-    public boolean isExpired(long timeoutMillis) {
-        return System.currentTimeMillis() - timestamp > timeoutMillis;
+    public boolean isExpired(long gameTime, long timeoutTicks) {
+        return gameTime - timestamp > timeoutTicks;
+    }
+
+    /**
+     * Whether its time is from later than now. Only a reservation saved by an older version, which
+     * timed them by the clock (milliseconds since 1970, far beyond any world's game time), is.
+     */
+    public boolean isFromTheFuture(long gameTime) {
+        return timestamp > gameTime;
     }
 
     // Identity is the (station, job) pair. The timestamp is deliberately excluded: it's

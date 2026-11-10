@@ -1,5 +1,6 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -185,6 +186,40 @@ public class WorkerGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "worker_paused", timeoutTicks = 600)
+    public void pausingTheGameDoesntCostAWorkerItsJob(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // A paused single-player game stops ticking but the clock runs on. Reservations used to be
+        // timed by the clock, so a pause of over 30 seconds made every walking worker give up its
+        // job on resume. Blocking the server thread is that pause.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, "bulbasaur level=20", START);
+        long[] pausedAt = {-1};
+        long[] heldSince = {0};
+
+        helper.onEachTick(() -> {
+            WorkerState state = WorkerStateManager.get(worker.getPokemon());
+            var held = state == null ? null : state.getCurrentReservation();
+            if (pausedAt[0] < 0 && held != null && !state.isWorking()) {
+                pausedAt[0] = helper.getTick();
+                heldSince[0] = held.getTimestamp();
+                try {
+                    Thread.sleep(31_000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            } else if (pausedAt[0] >= 0 && helper.getTick() <= pausedAt[0] + 5) {
+                helper.assertTrue(held != null && held.getTimestamp() == heldSince[0],
+                    "it should still have the job it had before the pause, has " + held);
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(pausedAt[0] >= 0, "it took a job");
+            assertWheatRow(helper, 0, "harvested after the pause");
+        });
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "worker_busy", timeoutTicks = 1000)
     public void aBusyWorkerPausesThenCarriesOn(GameTestHelper helper) {
         Workers.isolate(helper);
@@ -199,6 +234,24 @@ public class WorkerGameTests {
             worker.getBusyLocks().remove("palworks-test");
         });
         helper.runAfterDelay(201, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's free")));
+    }
+
+    // ---- Evolving ----
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_evolve_gain", timeoutTicks = 800)
+    public void anEvolvedWorkerTakesTheJobsOfItsNewType(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // Eevee (Normal) can't harvest; Leafeon (Grass) can. Its jobs used to be worked out once
+        // and saved, so it kept Eevee's forever. (setSpecies stands in for a real evolution.)
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, "eevee level=20", START);
+
+        helper.runAfterDelay(100, () -> {
+            assertWheatRow(helper, 7, "left alone by an Eevee");
+            worker.getPokemon().setSpecies(PokemonSpecies.INSTANCE.getByName("leafeon"));
+        });
+        helper.runAfterDelay(101, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's a Leafeon")));
     }
 
     // ---- Reachability ----

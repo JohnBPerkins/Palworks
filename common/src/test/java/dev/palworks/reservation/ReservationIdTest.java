@@ -5,7 +5,9 @@ import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests that ReservationId identity is the (station, job) pair and ignores the timestamp,
@@ -41,5 +43,21 @@ class ReservationIdTest {
     void timestampIsRetained() {
         ReservationId a = new ReservationId(POS, JobType.MINE_RESOURCE, 12_345L);
         assertEquals(12_345L, a.getTimestamp());
+    }
+
+    @Test
+    void expiresOnlyOnceMoreThanTheTimeoutHasPassedInGameTime() {
+        ReservationId a = new ReservationId(POS, JobType.HARVEST_CROPS, 1_000L);
+        assertFalse(a.isExpired(1_000L, 600), "just taken");
+        assertFalse(a.isExpired(1_600L, 600), "exactly the timeout: not yet");
+        assertTrue(a.isExpired(1_601L, 600), "past the timeout");
+    }
+
+    @Test
+    void aReservationTimedByTheClockIsFromTheFuture() {
+        // Older versions saved System.currentTimeMillis(); game time is far smaller
+        ReservationId old = new ReservationId(POS, JobType.HARVEST_CROPS, 1_731_000_000_000L);
+        assertTrue(old.isFromTheFuture(24_000L));
+        assertFalse(new ReservationId(POS, JobType.HARVEST_CROPS, 24_000L).isFromTheFuture(24_000L));
     }
 }

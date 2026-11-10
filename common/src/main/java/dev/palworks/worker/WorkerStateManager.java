@@ -49,8 +49,6 @@ public class WorkerStateManager {
 
         Palworks.LOGGER.debug("Creating new WorkerState for {}", pokemon.getSpecies().getName());
         WorkerState state = new WorkerState();
-        // Initialize suitabilities on first creation
-        state.initializeSuitabilities(pokemon);
         save(pokemon, state); // writes NBT + caches
         return state;
     }

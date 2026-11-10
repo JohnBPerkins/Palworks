@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.tree.TreeDetector;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.features.TreeFeatures;
 import net.minecraft.gametest.framework.GameTest;
@@ -12,6 +13,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
@@ -113,9 +115,16 @@ public class RealTreeGameTests {
      */
     private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
                                      long seed, String lumberjack, Block sapling) {
+        chopRealTree(helper, tree, seed, lumberjack, sapling, () -> {});
+    }
+
+    /** {@link #chopRealTree}, with {@code dressTree} run once the tree has grown. */
+    private static void chopRealTree(GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree,
+                                     long seed, String lumberjack, Block sapling, Runnable dressTree) {
         Workers.isolate(helper);
         arenaFloor(helper, Blocks.GRASS_BLOCK);
         grow(helper, tree, seed);
+        dressTree.run();
         helper.assertTrue(!treeBlocks(helper).isEmpty(), "the tree grew");
         List<BlockPos> trunk = trunkAtBase(helper);
         PokemonEntity worker = Workers.sendOut(helper, lumberjack + " level=30", new BlockPos(8, 1, 3));
@@ -180,6 +189,19 @@ public class RealTreeGameTests {
     @GameTest(template = Templates.ARENA, batch = "real_dark_oak", timeoutTicks = 300)
     public void machopChopsARealDarkOak(GameTestHelper helper) {
         chopRealTree(helper, TreeFeatures.DARK_OAK, 7, "machop", Blocks.DARK_OAK_SAPLING);
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "real_jungle_cocoa", timeoutTicks = 300)
+    public void machopChopsARealJungleTreeWithCocoaPods(GameTestHelper helper) {
+        // Cocoa pods grow on jungle trunks and are solid, which used to get the tree skipped. One
+        // at head height on the side facing the worker (it can't stand there), one above it.
+        chopRealTree(helper, TreeFeatures.JUNGLE_TREE, 8, "machop", Blocks.JUNGLE_SAPLING, () -> {
+            helper.setBlock(TREE.offset(0, 1, -1),
+                Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, Direction.SOUTH).setValue(CocoaBlock.AGE, 2));
+            helper.setBlock(TREE.offset(1, 2, 0),
+                Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, Direction.WEST).setValue(CocoaBlock.AGE, 1));
+            helper.assertBlockPresent(Blocks.COCOA, TREE.offset(0, 1, -1));
+        });
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_oak_scyther", timeoutTicks = 300)
