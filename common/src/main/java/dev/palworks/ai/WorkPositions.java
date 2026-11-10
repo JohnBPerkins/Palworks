@@ -235,7 +235,7 @@ public final class WorkPositions {
      * tiles touching the trunk) for most, 2 for one wider than about a block (Conkeldurr, Hariyama).
      */
     public static int closestChopRing(Mob entity) {
-        return Math.max(1, (int) Math.ceil(entity.getBbWidth() / 2.0 + 0.5 - 1e-3));
+        return WorkStance.AGAINST.ringFor(entity);
     }
 
     /**
@@ -473,17 +473,12 @@ public final class WorkPositions {
     }
 
     /**
-     * How many blocks in front of the worked block the Cobblemon should stand.
-     *
-     * <p>Rough first cut — <b>tune in-game</b>. Scales with the entity's (already size-scaled)
-     * hitbox width, clamped to [2, 4], so a larger Cobblemon stands further back and its animation
-     * lines up with the block; a small one stays at 2 (a one-block gap, not flush against it).
+     * How many blocks from the worked block the worker stands, for anything but a tree: its ring in
+     * the {@link WorkStance#NEAR} stance. 2 for most (a one-block gap, not flush against it), up to
+     * 4 for the biggest, so a larger Cobblemon stands further back and its animation lines up.
      */
     public static int reachDistanceFor(Mob entity) {
-        // Base of 2 leaves a one-block gap in front of the station (not flush); scales further for
-        // larger Cobblemon so their animation lines up. Clamped to [2, 4].
-        int d = 2 + (int) Math.floor(entity.getBbWidth() / 2.0);
-        return Math.max(2, Math.min(4, d));
+        return WorkStance.NEAR.ringFor(entity);
     }
 
     /**
