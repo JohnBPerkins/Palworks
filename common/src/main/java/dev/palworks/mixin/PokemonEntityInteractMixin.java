@@ -2,7 +2,6 @@ package dev.palworks.mixin;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.net.packets.WorkerStatusPacket;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkerStateManager;
@@ -34,13 +33,11 @@ public abstract class PokemonEntityInteractMixin {
         if (ownerUUID == null || !ownerUUID.equals(player.getUUID())) {
             return;
         }
-        // A Pokemon with no work it can do gets no work options (the client shows them only if this
-        // arrives).
+        // A Pokemon with no work it can do gets no toggle (the client shows one only if this arrives).
         if (SuitabilityDetector.getSuitabilities(pokemon).isEmpty()) {
             return;
         }
         boolean enabled = WorkerStateManager.getOrCreate(pokemon).isEnabled();
-        new WorkerStatusPacket(((PokemonEntity) (Object) this).getUUID(), enabled,
-                WorkerInventoryManager.carryModeFor(pokemon)).sendToPlayer(player);
+        new WorkerStatusPacket(((PokemonEntity) (Object) this).getUUID(), enabled).sendToPlayer(player);
     }
 }

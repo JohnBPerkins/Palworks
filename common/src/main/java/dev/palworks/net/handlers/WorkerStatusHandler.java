@@ -14,7 +14,6 @@ public class WorkerStatusHandler implements ClientNetworkPacketHandler<WorkerSta
 
     @Override
     public void handle(@NotNull WorkerStatusPacket packet, @NotNull Minecraft client) {
-        WorkerStatusCache.put(packet.getEntityUUID(),
-                new WorkerStatusCache.Status(packet.isEnabled(), packet.getCarryMode()));
+        WorkerStatusCache.put(packet.getEntityUUID(), packet.isEnabled());
     }
 }
