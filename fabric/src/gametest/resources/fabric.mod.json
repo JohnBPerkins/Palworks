@@ -18,7 +18,8 @@
       "dev.palworks.gametest.HangingFruitGameTests",
       "dev.palworks.gametest.CobblemonCropGameTests",
       "dev.palworks.gametest.PathingGameTests",
-      "dev.palworks.gametest.SharedJobGameTests"
+      "dev.palworks.gametest.SharedJobGameTests",
+      "dev.palworks.gametest.WateringGameTests"
     ]
   },
   "mixins": [

@@ -57,7 +57,9 @@ public class DebugInfo {
             this.suitabilities = new ArrayList<>();
             Set<Suitability> suits = dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon);
             for (Suitability suit : suits) {
-                this.suitabilities.add(suit.getId());
+                // With its work level: "watering 3"
+                this.suitabilities.add(suit.getId() + " "
+                        + dev.palworks.suitability.SuitabilityDetector.getSuitabilityLevel(pokemon, suit));
             }
 
             this.pathFailCount = state.getPathFailCount();

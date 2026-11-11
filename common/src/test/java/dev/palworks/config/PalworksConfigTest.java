@@ -36,9 +36,31 @@ class PalworksConfigTest {
         PalworksConfig config = parse("{\"work_range_horizontal\": 48, \"pickup_radius\": 2.5}", warnings);
         assertEquals(
                 new PalworksConfig(
-                        48, PalworksConfig.DEFAULTS.workRangeVertical(), PalworksConfig.DEFAULTS.ownerRange(), 2.5),
+                        48,
+                        PalworksConfig.DEFAULTS.workRangeVertical(),
+                        PalworksConfig.DEFAULTS.ownerRange(),
+                        2.5,
+                        PalworksConfig.DEFAULTS.fertilizeChancePerLevel(),
+                        PalworksConfig.DEFAULTS.wateringCooldownSeconds()),
                 config);
         assertEquals(List.of(), warnings);
+    }
+
+    @Test
+    void wateringSettingsAreRead() {
+        List<String> warnings = new ArrayList<>();
+        PalworksConfig config =
+                parse("{\"fertilize_chance_per_level\": 0.05, \"watering_cooldown_seconds\": 30}", warnings);
+        assertEquals(0.05, config.fertilizeChancePerLevel());
+        assertEquals(30, config.wateringCooldownSeconds());
+        assertEquals(List.of(), warnings);
+    }
+
+    @Test
+    void aFertilizeChanceOverCertainAtLevelFiveIsRefused() {
+        List<String> warnings = new ArrayList<>();
+        assertEquals(PalworksConfig.DEFAULTS, parse("{\"fertilize_chance_per_level\": 0.5}", warnings));
+        assertEquals(1, warnings.size());
     }
 
     @Test

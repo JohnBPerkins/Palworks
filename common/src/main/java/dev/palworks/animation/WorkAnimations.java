@@ -50,8 +50,14 @@ public final class WorkAnimations {
      */
     public static final WorkAnimation CHOP = WorkAnimation.move("chop", "scratch", 32, 0.5, WorkStance.AGAINST);
 
+    /**
+     * Watering a crop: Water Gun, a ranged move. Its spray leaves at 1.2s and hits the target at
+     * about 1.55s (1.2 + 0.01 + 0.03 + 0.3 + 0.01); aimed low, at the foot of the crop.
+     */
+    public static final WorkAnimation WATER = WorkAnimation.move("water", "watergun", 31, 0.25, WorkStance.NEAR);
+
     /** All of them. */
-    public static final List<WorkAnimation> ALL = List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP);
+    public static final List<WorkAnimation> ALL = List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP, WATER);
 
     /**
      * The animation a species plays in place of {@code animation}: the default, with whatever the
