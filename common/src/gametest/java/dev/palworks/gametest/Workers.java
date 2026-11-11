@@ -4,6 +4,12 @@ import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.job.JobType;
+import dev.palworks.reservation.ReservationId;
+import dev.palworks.worker.WorkerState;
+import dev.palworks.worker.WorkerStateManager;
+import java.util.HashMap;
+import java.util.Map;
 import kotlin.Unit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -102,5 +108,30 @@ public final class Workers {
             helper.fail("Cobblemon didn't send out " + properties);
         }
         return entity;
+    }
+
+    /**
+     * Fail the test the moment two of these workers hold the same job at once: the same block and
+     * the same kind of job (a job's identity, see ReservationId). Checked every tick, from each
+     * worker's own state, which is what it acts on. Deliveries are left out: each is a worker
+     * emptying its own cargo, and two can unload into one chest at once.
+     */
+    static void neverShareAJob(GameTestHelper helper, PokemonEntity... workers) {
+        helper.onEachTick(() -> {
+            Map<ReservationId, PokemonEntity> held = new HashMap<>();
+            for (PokemonEntity worker : workers) {
+                WorkerState state = WorkerStateManager.get(worker.getPokemon());
+                ReservationId job = state == null ? null : state.getCurrentReservation();
+                if (job == null || job.getJobType() == JobType.DELIVER_ITEMS) {
+                    continue;
+                }
+                PokemonEntity other = held.put(job, worker);
+                if (other != null) {
+                    helper.fail(job.getJobType() + " at " + job.getStationPos() + " is held by two workers at once ("
+                            + other.getPokemon().getSpecies().getName() + " and "
+                            + worker.getPokemon().getSpecies().getName() + ")");
+                }
+            }
+        });
     }
 }
