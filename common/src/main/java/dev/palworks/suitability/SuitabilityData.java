@@ -24,11 +24,11 @@ import java.util.function.Consumer;
  * }</pre>
  * <ul>
  *   <li>The file name is the job's id ({@link Suitability}: {@code kindling}, {@code lumbering}...).</li>
- *   <li>{@code types}: every Pokémon of that type (its Showdown id, {@code fire}) can do the job, at
- *       that level.</li>
+ *   <li>{@code types}: every Pokémon of that type (its Showdown id, {@code fire}) can do the job. Its
+ *       number is added to the Pokémon's own level (see below): 1 is the usual, 2 gives one more.</li>
  *   <li>{@code species}: extra species, by id ({@code cobblemon:scizor}; without a namespace it's
- *       Cobblemon's), or a higher level for them. Level 0 takes the job away from that species even
- *       if one of its types gives it.</li>
+ *       Cobblemon's), at exactly that level, whatever its types and stats would give. Level 0 takes
+ *       the job away from that species even if one of its types gives it.</li>
  *   <li>Levels go from 1 to {@value #MAX_LEVEL} (0 too, for species).</li>
  * </ul>
  * Files for the same job from different namespaces merge, like vanilla tags, so an addon can add a
@@ -37,17 +37,26 @@ import java.util.function.Consumer;
  * namespaces' files for its job instead. As with any datapack file, a pack loaded later replaces a
  * file with the same path, so a pack can override ours.
  *
- * <p>A Pokémon's level for a job is the highest its types give, +1 if both of its types give it,
- * raised to its species' level if that's higher. Pure logic (no Minecraft types), so it's
- * unit-tested; {@link SuitabilityReloadListener} feeds it and {@link DatapackSuitabilityProvider}
- * reads it.
+ * <p>A Pokémon's level for a job (its work level) comes from how strong it is: its form's base stat
+ * total ({@link #powerLevel}), from 1 (Squirtle, 314) to 5 (Kyogre, 670). A type that gives the job
+ * gives that level, plus its own number less 1, less one for each earlier form in its evolution
+ * line that didn't have the type: Hisuian Typhlosion is Kindling 3 but Nether 1, as Cyndaquil and
+ * Quilava were Fire but not Ghost. Its level is the best of its types', at least 1, unless its
+ * species has a level of its own. Pure logic (no Minecraft types), so it's unit-tested;
+ * {@link SuitabilityReloadListener} feeds it and {@link DatapackSuitabilityProvider} reads it.
  */
 public final class SuitabilityData {
     private static final String REPLACE = "replace";
-    // A suitability given by both of a dual-type Pokemon's types gets a level more
-    private static final int BOTH_TYPES = 2;
 
     public static final int MAX_LEVEL = 5;
+    /**
+     * The base stat totals at which a Pokémon's power level goes up: below the first it's 1, from
+     * the last on it's {@value #MAX_LEVEL}. A first form is usually under 350, a middle one under
+     * 450, a final one under 550; pseudo-legendaries and most legendaries are 580 to 600, and the
+     * strongest legendaries 650 or more.
+     */
+    private static final int[] POWER_THRESHOLDS = {350, 450, 550, 650};
+
     private static final String DEFAULT_SPECIES_NAMESPACE = "cobblemon";
 
     public static final SuitabilityData EMPTY = new SuitabilityData(Map.of(), Map.of(), 0);
@@ -95,31 +104,55 @@ public final class SuitabilityData {
     }
 
     /**
-     * Job levels for a Pokémon with these types (Showdown ids) and species id. Only jobs with a
-     * level above 0 are included.
+     * One form in a Pokémon's evolution line: its types (Showdown ids) and its base stat total.
      */
-    public Map<Suitability, Integer> levels(Collection<String> typeIds, String speciesId) {
-        Map<Suitability, Integer> result = new EnumMap<>(Suitability.class);
-        Map<Suitability, Integer> typesGiving = new EnumMap<>(Suitability.class);
-        for (String typeId : typeIds) {
-            for (Map.Entry<Suitability, Integer> e :
-                    types.getOrDefault(typeId, Map.of()).entrySet()) {
-                result.merge(e.getKey(), e.getValue(), Math::max);
-                typesGiving.merge(e.getKey(), 1, Integer::sum);
+    public record Form(Collection<String> typeIds, int baseStatTotal) {}
+
+    /**
+     * A Pokémon's power level, 1 to {@value #MAX_LEVEL}, from its base stat total: Squirtle (314) 1,
+     * Wartortle (405) 2, Blastoise (530) 3, Dragonite (600) 4, Kyogre (670) 5.
+     */
+    public static int powerLevel(int baseStatTotal) {
+        int level = 1;
+        for (int threshold : POWER_THRESHOLDS) {
+            if (baseStatTotal >= threshold) {
+                level++;
             }
         }
-        // Both types give it: a dual-type bonus.
-        typesGiving.forEach((suitability, count) -> {
-            if (count >= BOTH_TYPES) {
-                result.computeIfPresent(suitability, (s, level) -> Math.min(MAX_LEVEL, level + 1));
+        return level;
+    }
+
+    /**
+     * Job levels for a Pokémon of this species, whose evolution line is {@code line}: its own form
+     * first, then the one it evolved from, and so on back to the first. Only jobs with a level
+     * above 0 are included.
+     */
+    public Map<Suitability, Integer> levels(String speciesId, List<Form> line) {
+        Map<Suitability, Integer> result = new EnumMap<>(Suitability.class);
+        if (!line.isEmpty()) {
+            Form form = line.get(0);
+            List<Form> earlier = line.subList(1, line.size());
+            int power = powerLevel(form.baseStatTotal());
+            for (String typeId : form.typeIds()) {
+                int notThisType = 0;
+                for (Form before : earlier) {
+                    if (!before.typeIds().contains(typeId)) {
+                        notThisType++;
+                    }
+                }
+                for (Map.Entry<Suitability, Integer> e :
+                        types.getOrDefault(typeId, Map.of()).entrySet()) {
+                    int level = Math.max(1, Math.min(MAX_LEVEL, power + e.getValue() - 1 - notThisType));
+                    result.merge(e.getKey(), level, Math::max);
+                }
             }
-        });
+        }
         for (Map.Entry<Suitability, Integer> e :
                 species.getOrDefault(speciesId, Map.of()).entrySet()) {
             if (e.getValue() == 0) {
                 result.remove(e.getKey());
             } else {
-                result.merge(e.getKey(), e.getValue(), Math::max);
+                result.put(e.getKey(), e.getValue());
             }
         }
         return result;

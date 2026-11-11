@@ -8,6 +8,8 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.function.Consumer;
 import javax.xml.parsers.ParserConfigurationException;
+import net.minecraft.gametest.framework.AfterBatch;
+import net.minecraft.gametest.framework.BeforeBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestRegistry;
@@ -20,7 +22,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Registers test classes with vanilla's GameTest registry, the way Fabric's GameTest API does:
  * each {@code @GameTest} method becomes a test, using its template exactly as written
- * ("palworks_gametest:arena"). NeoForge's own registration would instead build the structure name
+ * ("palworks_gametest:arena"), and each {@code @BeforeBatch} and {@code @AfterBatch} method runs
+ * before and after its batch. NeoForge's own registration would instead build the structure name
  * from a NeoForge-only annotation and the class name, which the shared classes can't carry. Used by
  * the NeoForge test mods (in-game tests and the stress test); Fabric's API does this itself.
  */
@@ -55,6 +58,7 @@ public final class TestRegistration {
 
     private static void registerAll(List<Class<?>> testClasses, @Nullable Set<String> namespaces) {
         for (Class<?> testClass : testClasses) {
+            boolean anyRegistered = false;
             for (Method method : testClass.getDeclaredMethods()) {
                 GameTest test = method.getAnnotation(GameTest.class);
                 if (test == null) {
@@ -81,8 +85,24 @@ public final class TestRegistration {
                                 test.requiredSuccesses(),
                                 test.skyAccess(),
                                 invoke(testClass, method)));
+                anyRegistered = true;
+            }
+            if (anyRegistered) {
+                registerBatchHooks(testClass);
             }
             GameTestRegistry.getAllTestClassNames().add(testClass.getSimpleName());
+        }
+    }
+
+    /**
+     * Register a class's {@code @BeforeBatch} and {@code @AfterBatch} methods: by vanilla itself,
+     * which registers only those for a method without {@code @GameTest}.
+     */
+    private static void registerBatchHooks(Class<?> testClass) {
+        for (Method method : testClass.getDeclaredMethods()) {
+            if (method.isAnnotationPresent(BeforeBatch.class) || method.isAnnotationPresent(AfterBatch.class)) {
+                GameTestRegistry.register(method);
+            }
         }
     }
 

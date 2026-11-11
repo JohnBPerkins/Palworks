@@ -3,6 +3,7 @@ package dev.palworks.job;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
+import dev.palworks.crop.Watering;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.station.ChestHelper;
@@ -87,6 +88,7 @@ public final class JobChecks {
             case FUEL_FURNACE -> FurnaceHelper.canUseHeat(level, pos);
             case HARVEST_CROPS -> CropAdapter.isFullyGrown(level, pos) || CropAdapter.isAttachedFruit(level, pos);
             case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
+            case WATER_CROPS -> Watering.needsWater(level, pos);
             case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
             case GET_SEEDS ->
                 isChest(level.getBlockState(pos))

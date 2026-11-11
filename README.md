@@ -14,9 +14,13 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 
 - **Autonomous workers** — a sent-out Pokémon scans the area around it (32 blocks by default, see [Server settings](#server-settings)) for
   available work and performs it without micromanagement.
-- **Jobs** — smelting (furnaces), planting & harvesting crops, lumbering (chopping trees), and
-  hauling finished goods to nearby chests. Haulers fill up before a trip: they pick up anything while
-  they have a free slot, then only items matching what they carry. Mining is in progress.
+- **Jobs** — smelting (furnaces), planting, watering & harvesting crops, lumbering (chopping
+  trees), and hauling finished goods to nearby chests. Haulers fill up before a trip: they pick up
+  anything while they have a free slot, then only items matching what they carry. Mining is in
+  progress.
+- **Watering** — Water types water growing crops, keeping their farmland wet, and sometimes
+  fertilize them as they do, just as bone meal would. The stronger the Pokémon, the more often
+  (see [Work levels](#work-levels)).
 - **Suitability** — type- and species-based mapping decides which jobs a given Pokémon can do
   and how well.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
@@ -60,7 +64,9 @@ settings that aren't per-Pokémon:
   "work_range_horizontal": 32,
   "work_range_vertical": 32,
   "owner_range": 24,
-  "pickup_radius": 3.0
+  "pickup_radius": 3.0,
+  "fertilize_chance_per_level": 0.1,
+  "watering_cooldown_seconds": 60
 }
 ```
 
@@ -71,6 +77,11 @@ settings that aren't per-Pokémon:
   teleports a party Pokémon back to its owner past 32 blocks, so it can't be more.
 - **`pickup_radius`** (1 to 8): how far round a harvest, chop or pickup spot dropped items are
   collected from.
+- **`fertilize_chance_per_level`** (0 to 0.2): the chance that watering a crop also fertilizes it,
+  for each of the waterer's [Watering levels](#work-levels): at 0.1, a level 1 Squirtle fertilizes
+  10% of the crops it waters, a level 3 Blastoise 30%.
+- **`watering_cooldown_seconds`** (5 to 600): how long after a crop is watered until it can be
+  watered again. Crops watered before a restart can be watered again straight away.
 
 Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
 the server logs a warning and uses the defaults. Changes apply the next time the server starts.
@@ -88,14 +99,13 @@ Which work a Pokémon can do (its *work suitabilities*) comes from datapack file
 }
 ```
 
-- **`types`**: every Pokémon of that type can do the job, at that level (1 to 5). Types are named
-  as in Cobblemon (`fire`, `fighting`, …).
-- **`species`**: extra species that can do it, or at a higher level. A species without a namespace
-  is Cobblemon's (`scizor` = `cobblemon:scizor`). Level `0` takes the job away from that species,
-  even if one of its types gives it.
-
-A Pokémon's level for a job is the highest its types give (+1 if both of its types give it), raised
-to its species' level if that's higher.
+- **`types`**: every Pokémon of that type can do the job. Types are named as in Cobblemon (`fire`,
+  `fighting`, …). The number (1 to 5) is added to the Pokémon's [work level](#work-levels): `1` is
+  the usual, `2` gives one more.
+- **`species`**: extra species that can do it, at exactly that level (1 to 5), whatever their types
+  and stats would give. A species without a namespace is Cobblemon's (`scizor` =
+  `cobblemon:scizor`). Level `0` takes the job away from that species, even if one of its types
+  gives it.
 
 Files for the same job from different namespaces **merge**, like vanilla tags: an addon can add
 `data/myaddon/palworks/suitability/kindling.json` with just its own entries. Where two files give the
@@ -113,11 +123,34 @@ furnace, blast furnace and smoker; a modded block needs a furnace block entity) 
 (for Mining, once it's done). Add to them like any tag, with a
 `data/palworks/tags/block/<tag>.json` in your datapack.
 
+### Work levels
+
+A Pokémon's level for a job (1 to 5) comes from how strong it is: its **base stat total**.
+
+| Base stat total | Level | For example |
+|---|---|---|
+| under 350 | 1 | Squirtle (314), Magikarp (200) |
+| 350 to 449 | 2 | Wartortle (405) |
+| 450 to 549 | 3 | Blastoise (530), Vaporeon (525), Lapras (535) |
+| 550 to 649 | 4 | Dragonite (600), most legendaries |
+| 650 or more | 5 | Kyogre (670), Mewtwo (680) |
+
+A type that gives the job gives one level less for each earlier form in the Pokémon's evolution
+line that didn't have that type. Hisuian Typhlosion does Kindling at 3, but Nether work at only 1,
+as Cyndaquil and Quilava were Fire but not Ghost. Vaporeon waters at 2, as Eevee was Normal. With
+two types that give the job, the better level counts. A Pokémon's level only changes as it evolves
+or changes form, not as it levels up. A species entry in the files sets its level outright, to
+make an exception (Slaking's stats are a legendary's, but it loafs around).
+
+Levels so far change how often a Watering worker fertilizes crops (see
+[`fertilize_chance_per_level`](#server-settings)). `/palworks inspect worker` shows a worker's
+levels.
+
 ## Customizing work animations
 
 While a Pokémon works, it plays a placeholder Cobblemon move as its work animation: Ember to light
-a furnace, Razor Leaf to harvest, Leech Seed to plant and Scratch to chop. Each animation has a
-**stance**, which sets where the worker stands. A contact move like Scratch is played right up
+a furnace, Razor Leaf to harvest, Leech Seed to plant, Water Gun to water and Scratch to chop. Each
+animation has a **stance**, which sets where the worker stands. A contact move like Scratch is played right up
 against the block; ranged moves are played from a little way back. Bigger Pokémon stand further
 back, measured from the edge of their hitbox.
 
@@ -141,7 +174,7 @@ work animation. Use files at `data/<namespace>/palworks/work_animations/<name>.j
 
 - **`species`**: one species, or a list of them. A species without a namespace is Cobblemon's.
 - **`animations`**: the changes for each animation, by id. The ids are `ignite_furnace`, `harvest`,
-  `plant` and `chop`. Anything you leave out keeps its default.
+  `plant`, `water` and `chop`. Anything you leave out keeps its default.
   - **`move`**: the action effect to play. Give a Cobblemon move name (`furycutter`) or a full id
     (`myaddon:chop`).
   - **`impact_ticks`**: how many ticks in the effect lands on the block. The work (the harvest, the

@@ -5,6 +5,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
+import dev.palworks.crop.Watering;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.WorkerDebugSync;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -110,6 +111,7 @@ public class JobManager {
         WorkerDebugSync.clear();
         WorkAnimator.clear();
         WorkAspectSync.clear();
+        Watering.clear();
     }
 
     /**
@@ -415,6 +417,7 @@ public class JobManager {
 
         if (currentTime % FOLLOW_UP_RECHECK_INTERVAL == 0) {
             pool.dropGoneFollowUps(level);
+            Watering.forgetExpired(level);
         }
         scanner.dropStaleCaches(currentTime);
         pool.expire(currentTime, JOB_POOL_EXPIRY_TICKS);

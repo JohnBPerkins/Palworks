@@ -19,6 +19,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.AttachedStemBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BonemealableBlock;
 import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
@@ -249,6 +250,29 @@ public class CropAdapter {
                 || state.is(Blocks.CAVE_VINES)
                 || state.is(Blocks.CAVE_VINES_PLANT)
                 || state.is(COBBLEMON_BERRIES);
+    }
+
+    /**
+     * Whether the block at {@code pos} is a crop still growing, which watering helps along (see
+     * Watering): a field crop, a stem, a berry bush, a pitcher plant, by its own rule for whether bone
+     * meal would grow it any more. A two-block crop is watered from its lower half. Not nether wart
+     * (Nether work, and bone meal doesn't grow it), nor a fruit hanging in a tree (cocoa, apricorns),
+     * nor glow berries.
+     */
+    public static boolean isGrowing(Level level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        Block block = state.getBlock();
+        boolean watered = block instanceof CropBlock
+                || block instanceof StemBlock
+                || block instanceof SweetBerryBushBlock
+                || block instanceof PitcherCropBlock
+                || state.is(COBBLEMON_BERRIES);
+        boolean upperHalf = state.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)
+                && state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.UPPER;
+        if (!watered || upperHalf) {
+            return false;
+        }
+        return block instanceof BonemealableBlock crop && crop.isValidBonemealTarget(level, pos, state);
     }
 
     /**

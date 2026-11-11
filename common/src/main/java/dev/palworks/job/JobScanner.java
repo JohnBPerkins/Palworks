@@ -2,6 +2,7 @@ package dev.palworks.job;
 
 import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
+import dev.palworks.crop.Watering;
 import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.station.ChestHelper;
@@ -296,6 +297,11 @@ final class JobScanner {
             return state.is(Blocks.NETHER_WART)
                     ? JobRecord.of(JobType.HARVEST_CROPS, pos, now, EnumSet.of(Suitability.NETHER))
                     : JobRecord.of(JobType.HARVEST_CROPS, pos, now);
+        }
+
+        // A crop still growing, not watered lately (Watering)
+        if (Watering.needsWater(level, pos)) {
+            return JobRecord.of(JobType.WATER_CROPS, pos, now);
         }
 
         // Check for planting jobs (empty farmland, or soul sand: that's Nether work)

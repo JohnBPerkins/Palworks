@@ -33,6 +33,7 @@ public final class JobHandlerRegistry {
             case DELIVER_ITEMS -> new DeliverItemsHandler();
             case PLANT_SEEDS -> new PlantSeedsHandler();
             case HARVEST_CROPS -> new HarvestCropsHandler();
+            case WATER_CROPS -> new WaterCropsHandler();
             case CHOP_TREE -> new ChopTreeHandler();
             // Stands 4s but doesn't break the ore yet (mining isn't scanned for until it does)
             case MINE_RESOURCE -> () -> List.of(Step.pause("wait", species -> 80));

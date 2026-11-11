@@ -21,6 +21,9 @@ public enum JobType {
     // Gathering
     HARVEST_CROPS(Suitability.GATHERING, 8),
 
+    // Watering: upkeep, never urgent, so a worker that does other work too does that first
+    WATER_CROPS(Suitability.WATERING, 3),
+
     // Lumbering
     CHOP_TREE(Suitability.LUMBERING, 4),
 

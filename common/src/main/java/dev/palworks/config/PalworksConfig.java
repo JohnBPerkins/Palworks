@@ -29,9 +29,19 @@ import java.util.function.Consumer;
  * @param ownerRange how far (straight line) from its owner a party Pokémon takes jobs. At most
  *     Cobblemon's teleport-back distance ({@link WorkRange#OWNER_LEASH}), or it would be yanked back mid-walk
  * @param pickupRadius how far round a pickup job's spot its items are looked for and picked up
+ * @param fertilizeChancePerLevel the chance, for each of a waterer's Watering levels, that watering
+ *     a crop also fertilizes it, as bone meal would: 0.1 is 10% at level 1, 30% at level 3. At most
+ *     0.2, so level 5 is at most certain
+ * @param wateringCooldownSeconds how long after a crop is watered until it can be watered again
  */
-public record PalworksConfig(int workRangeHorizontal, int workRangeVertical, int ownerRange, double pickupRadius) {
-    public static final PalworksConfig DEFAULTS = new PalworksConfig(32, 32, 24, 3.0);
+public record PalworksConfig(
+        int workRangeHorizontal,
+        int workRangeVertical,
+        int ownerRange,
+        double pickupRadius,
+        double fertilizeChancePerLevel,
+        int wateringCooldownSeconds) {
+    public static final PalworksConfig DEFAULTS = new PalworksConfig(32, 32, 24, 3.0, 0.1, 60);
 
     public static final Codec<PalworksConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                     field(Codec.intRange(8, 64), "work_range_horizontal", DEFAULTS.workRangeHorizontal())
@@ -41,7 +51,11 @@ public record PalworksConfig(int workRangeHorizontal, int workRangeVertical, int
                     field(Codec.intRange(4, WorkRange.OWNER_LEASH), "owner_range", DEFAULTS.ownerRange())
                             .forGetter(PalworksConfig::ownerRange),
                     field(Codec.doubleRange(1.0, 8.0), "pickup_radius", DEFAULTS.pickupRadius())
-                            .forGetter(PalworksConfig::pickupRadius))
+                            .forGetter(PalworksConfig::pickupRadius),
+                    field(Codec.doubleRange(0.0, 0.2), "fertilize_chance_per_level", DEFAULTS.fertilizeChancePerLevel())
+                            .forGetter(PalworksConfig::fertilizeChancePerLevel),
+                    field(Codec.intRange(5, 600), "watering_cooldown_seconds", DEFAULTS.wateringCooldownSeconds())
+                            .forGetter(PalworksConfig::wateringCooldownSeconds))
             .apply(instance, PalworksConfig::new));
 
     private static final String FILE_NAME = "palworks.json";
