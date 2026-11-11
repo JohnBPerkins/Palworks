@@ -2,6 +2,7 @@ package dev.palworks;
 
 import dev.architectury.event.events.common.CommandRegistrationEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
+import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.registry.ReloadListenerRegistry;
 import dev.palworks.animation.WorkAnimationReloadListener;
@@ -9,6 +10,7 @@ import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.suitability.SuitabilityReloadListener;
+import dev.palworks.worker.WorkLevelSync;
 import dev.palworks.worker.WorkerTicking;
 import net.minecraft.server.packs.PackType;
 
@@ -38,6 +40,11 @@ public final class PalworksCommon {
         LifecycleEvent.SERVER_STARTING.register(server -> WorkerTicking.onServerStarting());
         TickEvent.SERVER_POST.register(WorkerTicking::onServerTick);
         LifecycleEvent.SERVER_STOPPED.register(server -> WorkerTicking.onServerStopped());
+
+        // Work levels for the PC and summary screens: each player's party's as they change
+        TickEvent.SERVER_POST.register(WorkLevelSync::onServerTick);
+        PlayerEvent.PLAYER_QUIT.register(player -> WorkLevelSync.forget(player.getUUID()));
+        LifecycleEvent.SERVER_STOPPED.register(server -> WorkLevelSync.clear());
 
         // Show what workers are doing as aspects, for posers to animate from
         WorkAspectSync.register();

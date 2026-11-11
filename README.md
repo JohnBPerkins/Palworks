@@ -23,6 +23,10 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
   (see [Work levels](#work-levels)).
 - **Suitability** — type- and species-based mapping decides which jobs a given Pokémon can do
   and how well.
+- **Work skills in the PC and summary** — each Pokémon's jobs and [work levels](#work-levels) show
+  as icons in the corner of its portrait, in the PC as you hover over it and on its summary. The
+  summary's Info page names them, in the box beside the experience bar. Hover either for the full
+  list.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
 - **Work toggle** — shift-right-click your Pokémon and use the bottom slot of the interact wheel
   to switch its work on (green check) or off (red cross).
@@ -143,8 +147,9 @@ or changes form, not as it levels up. A species entry in the files sets its leve
 make an exception (Slaking's stats are a legendary's, but it loafs around).
 
 Levels so far change how often a Watering worker fertilizes crops (see
-[`fertilize_chance_per_level`](#server-settings)). `/palworks inspect worker` shows a worker's
-levels.
+[`fertilize_chance_per_level`](#server-settings)). A Pokémon's levels show in the PC and on its
+summary, for work Palworks does so far (Cooling, say, isn't shown until there's something to cool),
+and `/palworks inspect worker` shows a worker's levels.
 
 ## Customizing work animations
 

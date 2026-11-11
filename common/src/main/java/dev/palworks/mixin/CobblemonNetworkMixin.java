@@ -3,13 +3,17 @@ package dev.palworks.mixin;
 import com.cobblemon.mod.common.CobblemonNetwork;
 import com.cobblemon.mod.common.net.PacketRegisterInfo;
 import dev.palworks.net.handlers.OpenInventoryHandler;
+import dev.palworks.net.handlers.RequestPcWorkLevelsHandler;
 import dev.palworks.net.handlers.ToggleWorkerHandler;
 import dev.palworks.net.handlers.WorkActivityHandler;
+import dev.palworks.net.handlers.WorkLevelsHandler;
 import dev.palworks.net.handlers.WorkerDebugHandler;
 import dev.palworks.net.handlers.WorkerStatusHandler;
 import dev.palworks.net.packets.OpenInventoryPacket;
+import dev.palworks.net.packets.RequestPcWorkLevelsPacket;
 import dev.palworks.net.packets.ToggleWorkerPacket;
 import dev.palworks.net.packets.WorkActivityPacket;
+import dev.palworks.net.packets.WorkLevelsPacket;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.net.packets.WorkerStatusPacket;
 import java.util.List;
@@ -37,6 +41,12 @@ public abstract class CobblemonNetworkMixin {
 
         list.add(new PacketRegisterInfo<>(
                 ToggleWorkerPacket.ID, ToggleWorkerPacket::decode, new ToggleWorkerHandler(), null));
+
+        list.add(new PacketRegisterInfo<>(
+                RequestPcWorkLevelsPacket.ID,
+                RequestPcWorkLevelsPacket::decode,
+                new RequestPcWorkLevelsHandler(),
+                null));
     }
 
     /**
@@ -53,5 +63,8 @@ public abstract class CobblemonNetworkMixin {
         cir.getReturnValue()
                 .add(new PacketRegisterInfo<>(
                         WorkerDebugPacket.ID, WorkerDebugPacket::decode, new WorkerDebugHandler(), null));
+        cir.getReturnValue()
+                .add(new PacketRegisterInfo<>(
+                        WorkLevelsPacket.ID, WorkLevelsPacket::decode, new WorkLevelsHandler(), null));
     }
 }

@@ -29,5 +29,6 @@ public final class Templates {
             CobblemonCropGameTests.class,
             PathingGameTests.class,
             SharedJobGameTests.class,
-            WateringGameTests.class);
+            WateringGameTests.class,
+            WorkLevelSyncGameTests.class);
 }

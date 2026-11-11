@@ -8,5 +8,22 @@
   "palworks.message.worker.not_owner": "You can only change your own Pokemon's work",
   "palworks.message.inventory.not_found": "Pokemon not found in your party",
   "palworks.message.inventory.not_owner": "You can only open your own Pokemon's inventory",
-  "palworks.message.inventory.carries_nothing": "%s doesn't carry anything"
+  "palworks.message.inventory.carries_nothing": "%s doesn't carry anything",
+  "palworks.work_skill.kindling": "Kindling",
+  "palworks.work_skill.watering": "Watering",
+  "palworks.work_skill.planting": "Planting",
+  "palworks.work_skill.generating_electricity": "Generating Electricity",
+  "palworks.work_skill.handiwork": "Handiwork",
+  "palworks.work_skill.gathering": "Gathering",
+  "palworks.work_skill.lumbering": "Lumbering",
+  "palworks.work_skill.mining": "Mining",
+  "palworks.work_skill.medicine_production": "Medicine Production",
+  "palworks.work_skill.cooling": "Cooling",
+  "palworks.work_skill.transporting": "Transporting",
+  "palworks.work_skill.nether": "Nether Work",
+  "palworks.work_skill.farming": "Farming",
+  "palworks.ui.work_skills.title": "Work skills",
+  "palworks.ui.work_skills.entry": "%s: level %s",
+  "palworks.ui.work_skills.more": "+%s more",
+  "palworks.ui.work_skills.none": "Can't work"
 }

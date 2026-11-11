@@ -2,6 +2,7 @@ package dev.palworks.client;
 
 import dev.architectury.registry.menu.MenuRegistry;
 import dev.palworks.client.gui.PokemonInteractHandler;
+import dev.palworks.client.gui.WorkSkillsOverlay;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventoryScreen;
 
@@ -23,5 +24,8 @@ public final class PalworksClient {
 
         // The work toggle (and inventory button) on Cobblemon's interact wheel
         PokemonInteractHandler.init();
+
+        // Work skills on Cobblemon's PC and summary screens
+        WorkSkillsOverlay.init();
     }
 }
