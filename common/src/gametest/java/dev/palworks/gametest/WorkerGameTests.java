@@ -9,6 +9,7 @@ import dev.palworks.ai.WorkStance;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobHandlerRegistry;
@@ -22,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.SectionPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +36,8 @@ import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 
 /**
  * Real Cobblemon Pokémon doing real jobs, end to end: finding the job, walking there, doing it.
@@ -78,6 +82,46 @@ public class WorkerGameTests {
         Workers.sendOut(helper, BULBASAUR, START);
 
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested and reset"));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_harvest_empty_section", timeoutTicks = 800)
+    public void aCropPutWhereThereWasOnlyAirIsStillFound(GameTestHelper helper) {
+        // The chunk scan skips a section (16 blocks high) holding nothing but air and plain terrain
+        // (JobScanner), so it must notice once a job is put in one. Up in the sky, in the first
+        // section wholly above the test area: all air, then a stone platform (still skipped) the
+        // worker stands on while the scan goes over it, then a ripe crop put in the platform.
+        Workers.isolate(helper);
+        int floorY = helper.absolutePos(BlockPos.ZERO).getY();
+        int bottom = SectionPos.sectionToBlockCoord(SectionPos.blockToSectionCoord(floorY + 8) + 1);
+        int platformY = bottom - floorY;
+        BlockPos crop = new BlockPos(5, platformY + 1, 5);
+        LevelChunkSection section = sectionAt(helper, crop);
+        helper.assertTrue(section.hasOnlyAir(), "the section above the test area should start out all air");
+
+        for (int x = 0; x < 8; x++) {
+            for (int z = 0; z < 8; z++) {
+                helper.setBlock(x, platformY, z, Blocks.STONE);
+            }
+        }
+        Workers.sendOut(helper, BULBASAUR, new BlockPos(2, platformY + 1, 2));
+
+        // The scan goes over each chunk at least every 2 seconds (JobScanner.JOB_CACHE_LIFETIME_TICKS)
+        helper.runAfterDelay(100, () -> {
+            helper.assertFalse(
+                    section.maybeHas(state -> !JobChecks.canNeverBeWork(state)),
+                    "the scan should still be skipping the section (only stone and air)");
+            helper.setBlock(crop.below(), Blocks.FARMLAND);
+            helper.setBlock(crop, WHEAT.getStateForAge(7));
+            helper.succeedWhen(() -> helper.assertTrue(
+                    helper.getBlockState(crop).equals(WHEAT.getStateForAge(0)),
+                    "the wheat should be harvested and reset, but there's " + helper.getBlockState(crop)));
+        });
+    }
+
+    private static LevelChunkSection sectionAt(GameTestHelper helper, BlockPos rel) {
+        BlockPos abs = helper.absolutePos(rel);
+        LevelChunk chunk = helper.getLevel().getChunkAt(abs);
+        return chunk.getSection(chunk.getSectionIndex(abs.getY()));
     }
 
     @GameTest(template = Templates.EMPTY, batch = "worker_play_out", timeoutTicks = 800)

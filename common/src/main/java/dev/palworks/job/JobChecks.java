@@ -10,11 +10,13 @@ import dev.palworks.station.FurnaceHelper;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -30,6 +32,45 @@ public final class JobChecks {
      */
     public static double pickupRadius() {
         return PalworksConfig.current().pickupRadius();
+    }
+
+    /**
+     * Plain terrain that's never part of any job: not a crop, a soil a seed is planted in, a tree, a
+     * chest, a furnace or an ore. A chunk section made only of these and air can't hold a job, so
+     * the chunk scan skips it whole (see JobScanner), which is most of the world: solid ground below,
+     * open sky above. Only add a block here if no job can involve it; JobGameTests checks every one
+     * against the scan's own checks.
+     */
+    private static final Set<Block> NEVER_WORK = Set.of(
+            Blocks.STONE,
+            Blocks.DEEPSLATE,
+            Blocks.GRANITE,
+            Blocks.DIORITE,
+            Blocks.ANDESITE,
+            Blocks.TUFF,
+            Blocks.CALCITE,
+            Blocks.DIRT,
+            Blocks.GRASS_BLOCK,
+            Blocks.COARSE_DIRT,
+            Blocks.GRAVEL,
+            Blocks.SAND,
+            Blocks.RED_SAND,
+            Blocks.SANDSTONE,
+            Blocks.CLAY,
+            Blocks.BEDROCK,
+            Blocks.WATER,
+            Blocks.LAVA,
+            Blocks.NETHERRACK,
+            Blocks.END_STONE);
+
+    /** Whether a block is air or plain terrain, never any part of a job (see {@link #NEVER_WORK}). */
+    public static boolean canNeverBeWork(BlockState state) {
+        return state.isAir() || NEVER_WORK.contains(state.getBlock());
+    }
+
+    /** The plain terrain blocks of {@link #canNeverBeWork} (not counting air), for tests. */
+    public static Set<Block> neverWorkBlocks() {
+        return NEVER_WORK;
     }
 
     /**
@@ -111,7 +152,7 @@ public final class JobChecks {
     }
 
     // Helper methods for job detection
-    static boolean isChest(BlockState state) {
+    public static boolean isChest(BlockState state) {
         return state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST);
     }
 
