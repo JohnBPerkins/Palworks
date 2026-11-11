@@ -56,7 +56,7 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public class StressGameTests {
     /** Bump when a scenario changes, so CI doesn't compare runs of different scenarios. */
-    static final int SCENARIO_VERSION = 1;
+    static final int SCENARIO_VERSION = 2;
 
     static final String DENSE = "dense";
     static final String SPREAD = "spread";
@@ -98,14 +98,14 @@ public class StressGameTests {
             "growlithe", // 1.1
             "arcanine", // 1.2
             "charizard"); // 1.5, flies
-    private static final List<String> CARRIERS = List.of( // Flying and Psychic: pick up, deliver
+    private static final List<String> CARRIERS = List.of( // Flying: pick up, deliver
             "pidgey", // 0.5
             "starly", // 0.6
             "natu", // 0.6, walks
             "hoothoot", // 0.7
             "xatu", // 0.7
             "pidgeot", // 0.75
-            "abra", // 1.0
+            "staravia", // 1.0
             "fearow"); // 1.35
 
     private static final CropBlock WHEAT = (CropBlock) Blocks.WHEAT;
