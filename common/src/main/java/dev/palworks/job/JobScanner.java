@@ -45,6 +45,10 @@ final class JobScanner {
     private static final int MAX_BLOCKS_SCANNED_PER_TICK = 32768;
     // 2s: max staleness of a chunk's job scan (also bounds furnace/crop discovery latency)
     static final int JOB_CACHE_LIFETIME_TICKS = 40;
+    // What a chunk counts against MAX_BLOCKS_SCANNED_PER_TICK however little of it is scanned
+    // (looking it up, its sections' palettes, replacing its cache): at most 32 a tick, enough to
+    // keep 1280 fresh, so a server's many mostly empty chunks are spread over the ticks
+    private static final int CHUNK_SCAN_COST = 1024;
     private static final boolean MINING_JOBS_ENABLED = false; // Flip on once MINE_RESOURCE breaks ores
 
     private final JobPool pool;
@@ -172,7 +176,9 @@ final class JobScanner {
         ChunkJobCache cache = new ChunkJobCache(level.getGameTime());
         treeBlocksSeenThisScan.clear();
 
-        int blocksScanned = 0;
+        // Counted against the budget even if every section is skipped: otherwise empty chunks
+        // were free, and all of them, scanned together, were rescanned together in one tick.
+        int blocksScanned = CHUNK_SCAN_COST;
 
         // Scan every block in the worker-height band (16x16 x-z, every Y layer - no gaps), a chunk
         // section (16 blocks high) at a time
