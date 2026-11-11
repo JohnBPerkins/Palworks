@@ -36,10 +36,20 @@ import org.jetbrains.annotations.Nullable;
  * WorkLevelSync): the party's are kept up to date, and the PC's are asked for as it opens. Nothing is
  * shown for a Pokémon whose levels haven't come.
  *
- * <p>Drawn over the screen once it's drawn (Architectury's screen render event, on both loaders).
- * The layouts are copied from PCGUI and Summary, the same in Cobblemon 1.7 and 1.8.
+ * <p>Drawn over the screen once it's drawn (Architectury's screen render event, on both loaders),
+ * lifted to {@link #OVERLAY_Z}. The layouts are copied from PCGUI and Summary, the same in
+ * Cobblemon 1.7 and 1.8.
  */
 public final class WorkSkillsOverlay {
+    /**
+     * How far towards the viewer everything here is drawn. The summary draws its pages, party and
+     * model 1000 forward ("so they aren't overlapped"), and the PC its boxes; drawn last but at 0,
+     * anything of ours under them was hidden, tooltip and all. This is in front of them and the
+     * model (which reaches a little either side of where it's drawn), and behind Cobblemon's own
+     * tooltips (another 400 forward). Ours is 400 in front of this, so it's in front of everything.
+     */
+    private static final float OVERLAY_Z = 1200;
+
     // PCGUI: its size, and where its portrait is
     private static final int PC_WIDTH = 349;
     private static final int PC_HEIGHT = 205;
@@ -84,6 +94,17 @@ public final class WorkSkillsOverlay {
     }
 
     private static void render(Screen screen, GuiGraphics graphics, int mouseX, int mouseY) {
+        if (!(screen instanceof PCGUI) && !(screen instanceof Summary)) {
+            return;
+        }
+        PoseStack pose = graphics.pose();
+        pose.pushPose();
+        pose.translate(0, 0, OVERLAY_Z);
+        renderLifted(screen, graphics, mouseX, mouseY);
+        pose.popPose();
+    }
+
+    private static void renderLifted(Screen screen, GuiGraphics graphics, int mouseX, int mouseY) {
         if (screen instanceof PCGUI) {
             // The accessor mixin makes every PCGUI one
             Pokemon pokemon = ((PCGUIAccessor) (Object) screen).palworks$previewPokemon();
