@@ -132,11 +132,15 @@ loom {
     }
 }
 
-// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers on a big
-// farm, with spark measuring tick times. Its own source set and mod (palworks_stress, never
-// published, src/stress), so `./gradlew :neoforge:runStressTest` runs only it (by its template
-// namespace): the in-game test mod is loaded too, for its helpers, but none of its tests run.
-// Writes its results to build/stress/results.json.
+// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers of many species,
+// with spark measuring tick times, in two scenarios: `dense` (one packed farm) and `spread` (40 small
+// bases far apart). Its own source set and mod (palworks_stress, never published, src/stress), so it
+// runs only that (by its template namespace): the in-game test mod is loaded too, for its helpers,
+// but none of its tests run. `./gradlew :neoforge:runStressTest` runs both scenarios
+// (runStressDense, then runStressSpread), each in its own server so one's workers can't add to the
+// other's load, and each writes its results to build/stress/<scenario>.json.
+def stressScenarios = ["dense", "spread"]
+
 sourceSets {
     stress {
         java.srcDir project(":common").file("src/stress/java")
@@ -161,16 +165,19 @@ loom {
         }
     }
     runs {
-        stressTest {
-            server()
-            name "Stress Test"
-            source sourceSets.stress
-            runDir "build/run/stressTest"
-            property "neoforge.gameTestServer", "true"
-            property "neoforge.enableGameTest", "true"
-            property "neoforge.enabledGameTestNamespaces", "palworks_stress"
-            property "palworks.gametest.report", layout.buildDirectory.file("test-results/stress/TEST-stress.xml").get().asFile.absolutePath
-            property "palworks.stress.report", layout.buildDirectory.file("stress/results.json").get().asFile.absolutePath
+        stressScenarios.each { scenario ->
+            create("stress${scenario.capitalize()}") {
+                server()
+                name "Stress Test (${scenario})"
+                source sourceSets.stress
+                runDir "build/run/stress/${scenario}"
+                property "neoforge.gameTestServer", "true"
+                property "neoforge.enableGameTest", "true"
+                property "neoforge.enabledGameTestNamespaces", "palworks_stress"
+                property "palworks.gametest.report", layout.buildDirectory.file("test-results/stress/TEST-${scenario}.xml").get().asFile.absolutePath
+                property "palworks.stress.scenario", scenario
+                property "palworks.stress.report", layout.buildDirectory.file("stress/${scenario}.json").get().asFile.absolutePath
+            }
         }
     }
 }
@@ -178,17 +185,25 @@ loom {
 // A fresh run directory each time (its world, and spark's profile from the last run, go), and spark
 // set up for measuring. Loom's dev runs load every mod in loom.mods, so the in-game test mod is built
 // first: the stress test needs it anyway, for its mixin letting Cobblemon's packets reach mock players.
-tasks.matching { it.name == "runStressTest" }.configureEach {
-    dependsOn "gametestClasses"
-    doFirst {
-        def dir = file("build/run/stressTest")
-        delete dir
-        dir.mkdirs()
-        // spark: never upload a profile (bytebin is spark's public paste site; nothing listens on
-        // port 9), and no background profiler adding to the load being measured
-        def spark = new File(dir, "config/spark")
-        spark.mkdirs()
-        new File(spark, "config.json").text = '{"backgroundProfiler": false, "bytebinUrl": "http://127.0.0.1:9/", "bytesocksHost": "127.0.0.1:9"}\n'
-        delete layout.buildDirectory.dir("stress")
+stressScenarios.each { scenario ->
+    tasks.matching { it.name == "runStress${scenario.capitalize()}" }.configureEach {
+        dependsOn "gametestClasses"
+        doFirst {
+            def dir = file("build/run/stress/${scenario}")
+            delete dir
+            dir.mkdirs()
+            // spark: never upload a profile (bytebin is spark's public paste site; nothing listens on
+            // port 9), and no background profiler adding to the load being measured
+            def spark = new File(dir, "config/spark")
+            spark.mkdirs()
+            new File(spark, "config.json").text = '{"backgroundProfiler": false, "bytebinUrl": "http://127.0.0.1:9/", "bytesocksHost": "127.0.0.1:9"}\n'
+            delete layout.buildDirectory.file("stress/${scenario}.json")
+        }
     }
+}
+tasks.matching { it.name == "runStressSpread" }.configureEach { mustRunAfter "runStressDense" }
+tasks.register("runStressTest") {
+    group = "neoforge"
+    description = "Runs every stress test scenario, each in its own server"
+    dependsOn stressScenarios.collect { "runStress${it.capitalize()}" }
 }

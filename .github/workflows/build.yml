@@ -195,14 +195,15 @@ jobs:
             ${{ matrix.loader }}/build/test-results/gametest/
           retention-days: 14
 
-  # Stress test: 200 workers on a big farm, timed with spark (see StressGameTests). On a PR it
-  # runs main's version first, then this change's, on the same runner, and fails if this change's
-  # ticks are more than 20% slower (.github/scripts/compare_stress.py). Shared runners vary in
-  # speed from run to run, so it's compared with main rather than held to a fixed budget.
+  # Stress test: 200 workers in two scenarios (one packed farm, and 40 bases spread out), timed
+  # with spark (see StressGameTests). On a PR it runs main's version first, then this change's, on
+  # the same runner, and fails if either scenario's ticks are more than 20% slower
+  # (.github/scripts/compare_stress.py). Shared runners vary in speed from run to run, so it's
+  # compared with main rather than held to a fixed budget.
   stress:
     name: stress (${{ matrix.loader }})
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -246,8 +247,14 @@ jobs:
           if [ -d common/src/stress ]; then
             ./gradlew ":$LOADER:runStressTest"
             mkdir -p stress-results/main stress-profiles/main
-            cp "$LOADER/build/stress/results.json" stress-results/main/
-            find "$LOADER/build/run/stressTest/config/spark" -name '*.sparkprofile' -exec cp {} stress-profiles/main/ \; || true
+            cp "$LOADER"/build/stress/*.json stress-results/main/
+            for run in "$LOADER"/build/run/stress/*/; do
+              scenario=$(basename "$run")
+              mkdir -p "stress-profiles/main/$scenario"
+              find "$run/config/spark" -name '*.sparkprofile' -exec cp {} "stress-profiles/main/$scenario/" \; || true
+            done
+            # So nothing of main's is taken for this change's below
+            rm -rf "$LOADER/build/stress" "$LOADER/build/run/stress"
           else
             echo "main has no stress test yet: nothing to compare with"
           fi
@@ -260,8 +267,12 @@ jobs:
         run: |
           ./gradlew ":$LOADER:runStressTest"
           mkdir -p stress-results/head stress-profiles/head
-          cp "$LOADER/build/stress/results.json" stress-results/head/
-          find "$LOADER/build/run/stressTest/config/spark" -name '*.sparkprofile' -exec cp {} stress-profiles/head/ \; || true
+          cp "$LOADER"/build/stress/*.json stress-results/head/
+          for run in "$LOADER"/build/run/stress/*/; do
+            scenario=$(basename "$run")
+            mkdir -p "stress-profiles/head/$scenario"
+            find "$run/config/spark" -name '*.sparkprofile' -exec cp {} "stress-profiles/head/$scenario/" \; || true
+          done
 
       - name: Compare with main
         run: python3 -I .github/scripts/compare_stress.py --base stress-results/main --head stress-results/head
@@ -274,7 +285,7 @@ jobs:
           path: |
             stress-results/
             stress-profiles/
-            ${{ matrix.loader }}/build/run/stressTest/logs/
+            ${{ matrix.loader }}/build/run/stress/*/logs/
           if-no-files-found: ignore
           retention-days: 14
 
