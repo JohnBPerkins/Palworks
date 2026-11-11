@@ -75,9 +75,12 @@ public class WateringGameTests {
     }
 
     @BeforeBatch(batch = FERTILIZE_BATCH)
-    public void oftenFertilize(ServerLevel level) {
-        // Level 3 at 20% a level: a 60% chance each watering, with a crop watered again every 5s
-        use(config(0.2, 5));
+    public void alwaysFertilize(ServerLevel level) {
+        // More than a third a level, so level 3 always fertilizes (past the config file's 0.2 most,
+        // which this skips): each watering grows wheat 2 to 5 stages, so it's ripe within 4. By
+        // chance (60%, the most the file allows), too few of the waterings in the time could
+        // fertilize. With a crop watered again every 5s
+        use(config(0.34, 5));
     }
 
     @AfterBatch(batch = FERTILIZE_BATCH)
