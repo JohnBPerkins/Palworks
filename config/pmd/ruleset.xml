@@ -110,4 +110,11 @@
             <property name="violationSuppressXPath" value="./ancestor-or-self::ClassDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.Mixin')]"/>
         </properties>
     </rule>
+
+    <!-- A mixin accessor with one method is implemented by Mixin on its target class, never by a lambda. -->
+    <rule ref="category/java/bestpractices.xml/ImplicitFunctionalInterface">
+        <properties>
+            <property name="violationSuppressXPath" value="./ancestor-or-self::ClassDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.Mixin')]"/>
+        </properties>
+    </rule>
 </ruleset>

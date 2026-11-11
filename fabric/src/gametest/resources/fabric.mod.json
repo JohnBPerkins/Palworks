@@ -19,7 +19,8 @@
       "dev.palworks.gametest.CobblemonCropGameTests",
       "dev.palworks.gametest.PathingGameTests",
       "dev.palworks.gametest.SharedJobGameTests",
-      "dev.palworks.gametest.WateringGameTests"
+      "dev.palworks.gametest.WateringGameTests",
+      "dev.palworks.gametest.WorkLevelSyncGameTests"
     ]
   },
   "mixins": [
