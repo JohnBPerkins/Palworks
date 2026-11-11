@@ -1,22 +1,76 @@
 package dev.palworks.job;
 
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkerState;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 /** A level's jobs: the ones waiting for a worker (available), and the ones a worker has (reserved). */
 final class JobPool {
     private final Map<JobKey, JobRecord> available = new ConcurrentHashMap<>();
+    // The same available jobs, grouped by the suitabilities they need, so a worker only goes
+    // through the groups it has all of (availableFor): a lumberjack never looks at every crop on the
+    // farm. Kept in step with `available` by the methods below; nothing else changes either.
+    private final Map<Set<Suitability>, Map<JobKey, JobRecord>> availableByNeeds = new ConcurrentHashMap<>();
     private final Map<JobKey, JobRecord> reserved = new ConcurrentHashMap<>();
 
+    /** Every job waiting for a worker (read only: change them through the pool's methods). */
     Collection<JobRecord> available() {
-        return available.values();
+        return Collections.unmodifiableCollection(available.values());
+    }
+
+    /** The jobs waiting for a worker that one with these suitabilities can do, in groups. */
+    List<Collection<JobRecord>> availableFor(Set<Suitability> suitabilities) {
+        List<Collection<JobRecord>> groups = new ArrayList<>();
+        availableByNeeds.forEach((needs, jobs) -> {
+            if (!jobs.isEmpty() && suitabilities.containsAll(needs)) {
+                groups.add(jobs.values());
+            }
+        });
+        return groups;
+    }
+
+    private void putAvailable(JobKey key, JobRecord job) {
+        JobRecord replaced = available.put(key, job);
+        if (replaced != null && replaced != job) {
+            unindex(key, replaced);
+        }
+        availableByNeeds
+                .computeIfAbsent(job.requiredSuitabilities(), needs -> new ConcurrentHashMap<>())
+                .put(key, job);
+    }
+
+    private void unindex(JobKey key, JobRecord job) {
+        Map<JobKey, JobRecord> group = availableByNeeds.get(job.requiredSuitabilities());
+        if (group != null) {
+            group.remove(key, job);
+        }
+    }
+
+    private void removeAvailable(JobKey key) {
+        JobRecord removed = available.remove(key);
+        if (removed != null) {
+            unindex(key, removed);
+        }
+    }
+
+    private void removeAvailableIf(Predicate<JobRecord> condition) {
+        available.entrySet().removeIf(entry -> {
+            if (!condition.test(entry.getValue())) {
+                return false;
+            }
+            unindex(entry.getKey(), entry.getValue());
+            return true;
+        });
     }
 
     Collection<JobRecord> reserved() {
@@ -29,12 +83,15 @@ final class JobPool {
 
     /** Put a job in the pool for any worker (replacing one with the same key). */
     void offer(JobRecord job) {
-        available.put(JobKey.of(job), job);
+        putAvailable(JobKey.of(job), job);
     }
 
     /** Take a job out of the pool, so no other worker gets it too. Does nothing for one not in it. */
     void take(JobRecord job) {
-        available.remove(JobKey.of(job), job);
+        JobKey key = JobKey.of(job);
+        if (available.remove(key, job)) {
+            unindex(key, job);
+        }
     }
 
     /** Record that a worker has the job. */
@@ -53,13 +110,13 @@ final class JobPool {
             return;
         }
         job.release(gameTime);
-        available.put(key, job);
+        putAvailable(key, job);
     }
 
     /** Remove a job entirely, reserved or not (it's done, or gone). */
     void remove(JobKey key) {
         reserved.remove(key);
-        available.remove(key);
+        removeAvailable(key);
     }
 
     /**
@@ -70,7 +127,7 @@ final class JobPool {
     void removeScanned(JobKey key) {
         JobRecord job = available.get(key);
         if (job != null && !job.isFollowUp() && !job.isHandedOver()) {
-            available.remove(key);
+            removeAvailable(key);
         }
     }
 
@@ -93,11 +150,9 @@ final class JobPool {
      * original target (a chopped tree) being gone is expected.
      */
     void dropGoneFollowUps(Level level) {
-        available
-                .values()
-                .removeIf(job -> job.isFollowUp()
-                        && !job.isHandedOver()
-                        && !JobChecks.isJobStillThere(level, job.type(), job.position()));
+        removeAvailableIf(job -> job.isFollowUp()
+                && !job.isHandedOver()
+                && !JobChecks.isJobStillThere(level, job.type(), job.position()));
     }
 
     /**
@@ -105,7 +160,7 @@ final class JobPool {
      * doesn't count: that used to drop every job, handed-over ones included, after a 5-minute pause).
      */
     void expire(long gameTime, long maxAge) {
-        available.values().removeIf(job -> (gameTime - job.discoveryTime()) > maxAge);
+        removeAvailableIf(job -> (gameTime - job.discoveryTime()) > maxAge);
     }
 
     /** Reserved jobs whose worker is no longer registered. */
