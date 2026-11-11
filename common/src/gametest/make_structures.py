@@ -1,6 +1,7 @@
-"""Writes the empty test-area structures the in-game tests use (data/palworks_gametest/structure).
+"""Writes the empty test-area structures the in-game tests use (data/palworks_gametest/structure),
+and the stress test's (data/palworks_stress/structure, in common/src/stress).
 
-Both are boxes of air: placing one clears that space for a test. Structure .nbt files load on both
+All are boxes of air: placing one clears that space for a test. Structure .nbt files load on both
 Fabric and NeoForge (Fabric's .snbt test structures are Fabric-only). Run from the repo root:
     python3 common/src/gametest/make_structures.py
 """
@@ -10,8 +11,14 @@ import os
 import struct
 
 DATA_VERSION = 3955  # Minecraft 1.21.1
-OUT = os.path.join(os.path.dirname(__file__), "resources", "data", "palworks_gametest", "structure")
-AREAS = {"empty": (8, 8, 8), "arena": (16, 24, 16)}
+HERE = os.path.dirname(__file__)
+GAMETEST = os.path.join(HERE, "resources", "data", "palworks_gametest", "structure")
+STRESS = os.path.join(HERE, "..", "stress", "resources", "data", "palworks_stress", "structure")
+# Output folder -> area name -> size. 48 is the most a structure can be along each side.
+AREAS = {
+    GAMETEST: {"empty": (8, 8, 8), "arena": (16, 24, 16)},
+    STRESS: {"farm": (48, 16, 48)},
+}
 
 TAG_END, TAG_INT, TAG_STRING, TAG_LIST, TAG_COMPOUND = 0, 3, 8, 9, 10
 
@@ -52,8 +59,9 @@ def structure(size) -> bytes:
     return bytes([TAG_COMPOUND]) + name("") + root + bytes([TAG_END])
 
 
-os.makedirs(OUT, exist_ok=True)
-for area, size in AREAS.items():
-    with gzip.open(os.path.join(OUT, area + ".nbt"), "wb") as f:
-        f.write(structure(size))
-    print("wrote", area, size)
+for out, areas in AREAS.items():
+    os.makedirs(out, exist_ok=True)
+    for area, size in areas.items():
+        with gzip.open(os.path.join(out, area + ".nbt"), "wb") as f:
+            f.write(structure(size))
+        print("wrote", area, size)

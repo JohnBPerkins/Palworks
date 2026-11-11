@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "palworks_stress",
+  "version": "1.0.0",
+  "name": "Palworks Stress Test",
+  "description": "Palworks's stress test (common/src/stress), shared with NeoForge. Dev runs only (./gradlew :fabric:runStressTest); never published.",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "dev.palworks.stress.StressGameTests"
+    ]
+  },
+  "depends": {
+    "palworks": "*",
+    "fabric-gametest-api-v1": "*",
+    "spark": "*"
+  }
+}

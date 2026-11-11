@@ -1,0 +1,24 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+# Palworks's stress test, shared with Fabric (common/src/stress).
+# Dev runs only (./gradlew :neoforge:runStressTest); never published.
+[[mods]]
+modId = "palworks_stress"
+version = "1.0.0"
+displayName = "Palworks Stress Test"
+
+[[dependencies.palworks_stress]]
+modId = "palworks"
+type = "required"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.palworks_stress]]
+modId = "spark"
+type = "required"
+versionRange = "*"
+ordering = "AFTER"
+side = "BOTH"
