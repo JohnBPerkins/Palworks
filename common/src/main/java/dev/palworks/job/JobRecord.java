@@ -16,7 +16,10 @@ import org.jetbrains.annotations.Nullable;
 public final class JobRecord {
     private final BlockPos position;
     private final JobType type;
-    private final Set<Suitability> requiredSuitabilities; // a worker needs all of them
+    // A worker needs all of them. The EnumSet itself is kept as well as the read-only view handed
+    // out, so canBeDoneWith is a bit test: containsAll against the view checks them one at a time.
+    private final Set<Suitability> required;
+    private final Set<Suitability> requiredSuitabilities;
     private final boolean followUp;
 
     private long discoveryTime; // Game time it was found (or handed over)
@@ -38,7 +41,8 @@ public final class JobRecord {
         this.type = type;
         this.position = position.immutable();
         this.discoveryTime = discoveryTime;
-        this.requiredSuitabilities = Collections.unmodifiableSet(EnumSet.copyOf(required));
+        this.required = EnumSet.copyOf(required);
+        this.requiredSuitabilities = Collections.unmodifiableSet(this.required);
         this.followUp = followUp;
     }
 
@@ -73,6 +77,11 @@ public final class JobRecord {
 
     public Set<Suitability> requiredSuitabilities() {
         return requiredSuitabilities;
+    }
+
+    /** Whether a worker with these suitabilities has every one this job needs. */
+    public boolean canBeDoneWith(Set<Suitability> suitabilities) {
+        return suitabilities.containsAll(required);
     }
 
     /** 0-10, higher first. */

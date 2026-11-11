@@ -1,7 +1,10 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import com.cobblemon.mod.common.pokemon.Pokemon;
+import com.google.gson.JsonParser;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.inventory.CarryMode;
@@ -10,8 +13,14 @@ import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityData;
+import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
@@ -476,6 +485,32 @@ public class WorkerGameTests {
         });
         helper.runAfterDelay(
                 101, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's a Leafeon")));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "suitability_reload")
+    public void aReloadedDatapackChangesWhatAWorkerCanDo(GameTestHelper helper) {
+        // Suitabilities are cached per species and types for the data loaded
+        // (DatapackSuitabilityProvider), so a /reload must still change them. The stand-in data is
+        // put back within this tick, and nothing else runs in this batch, so no other test sees it.
+        Pokemon bulbasaur = PokemonProperties.Companion.parse(BULBASAUR).create();
+        Set<Suitability> before = SuitabilityDetector.getSuitabilities(bulbasaur);
+        SuitabilityData loaded = SuitabilityData.current();
+        Set<Suitability> reloaded;
+        try {
+            SuitabilityData.setCurrent(SuitabilityData.fromFiles(
+                    Map.of("palworks:mining", JsonParser.parseString("{\"species\": {\"cobblemon:bulbasaur\": 2}}")),
+                    warning -> helper.fail("the stand-in data should load cleanly: " + warning)));
+            reloaded = SuitabilityDetector.getSuitabilities(bulbasaur);
+        } finally {
+            SuitabilityData.setCurrent(loaded);
+        }
+        Set<Suitability> after = SuitabilityDetector.getSuitabilities(bulbasaur);
+
+        helper.assertTrue(before.contains(Suitability.PLANTING), "a Bulbasaur can plant, got " + before);
+        helper.assertTrue(
+                reloaded.equals(EnumSet.of(Suitability.MINING)), "after the reload, only Mining, got " + reloaded);
+        helper.assertTrue(after.equals(before), "back to what it could do, got " + after);
+        helper.succeed();
     }
 
     // ---- Reachability ----

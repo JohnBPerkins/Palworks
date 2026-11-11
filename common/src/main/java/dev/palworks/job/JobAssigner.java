@@ -18,6 +18,7 @@ import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -194,49 +195,58 @@ final class JobAssigner {
         // Open farmland in its range, worked out only if there's a seed chest to consider
         List<BlockPos> openFarmland = null;
 
-        // Collect viable candidates and score them cheaply (NO pathfinding in this pass).
-        List<JobRecord> candidates = new ArrayList<>();
-        for (JobRecord job : pool.available()) {
-            // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
-            if (!canDoJob(worker, job)
-                    || !inWorkRange(worker, job.position())
-                    || isRecentlyUnreachable(worker, job.position())
-                    || !canWorkerDo(worker, job)) {
-                continue;
-            }
-
-            // Planters fetch seeds only once they've run out (then plant until the stack is gone);
-            // room to carry them is canWorkerDo's. For farmland, "run out" means of seeds the
-            // open farmland in range can take, and it only goes for a chest with some of those:
-            // seeds that grow elsewhere (medicinal leek, cocoa beans) don't count either way.
-            if (job.type() == JobType.GET_SEEDS && inventory != null) {
-                if (job.requiredSuitabilities().contains(Suitability.PLANTING)) {
-                    if (openFarmland == null) {
-                        openFarmland = openFarmlandSpots(worker.position);
-                    }
-                    if (carriesSeedForAny(inventory, openFarmland)
-                            || seedToFetch(job.position(), openFarmland) == null) {
-                        continue;
-                    }
-                } else if (carriesSeeds) {
+        // Collect viable candidates and score them cheaply (NO pathfinding in this pass). Only the
+        // jobs it has the suitabilities for: the pool keeps them grouped that way.
+        List<ScoredJob> candidates = new ArrayList<>();
+        for (Collection<JobRecord> group : pool.availableFor(worker.suitabilities)) {
+            for (JobRecord job : group) {
+                // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
+                if (!inWorkRange(worker, job.position())
+                        || isRecentlyUnreachable(worker, job.position())
+                        || !canWorkerDo(worker, job)) {
                     continue;
                 }
-            }
 
-            candidates.add(job);
+                // Planters fetch seeds only once they've run out (then plant until the stack is
+                // gone); room to carry them is canWorkerDo's. For farmland, "run out" means of seeds
+                // the open farmland in range can take, and it only goes for a chest with some of
+                // those: seeds that grow elsewhere (medicinal leek, cocoa beans) don't count either way.
+                if (job.type() == JobType.GET_SEEDS && inventory != null) {
+                    if (job.requiredSuitabilities().contains(Suitability.PLANTING)) {
+                        if (openFarmland == null) {
+                            openFarmland = openFarmlandSpots(worker.position);
+                        }
+                        if (carriesSeedForAny(inventory, openFarmland)
+                                || seedToFetch(job.position(), openFarmland) == null) {
+                            continue;
+                        }
+                    } else if (carriesSeeds) {
+                        continue;
+                    }
+                }
+
+                candidates.add(new ScoredJob(job, scoreJob(worker, job)));
+            }
         }
 
         // Harvest everything first, then plant: while this worker has any harvest it could take,
         // planting jobs wait. Unreachable harvests drop out of candidates (recentlyFailedJobs), so
         // they can't hold planting back.
-        if (candidates.stream().anyMatch(j -> j.type() == JobType.HARVEST_CROPS)) {
-            candidates.removeIf(j -> j.type() == JobType.PLANT_SEEDS);
+        if (candidates.stream().anyMatch(c -> c.job().type() == JobType.HARVEST_CROPS)) {
+            candidates.removeIf(c -> c.job().type() == JobType.PLANT_SEEDS);
         }
 
-        // Sort by score (lower is better) so only the most promising jobs get path-checked.
-        candidates.sort(Comparator.comparingDouble(j -> scoreJob(worker, j)));
-        return candidates;
+        // Best score (lowest) first, so only the most promising jobs get path-checked. Each job is
+        // scored once, not on every comparison the sort makes.
+        candidates.sort(Comparator.comparingDouble(ScoredJob::score));
+        List<JobRecord> jobs = new ArrayList<>(candidates.size());
+        for (ScoredJob candidate : candidates) {
+            jobs.add(candidate.job());
+        }
+        return jobs;
     }
+
+    private record ScoredJob(JobRecord job, double score) {}
 
     /**
      * Assign the worker the first job in {@code candidates} (best first) that it can actually do
@@ -312,7 +322,7 @@ final class JobAssigner {
      * Lumbering).
      */
     static boolean canDoJob(WorkerInfo worker, JobRecord job) {
-        return worker.suitabilities.containsAll(job.requiredSuitabilities());
+        return job.canBeDoneWith(worker.suitabilities);
     }
 
     /** {@link JobChecks#canWorkerDo} for a worker being offered a job. One that isn't loaded can't do any. */

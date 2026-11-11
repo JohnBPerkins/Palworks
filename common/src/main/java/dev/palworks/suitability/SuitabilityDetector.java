@@ -2,6 +2,7 @@ package dev.palworks.suitability;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -27,16 +28,29 @@ public class SuitabilityDetector {
     }
 
     /**
-     * Get all suitabilities for a Pokémon.
+     * Get all suitabilities for a Pokémon (read only). Asked for several times a tick per worker,
+     * so with one provider (the datapack's, unless another mod adds its own) its set is returned as
+     * it is, cached; only a second provider's means merging them into a new set.
      */
     public static Set<Suitability> getSuitabilities(Pokemon pokemon) {
-        Set<Suitability> suitabilities = EnumSet.noneOf(Suitability.class);
-
+        Set<Suitability> first = null;
+        Set<Suitability> merged = null;
         for (SuitabilityProvider provider : providers) {
-            suitabilities.addAll(provider.getSuitabilities(pokemon));
+            Set<Suitability> granted = provider.getSuitabilities(pokemon);
+            if (merged != null) {
+                merged.addAll(granted);
+            } else if (first == null) {
+                first = granted;
+            } else {
+                merged = EnumSet.noneOf(Suitability.class);
+                merged.addAll(first);
+                merged.addAll(granted);
+            }
         }
-
-        return suitabilities;
+        if (merged != null) {
+            return Collections.unmodifiableSet(merged);
+        }
+        return first != null ? first : Set.of();
     }
 
     /**
