@@ -80,12 +80,12 @@
     <!-- Mixin handlers are called by the injected code, which PMD can't see. -->
     <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod">
         <properties>
-            <property name="violationSuppressXPath" value="./ancestor-or-self::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject')]"/>
+            <property name="violationSuppressXPath" value="./ancestor-or-self::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject') or pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.ModifyConstant')]"/>
         </properties>
     </rule>
     <rule ref="category/java/bestpractices.xml/UnusedFormalParameter">
         <properties>
-            <property name="violationSuppressXPath" value="./ancestor::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject')]"/>
+            <property name="violationSuppressXPath" value="./ancestor::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject') or pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.ModifyConstant')]"/>
         </properties>
     </rule>
 

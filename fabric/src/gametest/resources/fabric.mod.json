@@ -17,9 +17,13 @@
       "dev.palworks.gametest.TestAreaGameTests",
       "dev.palworks.gametest.HangingFruitGameTests",
       "dev.palworks.gametest.CobblemonCropGameTests",
-      "dev.palworks.gametest.PathingGameTests"
+      "dev.palworks.gametest.PathingGameTests",
+      "dev.palworks.gametest.SharedJobGameTests"
     ]
   },
+  "mixins": [
+    "palworks_gametest_common.mixins.json"
+  ],
   "depends": {
     "palworks": "*",
     "fabric-gametest-api-v1": "*"
