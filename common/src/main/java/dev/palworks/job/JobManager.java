@@ -243,7 +243,7 @@ public class JobManager {
         }
         // Drop per-worker caches so they don't leak after the worker is gone.
         workers.forgetEntity(pokemonUUID);
-        assigner.forgetUnreachable(pokemonUUID);
+        assigner.forget(pokemonUUID);
         WorkerInventoryManager.unload(pokemonUUID);
         WorkerStateManager.unload(pokemonUUID);
         WorkActivitySync.forget(pokemonUUID);

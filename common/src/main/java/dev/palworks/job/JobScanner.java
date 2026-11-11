@@ -10,6 +10,7 @@ import dev.palworks.suitability.Suitability;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.ToLongFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Items;
@@ -46,6 +48,9 @@ final class JobScanner {
     // Chunk-based job cache (performance optimization)
     private final Map<ChunkPos, ChunkJobCache> chunkCaches = new ConcurrentHashMap<>();
 
+    // The chunks in some worker's range at the last scan: their caches are kept (dropStaleCaches)
+    private Set<ChunkPos> chunksNearWorkers = Set.of();
+
     // Blocks of trees already validated during the current chunk scan, so a tree with several base
     // blocks only gets one tree search and one job. Cleared at the start of each chunk scan.
     private final Set<BlockPos> treeBlocksSeenThisScan = new HashSet<>();
@@ -63,23 +68,16 @@ final class JobScanner {
 
         // Get chunks near active workers, each with the Y band to scan (around worker height).
         Map<ChunkPos, int[]> scanRanges = getChunkScanRangesNearWorkers(level, workers);
+        chunksNearWorkers = scanRanges.keySet();
 
-        for (Map.Entry<ChunkPos, int[]> entry : scanRanges.entrySet()) {
+        for (ChunkPos chunk : dueChunks(scanRanges.keySet(), this::lastScan, currentTime)) {
             // Block budget is checked between chunks; a chunk we start always finishes.
             if (blocksScannedThisTick >= MAX_BLOCKS_SCANNED_PER_TICK) {
                 break;
             }
 
-            ChunkPos chunk = entry.getKey();
-            ChunkJobCache cache = chunkCaches.get(chunk);
-
-            // Skip if cache is fresh and not dirty
-            if (cache != null && !cache.isDirty() && (currentTime - cache.scanTime() < JOB_CACHE_LIFETIME_TICKS)) {
-                continue;
-            }
-
             // Scan this chunk's worker-height band for jobs
-            int[] range = entry.getValue();
+            int[] range = scanRanges.get(chunk);
             blocksScannedThisTick += scanChunkForJobs(level, chunk, range[0], range[1]);
         }
 
@@ -90,6 +88,40 @@ final class JobScanner {
                     scanRanges.size(),
                     pool.available().size());
         }
+    }
+
+    /** {@link #dueChunks}' "last scanned" for a chunk never scanned, or changed since its scan. */
+    static final long NEVER_SCANNED = Long.MIN_VALUE;
+
+    /** When a chunk was last scanned, or {@link #NEVER_SCANNED} if it never was or it's changed since. */
+    private long lastScan(ChunkPos chunk) {
+        ChunkJobCache cache = chunkCaches.get(chunk);
+        return cache == null || cache.isDirty() ? NEVER_SCANNED : cache.scanTime();
+    }
+
+    /**
+     * The chunks due a scan, most overdue first: those never scanned (or changed since their scan),
+     * then those whose scan is oldest. In this order every chunk gets its turn, however many there
+     * are. When more go stale than the per-tick budget gets through (a server's many bases), each
+     * one's scan just gets older, all of them falling behind together. Taking them in any fixed
+     * order instead scanned the same ones every time and the rest never, and a worker with any of
+     * those in range was never given a job ({@link #hasScannedAround}).
+     */
+    static List<ChunkPos> dueChunks(Collection<ChunkPos> chunks, ToLongFunction<ChunkPos> lastScan, long now) {
+        record Due(ChunkPos chunk, long lastScan) {}
+        List<Due> due = new ArrayList<>();
+        for (ChunkPos chunk : chunks) {
+            long last = lastScan.applyAsLong(chunk);
+            if (last == NEVER_SCANNED || now - last >= JOB_CACHE_LIFETIME_TICKS) {
+                due.add(new Due(chunk, last));
+            }
+        }
+        due.sort(Comparator.comparingLong(Due::lastScan));
+        List<ChunkPos> ordered = new ArrayList<>(due.size());
+        for (Due chunk : due) {
+            ordered.add(chunk.chunk());
+        }
+        return ordered;
     }
 
     /**
@@ -370,13 +402,19 @@ final class JobScanner {
     }
 
     /**
-     * Remove stale chunk caches (older than twice the cache lifetime), and their jobs: no worker is
-     * near enough to rescan them, so nothing would ever notice those jobs disappearing.
+     * Remove stale chunk caches (older than twice the cache lifetime) of chunks no worker is near,
+     * and their jobs: nothing will rescan those, so nothing would ever notice their jobs
+     * disappearing. A chunk near a worker keeps its cache until it's rescanned, however long that
+     * takes: when the scan falls behind (more chunks than it gets through in a lifetime), dropping
+     * those too left most of them looking never scanned, so no worker was ever given a job
+     * ({@link #hasScannedAround}).
      */
     void dropStaleCaches(long gameTime) {
         chunkCaches.entrySet().removeIf(entry -> {
             ChunkJobCache cache = entry.getValue();
-            boolean stale = !cache.isDirty() && (gameTime - cache.scanTime()) > JOB_CACHE_LIFETIME_TICKS * 2;
+            boolean stale = !chunksNearWorkers.contains(entry.getKey())
+                    && !cache.isDirty()
+                    && (gameTime - cache.scanTime()) > JOB_CACHE_LIFETIME_TICKS * 2;
             if (stale) {
                 removeJobsOf(cache);
             }
