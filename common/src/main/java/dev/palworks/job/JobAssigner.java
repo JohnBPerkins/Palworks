@@ -61,6 +61,9 @@ final class JobAssigner {
     private final Map<UUID, Map<BlockPos, Long>> recentlyFailedJobs = new ConcurrentHashMap<>();
     // Where each worker was when its current failures were recorded (reachability is from there).
     private final Map<UUID, BlockPos> failureAnchors = new ConcurrentHashMap<>();
+    // When each worker was last considered for a job (game time): each tick's batch is the idle
+    // workers that have waited longest (Turns.longestWaiting).
+    private final Map<UUID, Long> lastConsidered = new ConcurrentHashMap<>();
 
     JobAssigner(ServerLevel level, JobPool pool, JobScanner scanner, WorkerRegistry workers) {
         this.level = level;
@@ -74,18 +77,24 @@ final class JobAssigner {
      * {@link #assignFirstReachable}.
      */
     void assign(ServerLevel level) {
-        List<WorkerInfo> idleWorkers = workers.all().stream()
+        List<WorkerInfo> idle = workers.all().stream()
                 .filter(w -> w.idle && w.currentReservation == null)
                 .filter(scanner::hasScannedAround)
-                .limit(ASSIGNMENT_BATCH_SIZE)
                 .collect(Collectors.toList());
+        // The longest waiting first: in the registry's order (the same every tick), workers that
+        // stay idle with no job they can do (Water types while there's no watering) had the whole
+        // batch every tick, and no other worker in the level was ever given a job
+        List<WorkerInfo> idleWorkers = Turns.longestWaiting(
+                idle, w -> lastConsidered.getOrDefault(w.pokemonUUID, Long.MIN_VALUE), ASSIGNMENT_BATCH_SIZE);
 
         if (idleWorkers.isEmpty()) {
             return;
         }
 
+        long now = level.getGameTime();
         int assignedCount = 0;
         for (WorkerInfo worker : idleWorkers) {
+            lastConsidered.put(worker.pokemonUUID, now);
             Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
 
             // A transporter carrying cargo (anything but a planter's seeds) fills up before it
@@ -536,6 +545,12 @@ final class JobAssigner {
             }
             forgetUnreachable(worker.pokemonUUID);
         }
+    }
+
+    /** Drop everything remembered about a worker that's gone. */
+    void forget(UUID workerUUID) {
+        forgetUnreachable(workerUUID);
+        lastConsidered.remove(workerUUID);
     }
 
     void forgetUnreachable(UUID workerUUID) {

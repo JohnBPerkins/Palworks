@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "dev.palworks.gametest.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "mixins": [
+    "StructureGridSpawnerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

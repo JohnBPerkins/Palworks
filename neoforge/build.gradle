@@ -131,3 +131,86 @@ loom {
         }
     }
 }
+
+// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers of many species,
+// with spark measuring tick times, in two scenarios: `dense` (one packed farm) and `spread` (40 small
+// bases far apart). Its own source set and mod (palworks_stress, never published, src/stress), so it
+// runs only that (by its template namespace): the in-game test mod is loaded too, for its helpers,
+// but none of its tests run. `./gradlew :neoforge:runStressTest` runs both scenarios
+// (runStressDense, then runStressSpread), each in its own server so one's workers can't add to the
+// other's load, and each writes its results to build/stress/<scenario>.json.
+def stressScenarios = ["dense", "spread"]
+
+sourceSets {
+    stress {
+        java.srcDir project(":common").file("src/stress/java")
+        resources.srcDir project(":common").file("src/stress/resources")
+        // The in-game tests' helpers come from their own mod (palworks_gametest), loaded alongside:
+        // NeoForge loads each mod as a module, and two can't hold the same package
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output + sourceSets.gametest.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+dependencies {
+    stressCompileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.21"
+    // spark's API, bundled in its jar, to read tick times (spark itself is in dev runs, above)
+    stressCompileOnly("maven.modrinth:spark:1.10.124-neoforge-1.21.1") { transitive = false }
+}
+
+loom {
+    mods {
+        palworks_stress {
+            sourceSet sourceSets.stress
+        }
+    }
+    runs {
+        stressScenarios.each { scenario ->
+            create("stress${scenario.capitalize()}") {
+                server()
+                name "Stress Test (${scenario})"
+                source sourceSets.stress
+                runDir "build/run/stress/${scenario}"
+                property "neoforge.gameTestServer", "true"
+                property "neoforge.enableGameTest", "true"
+                property "neoforge.enabledGameTestNamespaces", "palworks_stress"
+                property "palworks.gametest.report", layout.buildDirectory.file("test-results/stress/TEST-${scenario}.xml").get().asFile.absolutePath
+                property "palworks.stress.scenario", scenario
+                property "palworks.stress.report", layout.buildDirectory.file("stress/${scenario}.json").get().asFile.absolutePath
+            }
+        }
+    }
+}
+
+// Loom's NeoForge dev runs load every mod in loom.mods, whichever run it is: the in-game tests'
+// server loads the stress test mod too, and the other way round (the stress test needs it anyway,
+// for its mixin letting Cobblemon's packets reach mock players). So every run builds both first:
+// NeoForge stops at a mod folder that isn't there, and the server never exits. Each run's own
+// namespace filter keeps the other's tests from running.
+tasks.matching { it.name.startsWith("run") }.configureEach {
+    dependsOn "gametestClasses", "stressClasses"
+}
+
+// A fresh run directory each time (its world, and spark's profile from the last run, go), and spark
+// set up for measuring
+stressScenarios.each { scenario ->
+    tasks.matching { it.name == "runStress${scenario.capitalize()}" }.configureEach {
+        doFirst {
+            def dir = file("build/run/stress/${scenario}")
+            delete dir
+            dir.mkdirs()
+            // spark: never upload a profile (bytebin is spark's public paste site; nothing listens on
+            // port 9), and no background profiler adding to the load being measured
+            def spark = new File(dir, "config/spark")
+            spark.mkdirs()
+            new File(spark, "config.json").text = '{"backgroundProfiler": false, "bytebinUrl": "http://127.0.0.1:9/", "bytesocksHost": "127.0.0.1:9"}\n'
+            delete layout.buildDirectory.file("stress/${scenario}.json")
+        }
+    }
+}
+tasks.matching { it.name == "runStressSpread" }.configureEach { mustRunAfter "runStressDense" }
+tasks.register("runStressTest") {
+    group = "neoforge"
+    description = "Runs every stress test scenario, each in its own server"
+    dependsOn stressScenarios.collect { "runStress${it.capitalize()}" }
+}

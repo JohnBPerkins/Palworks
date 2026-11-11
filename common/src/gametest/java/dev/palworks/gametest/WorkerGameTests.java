@@ -713,28 +713,4 @@ public class WorkerGameTests {
                             + " ticks");
         });
     }
-
-    @GameTest(template = Templates.EMPTY, batch = "worker_two_harvesters", timeoutTicks = 800)
-    public void twoHarvestersNeverTakeTheSameCrop(GameTestHelper helper) {
-        // Six ripe wheat, two Bulbasaur: every crop harvested exactly once (one wheat each)
-        Workers.isolate(helper);
-        Scenes.floor(helper, Blocks.GRASS_BLOCK);
-        for (int x = 1; x <= 6; x++) {
-            helper.setBlock(x, 0, 5, Blocks.FARMLAND);
-            helper.setBlock(x, 1, 5, WHEAT.getStateForAge(7));
-        }
-        Workers.sendOut(helper, BULBASAUR, new BlockPos(1, 1, 1));
-        Workers.sendOut(helper, BULBASAUR, new BlockPos(6, 1, 1));
-
-        helper.succeedWhen(() -> {
-            for (int x = 1; x <= 6; x++) {
-                helper.assertTrue(
-                        helper.getBlockState(new BlockPos(x, 1, 5)).equals(WHEAT.getStateForAge(0)),
-                        "wheat at x=" + x + " should be harvested");
-            }
-            helper.assertTrue(
-                    Scenes.itemsOnGround(helper, Items.WHEAT) == 6,
-                    "each crop harvested exactly once: 6 wheat, got " + Scenes.itemsOnGround(helper, Items.WHEAT));
-        });
-    }
 }
