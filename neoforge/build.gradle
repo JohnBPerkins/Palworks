@@ -182,12 +182,19 @@ loom {
     }
 }
 
+// Loom's NeoForge dev runs load every mod in loom.mods, whichever run it is: the in-game tests'
+// server loads the stress test mod too, and the other way round (the stress test needs it anyway,
+// for its mixin letting Cobblemon's packets reach mock players). So every run builds both first:
+// NeoForge stops at a mod folder that isn't there, and the server never exits. Each run's own
+// namespace filter keeps the other's tests from running.
+tasks.matching { it.name.startsWith("run") }.configureEach {
+    dependsOn "gametestClasses", "stressClasses"
+}
+
 // A fresh run directory each time (its world, and spark's profile from the last run, go), and spark
-// set up for measuring. Loom's dev runs load every mod in loom.mods, so the in-game test mod is built
-// first: the stress test needs it anyway, for its mixin letting Cobblemon's packets reach mock players.
+// set up for measuring
 stressScenarios.each { scenario ->
     tasks.matching { it.name == "runStress${scenario.capitalize()}" }.configureEach {
-        dependsOn "gametestClasses"
         doFirst {
             def dir = file("build/run/stress/${scenario}")
             delete dir
