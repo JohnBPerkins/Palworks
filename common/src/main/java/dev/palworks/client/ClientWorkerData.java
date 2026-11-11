@@ -2,6 +2,7 @@ package dev.palworks.client;
 
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.net.packets.WorkerDebugPacket;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,9 @@ import org.jetbrains.annotations.Nullable;
  *       and read once when the wheel is built ({@code PokemonInteractHandler}), by entity UUID.
  *       Only used to draw the wheel's options: the server never trusts it;</li>
  *   <li>the workers near the player (WorkerDebugPacket), for the debug overlay
- *       ({@code WorkerDebugRenderer}). Empty unless the player has {@code /palworks debug} on.</li>
+ *       ({@code WorkerDebugRenderer}). Empty unless the player has {@code /palworks debug} on;</li>
+ *   <li>the work levels of the player's Pokémon, party and PC (WorkLevelsPacket), for the PC and
+ *       summary screens ({@code WorkSkillsOverlay}), by Pokémon UUID.</li>
  * </ul>
  * Has no client-only imports, so it is safe to load on a dedicated server (where Cobblemon still
  * constructs the client packet handlers).
@@ -31,6 +34,7 @@ public final class ClientWorkerData {
     private static final Map<UUID, WorkActivity> ACTIVITY = new ConcurrentHashMap<>();
     private static final Map<UUID, Status> STATUS = new ConcurrentHashMap<>();
     private static volatile List<WorkerDebugPacket.Entry> debugEntries = List.of();
+    private static final Map<UUID, Map<Suitability, Integer>> WORK_LEVELS = new ConcurrentHashMap<>();
 
     private ClientWorkerData() {}
 
@@ -72,5 +76,21 @@ public final class ClientWorkerData {
 
     public static List<WorkerDebugPacket.Entry> debugEntries() {
         return debugEntries;
+    }
+
+    // --- Work levels (PC and summary screens) ---
+
+    public static void putWorkLevels(Map<UUID, Map<Suitability, Integer>> levels) {
+        WORK_LEVELS.putAll(levels);
+    }
+
+    /** A Pokémon's level for each job it can do (empty if none), or null if the server hasn't said. */
+    @Nullable
+    public static Map<Suitability, Integer> workLevels(UUID pokemonUUID) {
+        return WORK_LEVELS.get(pokemonUUID);
+    }
+
+    public static void clearWorkLevels() {
+        WORK_LEVELS.clear();
     }
 }
