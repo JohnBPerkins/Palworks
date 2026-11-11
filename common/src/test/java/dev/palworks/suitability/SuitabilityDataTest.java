@@ -287,7 +287,7 @@ class SuitabilityDataTest {
         assertEquals(Map.of(MINING, 1), levels(data, List.of("rock"), "x:y"));
         assertEquals(Map.of(MINING, 1), levels(data, List.of("ground"), "x:y"));
         assertEquals(Map.of(TRANSPORTING, 1), levels(data, List.of("flying"), "x:y"));
-        assertEquals(Map.of(MEDICINE_PRODUCTION, 1, TRANSPORTING, 1), levels(data, List.of("psychic"), "x:y"));
+        assertEquals(Map.of(MEDICINE_PRODUCTION, 1), levels(data, List.of("psychic"), "x:y"));
         assertEquals(Map.of(NETHER, 1), levels(data, List.of("ghost"), "x:y"));
         for (String none : List.of("poison", "bug", "dragon", "dark", "fairy")) {
             assertEquals(Map.of(), levels(data, List.of(none), "x:y"), none);

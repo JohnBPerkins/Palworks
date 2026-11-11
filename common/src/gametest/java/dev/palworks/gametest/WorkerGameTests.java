@@ -712,7 +712,7 @@ public class WorkerGameTests {
         BlockPos open = new BlockPos(6, 1, 7);
         helper.setBlock(open, Blocks.CHEST);
         PokemonEntity worker =
-                Workers.sendOut(helper, "drowzee level=20", new BlockPos(1, 1, 6)); // Psychic: Transporting
+                Workers.sendOut(helper, "doduo level=20", new BlockPos(1, 1, 6)); // Flying: Transporting; walks
         WorkerInventoryManager.getOrCreate(worker.getPokemon()).addItem(new ItemStack(Items.WHEAT, 20));
 
         helper.succeedWhen(() -> {
