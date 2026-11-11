@@ -91,12 +91,13 @@ their dependencies.
 
 ## Automated tests
 
-There are two kinds, and CI runs both on every PR:
+There are three kinds, and CI runs all of them on every PR:
 
 | Kind | Where | Run with | For |
 |---|---|---|---|
 | Unit tests | `common/src/test/java` | `./gradlew :common:test` | Logic that doesn't need a world: rules (steps, carry modes, sapling names), saved state, items |
 | In-game tests (GameTests) | `common/src/gametest/java` | `./gradlew :fabric:runGameTest`, `./gradlew :neoforge:runGameTest` | Anything that needs a real world: blocks, block tags, loot, entities, and real Cobblemon Pokémon doing jobs |
+| Stress test | `common/src/stress/java` | `./gradlew :fabric:runStressTest`, `./gradlew :neoforge:runStressTest` | Performance: how long each server tick takes with 200 workers busy, packed together and spread out |
 
 **Unit tests** can use items, blocks and block states after `Bootstrap.bootStrap()` (see
 `WorkerStateTest`), but not block tags or a world: tags only exist once a world loads its data.
@@ -134,6 +135,46 @@ test areas are `.nbt` structures in `common/src/gametest/resources/data/palworks
 written by `common/src/gametest/make_structures.py`; add a size there and run it again.
 A GameTest that never fails isn't testing anything: when adding one, briefly break the behavior
 it covers and check that it fails.
+
+### Performance (stress test)
+
+`StressGameTests` puts 200 workers to work, with their work coming back as fast as they do it, in
+two scenarios:
+
+- **`dense`**: one 48x48 farm with 560 crops, 16 trees, 14 furnaces and 8 chests, and 80
+  harvester-planters, 40 lumberjacks, 30 kindlers and 50 transporters in parties of 5 or 6 with a
+  mock owner each. Every worker is in range of every job, with the most Pokémon around each one.
+- **`spread`**: 40 small bases 96 blocks apart (out of each other's range), each a player's party
+  of 5 (2 harvester-planters, a lumberjack, a kindler and a transporter) with a 48-crop field, 2
+  trees, a furnace and a chest: a server's many players, across hundreds of chunks.
+
+Each job's workers mix 8 species, from small to large hitboxes (Sunkern at 0.4 blocks wide to
+Torterra at 2.25) and walkers and flyers, so nothing worked out per species or body size gets an
+easy ride.
+
+Each scenario runs in its own server (`runStressDense`, `runStressSpread`; `runStressTest` runs
+both). After 30 seconds to settle, it measures for a minute with
+[spark](https://spark.lucko.me/docs): spark's milliseconds per tick (MSPT: mean, median, 95th
+percentile, max) go to `<loader>/build/stress/<scenario>.json`, and spark's profile of that minute
+to `<loader>/build/run/stress/<scenario>/config/spark/` (open it at https://spark.lucko.me). The
+run never uploads anything: it points spark's upload address at a port nothing listens on. The test
+only fails if the workers barely worked, since then the timings would mean nothing.
+
+It's its own mod (`palworks_stress`, never published) with its own runs, so nothing else adds to
+the load: `fabric/src/stress` and `neoforge/src/stress` register just it. On NeoForge the in-game
+test mod is loaded too (the stress test uses its helpers, and its mixin for mock players), but
+none of its tests run.
+
+The test server doesn't wait between ticks, so the measured minute is thousands of ticks, and the
+"unpaced TPS" it reports is how many a second it could manage: headroom, not the 20 a real server
+aims for. MSPT means the same either way; 20 TPS needs 50 or less.
+
+**In CI**, the `stress` job runs main's stress test and then this change's, on the same runner, and
+fails if either scenario's mean MSPT is more than 20% higher (and by at least half a millisecond):
+`.github/scripts/compare_stress.py`, which also writes the comparison to the job summary. Shared
+runners vary in speed from run to run, so it compares with main instead of a fixed budget. The
+results and the spark profiles are in the job's artifacts. If you change a scenario, bump
+`SCENARIO_VERSION`: runs of different versions aren't compared.
 
 Behavior that's hard to automate (how something looks, a full play session) still needs an
 in-game check: use the dev runs above, or a normal Minecraft instance with the built jar from

@@ -27,11 +27,11 @@
         <exclude name="AvoidFieldNameMatchingMethodName"/>
     </rule>
 
-    <!-- Level, ServerLevel, ClientLevel and Minecraft are AutoCloseable but owned by the game:
+    <!-- Level, ServerLevel, ClientLevel, Minecraft and MinecraftServer are AutoCloseable but owned by the game:
          closing them would be the bug. Still checked for everything else (streams, files). -->
     <rule ref="category/java/errorprone.xml/CloseResource">
         <properties>
-            <property name="allowedResourceTypes" value="java.io.ByteArrayOutputStream,java.io.ByteArrayInputStream,java.io.StringWriter,java.io.CharArrayWriter,java.util.stream.Stream,java.util.stream.IntStream,java.util.stream.LongStream,java.util.stream.DoubleStream,net.minecraft.world.level.Level,net.minecraft.server.level.ServerLevel,net.minecraft.client.multiplayer.ClientLevel,net.minecraft.client.Minecraft"/>
+            <property name="allowedResourceTypes" value="java.io.ByteArrayOutputStream,java.io.ByteArrayInputStream,java.io.StringWriter,java.io.CharArrayWriter,java.util.stream.Stream,java.util.stream.IntStream,java.util.stream.LongStream,java.util.stream.DoubleStream,net.minecraft.world.level.Level,net.minecraft.server.level.ServerLevel,net.minecraft.client.multiplayer.ClientLevel,net.minecraft.client.Minecraft,net.minecraft.server.MinecraftServer"/>
         </properties>
     </rule>
 
@@ -80,12 +80,12 @@
     <!-- Mixin handlers are called by the injected code, which PMD can't see. -->
     <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod">
         <properties>
-            <property name="violationSuppressXPath" value="./ancestor-or-self::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject')]"/>
+            <property name="violationSuppressXPath" value="./ancestor-or-self::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject') or pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.ModifyConstant')]"/>
         </properties>
     </rule>
     <rule ref="category/java/bestpractices.xml/UnusedFormalParameter">
         <properties>
-            <property name="violationSuppressXPath" value="./ancestor::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject')]"/>
+            <property name="violationSuppressXPath" value="./ancestor::MethodDeclaration[pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.Inject') or pmd-java:hasAnnotation('org.spongepowered.asm.mixin.injection.ModifyConstant')]"/>
         </properties>
     </rule>
 

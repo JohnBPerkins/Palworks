@@ -121,3 +121,76 @@ sourceSets.matching { it.name == "gametest" }.configureEach {
 loom.runs.matching { it.name == "gameTest" }.configureEach {
     vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.file('test-results/gametest/TEST-gametest.xml').get().asFile}"
 }
+
+// Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers of many species,
+// with spark measuring tick times, in two scenarios: `dense` (one packed farm) and `spread` (40 small
+// bases far apart). Its own source set and mod (palworks_stress, never published), so it runs alone,
+// without the in-game tests: Fabric's GameTest API runs every test its mods register. It reuses the
+// in-game tests' helpers (Workers, Scenes), compiled in but not registered.
+// `./gradlew :fabric:runStressTest` runs both scenarios (runStressDense, then runStressSpread), each
+// in its own server so one's workers can't add to the other's load, and each writes its results to
+// build/stress/<scenario>.json.
+def stressScenarios = ["dense", "spread"]
+
+sourceSets {
+    stress {
+        java.srcDir project(":common").file("src/gametest/java")
+        java.srcDir project(":common").file("src/stress/java")
+        resources.srcDir project(":common").file("src/stress/resources")
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+dependencies {
+    // spark's API, bundled in its jar, to read tick times (spark itself is in dev runs, above).
+    // The API classes don't touch Minecraft, so the unremapped jar compiles against them as is.
+    stressCompileOnly("maven.modrinth:spark:1.10.109-fabric") { transitive = false }
+}
+
+loom {
+    mods {
+        palworks_stress {
+            sourceSet sourceSets.stress
+        }
+    }
+    runs {
+        stressScenarios.each { scenario ->
+            create("stress${scenario.capitalize()}") {
+                server()
+                name "Stress Test (${scenario})"
+                source sourceSets.stress
+                runDir "build/run/stress/${scenario}"
+                vmArg "-Dfabric-api.gametest"
+                vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.file("test-results/stress/TEST-${scenario}.xml").get().asFile}"
+                vmArg "-Dpalworks.stress.scenario=${scenario}"
+                vmArg "-Dpalworks.stress.report=${layout.buildDirectory.file("stress/${scenario}.json").get().asFile}"
+            }
+        }
+    }
+}
+
+// A fresh run directory each time (its world, and spark's profile from the last run, go), the EULA
+// accepted, as Fabric's GameTest setup does for runGameTest, and spark set up for measuring
+stressScenarios.each { scenario ->
+    tasks.matching { it.name == "runStress${scenario.capitalize()}" }.configureEach {
+        doFirst {
+            def dir = file("build/run/stress/${scenario}")
+            delete dir
+            dir.mkdirs()
+            new File(dir, "eula.txt").text = "eula=true\n"
+            // spark: never upload a profile (bytebin is spark's public paste site; nothing listens on
+            // port 9), and no background profiler adding to the load being measured
+            def spark = new File(dir, "config/spark")
+            spark.mkdirs()
+            new File(spark, "config.json").text = '{"backgroundProfiler": false, "bytebinUrl": "http://127.0.0.1:9/", "bytesocksHost": "127.0.0.1:9"}\n'
+            delete layout.buildDirectory.file("stress/${scenario}.json")
+        }
+    }
+}
+tasks.matching { it.name == "runStressSpread" }.configureEach { mustRunAfter "runStressDense" }
+tasks.register("runStressTest") {
+    group = "fabric"
+    description = "Runs every stress test scenario, each in its own server"
+    dependsOn stressScenarios.collect { "runStress${it.capitalize()}" }
+}

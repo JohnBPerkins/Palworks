@@ -14,7 +14,7 @@ import net.minecraft.world.phys.AABB;
  * Builds small test scenes inside a GameTest's 8x8x8 area, in relative coordinates (y=0 is the
  * area's floor layer). Tests pass absolute positions (helper.absolutePos) to Palworks code.
  */
-final class Scenes {
+public final class Scenes {
     private Scenes() {}
 
     /** Fill the floor layer (y=0) of the whole area. */
@@ -27,7 +27,7 @@ final class Scenes {
     }
 
     /** Natural leaves (not player placed), close enough to a log that they don't decay mid-test. */
-    static BlockState naturalLeaves(Block leaves) {
+    public static BlockState naturalLeaves(Block leaves) {
         return leaves.defaultBlockState()
                 .setValue(LeavesBlock.PERSISTENT, false)
                 .setValue(LeavesBlock.DISTANCE, 1);
@@ -42,7 +42,7 @@ final class Scenes {
      * A simple tree: a trunk of {@code log} from y=1 to y=height at (x, z), with a canopy of
      * {@code leaves} around its top two logs and on top. The ground under it isn't touched.
      */
-    static void tree(GameTestHelper helper, int x, int z, int height, Block log, BlockState leaves) {
+    public static void tree(GameTestHelper helper, int x, int z, int height, Block log, BlockState leaves) {
         for (int y = 1; y <= height; y++) {
             helper.setBlock(x, y, z, log);
         }
@@ -62,13 +62,20 @@ final class Scenes {
         return helper.absolutePos(new BlockPos(x, y, z));
     }
 
+    /**
+     * Where a test's dropped items are looked for: its area and a few blocks round it. Dropped
+     * items scatter and slide (a crop at the edge has lost one past a 1-block margin), and tests
+     * are spaced far enough apart that this never reaches a neighbour's (see
+     * StructureGridSpawnerMixin).
+     */
+    private static AABB itemArea(GameTestHelper helper) {
+        return helper.getBounds().inflate(4);
+    }
+
     /** Total count of an item lying on the ground anywhere in the test area. */
     static int itemsOnGround(GameTestHelper helper, Item item) {
-        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO))
-                .expandTowards(8, 8, 8)
-                .inflate(1);
         int total = 0;
-        for (ItemEntity entity : helper.getLevel().getEntitiesOfClass(ItemEntity.class, area)) {
+        for (ItemEntity entity : helper.getLevel().getEntitiesOfClass(ItemEntity.class, itemArea(helper))) {
             if (entity.getItem().is(item)) {
                 total += entity.getItem().getCount();
             }
@@ -78,10 +85,7 @@ final class Scenes {
 
     /** Remove every item lying on the ground in the test area. */
     static void clearItems(GameTestHelper helper) {
-        AABB area = new AABB(helper.absolutePos(BlockPos.ZERO))
-                .expandTowards(8, 8, 8)
-                .inflate(1);
-        helper.getLevel().getEntitiesOfClass(ItemEntity.class, area).forEach(ItemEntity::discard);
+        helper.getLevel().getEntitiesOfClass(ItemEntity.class, itemArea(helper)).forEach(ItemEntity::discard);
     }
 
     static void air(GameTestHelper helper, int x, int y, int z) {
