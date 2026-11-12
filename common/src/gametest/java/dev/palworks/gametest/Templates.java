@@ -30,5 +30,6 @@ public final class Templates {
             PathingGameTests.class,
             SharedJobGameTests.class,
             WateringGameTests.class,
-            WorkLevelSyncGameTests.class);
+            WorkLevelSyncGameTests.class,
+            HungerGameTests.class);
 }

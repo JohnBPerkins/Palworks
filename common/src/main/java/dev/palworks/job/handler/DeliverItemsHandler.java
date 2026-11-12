@@ -41,6 +41,7 @@ final class DeliverItemsHandler implements JobHandler {
         }
 
         if (totalDelivered > 0) {
+            ctx.didWork(1); // one trip, however much it delivered
             Palworks.LOGGER.debug("{} delivered {} items to chest at {}", ctx.name(), totalDelivered, chestPos);
         } else {
             Palworks.LOGGER.debug("{} failed to deliver items to chest at {}", ctx.name(), chestPos);

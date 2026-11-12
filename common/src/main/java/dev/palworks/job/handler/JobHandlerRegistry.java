@@ -35,9 +35,21 @@ public final class JobHandlerRegistry {
             case HARVEST_CROPS -> new HarvestCropsHandler();
             case WATER_CROPS -> new WaterCropsHandler();
             case CHOP_TREE -> new ChopTreeHandler();
+            case EAT_FOOD -> new EatFoodHandler();
+            case FETCH_FOOD -> new FetchFoodHandler();
             // Stands 4s but doesn't break the ore yet (mining isn't scanned for until it does)
             case MINE_RESOURCE -> () -> List.of(Step.pause("wait", species -> 80));
         };
+    }
+
+    /** How long this job's steps take a worker of this species, all told (once round, for one that repeats). */
+    public static int jobTicks(JobType job, Mob worker) {
+        String species = WorkAnimations.speciesOf(worker);
+        int ticks = 0;
+        for (Step step : forJob(job).steps()) {
+            ticks += step.ticksFor(species);
+        }
+        return ticks;
     }
 
     /** How a worker does this job. */

@@ -80,11 +80,15 @@ public final class WorkPositions {
         // Non-directional (crops, ore, brewing stand, ...; trees are handled above): the nearest
         // ring, from `distance` out, that has a tile the worker fits on; in that ring, the tile
         // nearest the worker. Rings are square (cardinal and diagonal tiles), and each tile is also
-        // tried one block up and down so slopes work.
+        // tried one block up and down so slopes work. A worker eating from a trough stands square to
+        // one of its sides if it can, so its head is over the food, not at a corner.
         Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
+        boolean squareOn = jobType == JobType.EAT_FOOD;
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
+            BlockPos bestSquare = null;
+            double bestSquareDistSq = Double.MAX_VALUE;
             for (BlockPos candidate : ring(targetPos, d)) {
                 // One height per tile: the first that works, level ground first
                 BlockPos spot = firstHeight(candidate, SLOPE_STEPS, fitsThere);
@@ -98,6 +102,14 @@ public final class WorkPositions {
                     best = spot;
                     bestDistSq = distSq;
                 }
+                boolean square = candidate.getX() == targetPos.getX() || candidate.getZ() == targetPos.getZ();
+                if (squareOn && square && distSq < bestSquareDistSq - 1e-6) {
+                    bestSquare = spot;
+                    bestSquareDistSq = distSq;
+                }
+            }
+            if (bestSquare != null) {
+                return bestSquare;
             }
             if (best != null) {
                 return best;

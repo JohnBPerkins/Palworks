@@ -28,6 +28,9 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
   summary's Info page names them, in the box beside the experience bar. Hover either for the full
   list.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
+- **Hunger and troughs** — work makes workers hungry (see [Hunger](#hunger)). Fill a **trough** with
+  Cobblemon berries or Aprijuice and they walk over and eat from it. A worker
+  that's run out of food works at a quarter speed until it eats.
 - **Work toggle** — shift-right-click your Pokémon and use the bottom slot of the interact wheel
   to switch its work on (green check) or off (red cross).
 - **Work icons on the party HUD** — in the top-left corner of each sent-out party member's card, next
@@ -70,7 +73,14 @@ settings that aren't per-Pokémon:
   "owner_range": 24,
   "pickup_radius": 3.0,
   "fertilize_chance_per_level": 0.1,
-  "watering_cooldown_seconds": 60
+  "watering_cooldown_seconds": 60,
+  "hunger": {
+    "enabled": true,
+    "work_per_fullness": 20,
+    "idle_drain_per_day": 0.25,
+    "trough_fill_fraction": 0.5,
+    "empty_work_speed": 0.25
+  }
 }
 ```
 
@@ -86,9 +96,81 @@ settings that aren't per-Pokémon:
   10% of the crops it waters, a level 3 Blastoise 30%.
 - **`watering_cooldown_seconds`** (5 to 600): how long after a crop is watered until it can be
   watered again. Crops watered before a restart can be watered again straight away.
+- **`hunger`**: how workers get hungry and eat (see [Hunger](#hunger)).
+  - **`enabled`**: `false` turns hunger off: Palworks leaves fullness entirely to Cobblemon.
+  - **`work_per_fullness`** (1 to 500): how many units of work use up one point of fullness. A
+    unit is a crop harvested, a seed planted, a crop watered, a furnace lit, a trip to pick up or
+    deliver, or every 8 logs of a tree (at most 5 a tree).
+  - **`idle_drain_per_day`** (0 to 1): the share of its max fullness a worker loses over a Minecraft
+    day while its work is on, working or not.
+  - **`trough_fill_fraction`** (0 to 1): how full troughs fill a worker, as a share of its max
+    fullness. The rest is left for hand-feeding. 0 and troughs never feed.
+  - **`empty_work_speed`** (0.1 to 1): how fast a worker with no fullness left works and walks.
 
 Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
 the server logs a warning and uses the defaults. Changes apply the next time the server starts.
+
+## Hunger
+
+A worker's hunger is its Cobblemon **fullness**, the bar on its summary screen: Palworks adds no
+stat of its own.
+
+- **While its work is on**, Cobblemon's own drain of its fullness is paused, and Palworks drains
+  it instead: a point for every 20 units of work it does (a crop harvested, a seed planted, a trip
+  made...), and a quarter of its bar over each Minecraft day. With its work off, or back in its
+  ball, it's a normal Cobblemon Pokémon again, and Palworks doesn't touch its fullness.
+- **When it's below half full** it walks to the nearest **trough** with feed and eats, a point at
+  a time, until it's half full. The other half is left for you: a full Pokémon refuses Mochi and
+  berries fed by hand. Eating from a trough only fills it up; the food's own effects (EVs,
+  friendship, healing) don't happen.
+- **With no fullness left** it works and walks at a quarter speed, with a half hunger shank over
+  its head, until it eats. It never stops working.
+
+A **trough** comes in every wood (oak, spruce, birch, jungle, acacia, dark oak, mangrove, cherry,
+bamboo, crimson and warped), crafted from 5 of that wood's slabs (two on the top row's ends, three
+along the bottom). It holds **feed**, as a composter holds compost: food put in it becomes feed,
+worth the fullness it gives (a point a berry), and workers eat it a point at a time.
+Each trough holds 64 points; an empty one shows its bare wooden bottom, and a layer of feed rises
+as it fills. Troughs placed side by side join into one long trough, whatever their woods, and share
+their feed evenly: food put in anywhere spreads along all of them, and workers eat at any of them.
+Feed can't be taken back out, and breaking a trough loses its share.
+
+Filling them:
+
+- **Right-click a trough holding food** to put one in; **shift-right-click** to put the whole stack
+  in, as far as there's room along it. Right-click with anything else to see how much feed it has.
+- **Hoppers** feed troughs as they do composters.
+- **Transporters take food to troughs first.** Harvested berries they carry go to the nearest
+  trough with room before a chest, so a berry farm keeps its workers fed.
+- **Transporters restock troughs from chests.** When a trough in reach has less than 16 feed left,
+  a transporter fetches a stack of food from a chest that has some.
+
+Troughs take the items in the `palworks:trough_food` item tag: by default Cobblemon's berries and
+Aprijuices. Datapacks can add to the tag, and set how much feed an item is worth in
+`data/<namespace>/palworks/trough_food/<name>.json` (anything not listed is worth 1):
+
+```json
+{
+  "values": [
+    { "item": "cobblemon:sitrus_berry", "fullness": 2 },
+    { "tag": "cobblemon:berries", "fullness": 1 }
+  ]
+}
+```
+
+### Display settings
+
+`config/palworks-client.json` (written with the defaults the first time the game starts) holds each
+player's own display settings:
+
+```json
+{
+  "show_status_icons": true
+}
+```
+
+- **`show_status_icons`**: whether workers show what's holding their work back (a half hunger
+  shank when they're out of food) over their heads.
 
 ## Customizing work skills
 

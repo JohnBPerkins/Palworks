@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "#cobblemon:berries",
+      "required": false
+    },
+    {
+      "id": "#cobblemon:aprijuices",
+      "required": false
+    }
+  ]
+}

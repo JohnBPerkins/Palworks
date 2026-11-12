@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "trough",
+  "pattern": [
+    "S S",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:cherry_slab"
+    }
+  },
+  "result": {
+    "id": "palworks:cherry_trough",
+    "count": 1
+  }
+}

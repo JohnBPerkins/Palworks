@@ -25,5 +25,17 @@
   "palworks.ui.work_skills.title": "Work skills",
   "palworks.ui.work_skills.entry": "%s: level %s",
   "palworks.ui.work_skills.more": "+%s more",
-  "palworks.ui.work_skills.none": "Can't work"
+  "palworks.ui.work_skills.none": "Can't work",
+  "block.palworks.oak_trough": "Oak Trough",
+  "block.palworks.spruce_trough": "Spruce Trough",
+  "block.palworks.birch_trough": "Birch Trough",
+  "block.palworks.jungle_trough": "Jungle Trough",
+  "block.palworks.acacia_trough": "Acacia Trough",
+  "block.palworks.dark_oak_trough": "Dark Oak Trough",
+  "block.palworks.mangrove_trough": "Mangrove Trough",
+  "block.palworks.cherry_trough": "Cherry Trough",
+  "block.palworks.bamboo_trough": "Bamboo Trough",
+  "block.palworks.crimson_trough": "Crimson Trough",
+  "block.palworks.warped_trough": "Warped Trough",
+  "palworks.trough.feed": "Feed: %s/%s"
 }

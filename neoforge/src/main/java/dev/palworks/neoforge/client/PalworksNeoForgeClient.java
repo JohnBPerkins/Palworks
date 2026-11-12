@@ -4,6 +4,7 @@ import dev.palworks.Palworks;
 import dev.palworks.client.PalworksClient;
 import dev.palworks.client.debug.WorkerDebugRenderer;
 import dev.palworks.client.hud.WorkStatusHud;
+import dev.palworks.client.render.StatusIconRenderer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.fml.common.Mod;
@@ -25,11 +26,13 @@ public class PalworksNeoForgeClient {
                 RenderGuiEvent.Post.class,
                 renderEvent -> WorkStatusHud.render(renderEvent.getGuiGraphics()));
 
-        // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
+        // The /palworks debug overlay (job icons above workers' heads, their paths and job blocks),
+        // and what's holding workers back (hungry...), over their heads
         NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, stageEvent -> {
             if (RenderLevelStageEvent.Stage.AFTER_ENTITIES.equals(stageEvent.getStage())) {
-                WorkerDebugRenderer.render(
-                        stageEvent.getCamera(), stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false));
+                float partialTick = stageEvent.getPartialTick().getGameTimeDeltaPartialTick(false);
+                WorkerDebugRenderer.render(stageEvent.getCamera(), partialTick);
+                StatusIconRenderer.render(stageEvent.getCamera(), partialTick);
             }
         });
     }

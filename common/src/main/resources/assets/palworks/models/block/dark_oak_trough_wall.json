@@ -1,0 +1,7 @@
+{
+  "parent": "palworks:block/template_trough_wall",
+  "textures": {
+    "wood": "minecraft:block/dark_oak_planks",
+    "particle": "minecraft:block/dark_oak_planks"
+  }
+}

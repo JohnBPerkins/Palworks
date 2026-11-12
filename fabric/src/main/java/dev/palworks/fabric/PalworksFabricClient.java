@@ -4,6 +4,7 @@ import dev.palworks.Palworks;
 import dev.palworks.client.PalworksClient;
 import dev.palworks.client.debug.WorkerDebugRenderer;
 import dev.palworks.client.hud.WorkStatusHud;
+import dev.palworks.client.render.StatusIconRenderer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -28,6 +29,10 @@ public class PalworksFabricClient implements ClientModInitializer {
 
         // The /palworks debug overlay: job icons above workers' heads, their paths and job blocks
         WorldRenderEvents.AFTER_ENTITIES.register(context -> WorkerDebugRenderer.render(
+                context.camera(), context.tickCounter().getGameTimeDeltaPartialTick(false)));
+
+        // What's holding workers back (hungry...), over their heads
+        WorldRenderEvents.AFTER_ENTITIES.register(context -> StatusIconRenderer.render(
                 context.camera(), context.tickCounter().getGameTimeDeltaPartialTick(false)));
     }
 }

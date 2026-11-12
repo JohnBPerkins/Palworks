@@ -25,6 +25,7 @@ final class FuelFurnaceHandler implements JobHandler {
     private static void ignite(JobContext ctx) {
         int burnDuration = dev.palworks.station.FurnaceHelper.getBurnDuration();
         dev.palworks.station.FurnaceHelper.igniteFurnace(ctx.level(), ctx.pos(), burnDuration);
+        ctx.didWork(1);
         Palworks.LOGGER.debug("{} ignited furnace at {} for {} ticks", ctx.name(), ctx.pos(), burnDuration);
     }
 

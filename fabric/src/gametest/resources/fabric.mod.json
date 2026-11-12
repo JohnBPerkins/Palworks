@@ -20,7 +20,8 @@
       "dev.palworks.gametest.PathingGameTests",
       "dev.palworks.gametest.SharedJobGameTests",
       "dev.palworks.gametest.WateringGameTests",
-      "dev.palworks.gametest.WorkLevelSyncGameTests"
+      "dev.palworks.gametest.WorkLevelSyncGameTests",
+      "dev.palworks.gametest.HungerGameTests"
     ]
   },
   "mixins": [

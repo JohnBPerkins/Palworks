@@ -3,6 +3,7 @@ package dev.palworks.client.debug;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import dev.palworks.job.JobType;
+import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.net.packets.WorkerDebugPacket.Details;
 import dev.palworks.net.packets.WorkerDebugPacket.PathStatus;
 import dev.palworks.worker.WorkActivity;
@@ -65,6 +66,34 @@ class WorkerDebugTextTest {
                         line("job 45.0s", false),
                         line("step 2/3 chop · 34/60t", false)),
                 lines(WORKING, d, 0));
+    }
+
+    private static Details withFullness(WorkerDebugPacket.Fullness fullness) {
+        return new Details(-1, -1, "", 0, 0, 0, 0, PathStatus.NONE, 0, 0, 0, fullness);
+    }
+
+    @Test
+    void aWorkersFullnessIsShown() {
+        assertEquals(
+                line("fullness 2/4 · eats below 2 · next 35%", false),
+                lines(WorkActivity.IDLE, withFullness(new WorkerDebugPacket.Fullness(2, 4, 2, 35, true)), 0)
+                        .get(1));
+    }
+
+    @Test
+    void anEmptyWorkerIsAWarning() {
+        assertEquals(
+                line("fullness 0/4 · eats below 2 · next 0%", true),
+                lines(WorkActivity.IDLE, withFullness(new WorkerDebugPacket.Fullness(0, 4, 2, 0, true)), 0)
+                        .get(1));
+    }
+
+    @Test
+    void aSwitchedOffWorkersFullnessIsCobblemons() {
+        assertEquals(
+                line("fullness 0/4 (Cobblemon's)", false),
+                lines(WorkActivity.OFF, withFullness(new WorkerDebugPacket.Fullness(0, 4, 2, 0, false)), 0)
+                        .get(1));
     }
 
     @Test

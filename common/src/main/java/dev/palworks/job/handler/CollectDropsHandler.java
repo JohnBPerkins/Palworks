@@ -39,6 +39,7 @@ final class CollectDropsHandler implements JobHandler {
         }
 
         if (pickedUp > 0) {
+            ctx.didWork(1); // one trip, however much it carried back
             Palworks.LOGGER.debug("{} collected {} dropped items from ground at {}", ctx.name(), pickedUp, targetPos);
         }
     }

@@ -27,6 +27,7 @@ final class WaterCropsHandler implements JobHandler {
         }
         int wateringLevel = SuitabilityDetector.getSuitabilityLevel(ctx.pokemon(), Suitability.WATERING);
         boolean fertilized = Watering.water(level, ctx.pos(), Watering.fertilizeChance(wateringLevel));
+        ctx.didWork(1);
         Palworks.LOGGER.debug(
                 "{} (Watering {}) watered the crop at {}{}",
                 ctx.name(),

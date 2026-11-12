@@ -1,5 +1,6 @@
 package dev.palworks.client.debug;
 
+import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.net.packets.WorkerDebugPacket.Details;
 import dev.palworks.net.packets.WorkerDebugPacket.PathStatus;
 import dev.palworks.worker.WorkActivity;
@@ -87,6 +88,21 @@ public final class WorkerDebugText {
                 parts.add("step-in " + d.stepInTicks() + "/" + maxStepInTicks);
             }
             lines.add(new Line(String.join(" · ", parts), warning));
+        }
+
+        WorkerDebugPacket.Fullness fullness = d.fullness();
+        if (fullness.max() > 0) {
+            String text = fullness.palworks()
+                    ? String.format(
+                            Locale.ROOT,
+                            "fullness %d/%d · eats below %d · next %d%%",
+                            fullness.current(),
+                            fullness.max(),
+                            fullness.troughCap(),
+                            fullness.owedPercent())
+                    : String.format(Locale.ROOT, "fullness %d/%d (Cobblemon's)", fullness.current(), fullness.max());
+            // Empty: it works slower until it eats
+            lines.add(new Line(text, fullness.palworks() && fullness.current() == 0));
         }
 
         if (unreachableSpots > 0) {

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "trough",
+  "pattern": [
+    "S S",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:spruce_slab"
+    }
+  },
+  "result": {
+    "id": "palworks:spruce_trough",
+    "count": 1
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "palworks:block/template_trough_base",
+  "textures": {
+    "wood": "minecraft:block/acacia_planks",
+    "particle": "minecraft:block/acacia_planks"
+  }
+}

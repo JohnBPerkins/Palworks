@@ -1,5 +1,6 @@
 package dev.palworks.station;
 
+import dev.palworks.block.TroughBlockEntity;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -101,13 +102,21 @@ public class ChestHelper {
      */
     public static boolean canAcceptItems(Level level, BlockPos pos, ItemStack stack) {
         BlockEntity blockEntity = level.getBlockEntity(pos);
+        // A trough takes food as feed, along it and the troughs joined to it
+        if (blockEntity instanceof TroughBlockEntity trough) {
+            return trough.canAccept(stack);
+        }
         if (!(blockEntity instanceof Container container)) {
             return false;
         }
 
-        // Simple check: look for empty slot or matching stack with space
+        // Simple check: look for empty slot or matching stack with space, in a slot that takes it
+        // (a trough only takes food)
         for (int i = 0; i < container.getContainerSize(); i++) {
             ItemStack slotStack = container.getItem(i);
+            if (!container.canPlaceItem(i, stack)) {
+                continue;
+            }
             if (slotStack.isEmpty()) {
                 return true;
             }
@@ -127,6 +136,10 @@ public class ChestHelper {
      */
     public static int insertItems(Level level, BlockPos chestPos, ItemStack stack) {
         BlockEntity blockEntity = level.getBlockEntity(chestPos);
+        // A trough takes food as feed, along it and the troughs joined to it (anything else, none)
+        if (blockEntity instanceof TroughBlockEntity trough) {
+            return trough.addFood(stack);
+        }
         if (!(blockEntity instanceof Container container)) {
             return stack.getCount();
         }
@@ -143,7 +156,8 @@ public class ChestHelper {
             }
         }
         for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
-            if (container.getItem(i).isEmpty()) {
+            // Only where the container takes it (a trough only takes food)
+            if (container.getItem(i).isEmpty() && container.canPlaceItem(i, stack)) {
                 int toAdd = Math.min(remaining, stack.getMaxStackSize());
                 container.setItem(i, stack.copyWithCount(toAdd));
                 remaining -= toAdd;

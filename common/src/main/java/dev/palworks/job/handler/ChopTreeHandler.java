@@ -3,6 +3,7 @@ package dev.palworks.job.handler;
 import dev.palworks.Palworks;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.animation.WorkAnimations;
+import dev.palworks.hunger.HungerMath;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.tree.TreeDetector;
@@ -99,6 +100,8 @@ final class ChopTreeHandler implements JobHandler {
         for (BlockPos canopyPos : canopy) {
             level.destroyBlock(canopyPos, true);
         }
+        // A tree counts by its size, but only so far: one huge tree doesn't empty the worker
+        ctx.didWork(HungerMath.treeUnits(logsChopped));
 
         Palworks.LOGGER.debug(
                 "{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",

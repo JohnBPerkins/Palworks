@@ -51,6 +51,7 @@ final class GetSeedsHandler implements JobHandler {
             if (!extracted.isEmpty()) {
                 int leftover = inventory.addItem(extracted);
                 ChestHelper.returnLeftover(ctx.level(), targetPos, extracted, leftover);
+                ctx.didWork(1);
                 Palworks.LOGGER.debug(
                         "{} got {} {} seeds from chest at {} ({} leftover)",
                         ctx.name(),
@@ -70,6 +71,7 @@ final class GetSeedsHandler implements JobHandler {
             if (!extracted.isEmpty()) {
                 int leftover = inventory.addItem(extracted);
                 ChestHelper.returnLeftover(ctx.level(), targetPos, extracted, leftover);
+                ctx.didWork(1);
                 Palworks.LOGGER.debug(
                         "{} got {} nether wart from chest at {} ({} leftover)",
                         ctx.name(),

@@ -6,6 +6,9 @@ import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.debug.DebugManager;
+import dev.palworks.hunger.EatingDisplay;
+import dev.palworks.hunger.Hunger;
+import dev.palworks.hunger.HungerMath;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
@@ -20,6 +23,7 @@ import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import dev.palworks.worker.WorkerStatusSync;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -76,12 +80,16 @@ public class WorkerAI {
      */
     public static boolean tick(Pokemon pokemon, Mob entity, Level level) {
         boolean handled = tickWork(pokemon, entity, level);
+        // Holding the food it's eating, and dropping crumbs
+        EatingDisplay.tick(entity, level, WorkerStateManager.getOrCreate(pokemon));
         // After the tick, so they reflect where it ended up (e.g. a job dropped this tick): what
         // its owner is shown, the aspects its poser animates from, and whether the animation it's
         // playing still belongs to a step it's on.
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
         WorkActivity activity = WorkActivitySync.update(pokemon, entity, state, level.getGameTime());
         WorkAspectSync.update(pokemon, activity, level.getGameTime());
+        // What's holding it back (hungry), shown over its head
+        WorkerStatusSync.update(pokemon, state);
         WorkAnimator.update(entity, state);
         return handled;
     }
@@ -92,12 +100,18 @@ public class WorkerAI {
 
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
 
-        // Before the enabled check: a disabled worker still shows what it's carrying.
-        showCarriedItem(entity, WorkerInventoryManager.getOrCreate(pokemon));
+        // Before the enabled check: a disabled worker still shows what it's carrying. One that's
+        // eating shows the food instead.
+        ItemStack eating = EatingDisplay.eating(level, state);
+        showItem(
+                entity,
+                eating.isEmpty() ? WorkerInventoryManager.getOrCreate(pokemon).getFirstItem() : eating);
 
         // New workers start enabled (see WorkerState), so a disabled state means it was turned off
-        // on purpose (/palworks worker disable). Respect that instead of re-enabling it.
+        // on purpose (/palworks worker disable). Respect that instead of re-enabling it. Its
+        // hunger is Cobblemon's again: no rest after its last job carries over.
         if (!state.isEnabled()) {
+            state.setRestUntil(0);
             return false;
         }
 
@@ -116,6 +130,10 @@ public class WorkerAI {
             }
             return false;
         }
+
+        // Its work uses up its fullness, a little all the time, whether it has a job or not (the work
+        // it does uses up more, as it does it: see Hunger.didWork)
+        Hunger.tick(pokemon, state);
 
         // Handle current reservation
         ReservationId reservation = state.getCurrentReservation();
@@ -335,6 +353,7 @@ public class WorkerAI {
             // Job complete - clear reservation
             state.clearReservation();
             state.resetPathFailures();
+            restAfterJob(pokemon, entity, level, state, reservation.getJobType());
 
             // Opt-in activity message (only players who ran /palworks debug see it)
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
@@ -389,7 +408,7 @@ public class WorkerAI {
         if (state.getStepTicks() > 0) {
             state.restartStep();
         }
-        navigateToJob(entity, standPos);
+        navigateToJob(entity, standPos, walkSpeed(pokemon, state, reservation.getJobType()));
         state.setWalkedToJob(true);
         state.resetStepIn();
 
@@ -535,8 +554,27 @@ public class WorkerAI {
      * along (see {@link WorkerNavigator}). The path ends on the tile itself, so a stance only just
      * off its tile (right up against a trunk) gets there too.
      */
-    private static void navigateToJob(Mob entity, BlockPos standPos) {
-        WorkerNavigator.walkTo(entity, standPos, 0.6);
+    private static void navigateToJob(Mob entity, BlockPos standPos, double speed) {
+        WorkerNavigator.walkTo(entity, standPos, speed);
+    }
+
+    /** Normal walking speed (0.6), slower for a worker with no fullness left; never on its way to eat. */
+    private static double walkSpeed(Pokemon pokemon, WorkerState state, JobType jobType) {
+        return jobType == JobType.EAT_FOOD ? 0.6 : 0.6 * Hunger.workSpeed(pokemon, state);
+    }
+
+    /**
+     * After a job, a worker with no fullness left rests before taking another, for long enough that
+     * it gets through its work at its slower speed (see {@link HungerMath#restTicks}). Not after
+     * eating, which is what makes it better.
+     */
+    private static void restAfterJob(Pokemon pokemon, Mob entity, Level level, WorkerState state, JobType jobType) {
+        double speed = Hunger.workSpeed(pokemon, state);
+        if (jobType == JobType.EAT_FOOD || speed >= 1) {
+            return;
+        }
+        long rest = HungerMath.restTicks(JobHandlerRegistry.jobTicks(jobType, entity), speed);
+        state.setRestUntil(level.getGameTime() + rest);
     }
 
     /**
@@ -570,22 +608,23 @@ public class WorkerAI {
     }
 
     /**
-     * Show the first item the worker is carrying, without touching its real Cobblemon held item.
+     * Show an item on the worker (the first it's carrying, or the food it's eating), without
+     * touching its real Cobblemon held item.
      *
      * <p>Cobblemon renders a Pokemon's held item if it has one (and it isn't hidden), and otherwise
      * whatever is in the entity's main hand, which Cobblemon itself never uses. So a display copy
      * goes in the main hand. Covers every way the inventory changes (jobs, the inventory screen,
      * debug commands) because it runs every tick; the comparison keeps it from resending.
      */
-    private static void showCarriedItem(Mob entity, WorkerInventory inventory) {
-        ItemStack carried = inventory.getFirstItem();
+    private static void showItem(Mob entity, ItemStack carried) {
         if (ItemStack.isSameItemSameComponents(entity.getMainHandItem(), carried)) {
             return;
         }
         // Count doesn't matter for display, and one item keeps the copy obviously cosmetic.
         entity.setItemSlot(EquipmentSlot.MAINHAND, carried.copyWithCount(1));
         // The copy is purely visual: it must never drop (on death, or when vanilla swaps a mob's
-        // equipment), or it would duplicate the item that's still in the worker's inventory.
+        // equipment), or it would duplicate the item that's still in the worker's inventory (or
+        // the trough).
         entity.setDropChance(EquipmentSlot.MAINHAND, 0.0F);
     }
 }

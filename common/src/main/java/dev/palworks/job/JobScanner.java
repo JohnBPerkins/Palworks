@@ -225,9 +225,12 @@ final class JobScanner {
 
                         BlockState state = level.getBlockState(pos);
 
-                        // Remember chests so delivery can pick one without its own block search
+                        // Remember chests and troughs so delivery and eating can pick one without
+                        // their own block search
                         if (JobChecks.isChest(state)) {
                             cache.addChest(pos.immutable());
+                        } else if (JobChecks.isTrough(state)) {
+                            cache.addTrough(pos.immutable());
                         }
 
                         // Check for job opportunities at this position
@@ -423,18 +426,31 @@ final class JobScanner {
      * {@code center}'s (delivery targets). Up to a scan old: check they're still chests.
      */
     List<BlockPos> chestsNear(BlockPos center, int chunkRadius) {
-        List<BlockPos> chests = new ArrayList<>();
+        return near(center, chunkRadius, ChunkJobCache::chests);
+    }
+
+    /**
+     * The troughs the last scans found in the square of chunks {@code chunkRadius} round
+     * {@code center}'s (where workers eat). Up to a scan old: check they're still troughs.
+     */
+    List<BlockPos> troughsNear(BlockPos center, int chunkRadius) {
+        return near(center, chunkRadius, ChunkJobCache::troughs);
+    }
+
+    private List<BlockPos> near(
+            BlockPos center, int chunkRadius, java.util.function.Function<ChunkJobCache, List<BlockPos>> found) {
+        List<BlockPos> positions = new ArrayList<>();
         int baseChunkX = center.getX() >> 4;
         int baseChunkZ = center.getZ() >> 4;
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
                 ChunkJobCache cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
                 if (cache != null) {
-                    chests.addAll(cache.chests());
+                    positions.addAll(found.apply(cache));
                 }
             }
         }
-        return chests;
+        return positions;
     }
 
     /**
@@ -463,6 +479,7 @@ final class JobScanner {
         private final long scanTime;
         private final Map<JobType, List<BlockPos>> jobs = new EnumMap<>(JobType.class);
         private final List<BlockPos> chests = new ArrayList<>(); // delivery targets
+        private final List<BlockPos> troughs = new ArrayList<>(); // where workers eat
         private boolean dirty;
 
         ChunkJobCache(long scanTime) {
@@ -490,6 +507,15 @@ final class JobScanner {
 
         void addChest(BlockPos pos) {
             chests.add(pos);
+        }
+
+        /** Troughs seen in the scan. */
+        List<BlockPos> troughs() {
+            return troughs;
+        }
+
+        void addTrough(BlockPos pos) {
+            troughs.add(pos);
         }
 
         /** Whether something in the chunk changed since, so it needs scanning again. */

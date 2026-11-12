@@ -48,7 +48,7 @@ public final class JobRecord {
 
     /** A job found at {@code position}, needing its type's suitability. */
     public static JobRecord of(JobType type, BlockPos position, long gameTime) {
-        return of(type, position, gameTime, EnumSet.of(type.getRequiredSuitability()));
+        return of(type, position, gameTime, type.requiredSuitabilities());
     }
 
     /** A job found at {@code position} that needs other suitabilities than its type's (Nether work). */
@@ -62,7 +62,7 @@ public final class JobRecord {
      * never removes them.
      */
     public static JobRecord followUp(JobType type, BlockPos position, long gameTime, @Nullable UUID suggestedWorker) {
-        JobRecord job = new JobRecord(type, position, gameTime, EnumSet.of(type.getRequiredSuitability()), true);
+        JobRecord job = new JobRecord(type, position, gameTime, type.requiredSuitabilities(), true);
         job.reservedBy = suggestedWorker;
         return job;
     }

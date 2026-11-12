@@ -1,16 +1,21 @@
 package dev.palworks;
 
 import dev.architectury.event.events.common.CommandRegistrationEvent;
+import dev.architectury.event.events.common.InteractionEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.registry.ReloadListenerRegistry;
 import dev.palworks.animation.WorkAnimationReloadListener;
 import dev.palworks.animation.WorkAspectSync;
+import dev.palworks.block.ModBlocks;
+import dev.palworks.block.TroughBlock;
 import dev.palworks.command.PalworksCommands;
+import dev.palworks.hunger.TroughFoodReloadListener;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.suitability.SuitabilityReloadListener;
 import dev.palworks.worker.WorkLevelSync;
+import dev.palworks.worker.WorkerStatusSync;
 import dev.palworks.worker.WorkerTicking;
 import net.minecraft.server.packs.PackType;
 
@@ -24,6 +29,7 @@ public final class PalworksCommon {
     public static void init() {
         Palworks.LOGGER.info("Palworks initializing...");
 
+        ModBlocks.register();
         ModMenuTypes.register();
 
         // Work suitabilities (data/<namespace>/palworks/suitability) and species' own work
@@ -32,9 +38,15 @@ public final class PalworksCommon {
                 PackType.SERVER_DATA, new SuitabilityReloadListener(), SuitabilityReloadListener.ID);
         ReloadListenerRegistry.register(
                 PackType.SERVER_DATA, new WorkAnimationReloadListener(), WorkAnimationReloadListener.ID);
+        // How much fullness each trough food gives (data/<namespace>/palworks/trough_food)
+        ReloadListenerRegistry.register(
+                PackType.SERVER_DATA, new TroughFoodReloadListener(), TroughFoodReloadListener.ID);
 
         CommandRegistrationEvent.EVENT.register(
                 (dispatcher, registryAccess, selection) -> dispatcher.register(PalworksCommands.build()));
+
+        // Shift-right-clicking a trough with food puts the whole stack in
+        InteractionEvent.RIGHT_CLICK_BLOCK.register(TroughBlock::onShiftRightClick);
 
         // Run workers: each from its own entity tick (PokemonEntityTickMixin), JobManager once a tick
         LifecycleEvent.SERVER_STARTING.register(server -> WorkerTicking.onServerStarting());
@@ -48,6 +60,8 @@ public final class PalworksCommon {
 
         // Show what workers are doing as aspects, for posers to animate from
         WorkAspectSync.register();
+        // And what's holding them back (hungry), for clients to show over their heads
+        WorkerStatusSync.register();
 
         // CI's server boot test looks for this line (.github/scripts/boot_server.sh)
         Palworks.LOGGER.info("Palworks initialized!");

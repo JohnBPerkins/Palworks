@@ -1,6 +1,7 @@
 package dev.palworks.config;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -54,6 +55,46 @@ class PalworksConfigTest {
         assertEquals(0.05, config.fertilizeChancePerLevel());
         assertEquals(30, config.wateringCooldownSeconds());
         assertEquals(List.of(), warnings);
+    }
+
+    @Test
+    void hungerSettingsAreReadFromTheirOwnObject() {
+        List<String> warnings = new ArrayList<>();
+        PalworksConfig config = parse(
+                "{\"hunger\": {\"work_per_fullness\": 40, \"empty_work_speed\": 0.5, \"trough_fill_fraction\": 0}}",
+                warnings);
+        assertEquals(List.of(), warnings);
+        assertEquals(
+                new PalworksConfig.HungerConfig(
+                        true, 40, PalworksConfig.HungerConfig.DEFAULTS.idleDrainPerDay(), 0.0, 0.5),
+                config.hunger());
+        assertEquals(PalworksConfig.DEFAULTS.withHunger(config.hunger()), config);
+    }
+
+    @Test
+    void hungerCanBeTurnedOff() {
+        List<String> warnings = new ArrayList<>();
+        assertFalse(
+                parse("{\"hunger\": {\"enabled\": false}}", warnings).hunger().enabled());
+        assertEquals(List.of(), warnings);
+    }
+
+    @Test
+    void theHungerDefaultsAreAQuarterADayAndAQuarterSpeed() {
+        PalworksConfig.HungerConfig hunger = PalworksConfig.DEFAULTS.hunger();
+        assertTrue(hunger.enabled());
+        assertEquals(20, hunger.workPerFullness());
+        assertEquals(0.25, hunger.idleDrainPerDay());
+        assertEquals(0.5, hunger.troughFillFraction());
+        assertEquals(0.25, hunger.emptyWorkSpeed());
+    }
+
+    @Test
+    void anEmptySpeedOfNothingIsRefused() {
+        // A worker that never works would be stuck: at least a tenth
+        List<String> warnings = new ArrayList<>();
+        assertEquals(PalworksConfig.DEFAULTS, parse("{\"hunger\": {\"empty_work_speed\": 0}}", warnings));
+        assertEquals(1, warnings.size());
     }
 
     @Test

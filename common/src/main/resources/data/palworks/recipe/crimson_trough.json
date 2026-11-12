@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "trough",
+  "pattern": [
+    "S S",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:crimson_slab"
+    }
+  },
+  "result": {
+    "id": "palworks:crimson_trough",
+    "count": 1
+  }
+}

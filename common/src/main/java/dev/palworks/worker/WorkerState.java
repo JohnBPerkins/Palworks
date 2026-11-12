@@ -36,6 +36,13 @@ public class WorkerState {
     // Ticks spent stepping the last bit onto its stand tile after its walk ended just short (not saved)
     private int stepInTicks;
 
+    // Fullness used up but not yet taken off (see dev.palworks.hunger.Hunger), in points: whole
+    // points come off as they build up. Saved, so work done just before a reload still counts.
+    private double fullnessOwed;
+    // Game time until which an empty worker rests after a job before taking another (not saved: a
+    // reload just ends its rest), so it gets through work at its slower speed
+    private long restUntil;
+
     public WorkerState() {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
@@ -193,6 +200,24 @@ public class WorkerState {
         return jobStep > 0;
     }
 
+    /** Fullness used up but not yet taken off its Pokémon, in points (see Hunger). */
+    public double getFullnessOwed() {
+        return fullnessOwed;
+    }
+
+    public void setFullnessOwed(double fullnessOwed) {
+        this.fullnessOwed = Math.max(0, fullnessOwed);
+    }
+
+    /** Game time an empty worker rests until before taking another job (0 for none). */
+    public long getRestUntil() {
+        return restUntil;
+    }
+
+    public void setRestUntil(long restUntil) {
+        this.restUntil = restUntil;
+    }
+
     /** Whether the worker is partway through the job, including the current step. */
     public boolean isWorking() {
         return jobStep > 0 || stepTicks > 0;
@@ -216,6 +241,9 @@ public class WorkerState {
 
         tag.putInt("pathFailCount", pathFailCount);
         tag.putLong("lastPathFailTime", lastPathFailTime);
+        if (fullnessOwed > 0) {
+            tag.putDouble("fullnessOwed", fullnessOwed);
+        }
 
         // Serialize current reservation
         if (currentReservation != null) {
@@ -247,6 +275,8 @@ public class WorkerState {
 
         pathFailCount = tag.getInt("pathFailCount");
         lastPathFailTime = tag.getLong("lastPathFailTime");
+        // Missing: none owed (saved before hunger, or nothing was)
+        fullnessOwed = Math.max(0, tag.getDouble("fullnessOwed"));
 
         // Deserialize current reservation
         if (tag.contains("currentReservation")) {
