@@ -63,6 +63,9 @@ public class WorkerGameTests {
     // A Grass type (Planting, Gathering) and a Fighting type (Lumbering)
     private static final String BULBASAUR = "bulbasaur level=20";
     private static final String MACHOP = "machop level=20";
+    // A Flying type (Transporting): planters can't take seeds out of chests, a transporter brings them
+    private static final String PIDGEY = "pidgey level=20";
+    private static final BlockPos TRANSPORTER = new BlockPos(1, 1, 1);
 
     private static final CropBlock WHEAT = (CropBlock) Blocks.WHEAT;
     private static final BlockPos START = new BlockPos(3, 1, 1);
@@ -351,8 +354,8 @@ public class WorkerGameTests {
         });
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "worker_plant_chest", timeoutTicks = 1000)
-    public void planterFetchesSeedsFromAChest(GameTestHelper helper) {
+    @GameTest(template = Templates.EMPTY, batch = "worker_plant_chest", timeoutTicks = 1600)
+    public void aTransporterBringsAPlanterSeedsFromAChest(GameTestHelper helper) {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         for (int x = 2; x <= 4; x++) {
@@ -363,6 +366,7 @@ public class WorkerGameTests {
         ((ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos)))
                 .setItem(0, new ItemStack(Items.WHEAT_SEEDS, 8));
         Workers.sendOut(helper, BULBASAUR, START);
+        Workers.sendOut(helper, PIDGEY, TRANSPORTER);
 
         helper.succeedWhen(() -> assertWheatRow(helper, 0, "planted with seeds from the chest"));
     }
@@ -682,21 +686,23 @@ public class WorkerGameTests {
         }
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "worker_wart_mixed_chest", timeoutTicks = 1000)
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_mixed_chest", timeoutTicks = 1600)
     public void aGhostTypeFetchesNetherWartFromAChestWithSeedsInItToo(GameTestHelper helper) {
         // A chest with seeds and wart used to be a seed chest for planters only
         soulSandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8), new ItemStack(Items.NETHER_WART, 8));
         Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether only
+        Workers.sendOut(helper, PIDGEY, TRANSPORTER); // brings it the wart
 
         helper.succeedWhen(() -> assertWartPlanted(helper));
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "worker_wart_planter", timeoutTicks = 1000)
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_planter", timeoutTicks = 1600)
     public void aPlanterThatIsAGhostTypeFetchesNetherWartToo(GameTestHelper helper) {
         // Nether work is all wart needs, whatever else it can do: a planter used to look for
         // farmland seeds in the chest instead, and take nothing
         soulSandAndChest(helper, new ItemStack(Items.NETHER_WART, 8));
         Workers.sendOut(helper, "phantump level=20", START); // Ghost/Grass: Planting, Gathering, Nether
+        Workers.sendOut(helper, PIDGEY, TRANSPORTER); // brings it the wart
 
         helper.succeedWhen(() -> assertWartPlanted(helper));
     }

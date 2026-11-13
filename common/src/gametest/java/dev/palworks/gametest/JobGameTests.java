@@ -207,15 +207,16 @@ public class JobGameTests {
         Workers.isolate(helper);
         BlockPos chest = new BlockPos(3, 1, 3);
         helper.setBlock(chest, Blocks.CHEST);
-        Pokemon worker = Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(1, 1, 1))
+        // Only transporters take seeds out of chests (a planter's are brought it)
+        Pokemon worker = Workers.sendOut(helper, "pidgey level=20", new BlockPos(1, 1, 1))
                 .getPokemon();
-        WorkerInventory pouch = WorkerInventoryManager.getOrCreate(worker);
+        WorkerInventory bag = WorkerInventoryManager.getOrCreate(worker);
 
-        helper.assertTrue(canDo(helper, worker, JobType.GET_SEEDS, chest), "an empty pouch");
-        for (int i = 0; i < 64 && pouch.addItem(new ItemStack(Items.WHEAT_SEEDS, 64)) == 0; i++) {
+        helper.assertTrue(canDo(helper, worker, JobType.GET_SEEDS, chest), "an empty inventory");
+        for (int i = 0; i < 64 && bag.addItem(new ItemStack(Items.WHEAT_SEEDS, 64)) == 0; i++) {
             // fill it up
         }
-        helper.assertFalse(canDo(helper, worker, JobType.GET_SEEDS, chest), "a full pouch");
+        helper.assertFalse(canDo(helper, worker, JobType.GET_SEEDS, chest), "a full inventory");
         helper.succeed();
     }
 

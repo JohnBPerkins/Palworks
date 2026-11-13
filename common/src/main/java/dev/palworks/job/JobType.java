@@ -18,9 +18,9 @@ public enum JobType {
 
     // Planting
     PLANT_SEEDS(Suitability.PLANTING, 5),
-    // Get seeds from a chest for planting: farmland seeds for Planting, nether wart for Nether work.
-    // No one skill, as what a worker takes depends on its (see JobAssigner.seedToFetch)
-    GET_SEEDS(null, 6),
+    // Take seeds a transporter (or a player) left for it off the ground: only the planter they were
+    // left for (see SeedRequests). Nether wart is Nether work.
+    TAKE_SEEDS(Suitability.PLANTING, 10),
 
     // Gathering
     HARVEST_CROPS(Suitability.GATHERING, 8),
@@ -39,6 +39,11 @@ public enum JobType {
     DELIVER_ITEMS(Suitability.TRANSPORTING, 10), // Deliver carried items to a chest: before anything else
     // Fetch food from a chest for a trough running low (then delivered there like any cargo)
     FETCH_FOOD(Suitability.TRANSPORTING, 9),
+    // Take seeds from a chest: for a planter that asked for them (only transporters take things
+    // out of chests), or to plant itself, for a transporter that plants too (see JobAssigner)
+    GET_SEEDS(Suitability.TRANSPORTING, 6),
+    // Bring seeds taken from a chest to the planter that asked for them, and drop them at its feet
+    BRING_SEEDS(Suitability.TRANSPORTING, 10),
 
     // Not work: a hungry worker eats from a trough (see dev.palworks.hunger.Hunger). Any worker
     // does it, whatever its skills, and before any work (JobAssigner hands it out first).

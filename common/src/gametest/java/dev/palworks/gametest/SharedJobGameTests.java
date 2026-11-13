@@ -114,8 +114,8 @@ public class SharedJobGameTests {
         });
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "shared_seeds", timeoutTicks = 1000)
-    public void plantersNeverFetchFromTheSameChestAtOnce(GameTestHelper helper) {
+    @GameTest(template = Templates.EMPTY, batch = "shared_seeds", timeoutTicks = 1600)
+    public void transportersNeverFetchFromTheSameChestAtOnce(GameTestHelper helper) {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         for (int x = 1; x <= 6; x++) {
@@ -125,8 +125,14 @@ public class SharedJobGameTests {
         helper.setBlock(chestPos, Blocks.CHEST);
         ((ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos)))
                 .setItem(0, new ItemStack(Items.WHEAT_SEEDS, 16));
+        // Two planters, and two transporters to bring them seeds (planters can't take them out of
+        // chests)
         Workers.neverShareAJob(
-                helper, Workers.sendOut(helper, BULBASAUR, SAME_SPOT), Workers.sendOut(helper, BULBASAUR, SAME_SPOT));
+                helper,
+                Workers.sendOut(helper, BULBASAUR, SAME_SPOT),
+                Workers.sendOut(helper, BULBASAUR, SAME_SPOT),
+                Workers.sendOut(helper, PIDGEY, SAME_SPOT),
+                Workers.sendOut(helper, PIDGEY, SAME_SPOT));
 
         helper.succeedWhen(() -> {
             for (int x = 1; x <= 6; x++) {

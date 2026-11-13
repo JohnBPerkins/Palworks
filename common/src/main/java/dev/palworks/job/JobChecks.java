@@ -20,7 +20,9 @@ import dev.palworks.tree.TreeDetector;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -29,6 +31,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Whether a job is still there in the world, and whether a worker can do it: the checks that
@@ -103,6 +106,9 @@ public final class JobChecks {
                         && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));
             case DELIVER_ITEMS -> level.getBlockEntity(pos) instanceof net.minecraft.world.Container;
             case COLLECT_DROPS -> !itemsToPickUp(level, pos).isEmpty();
+            // Seeds left there for a planter (it's only the one they were left for that can take
+            // them: canWorkerDo)
+            case TAKE_SEEDS -> !seedsHandedTo(level, pos, null).isEmpty();
             case EAT_FOOD -> level.getBlockEntity(pos) instanceof TroughBlockEntity trough && trough.hasFeed();
             case FETCH_FOOD -> isChest(level.getBlockState(pos)) && hasTroughFood(level, pos);
             case SLEEP -> isBed(level.getBlockState(pos));
@@ -130,6 +136,12 @@ public final class JobChecks {
             case COLLECT_DROPS -> hasRoomForAny(inventory, itemsToPickUp(level, pos));
             // Room for the seeds it fetches
             case GET_SEEDS -> inventory.hasSpace();
+            // Seeds for the planter it's bringing them to (see SeedRequests)
+            case BRING_SEEDS ->
+                level instanceof ServerLevel serverLevel
+                        && JobManager.getInstance(serverLevel).hasSeedsToBring(pokemon);
+            // Room for seeds left there for it
+            case TAKE_SEEDS -> hasRoomForAny(inventory, seedsHandedTo(level, pos, pokemon.getUuid()));
             // Something to deliver
             case DELIVER_ITEMS -> inventory.hasCargo(SuitabilityDetector.getSuitabilities(pokemon));
             // Hungry, with its work on: eating isn't work, but only a worker eats from troughs
@@ -160,7 +172,25 @@ public final class JobChecks {
         return level.getEntitiesOfClass(
                 ItemEntity.class,
                 new AABB(pos).inflate(pickupRadius()),
-                item -> item.isAlive() && !item.getItem().isEmpty() && TrackedDrops.isTracked(item));
+                item -> item.isAlive()
+                        && !item.getItem().isEmpty()
+                        && TrackedDrops.isTracked(item)
+                        // Seeds left for a planter are its own to take
+                        && TrackedDrops.handedTo(item) == null);
+    }
+
+    /**
+     * The seeds left lying round {@code pos} for {@code planter} to take (see SeedRequests), or for
+     * any planter if null.
+     */
+    public static List<ItemEntity> seedsHandedTo(Level level, BlockPos pos, @Nullable UUID planter) {
+        return level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(pickupRadius()), item -> {
+            if (!item.isAlive() || item.getItem().isEmpty()) {
+                return false;
+            }
+            UUID handedTo = TrackedDrops.handedTo(item);
+            return handedTo != null && (planter == null || planter.equals(handedTo));
+        });
     }
 
     /** Whether the worker carries a seed that can be planted at {@code plantPos}. */
