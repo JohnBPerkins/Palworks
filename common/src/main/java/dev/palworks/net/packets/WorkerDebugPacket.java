@@ -69,6 +69,7 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
      * @param stepInTicks    ticks spent stepping onto its tile after its walk ended just short (lumberjacks)
      * @param stillTicks     ticks it has stood still while meant to be walking (counted while
      *                       someone has the overlay on)
+     * @param fullness       its hunger (see dev.palworks.hunger.Hunger)
      */
     public record Details(
             int jobAgeTicks,
@@ -81,8 +82,50 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
             PathStatus pathStatus,
             int pathFailures,
             int stepInTicks,
-            int stillTicks) {
+            int stillTicks,
+            Fullness fullness) {
         public static final Details NONE = new Details(-1, -1, "", 0, 0, 0, 0, PathStatus.NONE, 0, 0, 0);
+
+        /** These details, with no hunger shown. */
+        public Details(
+                int jobAgeTicks,
+                int expiresInTicks,
+                String stepName,
+                int stepIndex,
+                int stepCount,
+                int stepTicks,
+                int stepLength,
+                PathStatus pathStatus,
+                int pathFailures,
+                int stepInTicks,
+                int stillTicks) {
+            this(
+                    jobAgeTicks,
+                    expiresInTicks,
+                    stepName,
+                    stepIndex,
+                    stepCount,
+                    stepTicks,
+                    stepLength,
+                    pathStatus,
+                    pathFailures,
+                    stepInTicks,
+                    stillTicks,
+                    Fullness.NONE);
+        }
+    }
+
+    /**
+     * A worker's hunger, for the overlay.
+     *
+     * @param current      its Cobblemon fullness
+     * @param max          its max fullness (0: nothing to show)
+     * @param troughCap    what troughs fill it up to
+     * @param owedPercent  how much of the next point its work has used up, in percent
+     * @param palworks     whether Palworks' hunger applies to it (its work is on); if not, it's Cobblemon's
+     */
+    public record Fullness(int current, int max, int troughCap, int owedPercent, boolean palworks) {
+        public static final Fullness NONE = new Fullness(0, 0, 0, 0, false);
     }
 
     private final List<Entry> entries;
@@ -128,6 +171,11 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
             buffer.writeVarInt(d.pathFailures());
             buffer.writeVarInt(d.stepInTicks());
             buffer.writeVarInt(d.stillTicks());
+            buffer.writeVarInt(d.fullness().current());
+            buffer.writeVarInt(d.fullness().max());
+            buffer.writeVarInt(d.fullness().troughCap());
+            buffer.writeVarInt(d.fullness().owedPercent());
+            buffer.writeBoolean(d.fullness().palworks());
 
             writePositions(buffer, entry.unreachable());
         }
@@ -162,7 +210,13 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
                     PathStatus.fromOrdinal(buffer.readVarInt()),
                     buffer.readVarInt(),
                     buffer.readVarInt(),
-                    buffer.readVarInt());
+                    buffer.readVarInt(),
+                    new Fullness(
+                            buffer.readVarInt(),
+                            buffer.readVarInt(),
+                            buffer.readVarInt(),
+                            buffer.readVarInt(),
+                            buffer.readBoolean()));
 
             List<BlockPos> unreachable = readPositions(buffer);
             entries.add(new Entry(entityId, new WorkActivity(phase, job), target, path, details, unreachable));

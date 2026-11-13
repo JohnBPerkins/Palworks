@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.animation.WorkAnimations;
+import dev.palworks.hunger.Hunger;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.net.packets.WorkerDebugPacket;
@@ -146,7 +147,17 @@ public final class WorkerDebugSync {
                 pathStatus,
                 state.getRecentPathFailCount(),
                 state.getStepInTicks(),
-                stillTicks(entity, activity, now));
+                stillTicks(entity, activity, now),
+                fullness(entity.getPokemon(), state));
+    }
+
+    private static WorkerDebugPacket.Fullness fullness(Pokemon pokemon, WorkerState state) {
+        return new WorkerDebugPacket.Fullness(
+                pokemon.getCurrentFullness(),
+                pokemon.getMaxFullness(),
+                Hunger.troughCap(pokemon),
+                (int) Math.round(state.getFullnessOwed() * 100),
+                Hunger.appliesTo(pokemon, state));
     }
 
     /**

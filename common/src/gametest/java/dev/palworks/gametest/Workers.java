@@ -97,11 +97,14 @@ public final class Workers {
 
     /**
      * Send out a Pokémon of {@code owner}'s at a spot in the test, joining its party (6 at most, as
-     * in Cobblemon).
+     * in Cobblemon). It's sent out fed.
      */
     public static PokemonEntity sendOut(GameTestHelper helper, ServerPlayer owner, String properties, BlockPos rel) {
         BlockPos abs = helper.absolutePos(rel);
         Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
+        // Fed, so it works at its usual speed: an empty worker is slowed down until it eats (see
+        // Hunger), and a new Pokémon starts empty. Hunger's own tests empty it again.
+        pokemon.setCurrentFullness(pokemon.getMaxFullness());
         Cobblemon.INSTANCE.getStorage().getParty(owner).add(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
         if (entity == null) {

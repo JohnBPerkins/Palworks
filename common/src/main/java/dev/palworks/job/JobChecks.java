@@ -1,15 +1,20 @@
 package dev.palworks.job;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.block.TroughBlock;
+import dev.palworks.block.TroughBlockEntity;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.crop.Watering;
+import dev.palworks.hunger.Hunger;
+import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
+import dev.palworks.worker.WorkerStateManager;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
@@ -95,6 +100,8 @@ public final class JobChecks {
                         && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));
             case DELIVER_ITEMS -> level.getBlockEntity(pos) instanceof net.minecraft.world.Container;
             case COLLECT_DROPS -> !itemsToPickUp(level, pos).isEmpty();
+            case EAT_FOOD -> level.getBlockEntity(pos) instanceof TroughBlockEntity trough && trough.hasFeed();
+            case FETCH_FOOD -> isChest(level.getBlockState(pos)) && hasTroughFood(level, pos);
             default -> true;
         };
     }
@@ -121,6 +128,10 @@ public final class JobChecks {
             case GET_SEEDS -> inventory.hasSpace();
             // Something to deliver
             case DELIVER_ITEMS -> inventory.hasCargo(SuitabilityDetector.getSuitabilities(pokemon));
+            // Hungry, with its work on: eating isn't work, but only a worker eats from troughs
+            case EAT_FOOD -> Hunger.wantsFood(pokemon) && Hunger.appliesTo(pokemon, WorkerStateManager.get(pokemon));
+            // Room for the food it fetches
+            case FETCH_FOOD -> inventory.hasSpace();
             default -> true;
         };
     }
@@ -156,6 +167,16 @@ public final class JobChecks {
     // Helper methods for job detection
     public static boolean isChest(BlockState state) {
         return state.is(Blocks.CHEST) || state.is(Blocks.TRAPPED_CHEST);
+    }
+
+    /** Whether the chest (or other container) at {@code pos} holds any food a trough takes. */
+    public static boolean hasTroughFood(Level level, BlockPos pos) {
+        return !ChestHelper.itemsMatching(level, pos, TroughFood::accepts).isEmpty();
+    }
+
+    /** Whether a block is a trough (of any wood), which hungry workers eat from. */
+    public static boolean isTrough(BlockState state) {
+        return state.getBlock() instanceof TroughBlock;
     }
 
     static boolean hasPlantableSeeds(Level level, BlockPos pos) {

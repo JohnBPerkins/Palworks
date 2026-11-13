@@ -17,6 +17,7 @@ import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import dev.palworks.worker.WorkerStatusSync;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -111,6 +112,7 @@ public class JobManager {
         WorkerDebugSync.clear();
         WorkAnimator.clear();
         WorkAspectSync.clear();
+        WorkerStatusSync.clear();
         Watering.clear();
     }
 

@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "values": [
+    "palworks:oak_trough",
+    "palworks:spruce_trough",
+    "palworks:birch_trough",
+    "palworks:jungle_trough",
+    "palworks:acacia_trough",
+    "palworks:dark_oak_trough",
+    "palworks:mangrove_trough",
+    "palworks:cherry_trough",
+    "palworks:bamboo_trough",
+    "palworks:crimson_trough",
+    "palworks:warped_trough"
+  ]
+}

@@ -48,7 +48,7 @@ class WorkSkillsTest {
         Set<Suitability> worked = EnumSet.of(Suitability.NETHER);
         for (JobType job : JobType.values()) {
             if (job != JobType.MINE_RESOURCE) { // not scanned for yet
-                worked.add(job.getRequiredSuitability());
+                worked.addAll(job.requiredSuitabilities()); // none for eating
             }
         }
         for (Suitability job : Suitability.values()) {

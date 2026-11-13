@@ -1,0 +1,88 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "palworks:block/crimson_trough_base"
+      }
+    },
+    {
+      "when": {
+        "north": "false"
+      },
+      "apply": {
+        "model": "palworks:block/crimson_trough_wall",
+        "uvlock": true
+      }
+    },
+    {
+      "when": {
+        "east": "false"
+      },
+      "apply": {
+        "model": "palworks:block/crimson_trough_wall",
+        "uvlock": true,
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "false"
+      },
+      "apply": {
+        "model": "palworks:block/crimson_trough_wall",
+        "uvlock": true,
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "false"
+      },
+      "apply": {
+        "model": "palworks:block/crimson_trough_wall",
+        "uvlock": true,
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "fill": "1"
+      },
+      "apply": {
+        "model": "palworks:block/trough_fill_1"
+      }
+    },
+    {
+      "when": {
+        "fill": "2"
+      },
+      "apply": {
+        "model": "palworks:block/trough_fill_2"
+      }
+    },
+    {
+      "when": {
+        "fill": "3"
+      },
+      "apply": {
+        "model": "palworks:block/trough_fill_3"
+      }
+    },
+    {
+      "when": {
+        "fill": "4"
+      },
+      "apply": {
+        "model": "palworks:block/trough_fill_4"
+      }
+    },
+    {
+      "when": {
+        "fill": "5"
+      },
+      "apply": {
+        "model": "palworks:block/trough_fill_5"
+      }
+    }
+  ]
+}

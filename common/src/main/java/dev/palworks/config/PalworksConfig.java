@@ -33,6 +33,7 @@ import java.util.function.Consumer;
  *     a crop also fertilizes it, as bone meal would: 0.1 is 10% at level 1, 30% at level 3. At most
  *     0.2, so level 5 is at most certain
  * @param wateringCooldownSeconds how long after a crop is watered until it can be watered again
+ * @param hunger how workers get hungry and eat (the {@code hunger} object in the file)
  */
 public record PalworksConfig(
         int workRangeHorizontal,
@@ -40,8 +41,76 @@ public record PalworksConfig(
         int ownerRange,
         double pickupRadius,
         double fertilizeChancePerLevel,
-        int wateringCooldownSeconds) {
-    public static final PalworksConfig DEFAULTS = new PalworksConfig(32, 32, 24, 3.0, 0.1, 60);
+        int wateringCooldownSeconds,
+        HungerConfig hunger) {
+    public static final PalworksConfig DEFAULTS = new PalworksConfig(32, 32, 24, 3.0, 0.1, 60, HungerConfig.DEFAULTS);
+
+    /** These settings, with the default hunger settings. */
+    public PalworksConfig(
+            int workRangeHorizontal,
+            int workRangeVertical,
+            int ownerRange,
+            double pickupRadius,
+            double fertilizeChancePerLevel,
+            int wateringCooldownSeconds) {
+        this(
+                workRangeHorizontal,
+                workRangeVertical,
+                ownerRange,
+                pickupRadius,
+                fertilizeChancePerLevel,
+                wateringCooldownSeconds,
+                HungerConfig.DEFAULTS);
+    }
+
+    /** These settings with other hunger settings. */
+    public PalworksConfig withHunger(HungerConfig hunger) {
+        return new PalworksConfig(
+                workRangeHorizontal,
+                workRangeVertical,
+                ownerRange,
+                pickupRadius,
+                fertilizeChancePerLevel,
+                wateringCooldownSeconds,
+                hunger);
+    }
+
+    /**
+     * How workers get hungry and eat. Hunger is the Pokémon's own Cobblemon fullness. While a sent-out
+     * Pokémon's work is switched on, Cobblemon's own drain of it is paused and these rates apply
+     * instead; with its work off it's left entirely to Cobblemon.
+     *
+     * @param enabled whether workers get hungry at all. Off, Palworks leaves fullness to Cobblemon
+     * @param workPerFullness how many units of work (a crop harvested, a seed planted, a trip made,
+     *     every 8 logs of a tree) use up one point of fullness
+     * @param idleDrainPerDay the share of its max fullness a worker loses over a Minecraft day while
+     *     its work is on, working or not (0 for none)
+     * @param troughFillFraction how full troughs fill a worker: it eats while below this share of its
+     *     max fullness (rounded up). The rest is left for hand-feeding (Mochi, berries), which a full
+     *     Pokémon refuses. 0 and troughs never feed
+     * @param emptyWorkSpeed how fast a worker with no fullness left works and walks, as a share of
+     *     its normal speed
+     */
+    public record HungerConfig(
+            boolean enabled,
+            int workPerFullness,
+            double idleDrainPerDay,
+            double troughFillFraction,
+            double emptyWorkSpeed) {
+        public static final HungerConfig DEFAULTS = new HungerConfig(true, 20, 0.25, 0.5, 0.25);
+
+        public static final Codec<HungerConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                        field(Codec.BOOL, "enabled", DEFAULTS.enabled()).forGetter(HungerConfig::enabled),
+                        field(Codec.intRange(1, 500), "work_per_fullness", DEFAULTS.workPerFullness())
+                                .forGetter(HungerConfig::workPerFullness),
+                        field(Codec.doubleRange(0.0, 1.0), "idle_drain_per_day", DEFAULTS.idleDrainPerDay())
+                                .forGetter(HungerConfig::idleDrainPerDay),
+                        field(Codec.doubleRange(0.0, 1.0), "trough_fill_fraction", DEFAULTS.troughFillFraction())
+                                .forGetter(HungerConfig::troughFillFraction),
+                        field(Codec.doubleRange(0.1, 1.0), "empty_work_speed", DEFAULTS.emptyWorkSpeed())
+                                .forGetter(HungerConfig::emptyWorkSpeed))
+                .apply(instance, HungerConfig::new));
+    }
 
     public static final Codec<PalworksConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                     field(Codec.intRange(8, 64), "work_range_horizontal", DEFAULTS.workRangeHorizontal())
@@ -55,7 +124,8 @@ public record PalworksConfig(
                     field(Codec.doubleRange(0.0, 0.2), "fertilize_chance_per_level", DEFAULTS.fertilizeChancePerLevel())
                             .forGetter(PalworksConfig::fertilizeChancePerLevel),
                     field(Codec.intRange(5, 600), "watering_cooldown_seconds", DEFAULTS.wateringCooldownSeconds())
-                            .forGetter(PalworksConfig::wateringCooldownSeconds))
+                            .forGetter(PalworksConfig::wateringCooldownSeconds),
+                    field(HungerConfig.CODEC, "hunger", DEFAULTS.hunger()).forGetter(PalworksConfig::hunger))
             .apply(instance, PalworksConfig::new));
 
     private static final String FILE_NAME = "palworks.json";

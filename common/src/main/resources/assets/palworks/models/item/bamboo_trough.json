@@ -1,0 +1,7 @@
+{
+  "parent": "palworks:block/template_trough_item",
+  "textures": {
+    "wood": "minecraft:block/bamboo_planks",
+    "particle": "minecraft:block/bamboo_planks"
+  }
+}

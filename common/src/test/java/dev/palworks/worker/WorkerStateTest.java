@@ -51,6 +51,23 @@ class WorkerStateTest {
     }
 
     @Test
+    void fullnessOwedSurvivesSaveAndLoad() {
+        WorkerState state = new WorkerState();
+        state.setFullnessOwed(0.35);
+        assertEquals(0.35, WorkerState.fromNBT(state.serializeNBT()).getFullnessOwed(), 1e-9);
+        // Saved before hunger existed: nothing owed
+        assertEquals(0, WorkerState.fromNBT(new CompoundTag()).getFullnessOwed());
+    }
+
+    @Test
+    void anEmptyWorkersRestIsNotSaved() {
+        // A reload just ends it
+        WorkerState state = new WorkerState();
+        state.setRestUntil(1234);
+        assertEquals(0, WorkerState.fromNBT(state.serializeNBT()).getRestUntil());
+    }
+
+    @Test
     void stateWithoutEnabledKeyLoadsAsEnabled() {
         assertTrue(
                 WorkerState.fromNBT(new CompoundTag()).isEnabled(),

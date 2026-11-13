@@ -100,13 +100,16 @@ final class JobPool {
     }
 
     /**
-     * Release a job reservation (make it available again). A delivery is dropped instead: it's
-     * only meaningful to the worker carrying the items, and back in the pool (at the top priority)
-     * it would send other transporters to deliver nothing.
+     * Release a job reservation (make it available again). A delivery or a meal is dropped
+     * instead: it's only meaningful to the worker carrying the items (or the hungry one), and back
+     * in the pool (at the top priority) it would send other workers to do it for nothing.
      */
     void release(JobKey key, long gameTime) {
         JobRecord job = reserved.remove(key);
-        if (job == null || job.type() == JobType.DELIVER_ITEMS) {
+        if (job == null
+                || job.type() == JobType.DELIVER_ITEMS
+                || job.type() == JobType.EAT_FOOD
+                || job.type() == JobType.FETCH_FOOD) {
             return;
         }
         job.release(gameTime);

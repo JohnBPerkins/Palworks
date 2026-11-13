@@ -9,6 +9,8 @@ import dev.palworks.ai.path.WorkerPathfinder;
 import dev.palworks.ai.path.WorkerPathfinder.Reach;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.debug.DebugManager;
+import dev.palworks.hunger.Hunger;
+import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
@@ -97,6 +99,22 @@ final class JobAssigner {
             lastConsidered.put(worker.pokemonUUID, now);
             Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
 
+            // A hungry worker eats before anything else, at the nearest trough with food it can
+            // reach. If there's none, it carries on working (slower once it's empty).
+            if (pokemon != null && Hunger.wantsFood(pokemon)) {
+                if (assignFirstReachable(worker, troughCandidates(level, worker)) != null) {
+                    assignedCount++;
+                    continue;
+                }
+            }
+
+            // An empty worker rests a while after each job, so it gets through work slower (see
+            // WorkerAI.restAfterJob); eating isn't held up by it
+            WorkerState state = pokemon == null ? null : WorkerStateManager.get(pokemon);
+            if (state != null && state.getRestUntil() > now && Hunger.isEmpty(pokemon, state)) {
+                continue;
+            }
+
             // A transporter carrying cargo (anything but a planter's seeds) fills up before it
             // delivers: it takes pickups it has room for, nearest first (a free slot takes anything;
             // once every slot is used, only items matching what it carries), and goes to a chest
@@ -124,6 +142,16 @@ final class JobAssigner {
                     continue;
                 }
                 // No chest it can use: fall through to its other jobs
+            }
+
+            // A transporter with room restocks a trough that's running low from a chest of food
+            // before other work: the workers eating from it depend on it
+            if (pokemon != null && worker.suitabilities.contains(Suitability.TRANSPORTING)) {
+                List<JobRecord> restock = restockCandidates(level, worker);
+                if (!restock.isEmpty() && assignFirstReachable(worker, restock) != null) {
+                    assignedCount++;
+                    continue;
+                }
             }
 
             // Best pool jobs first; the first one it can actually reach wins
@@ -168,7 +196,26 @@ final class JobAssigner {
         }
         chests.sort(Comparator.comparingDouble(workerPos::distSqr));
 
-        List<JobRecord> candidates = new ArrayList<>(chests.size());
+        // Food a trough takes goes to the nearest trough with room for it first, so a berry farm
+        // keeps its workers fed; whatever else it carries (and food the troughs have no room for)
+        // goes to a chest after
+        List<BlockPos> troughs = new ArrayList<>();
+        net.minecraft.world.item.ItemStack food = carriedTroughFood(inventory, worker);
+        if (!food.isEmpty()) {
+            for (BlockPos troughPos : troughsInReach(workerPos)) {
+                if (nearEnoughToOwner(worker, troughPos)
+                        && JobChecks.isTrough(level.getBlockState(troughPos))
+                        && ChestHelper.canAcceptItems(level, troughPos, food)) {
+                    troughs.add(troughPos);
+                }
+            }
+            troughs.sort(Comparator.comparingDouble(workerPos::distSqr));
+        }
+
+        List<JobRecord> candidates = new ArrayList<>(troughs.size() + chests.size());
+        for (BlockPos troughPos : troughs) {
+            candidates.add(JobRecord.of(JobType.DELIVER_ITEMS, troughPos, level.getGameTime()));
+        }
         for (BlockPos chestPos : chests) {
             candidates.add(JobRecord.of(JobType.DELIVER_ITEMS, chestPos, level.getGameTime()));
         }
@@ -178,6 +225,98 @@ final class JobAssigner {
                     "No chest found for {} to deliver {} items!",
                     pokemon.getSpecies().getName(),
                     WorkerInventoryManager.getTotalItemCount(pokemon));
+        }
+        return candidates;
+    }
+
+    /** The first food a trough takes that this worker carries as cargo, or empty. */
+    private static net.minecraft.world.item.ItemStack carriedTroughFood(WorkerInventory inventory, WorkerInfo worker) {
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
+            if (WorkerInventory.isCargo(stack, worker.suitabilities) && TroughFood.accepts(stack)) {
+                return stack;
+            }
+        }
+        return net.minecraft.world.item.ItemStack.EMPTY;
+    }
+
+    /** The troughs the chunk scan found within delivery reach of {@code workerPos} (may be a scan old). */
+    private List<BlockPos> troughsInReach(BlockPos workerPos) {
+        List<BlockPos> troughs = new ArrayList<>();
+        for (BlockPos troughPos : scanner.troughsNear(workerPos, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
+            if (Math.abs(troughPos.getX() - workerPos.getX()) <= DELIVERY_SEARCH_RADIUS
+                    && Math.abs(troughPos.getZ() - workerPos.getZ()) <= DELIVERY_SEARCH_RADIUS
+                    && Math.abs(troughPos.getY() - workerPos.getY()) <= DELIVERY_SEARCH_VERTICAL) {
+                troughs.add(troughPos);
+            }
+        }
+        return troughs;
+    }
+
+    /**
+     * FETCH_FOOD candidates for a transporter with room: if a trough in reach is running low (see
+     * TroughBlockEntity#isLow), the chests in reach with food in them, nearest first. Like
+     * deliveries, they aren't in the pool. Once it has the food, its delivery takes it to the trough.
+     */
+    private List<JobRecord> restockCandidates(ServerLevel level, WorkerInfo worker) {
+        Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
+        if (pokemon == null || !WorkerInventoryManager.getOrCreate(pokemon).hasSpace()) {
+            return List.of();
+        }
+        BlockPos workerPos = worker.position;
+        boolean troughLow = false;
+        for (BlockPos troughPos : troughsInReach(workerPos)) {
+            if (nearEnoughToOwner(worker, troughPos)
+                    && level.getBlockEntity(troughPos) instanceof dev.palworks.block.TroughBlockEntity trough
+                    && trough.isLow()) {
+                troughLow = true;
+                break;
+            }
+        }
+        if (!troughLow) {
+            return List.of();
+        }
+        List<BlockPos> chests = new ArrayList<>();
+        for (BlockPos chestPos : scanner.chestsNear(workerPos, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
+            if (Math.abs(chestPos.getX() - workerPos.getX()) <= DELIVERY_SEARCH_RADIUS
+                    && Math.abs(chestPos.getZ() - workerPos.getZ()) <= DELIVERY_SEARCH_RADIUS
+                    && Math.abs(chestPos.getY() - workerPos.getY()) <= DELIVERY_SEARCH_VERTICAL
+                    && JobChecks.isJobStillThere(level, JobType.FETCH_FOOD, chestPos)) {
+                chests.add(chestPos);
+            }
+        }
+        chests.sort(Comparator.comparingDouble(workerPos::distSqr));
+        List<JobRecord> candidates = new ArrayList<>(chests.size());
+        for (BlockPos chestPos : chests) {
+            candidates.add(JobRecord.of(JobType.FETCH_FOOD, chestPos, level.getGameTime()));
+        }
+        return candidates;
+    }
+
+    /**
+     * EAT_FOOD candidates for a hungry worker: the troughs (that the chunk scan already found) in
+     * range with food in them, nearest first. Like deliveries, they aren't in the pool: each worker
+     * gets its own, and several can eat at one trough.
+     */
+    private List<JobRecord> troughCandidates(ServerLevel level, WorkerInfo worker) {
+        BlockPos workerPos = worker.position;
+        List<BlockPos> troughs = new ArrayList<>();
+        for (BlockPos troughPos : scanner.troughsNear(workerPos, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
+            if (Math.abs(troughPos.getX() - workerPos.getX()) > DELIVERY_SEARCH_RADIUS
+                    || Math.abs(troughPos.getZ() - workerPos.getZ()) > DELIVERY_SEARCH_RADIUS
+                    || Math.abs(troughPos.getY() - workerPos.getY()) > DELIVERY_SEARCH_VERTICAL) {
+                continue;
+            }
+            // The cached position may be up to one scan old: re-check it's a trough, with food
+            if (JobChecks.isJobStillThere(level, JobType.EAT_FOOD, troughPos)) {
+                troughs.add(troughPos);
+            }
+        }
+        troughs.sort(Comparator.comparingDouble(workerPos::distSqr));
+
+        List<JobRecord> candidates = new ArrayList<>(troughs.size());
+        for (BlockPos troughPos : troughs) {
+            candidates.add(JobRecord.of(JobType.EAT_FOOD, troughPos, level.getGameTime()));
         }
         return candidates;
     }

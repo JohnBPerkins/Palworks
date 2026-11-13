@@ -2,6 +2,7 @@ package dev.palworks.job;
 
 import dev.palworks.suitability.Suitability;
 import java.util.Locale;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Represents what needs doing NOW.
@@ -32,12 +33,20 @@ public enum JobType {
 
     // Transporting
     COLLECT_DROPS(Suitability.TRANSPORTING, 9), // Pick up dropped items from the ground
-    DELIVER_ITEMS(Suitability.TRANSPORTING, 10); // Deliver carried items to a chest: before anything else
+    DELIVER_ITEMS(Suitability.TRANSPORTING, 10), // Deliver carried items to a chest: before anything else
+    // Fetch food from a chest for a trough running low (then delivered there like any cargo)
+    FETCH_FOOD(Suitability.TRANSPORTING, 9),
 
+    // Not work: a hungry worker eats from a trough (see dev.palworks.hunger.Hunger). Any worker
+    // does it, whatever its skills, and before any work (JobAssigner hands it out first).
+    EAT_FOOD(null, 10);
+
+    @Nullable
     private final Suitability requiredSuitability;
+
     private final int priority;
 
-    JobType(Suitability requiredSuitability, int priority) {
+    JobType(@Nullable Suitability requiredSuitability, int priority) {
         this.requiredSuitability = requiredSuitability;
         this.priority = priority;
     }
@@ -47,8 +56,17 @@ public enum JobType {
         return priority;
     }
 
+    /** The work skill this job needs, or null for one any worker does (eating). */
+    @Nullable
     public Suitability getRequiredSuitability() {
         return requiredSuitability;
+    }
+
+    /** The work skills this job needs: its own, or none. */
+    public java.util.Set<Suitability> requiredSuitabilities() {
+        return requiredSuitability == null
+                ? java.util.EnumSet.noneOf(Suitability.class)
+                : java.util.EnumSet.of(requiredSuitability);
     }
 
     public String getId() {
