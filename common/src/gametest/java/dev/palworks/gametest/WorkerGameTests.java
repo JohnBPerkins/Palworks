@@ -23,13 +23,18 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
@@ -756,5 +761,27 @@ public class WorkerGameTests {
                     "within a second and a half of the crop going, took " + (helper.getTick() - harvestedAt[0])
                             + " ticks");
         });
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void anEnchantedItemSurvivesTheInventoryBeingSavedAndLoaded(GameTestHelper helper) {
+        // Not sent out: its inventory is saved in its own data either way
+        Pokemon pidgey = PokemonProperties.Companion.parse("pidgey level=20").create(); // Flying: Transporting
+        ItemStack sword = new ItemStack(Items.IRON_SWORD);
+        Holder<Enchantment> sharpness = helper.getLevel()
+                .registryAccess()
+                .registryOrThrow(Registries.ENCHANTMENT)
+                .getHolderOrThrow(Enchantments.SHARPNESS);
+        sword.enchant(sharpness, 3);
+        WorkerInventoryManager.getOrCreate(pidgey).setItem(0, sword); // saved as it changes
+
+        WorkerInventoryManager.unload(pidgey.getUuid()); // as if its chunk unloaded: read back from its data
+        ItemStack loaded = WorkerInventoryManager.getOrCreate(pidgey).getItem(0);
+        WorkerInventoryManager.unload(pidgey.getUuid());
+        helper.assertTrue(loaded.is(Items.IRON_SWORD), "the sword is still there: " + loaded);
+        helper.assertTrue(
+                EnchantmentHelper.getItemEnchantmentLevel(sharpness, loaded) == 3,
+                "still Sharpness 3: " + loaded.getEnchantments());
+        helper.succeed();
     }
 }

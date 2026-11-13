@@ -1,9 +1,11 @@
 package dev.palworks.inventory;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.architectury.utils.GameInstance;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 
 /**
@@ -35,7 +37,7 @@ public class WorkerInventoryManager {
         final WorkerInventory inventory;
         if (persistentData.contains(NBT_KEY)) {
             CompoundTag inventoryTag = persistentData.getCompound(NBT_KEY);
-            inventory = WorkerInventory.fromNBT(uuid, inventoryTag);
+            inventory = WorkerInventory.fromNBT(uuid, inventoryTag, registries());
         } else {
             inventory = new WorkerInventory(uuid);
         }
@@ -61,7 +63,15 @@ public class WorkerInventoryManager {
      */
     public static void save(Pokemon pokemon, WorkerInventory inventory) {
         CompoundTag persistentData = pokemon.getPersistentData();
-        persistentData.put(NBT_KEY, inventory.serializeNBT());
+        persistentData.put(NBT_KEY, inventory.serializeNBT(registries()));
+    }
+
+    /**
+     * The running server's registries, which items' data-driven parts (enchantments...) are saved and
+     * loaded by. Inventories are only loaded and saved on the server.
+     */
+    private static HolderLookup.Provider registries() {
+        return GameInstance.getServer().registryAccess();
     }
 
     /**
