@@ -170,6 +170,23 @@ public class WateringGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY)
+    public void aBrokenOrReplacedCropForgetsItWasWatered(GameTestHelper helper) {
+        dryWheat(helper, CROP, 0);
+        Watering.water(helper.getLevel(), helper.absolutePos(CROP), 0.0);
+        helper.setBlock(CROP, WHEAT.getStateForAge(1));
+        helper.assertFalse(wantsWater(helper, CROP), "growing a stage keeps its cooldown");
+
+        helper.setBlock(CROP, Blocks.AIR);
+        helper.setBlock(CROP, WHEAT.getStateForAge(0));
+        helper.assertTrue(wantsWater(helper, CROP), "wheat broken and replanted wants water");
+
+        Watering.water(helper.getLevel(), helper.absolutePos(CROP), 0.0);
+        helper.setBlock(CROP, Blocks.CARROTS.defaultBlockState());
+        helper.assertTrue(wantsWater(helper, CROP), "carrots in the watered wheat's place want water");
+        helper.succeed();
+    }
+
     // ---- Work levels of real Pokémon ----
 
     private static int watering(String properties) {

@@ -20,8 +20,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * hydrates the farmland it grows in, and may fertilize it, just as bone meal would: the higher the
  * waterer's Watering level, the likelier ({@link #fertilizeChance}). A crop that's been watered
  * isn't watered again until the cooldown in {@code config/palworks.json} has passed. When each crop
- * was watered is kept here, per level, only for as long as that, and forgotten when the server
- * stops: after a restart every growing crop can be watered straight away.
+ * was watered is kept here, per level, only for as long as that or until the crop is broken or
+ * replaced, and forgotten when the server stops: after a restart every growing crop can be watered
+ * straight away.
  */
 public final class Watering {
     private static final int TICKS_PER_SECOND = 20;
@@ -86,6 +87,17 @@ public final class Watering {
         }
         level.levelEvent(LevelEvent.PARTICLES_AND_SOUND_PLANT_GROWTH, pos, BONE_MEAL_EVENT_DATA);
         return true;
+    }
+
+    /**
+     * Forget that the crop at {@code pos} was watered, as it's gone: broken, or replaced by another
+     * block. A crop planted there later can be watered straight away.
+     */
+    public static void forget(Level level, BlockPos pos) {
+        Map<BlockPos, Long> watered = WATERED_AT.get(level);
+        if (watered != null) {
+            watered.remove(pos);
+        }
     }
 
     /** Forget the crops in {@code level} watered longer ago than the cooldown: they can be watered again. */
