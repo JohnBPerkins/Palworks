@@ -1,0 +1,61 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "group": "huge_wool_bed_dye",
+  "ingredients": [
+    {
+      "item": "minecraft:magenta_dye"
+    },
+    [
+      {
+        "item": "palworks:huge_white_wool_bed"
+      },
+      {
+        "item": "palworks:huge_orange_wool_bed"
+      },
+      {
+        "item": "palworks:huge_light_blue_wool_bed"
+      },
+      {
+        "item": "palworks:huge_yellow_wool_bed"
+      },
+      {
+        "item": "palworks:huge_lime_wool_bed"
+      },
+      {
+        "item": "palworks:huge_pink_wool_bed"
+      },
+      {
+        "item": "palworks:huge_gray_wool_bed"
+      },
+      {
+        "item": "palworks:huge_light_gray_wool_bed"
+      },
+      {
+        "item": "palworks:huge_cyan_wool_bed"
+      },
+      {
+        "item": "palworks:huge_purple_wool_bed"
+      },
+      {
+        "item": "palworks:huge_blue_wool_bed"
+      },
+      {
+        "item": "palworks:huge_brown_wool_bed"
+      },
+      {
+        "item": "palworks:huge_green_wool_bed"
+      },
+      {
+        "item": "palworks:huge_red_wool_bed"
+      },
+      {
+        "item": "palworks:huge_black_wool_bed"
+      }
+    ]
+  ],
+  "result": {
+    "id": "palworks:huge_magenta_wool_bed",
+    "count": 1
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "wool_bed",
+  "pattern": [
+    "BB",
+    "BB"
+  ],
+  "key": {
+    "B": {
+      "item": "palworks:magenta_wool_bed"
+    }
+  },
+  "result": {
+    "id": "palworks:large_magenta_wool_bed",
+    "count": 1
+  }
+}

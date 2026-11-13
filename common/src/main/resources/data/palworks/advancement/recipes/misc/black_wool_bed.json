@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_black_wool": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:black_wool"
+          }
+        ]
+      }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "palworks:black_wool_bed"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_black_wool"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "palworks:black_wool_bed"
+    ]
+  }
+}

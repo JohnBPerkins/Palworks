@@ -34,6 +34,7 @@ import java.util.function.Consumer;
  *     0.2, so level 5 is at most certain
  * @param wateringCooldownSeconds how long after a crop is watered until it can be watered again
  * @param hunger how workers get hungry and eat (the {@code hunger} object in the file)
+ * @param sleep how pastured workers sleep (the {@code sleep} object in the file)
  */
 public record PalworksConfig(
         int workRangeHorizontal,
@@ -42,8 +43,10 @@ public record PalworksConfig(
         double pickupRadius,
         double fertilizeChancePerLevel,
         int wateringCooldownSeconds,
-        HungerConfig hunger) {
-    public static final PalworksConfig DEFAULTS = new PalworksConfig(32, 32, 24, 3.0, 0.1, 60, HungerConfig.DEFAULTS);
+        HungerConfig hunger,
+        SleepConfig sleep) {
+    public static final PalworksConfig DEFAULTS =
+            new PalworksConfig(32, 32, 24, 3.0, 0.1, 60, HungerConfig.DEFAULTS, SleepConfig.DEFAULTS);
 
     /** These settings, with the default hunger settings. */
     public PalworksConfig(
@@ -60,7 +63,8 @@ public record PalworksConfig(
                 pickupRadius,
                 fertilizeChancePerLevel,
                 wateringCooldownSeconds,
-                HungerConfig.DEFAULTS);
+                HungerConfig.DEFAULTS,
+                SleepConfig.DEFAULTS);
     }
 
     /** These settings with other hunger settings. */
@@ -72,7 +76,41 @@ public record PalworksConfig(
                 pickupRadius,
                 fertilizeChancePerLevel,
                 wateringCooldownSeconds,
-                hunger);
+                hunger,
+                sleep);
+    }
+
+    /** These settings with other sleep settings. */
+    public PalworksConfig withSleep(SleepConfig sleep) {
+        return new PalworksConfig(
+                workRangeHorizontal,
+                workRangeVertical,
+                ownerRange,
+                pickupRadius,
+                fertilizeChancePerLevel,
+                wateringCooldownSeconds,
+                hunger,
+                sleep);
+    }
+
+    /**
+     * How pastured workers sleep (party workers never do: they stay awake with their trainer). Each
+     * sleeps in its species' Cobblemon sleep hours, at night if those are "any"; in a bed, or it wakes
+     * Tired.
+     *
+     * @param enabled whether pastured workers keep a sleep schedule. Off, their sleep is Cobblemon's
+     *     alone, as for any pastured Pokémon
+     * @param tiredWorkSpeed how fast a Tired worker (one that slept without a bed) works and walks, as
+     *     a share of its normal speed
+     */
+    public record SleepConfig(boolean enabled, double tiredWorkSpeed) {
+        public static final SleepConfig DEFAULTS = new SleepConfig(true, 0.75);
+
+        public static final Codec<SleepConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                        field(Codec.BOOL, "enabled", DEFAULTS.enabled()).forGetter(SleepConfig::enabled),
+                        field(Codec.doubleRange(0.1, 1.0), "tired_work_speed", DEFAULTS.tiredWorkSpeed())
+                                .forGetter(SleepConfig::tiredWorkSpeed))
+                .apply(instance, SleepConfig::new));
     }
 
     /**
@@ -125,7 +163,8 @@ public record PalworksConfig(
                             .forGetter(PalworksConfig::fertilizeChancePerLevel),
                     field(Codec.intRange(5, 600), "watering_cooldown_seconds", DEFAULTS.wateringCooldownSeconds())
                             .forGetter(PalworksConfig::wateringCooldownSeconds),
-                    field(HungerConfig.CODEC, "hunger", DEFAULTS.hunger()).forGetter(PalworksConfig::hunger))
+                    field(HungerConfig.CODEC, "hunger", DEFAULTS.hunger()).forGetter(PalworksConfig::hunger),
+                    field(SleepConfig.CODEC, "sleep", DEFAULTS.sleep()).forGetter(PalworksConfig::sleep))
             .apply(instance, PalworksConfig::new));
 
     private static final String FILE_NAME = "palworks.json";

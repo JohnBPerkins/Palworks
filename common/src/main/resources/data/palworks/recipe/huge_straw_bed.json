@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "straw_bed",
+  "pattern": [
+    "BBB",
+    "BBB",
+    "BBB"
+  ],
+  "key": {
+    "B": {
+      "item": "palworks:straw_bed"
+    }
+  },
+  "result": {
+    "id": "palworks:huge_straw_bed",
+    "count": 1
+  }
+}

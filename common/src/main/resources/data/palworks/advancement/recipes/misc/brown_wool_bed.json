@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_brown_wool": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:brown_wool"
+          }
+        ]
+      }
+    },
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": {
+        "recipe": "palworks:brown_wool_bed"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_brown_wool"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "palworks:brown_wool_bed"
+    ]
+  }
+}

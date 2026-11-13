@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.aspect.AspectProvider;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.hunger.Hunger;
+import dev.palworks.sleep.Sleep;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Map;
@@ -34,11 +35,17 @@ public final class WorkerStatusSync {
         }
     }
 
-    /** What's wrong with this worker now: only while Palworks' hunger applies to it (its work is on). */
+    /**
+     * What's wrong with this worker now: only while Palworks' hunger or sleep applies to it (its work
+     * is on; sleep only for a pastured one).
+     */
     public static Set<WorkerStatus> statusesOf(Pokemon pokemon, WorkerState state) {
         Set<WorkerStatus> statuses = EnumSet.noneOf(WorkerStatus.class);
         if (Hunger.isEmpty(pokemon, state)) {
             statuses.add(WorkerStatus.HUNGRY);
+        }
+        if (state.isTired() && Sleep.appliesTo(pokemon, state)) {
+            statuses.add(WorkerStatus.TIRED);
         }
         return statuses;
     }

@@ -9,6 +9,7 @@
   ],
   "mixins": [
     "CobblemonNetworkMixin",
+    "DrowsySensorMixin",
     "PokemonEntityInteractMixin",
     "PokemonEntityTickMixin",
     "PokemonMetabolismMixin",

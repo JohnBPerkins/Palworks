@@ -105,11 +105,37 @@ public final class WorkerDebugText {
             lines.add(new Line(text, fullness.palworks() && fullness.current() == 0));
         }
 
+        String sleep = sleepLine(d.rest());
+        if (sleep != null) {
+            // Tired is a warning: it works slower until it sleeps in a bed
+            lines.add(new Line(sleep, d.rest().tired()));
+        }
+
         if (unreachableSpots > 0) {
             lines.add(new Line(
                     unreachableSpots + (unreachableSpots == 1 ? " unreachable spot" : " unreachable spots"), true));
         }
         return lines;
+    }
+
+    /** "asleep · in bed", "bedtime · no bed yet", "Tired"... or null for a rested worker awake in the day. */
+    @org.jetbrains.annotations.Nullable
+    static String sleepLine(WorkerDebugPacket.Rest rest) {
+        if (!rest.sleeps()) {
+            return null;
+        }
+        String state;
+        if (rest.asleep()) {
+            state = rest.inBed() ? "asleep · in bed" : "asleep · no bed";
+        } else if (rest.bedtime()) {
+            state = "bedtime";
+        } else {
+            state = null;
+        }
+        if (rest.tired()) {
+            return state == null ? "Tired" : state + " · Tired";
+        }
+        return state;
     }
 
     static String seconds(int ticks) {

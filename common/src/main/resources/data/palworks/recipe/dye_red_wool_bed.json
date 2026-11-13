@@ -1,0 +1,61 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "group": "wool_bed_dye",
+  "ingredients": [
+    {
+      "item": "minecraft:red_dye"
+    },
+    [
+      {
+        "item": "palworks:white_wool_bed"
+      },
+      {
+        "item": "palworks:orange_wool_bed"
+      },
+      {
+        "item": "palworks:magenta_wool_bed"
+      },
+      {
+        "item": "palworks:light_blue_wool_bed"
+      },
+      {
+        "item": "palworks:yellow_wool_bed"
+      },
+      {
+        "item": "palworks:lime_wool_bed"
+      },
+      {
+        "item": "palworks:pink_wool_bed"
+      },
+      {
+        "item": "palworks:gray_wool_bed"
+      },
+      {
+        "item": "palworks:light_gray_wool_bed"
+      },
+      {
+        "item": "palworks:cyan_wool_bed"
+      },
+      {
+        "item": "palworks:purple_wool_bed"
+      },
+      {
+        "item": "palworks:blue_wool_bed"
+      },
+      {
+        "item": "palworks:brown_wool_bed"
+      },
+      {
+        "item": "palworks:green_wool_bed"
+      },
+      {
+        "item": "palworks:black_wool_bed"
+      }
+    ]
+  ],
+  "result": {
+    "id": "palworks:red_wool_bed",
+    "count": 1
+  }
+}

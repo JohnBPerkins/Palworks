@@ -1,0 +1,41 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "palworks:block/lime_wool_bed_floor"
+      }
+    },
+    {
+      "when": {
+        "part_z": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_north"
+      }
+    },
+    {
+      "when": {
+        "part_z": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_south"
+      }
+    },
+    {
+      "when": {
+        "part_x": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_west_mid"
+      }
+    },
+    {
+      "when": {
+        "part_x": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_east_mid"
+      }
+    }
+  ]
+}

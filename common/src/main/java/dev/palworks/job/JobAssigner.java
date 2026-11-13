@@ -7,6 +7,7 @@ import dev.palworks.ai.WorkPositions;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.ai.path.WorkerPathfinder;
 import dev.palworks.ai.path.WorkerPathfinder.Reach;
+import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.Hunger;
@@ -15,8 +16,11 @@ import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.sleep.Beds;
+import dev.palworks.sleep.Sleep;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
@@ -99,6 +103,23 @@ final class JobAssigner {
             lastConsidered.put(worker.pokemonUUID, now);
             Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
 
+            // Sleep (pastured workers only): one Cobblemon has napping is left to nap; in its bedtime,
+            // it's only given a bed (none to be had, and it sleeps where it is: see WorkerAI)
+            PokemonEntity entity = workers.entity(worker.pokemonUUID);
+            if (pokemon != null && entity != null) {
+                WorkerState sleeper = WorkerStateManager.get(pokemon);
+                if (Sleep.isBedtimeFor(entity, sleeper)) {
+                    if ((sleeper == null || !sleeper.isAsleep())
+                            && assignFirstReachable(worker, bedCandidates(level, worker, entity)) != null) {
+                        assignedCount++;
+                    }
+                    continue;
+                }
+                if (Sleep.appliesTo(pokemon, sleeper) && Sleep.cobblemonHasItAsleep(entity)) {
+                    continue;
+                }
+            }
+
             // A hungry worker eats before anything else, at the nearest trough with food it can
             // reach. If there's none, it carries on working (slower once it's empty).
             if (pokemon != null && Hunger.wantsFood(pokemon)) {
@@ -108,10 +129,10 @@ final class JobAssigner {
                 }
             }
 
-            // An empty worker rests a while after each job, so it gets through work slower (see
-            // WorkerAI.restAfterJob); eating isn't held up by it
+            // An empty or Tired worker rests a while after each job, so it gets through work slower
+            // (see WorkerAI.restAfterJob); eating isn't held up by it
             WorkerState state = pokemon == null ? null : WorkerStateManager.get(pokemon);
-            if (state != null && state.getRestUntil() > now && Hunger.isEmpty(pokemon, state)) {
+            if (state != null && state.getRestUntil() > now && WorkSpeed.of(pokemon, state) < 1) {
                 continue;
             }
 
@@ -289,6 +310,37 @@ final class JobAssigner {
         List<JobRecord> candidates = new ArrayList<>(chests.size());
         for (BlockPos chestPos : chests) {
             candidates.add(JobRecord.of(JobType.FETCH_FOOD, chestPos, level.getGameTime()));
+        }
+        return candidates;
+    }
+
+    /**
+     * SLEEP candidates for a pastured worker at its bedtime: the beds in reach (that the chunk
+     * scan found) that no other worker has and that its body fits in (see Beds), the smallest first,
+     * then the nearest. Like
+     * deliveries, they aren't in the pool; the one it takes is reserved, so it's its own for the night.
+     */
+    private List<JobRecord> bedCandidates(ServerLevel level, WorkerInfo worker, PokemonEntity entity) {
+        BlockPos workerPos = worker.position;
+        List<BlockPos> beds = new ArrayList<>();
+        for (BlockPos bedPos : scanner.bedsNear(workerPos, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
+            if (Math.abs(bedPos.getX() - workerPos.getX()) <= DELIVERY_SEARCH_RADIUS
+                    && Math.abs(bedPos.getZ() - workerPos.getZ()) <= DELIVERY_SEARCH_RADIUS
+                    && Math.abs(bedPos.getY() - workerPos.getY()) <= DELIVERY_SEARCH_VERTICAL
+                    && JobChecks.isBed(level.getBlockState(bedPos))
+                    && level.getBlockState(bedPos).getBlock() instanceof WorkerBedBlock bed
+                    && !pool.isReserved(new JobPool.JobKey(bedPos, JobType.SLEEP))
+                    && Beds.fits(level, bedPos, bed, entity)) {
+                beds.add(bedPos);
+            }
+        }
+        // The smallest it fits first, so big beds are left for big Pokémon; nearest of those
+        beds.sort(Comparator.<BlockPos>comparingInt(
+                        bedPos -> ((WorkerBedBlock) level.getBlockState(bedPos).getBlock()).size())
+                .thenComparingDouble(workerPos::distSqr));
+        List<JobRecord> candidates = new ArrayList<>(beds.size());
+        for (BlockPos bedPos : beds) {
+            candidates.add(JobRecord.of(JobType.SLEEP, bedPos, level.getGameTime()));
         }
         return candidates;
     }

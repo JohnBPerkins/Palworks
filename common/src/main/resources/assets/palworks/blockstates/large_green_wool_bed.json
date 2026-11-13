@@ -1,0 +1,77 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "palworks:block/green_wool_bed_floor"
+      }
+    },
+    {
+      "when": {
+        "part_z": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_north"
+      }
+    },
+    {
+      "when": {
+        "part_z": "1"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_south"
+      }
+    },
+    {
+      "when": {
+        "part_x": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_west_mid"
+      }
+    },
+    {
+      "when": {
+        "part_x": "1"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_east_mid"
+      }
+    },
+    {
+      "when": {
+        "part_x": "0",
+        "part_z": "1"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_west_cap_n"
+      }
+    },
+    {
+      "when": {
+        "part_x": "0",
+        "part_z": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_west_cap_s"
+      }
+    },
+    {
+      "when": {
+        "part_x": "1",
+        "part_z": "1"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_east_cap_n"
+      }
+    },
+    {
+      "when": {
+        "part_x": "1",
+        "part_z": "0"
+      },
+      "apply": {
+        "model": "palworks:block/bed_rim_east_cap_s"
+      }
+    }
+  ]
+}

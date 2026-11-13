@@ -70,6 +70,7 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
      * @param stillTicks     ticks it has stood still while meant to be walking (counted while
      *                       someone has the overlay on)
      * @param fullness       its hunger (see dev.palworks.hunger.Hunger)
+     * @param rest           its sleep (see dev.palworks.sleep.Sleep)
      */
     public record Details(
             int jobAgeTicks,
@@ -83,7 +84,8 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
             int pathFailures,
             int stepInTicks,
             int stillTicks,
-            Fullness fullness) {
+            Fullness fullness,
+            Rest rest) {
         public static final Details NONE = new Details(-1, -1, "", 0, 0, 0, 0, PathStatus.NONE, 0, 0, 0);
 
         /** These details, with no hunger shown. */
@@ -111,8 +113,52 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
                     pathFailures,
                     stepInTicks,
                     stillTicks,
-                    Fullness.NONE);
+                    Fullness.NONE,
+                    Rest.NONE);
         }
+
+        /** These details, with no sleep shown. */
+        public Details(
+                int jobAgeTicks,
+                int expiresInTicks,
+                String stepName,
+                int stepIndex,
+                int stepCount,
+                int stepTicks,
+                int stepLength,
+                PathStatus pathStatus,
+                int pathFailures,
+                int stepInTicks,
+                int stillTicks,
+                Fullness fullness) {
+            this(
+                    jobAgeTicks,
+                    expiresInTicks,
+                    stepName,
+                    stepIndex,
+                    stepCount,
+                    stepTicks,
+                    stepLength,
+                    pathStatus,
+                    pathFailures,
+                    stepInTicks,
+                    stillTicks,
+                    fullness,
+                    Rest.NONE);
+        }
+    }
+
+    /**
+     * A pastured worker's sleep, for the overlay.
+     *
+     * @param sleeps  whether Palworks' sleep applies to it (pastured, its work on); if not, nothing's shown
+     * @param bedtime whether it's its bedtime
+     * @param asleep  whether it's asleep
+     * @param inBed   whether it's asleep in a bed (its SLEEP job)
+     * @param tired   whether it's Tired
+     */
+    public record Rest(boolean sleeps, boolean bedtime, boolean asleep, boolean inBed, boolean tired) {
+        public static final Rest NONE = new Rest(false, false, false, false, false);
     }
 
     /**
@@ -176,6 +222,11 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
             buffer.writeVarInt(d.fullness().troughCap());
             buffer.writeVarInt(d.fullness().owedPercent());
             buffer.writeBoolean(d.fullness().palworks());
+            buffer.writeBoolean(d.rest().sleeps());
+            buffer.writeBoolean(d.rest().bedtime());
+            buffer.writeBoolean(d.rest().asleep());
+            buffer.writeBoolean(d.rest().inBed());
+            buffer.writeBoolean(d.rest().tired());
 
             writePositions(buffer, entry.unreachable());
         }
@@ -216,6 +267,12 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
                             buffer.readVarInt(),
                             buffer.readVarInt(),
                             buffer.readVarInt(),
+                            buffer.readBoolean()),
+                    new Rest(
+                            buffer.readBoolean(),
+                            buffer.readBoolean(),
+                            buffer.readBoolean(),
+                            buffer.readBoolean(),
                             buffer.readBoolean()));
 
             List<BlockPos> unreachable = readPositions(buffer);

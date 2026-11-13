@@ -90,6 +90,21 @@ class PalworksConfigTest {
     }
 
     @Test
+    void sleepSettingsAreReadFromTheirOwnObject() {
+        List<String> warnings = new ArrayList<>();
+        PalworksConfig config = parse("{\"sleep\": {\"enabled\": false, \"tired_work_speed\": 0.5}}", warnings);
+        assertEquals(List.of(), warnings);
+        assertEquals(new PalworksConfig.SleepConfig(false, 0.5), config.sleep());
+        assertEquals(PalworksConfig.DEFAULTS.withSleep(config.sleep()), config);
+    }
+
+    @Test
+    void theSleepDefaultsAreOnAndThreeQuartersSpeedWhenTired() {
+        assertTrue(PalworksConfig.DEFAULTS.sleep().enabled());
+        assertEquals(0.75, PalworksConfig.DEFAULTS.sleep().tiredWorkSpeed());
+    }
+
+    @Test
     void anEmptySpeedOfNothingIsRefused() {
         // A worker that never works would be stuck: at least a tenth
         List<String> warnings = new ArrayList<>();

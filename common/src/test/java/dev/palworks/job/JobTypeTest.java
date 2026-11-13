@@ -14,8 +14,8 @@ class JobTypeTest {
     @Test
     void everyJobButEatingMapsToASuitability() {
         for (JobType type : JobType.values()) {
-            if (type == JobType.EAT_FOOD) {
-                continue;
+            if (type == JobType.EAT_FOOD || type == JobType.SLEEP) {
+                continue; // what any worker does, whatever its skills
             }
             assertNotNull(type.getRequiredSuitability(), type + " must declare a required suitability");
             assertEquals(java.util.EnumSet.of(type.getRequiredSuitability()), type.requiredSuitabilities());

@@ -1,0 +1,6 @@
+{
+  "parent": "palworks:item/template_large_bed",
+  "textures": {
+    "cushion": "minecraft:block/cyan_wool"
+  }
+}

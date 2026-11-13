@@ -89,7 +89,10 @@ public final class StatusIconRenderer {
         float x = -width / 2F;
         for (WorkerStatus status : statuses) {
             // The outline, then the icon over it
-            drawSprite(minecraft, matrix, status.background(), x);
+            ResourceLocation background = status.background();
+            if (background != null) {
+                drawSprite(minecraft, matrix, background, x);
+            }
             drawSprite(minecraft, matrix, status.sprite(), x);
             x += ICON_PX + GAP_PX;
         }

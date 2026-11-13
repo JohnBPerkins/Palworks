@@ -3,6 +3,7 @@ package dev.palworks.job;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.block.TroughBlock;
 import dev.palworks.block.TroughBlockEntity;
+import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.crop.Watering;
@@ -10,6 +11,7 @@ import dev.palworks.hunger.Hunger;
 import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.sleep.Sleep;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.suitability.SuitabilityDetector;
@@ -102,6 +104,7 @@ public final class JobChecks {
             case COLLECT_DROPS -> !itemsToPickUp(level, pos).isEmpty();
             case EAT_FOOD -> level.getBlockEntity(pos) instanceof TroughBlockEntity trough && trough.hasFeed();
             case FETCH_FOOD -> isChest(level.getBlockState(pos)) && hasTroughFood(level, pos);
+            case SLEEP -> isBed(level.getBlockState(pos));
             default -> true;
         };
     }
@@ -132,6 +135,9 @@ public final class JobChecks {
             case EAT_FOOD -> Hunger.wantsFood(pokemon) && Hunger.appliesTo(pokemon, WorkerStateManager.get(pokemon));
             // Room for the food it fetches
             case FETCH_FOOD -> inventory.hasSpace();
+            // Its bedtime (it's woken up once that's over)
+            case SLEEP ->
+                pokemon.getEntity() != null && Sleep.isBedtimeFor(pokemon.getEntity(), WorkerStateManager.get(pokemon));
             default -> true;
         };
     }
@@ -172,6 +178,14 @@ public final class JobChecks {
     /** Whether the chest (or other container) at {@code pos} holds any food a trough takes. */
     public static boolean hasTroughFood(Level level, BlockPos pos) {
         return !ChestHelper.itemsMatching(level, pos, TroughFood::accepts).isEmpty();
+    }
+
+    /**
+     * Whether a block is a bed, which a pastured worker sleeps in: its corner block, which
+     * stands for the whole bed (a bigger one's other blocks don't count again).
+     */
+    public static boolean isBed(BlockState state) {
+        return state.getBlock() instanceof WorkerBedBlock && WorkerBedBlock.isOrigin(state);
     }
 
     /** Whether a block is a trough (of any wood), which hungry workers eat from. */
