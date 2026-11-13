@@ -66,9 +66,10 @@ final class PickupQueue {
      * Keep track of an item to pick up that's just come into the world: it gets a pickup job once
      * it's landed (or, for one a decaying leaf dropped, with the rest of its batch).
      */
-    void track(ItemEntity item, @Nullable UUID suggestedWorker, boolean decay, long gameTime) {
+    void track(
+            ItemEntity item, @Nullable UUID suggestedWorker, @Nullable BlockPos source, boolean decay, long gameTime) {
         long due = decay ? (gameTime / DECAY_BATCH_TICKS + 1) * DECAY_BATCH_TICKS : gameTime + LANDING_DELAY;
-        tracked.put(item.getUUID(), new Tracked(due, suggestedWorker));
+        tracked.put(item.getUUID(), new Tracked(due, suggestedWorker, source));
     }
 
     /** Create the queued pickup jobs that are due, and jobs for items with none round them. */
@@ -114,7 +115,7 @@ final class PickupQueue {
             if (covered(entity, jobs)) {
                 continue;
             }
-            BlockPos at = spotOf(entity);
+            BlockPos at = spotFor(entity, item.source, radius);
             createCollectDropsJob(level, at, item.suggestedWorker);
             jobs.add(new AABB(at).inflate(radius));
             item.suggestedWorker = null; // only its first job is offered to the worker that dropped it
@@ -122,7 +123,20 @@ final class PickupQueue {
     }
 
     /**
-     * The spot a pickup job for this item goes at: the block it's lying in. Not the one under its
+     * Where a pickup job for this item goes: where it was dropped (the crop harvested, the tree
+     * chopped, the block mined), if it's landed within reach of that: where a worker can stand, as
+     * the drops round a tree land on its leaves, say, out of reach themselves, but in reach of a
+     * pickup at its base. Otherwise (it rolled off, or it was thrown) where it is.
+     */
+    private static BlockPos spotFor(ItemEntity item, @Nullable BlockPos source, double radius) {
+        if (source != null && new AABB(source).inflate(radius).intersects(item.getBoundingBox())) {
+            return source;
+        }
+        return spotOf(item);
+    }
+
+    /**
+     * The spot a pickup job for this item goes at, where it is: the block it's lying in. Not the one under its
      * feet: an item lying on farmland (or a slab, a path) is within the top of that block, and a
      * job there is in a solid block, which nowhere to stand is found round, so it was never
      * picked up.
@@ -172,7 +186,8 @@ final class PickupQueue {
 
     /**
      * An item to pick up: it's given a pickup job from game time {@code due} on (once it's landed),
-     * the first offered to {@code suggestedWorker}, the worker that dropped it, if given.
+     * by {@code source}, where it was dropped, if given (see spotFor), the first offered to
+     * {@code suggestedWorker}, the worker that dropped it, if given.
      */
     private static final class Tracked {
         final long due;
@@ -180,9 +195,13 @@ final class PickupQueue {
         @Nullable
         UUID suggestedWorker;
 
-        Tracked(long due, @Nullable UUID suggestedWorker) {
+        @Nullable
+        final BlockPos source;
+
+        Tracked(long due, @Nullable UUID suggestedWorker, @Nullable BlockPos source) {
             this.due = due;
             this.suggestedWorker = suggestedWorker;
+            this.source = source;
         }
     }
 }

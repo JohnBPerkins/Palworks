@@ -17,7 +17,7 @@ public abstract class ServerPlayerGameModeMixin {
 
     @Inject(method = "destroyBlock", at = @At("HEAD"))
     private void palworks$beforeBreak(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        TrackedDrops.begin(null, false);
+        TrackedDrops.begin(null, pos, false);
     }
 
     @Inject(method = "destroyBlock", at = @At("RETURN"))

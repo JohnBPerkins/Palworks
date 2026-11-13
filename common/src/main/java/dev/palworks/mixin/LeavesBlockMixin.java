@@ -23,7 +23,7 @@ public abstract class LeavesBlockMixin {
     private void palworks$beforeDecay(
             BlockState state, ServerLevel level, BlockPos pos, RandomSource random, CallbackInfo ci) {
         if (DecayingCanopies.get(level).contains(pos)) {
-            TrackedDrops.begin(null, true);
+            TrackedDrops.begin(null, null, true);
         }
     }
 

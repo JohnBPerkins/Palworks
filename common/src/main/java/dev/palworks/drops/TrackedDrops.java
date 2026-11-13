@@ -4,6 +4,7 @@ import dev.architectury.event.EventResult;
 import dev.palworks.job.JobManager;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -31,6 +32,10 @@ public final class TrackedDrops {
     @Nullable
     private static UUID breaker;
 
+    // Where the breaking is (the crop, the tree, the block mined): where their pickup goes
+    @Nullable
+    private static BlockPos source;
+
     private static boolean decaying;
 
     private TrackedDrops() {}
@@ -41,11 +46,12 @@ public final class TrackedDrops {
     }
 
     /**
-     * Run some work that breaks blocks, with what it drops marked to pick up. {@code worker}, if
-     * given, is offered the pickup first (it's the one that made the drops).
+     * Run some work that breaks blocks at {@code at} (a crop, a tree), with what it drops marked to
+     * pick up, there. {@code worker}, if given, is offered the pickup first (it's the one that made
+     * the drops).
      */
-    public static boolean breaking(@Nullable UUID worker, BooleanSupplier work) {
-        begin(worker, false);
+    public static boolean breaking(@Nullable UUID worker, BlockPos at, BooleanSupplier work) {
+        begin(worker, at, false);
         try {
             return work.getAsBoolean();
         } finally {
@@ -53,9 +59,9 @@ public final class TrackedDrops {
         }
     }
 
-    /** {@link #breaking(UUID, BooleanSupplier)} for work with no result. */
-    public static void breaking(@Nullable UUID worker, Runnable work) {
-        breaking(worker, () -> {
+    /** {@link #breaking(UUID, BlockPos, BooleanSupplier)} for work with no result. */
+    public static void breaking(@Nullable UUID worker, BlockPos at, Runnable work) {
+        breaking(worker, at, () -> {
             work.run();
             return true;
         });
@@ -63,12 +69,14 @@ public final class TrackedDrops {
 
     /**
      * Start marking what spawns as to pick up, until {@link #end}. For mixins, which can't wrap a
-     * call (a player breaking a block, leaves decaying); {@code decay} picks them up in batches, as
-     * leaves drop a few at a time for minutes.
+     * call (a player breaking a block, leaves decaying). {@code at} is where the breaking is, which
+     * their pickup goes by if they land near it (null: by where each lands); {@code decay} picks
+     * them up in batches, as leaves drop a few at a time for minutes.
      */
-    public static void begin(@Nullable UUID worker, boolean decay) {
+    public static void begin(@Nullable UUID worker, @Nullable BlockPos at, boolean decay) {
         if (depth == 0) {
             breaker = worker;
+            source = at == null ? null : at.immutable();
             decaying = decay;
         }
         depth++;
@@ -82,6 +90,7 @@ public final class TrackedDrops {
         depth--;
         if (depth == 0) {
             breaker = null;
+            source = null;
             decaying = false;
         }
     }
@@ -93,6 +102,7 @@ public final class TrackedDrops {
     public static void resetAfterTick() {
         depth = 0;
         breaker = null;
+        source = null;
         decaying = false;
     }
 
@@ -109,7 +119,13 @@ public final class TrackedDrops {
             item.addTag(TAG);
         }
         if (isTracked(item)) {
-            JobManager.onTrackedItemAdded(serverLevel, item, depth > 0 ? breaker : null, depth > 0 && decaying);
+            boolean breakingNow = depth > 0;
+            JobManager.onTrackedItemAdded(
+                    serverLevel,
+                    item,
+                    breakingNow ? breaker : null,
+                    breakingNow ? source : null,
+                    breakingNow && decaying);
         }
         return EventResult.pass();
     }
