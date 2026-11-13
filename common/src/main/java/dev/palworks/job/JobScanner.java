@@ -347,14 +347,11 @@ final class JobScanner {
             }
         }
 
-        // Check for get seeds jobs (chests with seeds)
-        if (JobChecks.isChest(state)) {
-            if (JobChecks.hasPlantableSeeds(level, pos)) {
-                return JobRecord.of(JobType.GET_SEEDS, pos, now);
-            }
-            if (ChestHelper.hasItem(level, pos, Items.NETHER_WART)) {
-                return JobRecord.of(JobType.GET_SEEDS, pos, now, EnumSet.of(Suitability.NETHER));
-            }
+        // Check for get seeds jobs (chests with farmland seeds or nether wart): one per chest, for
+        // planters and Nether workers alike; what each would take is JobAssigner.seedToFetch's
+        if (JobChecks.isChest(state)
+                && (JobChecks.hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART))) {
+            return JobRecord.of(JobType.GET_SEEDS, pos, now);
         }
 
         // Check for lumbering jobs (trees). One job per tree, at a base block (a log, or a mangrove

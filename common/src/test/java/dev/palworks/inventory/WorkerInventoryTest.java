@@ -104,16 +104,6 @@ class WorkerInventoryTest {
     }
 
     @Test
-    void hasAnySeedSpotsSeedsAmongOtherItems() {
-        WorkerInventory inventory = inventory(CarryMode.FULL);
-        inventory.addItem(new ItemStack(Items.WHEAT, 3));
-        assertFalse(inventory.hasAnySeed());
-
-        inventory.addItem(new ItemStack(Items.POTATO, 1));
-        assertTrue(inventory.hasAnySeed(), "a potato plants potatoes");
-    }
-
-    @Test
     void addItemDoesNotChangeTheStackPassedIn() {
         WorkerInventory inventory = inventory(CarryMode.FULL);
         ItemStack stack = new ItemStack(Items.WHEAT, 10);

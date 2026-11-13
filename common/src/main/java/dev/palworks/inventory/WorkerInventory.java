@@ -246,16 +246,6 @@ public class WorkerInventory implements Container {
         return false;
     }
 
-    /** Whether it carries any seed or other plantable item. */
-    public boolean hasAnySeed() {
-        for (ItemStack stack : items) {
-            if (!stack.isEmpty() && dev.palworks.crop.CropAdapter.isSeed(stack.getItem())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /**
      * Get the first item stack in the inventory (for compatibility with old single-slot system).
      */

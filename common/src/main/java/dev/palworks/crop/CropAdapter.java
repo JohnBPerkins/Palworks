@@ -64,7 +64,7 @@ public class CropAdapter {
             return true;
         }
 
-        // Soul sand for nether wart (requires both PLANTING and NETHER suitabilities)
+        // Soul sand for nether wart (Nether work)
         if (state.is(Blocks.SOUL_SAND)) {
             return true;
         }

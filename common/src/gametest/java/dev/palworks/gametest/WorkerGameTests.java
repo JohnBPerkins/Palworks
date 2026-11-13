@@ -656,6 +656,47 @@ public class WorkerGameTests {
                 helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, "harvested and reset"));
     }
 
+    /** Soul sand for nether wart along z=5, and a chest holding these, for a planting test. */
+    private static ChestBlockEntity soulSandAndChest(GameTestHelper helper, ItemStack... contents) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        for (int x = 2; x <= 4; x++) {
+            helper.setBlock(x, 0, 5, Blocks.SOUL_SAND);
+        }
+        BlockPos chestPos = new BlockPos(6, 1, 2);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        ChestBlockEntity chest = (ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos));
+        for (int i = 0; i < contents.length; i++) {
+            chest.setItem(i, contents[i]);
+        }
+        return chest;
+    }
+
+    private static void assertWartPlanted(GameTestHelper helper) {
+        for (int x = 2; x <= 4; x++) {
+            helper.assertBlockPresent(Blocks.NETHER_WART, new BlockPos(x, 1, 5));
+        }
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_mixed_chest", timeoutTicks = 1000)
+    public void aGhostTypeFetchesNetherWartFromAChestWithSeedsInItToo(GameTestHelper helper) {
+        // A chest with seeds and wart used to be a seed chest for planters only
+        soulSandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8), new ItemStack(Items.NETHER_WART, 8));
+        Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether only
+
+        helper.succeedWhen(() -> assertWartPlanted(helper));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_planter", timeoutTicks = 1000)
+    public void aPlanterThatIsAGhostTypeFetchesNetherWartToo(GameTestHelper helper) {
+        // Nether work is all wart needs, whatever else it can do: a planter used to look for
+        // farmland seeds in the chest instead, and take nothing
+        soulSandAndChest(helper, new ItemStack(Items.NETHER_WART, 8));
+        Workers.sendOut(helper, "phantump level=20", START); // Ghost/Grass: Planting, Gathering, Nether
+
+        helper.succeedWhen(() -> assertWartPlanted(helper));
+    }
+
     // ---- Handing a job over ----
 
     @GameTest(template = Templates.EMPTY, batch = "worker_handover", timeoutTicks = 1600)

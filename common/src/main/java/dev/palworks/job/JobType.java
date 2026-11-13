@@ -17,7 +17,9 @@ public enum JobType {
 
     // Planting
     PLANT_SEEDS(Suitability.PLANTING, 5),
-    GET_SEEDS(Suitability.PLANTING, 6), // Get seeds from a chest for planting
+    // Get seeds from a chest for planting: farmland seeds for Planting, nether wart for Nether work.
+    // No one skill, as what a worker takes depends on its (see JobAssigner.seedToFetch)
+    GET_SEEDS(null, 6),
 
     // Gathering
     HARVEST_CROPS(Suitability.GATHERING, 8),
@@ -60,7 +62,7 @@ public enum JobType {
         return priority;
     }
 
-    /** The work skill this job needs, or null for one any worker does (eating). */
+    /** The work skill this job needs, or null for one it doesn't decide alone (eating, sleeping, seeds). */
     @Nullable
     public Suitability getRequiredSuitability() {
         return requiredSuitability;

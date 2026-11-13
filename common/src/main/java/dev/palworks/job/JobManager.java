@@ -8,11 +8,13 @@ import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.crop.Watering;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.WorkerDebugSync;
+import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
@@ -22,6 +24,7 @@ import dev.palworks.worker.WorkerStatusSync;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
@@ -492,12 +495,13 @@ public class JobManager {
     }
 
     /**
-     * The seed a planter at {@code workerPos} should take from the chest at {@code chestPos}, or
-     * null if none of its seeds can go anywhere open in range (see JobAssigner).
+     * The seed (or nether wart) a worker at {@code workerPos} with these skills, carrying {@code
+     * inventory}, should take from the chest at {@code chestPos}, or null if none (see JobAssigner).
      */
     @Nullable
-    public Item seedToFetch(BlockPos chestPos, @Nullable BlockPos workerPos) {
-        return assigner.seedToFetch(chestPos, workerPos);
+    public Item seedToFetch(
+            BlockPos chestPos, @Nullable BlockPos workerPos, Set<Suitability> skills, WorkerInventory inventory) {
+        return assigner.seedToFetch(chestPos, workerPos, skills, inventory);
     }
 
     /** The spots this worker currently remembers it couldn't reach (for the debug overlay). */
