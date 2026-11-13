@@ -9,8 +9,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * The /palworks commands, all requiring OP level 2. Each loader registers {@link #build()} with
- * its own command event.
+ * The /palworks commands, all requiring OP level 2. {@link #build()} is registered once for both
+ * loaders, through Architectury's command event ({@code PalworksCommon.init}).
  */
 public final class PalworksCommands {
     private PalworksCommands() {}

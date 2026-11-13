@@ -36,7 +36,7 @@ import org.jetbrains.annotations.Nullable;
  * <ul>
  *   <li>{@code species}: a species id, or a list of them; without a namespace it's Cobblemon's.</li>
  *   <li>{@code animations}: by id ({@code ignite_furnace}, {@code harvest}, {@code plant},
- *       {@code chop}), what changes. Anything left out stays as the default has it.</li>
+ *       {@code water}, {@code chop}), what changes. Anything left out stays as the default has it.</li>
  *   <li>{@code move}: the action effect to play, by move name ({@code furycutter}, Cobblemon's)
  *       or id ({@code myaddon:chop}); {@code impact_ticks}: when it lands on the block;
  *       {@code duration_ticks}: when the body animation is over; {@code aim_y}: where in the block

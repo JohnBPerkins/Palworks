@@ -12,8 +12,8 @@ import net.minecraft.util.profiling.ProfilerFiller;
 
 /**
  * Loads {@code data/<namespace>/palworks/work_animations/<name>.json} into
- * {@link WorkAnimationData} when the server starts and on {@code /reload}. Each loader registers it
- * (Fabric's resource loader, NeoForge's AddReloadListenerEvent).
+ * {@link WorkAnimationData} when the server starts and on {@code /reload}. Registered once for both
+ * loaders, through Architectury ({@code PalworksCommon.init}).
  */
 public class WorkAnimationReloadListener extends SimpleJsonResourceReloadListener {
     public static final ResourceLocation ID = Palworks.id("work_animations");

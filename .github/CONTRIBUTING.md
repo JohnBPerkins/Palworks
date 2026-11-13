@@ -55,7 +55,7 @@ Palworks is a multi-loader mod built with [Architectury](https://architectury.de
 | Module      | Contents                                                                   |
 |-------------|----------------------------------------------------------------------------|
 | `common/`   | Loader-agnostic core: worker AI, job system, suitability, world helpers.   |
-| `fabric/`   | Fabric entry point, mixins, and registration.                              |
+| `fabric/`   | Fabric entry point and registration.                                       |
 | `neoforge/` | NeoForge entry point and registration.                                     |
 
 Most logic lives in `common/`. Put new logic there and keep `fabric/` and `neoforge/` limited to

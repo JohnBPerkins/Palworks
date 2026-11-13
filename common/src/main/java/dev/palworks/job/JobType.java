@@ -7,7 +7,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Represents what needs doing NOW.
  * Separate from Suitability to allow flexible job definitions. Only jobs a worker can actually do
- * are listed; add a value together with its handler (WorkerAI) and its scan (JobManager).
+ * are listed; add a value together with its handler (JobHandlerRegistry) and how it's found
+ * (JobScanner, or JobAssigner for jobs made per worker, like deliveries).
  */
 public enum JobType {
     // Priorities: 0-10, higher is taken first (see JobManager's job scoring)

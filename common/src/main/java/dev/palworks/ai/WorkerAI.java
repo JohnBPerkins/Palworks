@@ -169,7 +169,7 @@ public class WorkerAI {
             }
 
             // A saved job far outside any work range (e.g. the Pokémon was recalled and sent out
-            // somewhere else) is dropped rather than walked to. Work range is 32 blocks.
+            // somewhere else) is dropped rather than walked to: 100 blocks is past any work range.
             BlockPos entityPos = entity.blockPosition();
             double distanceSq = entityPos.distSqr(reservation.getStationPos());
             if (distanceSq > 100 * 100) {

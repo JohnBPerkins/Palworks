@@ -36,7 +36,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Finds a level's jobs: scans the chunks round its workers, a few a tick, putting what it finds in
  * the {@link JobPool} and taking out what's gone. Each chunk's scan is cached
- * ({@link ChunkJobCache}) until it's stale or something in it changes.
+ * ({@link ChunkJobCache}) until it's {@link #JOB_CACHE_LIFETIME_TICKS} old, or sooner if it's
+ * marked for a rescan (a worker newly reporting in near it, {@code /palworks testarea}). A block
+ * changing doesn't mark it: the change is found on the chunk's next scan.
  */
 final class JobScanner {
 
