@@ -13,7 +13,8 @@ import net.minecraft.util.profiling.ProfilerFiller;
 /**
  * Loads {@code data/<namespace>/palworks/suitability/<job>.json} into {@link SuitabilityData} when
  * the server starts and on {@code /reload}. Each loader registers it (Fabric's resource loader,
- * NeoForge's AddReloadListenerEvent).
+ * NeoForge's AddReloadListenerEvent). Admins' in-game changes ({@link SuitabilityOverrides}) are
+ * put back over it.
  */
 public class SuitabilityReloadListener extends SimpleJsonResourceReloadListener {
     public static final ResourceLocation ID = Palworks.id("suitability");
@@ -30,7 +31,7 @@ public class SuitabilityReloadListener extends SimpleJsonResourceReloadListener 
         files.forEach((id, json) -> byId.put(id.toString(), json));
         SuitabilityData data =
                 SuitabilityData.fromFiles(byId, message -> Palworks.LOGGER.warn("[suitability] {}", message));
-        SuitabilityData.setCurrent(data);
+        SuitabilityOverrides.setDatapack(data);
         Palworks.LOGGER.info(
                 "Loaded work suitabilities: {} jobs, {} types, {} species",
                 data.jobCount(),

@@ -51,6 +51,15 @@ public class DatapackSuitabilityProvider implements SuitabilityProvider {
         return current.levels().computeIfAbsent(key, k -> compute(data, k));
     }
 
+    /** The job levels of a Pokémon of this form, with the form's own types (for commands, which have no Pokémon). */
+    public static Map<Suitability, Integer> levels(FormData form) {
+        List<ElementalType> types = new ArrayList<>(2);
+        for (ElementalType type : form.getTypes()) {
+            types.add(type);
+        }
+        return compute(SuitabilityData.current(), new Key(form, types)).levels();
+    }
+
     private static Levels compute(SuitabilityData data, Key key) {
         String speciesId = key.form().getSpecies().getResourceIdentifier().toString();
         Map<Suitability, Integer> levels = data.levels(speciesId, line(key));

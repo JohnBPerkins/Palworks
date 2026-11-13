@@ -35,7 +35,8 @@ import java.util.function.Consumer;
  * species without copying ours; where two give the same type or species a level, the higher wins
  * (and a species' 0 wins over any level). A file with {@code "replace": true} replaces the other
  * namespaces' files for its job instead. As with any datapack file, a pack loaded later replaces a
- * file with the same path, so a pack can override ours.
+ * file with the same path, so a pack can override ours. Admins' in-game changes
+ * ({@link SuitabilityOverrides}, {@code /palworks suitability}) go over all of them.
  *
  * <p>A Pokémon's level for a job (its work level) comes from how strong it is: its form's base stat
  * total ({@link #powerLevel}), from 1 (Squirtle, 314) to 5 (Kyogre, 670). A type that gives the job
@@ -156,6 +157,25 @@ public final class SuitabilityData {
             }
         }
         return result;
+    }
+
+    /**
+     * This data with these species' levels put over its own, as admins set them in game
+     * ({@link SuitabilityOverrides}): each job given is the species' level for it, as if a datapack
+     * gave it (0 takes the job away); the species' other jobs are left as they were.
+     */
+    public SuitabilityData withSpecies(Map<String, Map<Suitability, Integer>> overrides) {
+        if (overrides.isEmpty()) {
+            return this;
+        }
+        Map<String, Map<Suitability, Integer>> merged = new HashMap<>(species);
+        overrides.forEach((id, jobs) -> {
+            Map<Suitability, Integer> levels = new EnumMap<>(Suitability.class);
+            levels.putAll(species.getOrDefault(id, Map.of()));
+            levels.putAll(jobs);
+            merged.put(id, Collections.unmodifiableMap(levels));
+        });
+        return new SuitabilityData(types, Map.copyOf(merged), jobCount);
     }
 
     /** One job file's parsed contents. */
