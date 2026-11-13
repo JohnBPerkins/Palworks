@@ -73,6 +73,7 @@ public class JobManager {
         this.scanner = new JobScanner(pool);
         this.assigner = new JobAssigner(level, pool, scanner, workers, nonWorkerBeds);
         this.pickups = new PickupQueue(pool, workers, assigner);
+        assigner.onUnreachablePickup(pos -> pickups.outOfReach(pos, level.getGameTime()));
     }
 
     /**

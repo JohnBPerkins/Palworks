@@ -15,6 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -37,6 +38,10 @@ final class PickupQueue {
     static final int DECAY_BATCH_TICKS = 600;
     /** How often (ticks) items with no pickup job round them are given one. */
     static final int SWEEP_TICKS = 20;
+    // Items out of reach wait this long (ticks) for another pickup job, twice as long each time
+    // after, up to the most
+    private static final long OUT_OF_REACH_WAIT = 30 * 20;
+    private static final long OUT_OF_REACH_MAX_WAIT = 5 * 60 * 20;
 
     private final JobPool pool;
     private final WorkerRegistry workers;
@@ -70,6 +75,22 @@ final class PickupQueue {
             ItemEntity item, @Nullable UUID suggestedWorker, @Nullable BlockPos source, boolean decay, long gameTime) {
         long due = decay ? (gameTime / DECAY_BATCH_TICKS + 1) * DECAY_BATCH_TICKS : gameTime + LANDING_DELAY;
         tracked.put(item.getUUID(), new Tracked(due, suggestedWorker, source));
+    }
+
+    /**
+     * A pickup job at {@code pos} was out of reach (no worker could get to it): the items round it
+     * wait a while for another, longer each time, so they're not path-checked over and over. They
+     * stay tracked: once the way's clear (or they've been moved), they're picked up.
+     */
+    void outOfReach(BlockPos pos, long now) {
+        AABB area = new AABB(pos).inflate(JobChecks.pickupRadius());
+        for (Map.Entry<UUID, Tracked> entry : tracked.entrySet()) {
+            Tracked item = entry.getValue();
+            if (item.lastSpot != null && area.contains(Vec3.atCenterOf(item.lastSpot))) {
+                item.wait = item.wait == 0 ? OUT_OF_REACH_WAIT : Math.min(item.wait * 2, OUT_OF_REACH_MAX_WAIT);
+                item.due = now + item.wait;
+            }
+        }
     }
 
     /** Create the queued pickup jobs that are due, and jobs for items with none round them. */
@@ -116,6 +137,7 @@ final class PickupQueue {
                 continue;
             }
             BlockPos at = spotFor(entity, item.source, radius);
+            item.lastSpot = entity.blockPosition();
             createCollectDropsJob(level, at, item.suggestedWorker);
             jobs.add(new AABB(at).inflate(radius));
             item.suggestedWorker = null; // only its first job is offered to the worker that dropped it
@@ -190,7 +212,12 @@ final class PickupQueue {
      * {@code suggestedWorker}, the worker that dropped it, if given.
      */
     private static final class Tracked {
-        final long due;
+        long due;
+        // How long it waited last after a pickup out of reach (0: none was); where it last was
+        long wait;
+
+        @Nullable
+        BlockPos lastSpot;
 
         @Nullable
         UUID suggestedWorker;
