@@ -31,5 +31,6 @@ public final class Templates {
             SharedJobGameTests.class,
             WateringGameTests.class,
             WorkLevelSyncGameTests.class,
-            HungerGameTests.class);
+            HungerGameTests.class,
+            SleepGameTests.class);
 }

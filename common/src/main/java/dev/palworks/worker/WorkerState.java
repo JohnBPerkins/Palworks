@@ -43,6 +43,21 @@ public class WorkerState {
     // reload just ends its rest), so it gets through work at its slower speed
     private long restUntil;
 
+    // Sleep (see dev.palworks.sleep.Sleep). Saved, so a reload in the night doesn't wake it, or lose
+    // how it slept. Whether it's asleep (in a bed or not), and how long it has slept in each this time
+    private boolean asleep;
+    private long bedSleepTicks;
+    private long groundSleepTicks;
+    // It slept without a bed: slower until it next sleeps
+    private boolean tired;
+    // Whether it's asleep in a bed (its SLEEP job), so it knows it's lost its bed if the job goes
+    private boolean inBed;
+    // Game time until which it stays awake, after something woke it in the night (hurt, its bed
+    // broken, recalled). Saved, so a recall and send-out doesn't put it straight back to sleep.
+    private long wokenUntil;
+    // Ticks it's been idle in its bedtime without being put to bed (not saved)
+    private int bedtimeIdleTicks;
+
     public WorkerState() {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
         this.assignedJob = null;
@@ -218,6 +233,80 @@ public class WorkerState {
         this.restUntil = restUntil;
     }
 
+    /** Whether it's asleep (in a bed, or wherever it is). */
+    public boolean isAsleep() {
+        return asleep;
+    }
+
+    public void setAsleep(boolean asleep) {
+        this.asleep = asleep;
+    }
+
+    /** Ticks it has slept in a bed, this time. */
+    public long getBedSleepTicks() {
+        return bedSleepTicks;
+    }
+
+    /** Ticks it has slept without one, this time. */
+    public long getGroundSleepTicks() {
+        return groundSleepTicks;
+    }
+
+    /** It slept another tick, in a bed or not. */
+    public void addSleepTick(boolean inBed) {
+        if (inBed) {
+            bedSleepTicks++;
+        } else {
+            groundSleepTicks++;
+        }
+    }
+
+    /** Forget how it slept (it's woken up). */
+    public void resetSleepTicks() {
+        bedSleepTicks = 0;
+        groundSleepTicks = 0;
+    }
+
+    /** Whether it's Tired: it last slept without a bed. */
+    public boolean isTired() {
+        return tired;
+    }
+
+    public void setTired(boolean tired) {
+        this.tired = tired;
+    }
+
+    /** Whether it's asleep in a bed (its SLEEP job). */
+    public boolean isInBed() {
+        return inBed;
+    }
+
+    public void setInBed(boolean inBed) {
+        this.inBed = inBed;
+    }
+
+    /** Game time until which it stays awake, after being woken in the night (0 if it wasn't). */
+    public long getWokenUntil() {
+        return wokenUntil;
+    }
+
+    public void setWokenUntil(long wokenUntil) {
+        this.wokenUntil = wokenUntil;
+    }
+
+    /** Ticks it's been idle in its bedtime without going to bed. */
+    public int getBedtimeIdleTicks() {
+        return bedtimeIdleTicks;
+    }
+
+    public void addBedtimeIdleTick() {
+        bedtimeIdleTicks++;
+    }
+
+    public void resetBedtimeIdleTicks() {
+        bedtimeIdleTicks = 0;
+    }
+
     /** Whether the worker is partway through the job, including the current step. */
     public boolean isWorking() {
         return jobStep > 0 || stepTicks > 0;
@@ -243,6 +332,24 @@ public class WorkerState {
         tag.putLong("lastPathFailTime", lastPathFailTime);
         if (fullnessOwed > 0) {
             tag.putDouble("fullnessOwed", fullnessOwed);
+        }
+        if (asleep) {
+            tag.putBoolean("asleep", true);
+        }
+        if (bedSleepTicks > 0) {
+            tag.putLong("bedSleepTicks", bedSleepTicks);
+        }
+        if (groundSleepTicks > 0) {
+            tag.putLong("groundSleepTicks", groundSleepTicks);
+        }
+        if (tired) {
+            tag.putBoolean("tired", true);
+        }
+        if (inBed) {
+            tag.putBoolean("inBed", true);
+        }
+        if (wokenUntil > 0) {
+            tag.putLong("wokenUntil", wokenUntil);
         }
 
         // Serialize current reservation
@@ -277,6 +384,13 @@ public class WorkerState {
         lastPathFailTime = tag.getLong("lastPathFailTime");
         // Missing: none owed (saved before hunger, or nothing was)
         fullnessOwed = Math.max(0, tag.getDouble("fullnessOwed"));
+        // Missing: awake and rested (saved before sleep, or nothing to save)
+        asleep = tag.getBoolean("asleep");
+        bedSleepTicks = Math.max(0, tag.getLong("bedSleepTicks"));
+        groundSleepTicks = Math.max(0, tag.getLong("groundSleepTicks"));
+        tired = tag.getBoolean("tired");
+        inBed = tag.getBoolean("inBed");
+        wokenUntil = Math.max(0, tag.getLong("wokenUntil"));
 
         // Deserialize current reservation
         if (tag.contains("currentReservation")) {

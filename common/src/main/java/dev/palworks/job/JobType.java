@@ -39,7 +39,11 @@ public enum JobType {
 
     // Not work: a hungry worker eats from a trough (see dev.palworks.hunger.Hunger). Any worker
     // does it, whatever its skills, and before any work (JobAssigner hands it out first).
-    EAT_FOOD(null, 10);
+    EAT_FOOD(null, 10),
+
+    // Not work either: a pastured worker goes to a bed to sleep at its bedtime (see
+    // dev.palworks.sleep.Sleep). JobAssigner hands it out, and nothing else, at bedtime.
+    SLEEP(null, 10);
 
     @Nullable
     private final Suitability requiredSuitability;

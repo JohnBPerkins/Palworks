@@ -1,0 +1,61 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "group": "large_wool_bed_dye",
+  "ingredients": [
+    {
+      "item": "minecraft:gray_dye"
+    },
+    [
+      {
+        "item": "palworks:large_white_wool_bed"
+      },
+      {
+        "item": "palworks:large_orange_wool_bed"
+      },
+      {
+        "item": "palworks:large_magenta_wool_bed"
+      },
+      {
+        "item": "palworks:large_light_blue_wool_bed"
+      },
+      {
+        "item": "palworks:large_yellow_wool_bed"
+      },
+      {
+        "item": "palworks:large_lime_wool_bed"
+      },
+      {
+        "item": "palworks:large_pink_wool_bed"
+      },
+      {
+        "item": "palworks:large_light_gray_wool_bed"
+      },
+      {
+        "item": "palworks:large_cyan_wool_bed"
+      },
+      {
+        "item": "palworks:large_purple_wool_bed"
+      },
+      {
+        "item": "palworks:large_blue_wool_bed"
+      },
+      {
+        "item": "palworks:large_brown_wool_bed"
+      },
+      {
+        "item": "palworks:large_green_wool_bed"
+      },
+      {
+        "item": "palworks:large_red_wool_bed"
+      },
+      {
+        "item": "palworks:large_black_wool_bed"
+      }
+    ]
+  ],
+  "result": {
+    "id": "palworks:large_gray_wool_bed",
+    "count": 1
+  }
+}

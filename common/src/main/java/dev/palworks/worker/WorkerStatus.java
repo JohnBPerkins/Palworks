@@ -2,6 +2,7 @@ package dev.palworks.worker;
 
 import java.util.Locale;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Something wrong with a worker that it shows over its head (see WorkerStatusSync and, on the
@@ -14,20 +15,29 @@ public enum WorkerStatus {
      * dev.palworks.hunger.Hunger). A half hunger shank, as on the hunger bar: the half drawn over
      * the empty outline.
      */
-    HUNGRY("hud/food_empty", "hud/food_half");
+    HUNGRY("minecraft:hud/food_empty", "minecraft:hud/food_half"),
 
-    // Vanilla sprites in the GUI atlas, by path: drawn one over the other
+    /**
+     * It slept without a bed: it works slower until it next sleeps (see dev.palworks.sleep.Sleep).
+     * A sleepy "z".
+     */
+    TIRED(null, "palworks:status/tired");
+
+    // Sprites in the GUI atlas, by id: the background (if any) drawn first, the icon over it
+    @Nullable
     private final String background;
+
     private final String sprite;
 
-    WorkerStatus(String background, String sprite) {
+    WorkerStatus(@Nullable String background, String sprite) {
         this.background = background;
         this.sprite = sprite;
     }
 
-    /** What the icon is drawn over (the hunger bar's empty outline). */
+    /** What the icon is drawn over (the hunger bar's empty outline), or null for nothing. */
+    @Nullable
     public ResourceLocation background() {
-        return ResourceLocation.withDefaultNamespace(background);
+        return background == null ? null : ResourceLocation.parse(background);
     }
 
     /** The aspect a Pokémon with this status has: {@code palworks-hungry}. */
@@ -37,6 +47,6 @@ public enum WorkerStatus {
 
     /** The icon shown over its head, over its {@link #background}: a sprite from the GUI atlas. */
     public ResourceLocation sprite() {
-        return ResourceLocation.withDefaultNamespace(sprite);
+        return ResourceLocation.parse(sprite);
     }
 }

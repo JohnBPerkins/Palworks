@@ -1,5 +1,6 @@
 package dev.palworks.block;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
@@ -9,7 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
-/** Every wood's trough has its blockstate, models, recipe, loot table and name. */
+/** Every wood's trough and every bed has its blockstate, models, recipe, loot table and name. */
 class TroughFilesTest {
     private static final Path RESOURCES = Path.of("src/main/resources");
 
@@ -32,6 +33,19 @@ class TroughFilesTest {
             assertJson("data/palworks/recipe/" + trough);
             assertJson("data/palworks/loot_table/blocks/" + trough);
             assertTrue(lang.has("block.palworks." + trough), "no name for the " + wood + " trough");
+        }
+        // Straw, and each of the 16 wools, in 3 sizes
+        assertEquals(17 * WorkerBedBlock.MAX_SIZE, ModBlocks.bedIds().size());
+        for (String bed : ModBlocks.bedIds()) {
+            assertJson("assets/palworks/models/block/" + bed.replaceFirst("^(large|huge)_", "") + "_floor");
+            assertJson("assets/palworks/blockstates/" + bed);
+            assertJson("assets/palworks/models/item/" + bed);
+            assertJson("data/palworks/recipe/" + bed);
+            assertJson("data/palworks/loot_table/blocks/" + bed);
+            assertTrue(lang.has("block.palworks." + bed), "no name for the " + bed);
+            if (bed.contains("_wool_")) {
+                assertJson("data/palworks/recipe/dye_" + bed); // dyed from another colour's
+            }
         }
         for (int level = 1; level <= TroughFeed.MAX_FILL; level++) {
             assertJson("assets/palworks/models/block/trough_fill_" + level);

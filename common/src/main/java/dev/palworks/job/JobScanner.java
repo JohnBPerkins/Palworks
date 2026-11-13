@@ -231,6 +231,8 @@ final class JobScanner {
                             cache.addChest(pos.immutable());
                         } else if (JobChecks.isTrough(state)) {
                             cache.addTrough(pos.immutable());
+                        } else if (JobChecks.isBed(state)) {
+                            cache.addBed(pos.immutable());
                         }
 
                         // Check for job opportunities at this position
@@ -437,6 +439,14 @@ final class JobScanner {
         return near(center, chunkRadius, ChunkJobCache::troughs);
     }
 
+    /**
+     * The beds the last scans found in the square of chunks {@code chunkRadius} round
+     * {@code center}'s (where pastured workers sleep). Up to a scan old: check they're still beds.
+     */
+    List<BlockPos> bedsNear(BlockPos center, int chunkRadius) {
+        return near(center, chunkRadius, ChunkJobCache::beds);
+    }
+
     private List<BlockPos> near(
             BlockPos center, int chunkRadius, java.util.function.Function<ChunkJobCache, List<BlockPos>> found) {
         List<BlockPos> positions = new ArrayList<>();
@@ -480,6 +490,7 @@ final class JobScanner {
         private final Map<JobType, List<BlockPos>> jobs = new EnumMap<>(JobType.class);
         private final List<BlockPos> chests = new ArrayList<>(); // delivery targets
         private final List<BlockPos> troughs = new ArrayList<>(); // where workers eat
+        private final List<BlockPos> beds = new ArrayList<>(); // where pastured workers sleep
         private boolean dirty;
 
         ChunkJobCache(long scanTime) {
@@ -516,6 +527,15 @@ final class JobScanner {
 
         void addTrough(BlockPos pos) {
             troughs.add(pos);
+        }
+
+        /** beds seen in the scan. */
+        List<BlockPos> beds() {
+            return beds;
+        }
+
+        void addBed(BlockPos pos) {
+            beds.add(pos);
         }
 
         /** Whether something in the chunk changed since, so it needs scanning again. */

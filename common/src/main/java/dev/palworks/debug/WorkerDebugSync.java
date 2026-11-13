@@ -6,9 +6,11 @@ import dev.palworks.ai.WorkerAI;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.job.JobManager;
+import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.sleep.Sleep;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerState;
@@ -148,7 +150,18 @@ public final class WorkerDebugSync {
                 state.getRecentPathFailCount(),
                 state.getStepInTicks(),
                 stillTicks(entity, activity, now),
-                fullness(entity.getPokemon(), state));
+                fullness(entity.getPokemon(), state),
+                rest(entity, state, reservation));
+    }
+
+    private static WorkerDebugPacket.Rest rest(PokemonEntity entity, WorkerState state, ReservationId reservation) {
+        boolean sleeps = Sleep.appliesTo(entity.getPokemon(), state);
+        return new WorkerDebugPacket.Rest(
+                sleeps,
+                sleeps && Sleep.isBedtime(entity),
+                state.isAsleep(),
+                state.isAsleep() && reservation != null && reservation.getJobType() == JobType.SLEEP,
+                state.isTired());
     }
 
     private static WorkerDebugPacket.Fullness fullness(Pokemon pokemon, WorkerState state) {

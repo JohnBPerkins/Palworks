@@ -96,6 +96,43 @@ class WorkerDebugTextTest {
                         .get(1));
     }
 
+    private static Details withRest(WorkerDebugPacket.Rest rest) {
+        return new Details(-1, -1, "", 0, 0, 0, 0, PathStatus.NONE, 0, 0, 0, WorkerDebugPacket.Fullness.NONE, rest);
+    }
+
+    @Test
+    void aSleepingWorkerSaysWhere() {
+        assertEquals(
+                line("asleep · in bed", false),
+                lines(WorkActivity.IDLE, withRest(new WorkerDebugPacket.Rest(true, true, true, true, false)), 0)
+                        .get(1));
+        assertEquals(
+                line("asleep · no bed", false),
+                lines(WorkActivity.IDLE, withRest(new WorkerDebugPacket.Rest(true, true, true, false, false)), 0)
+                        .get(1));
+    }
+
+    @Test
+    void aTiredWorkerIsAWarning() {
+        assertEquals(
+                line("Tired", true),
+                lines(WorkActivity.IDLE, withRest(new WorkerDebugPacket.Rest(true, false, false, false, true)), 0)
+                        .get(1));
+    }
+
+    @Test
+    void aRestedWorkerAwakeShowsNoSleepLine() {
+        assertEquals(
+                1,
+                lines(WorkActivity.IDLE, withRest(new WorkerDebugPacket.Rest(true, false, false, false, false)), 0)
+                        .size());
+        // A party worker doesn't sleep at all
+        assertEquals(
+                1,
+                lines(WorkActivity.IDLE, withRest(WorkerDebugPacket.Rest.NONE), 0)
+                        .size());
+    }
+
     @Test
     void oneUnreachableSpotIsSingular() {
         assertEquals(

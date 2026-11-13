@@ -1,0 +1,6 @@
+{
+  "parent": "palworks:block/template_bed_floor",
+  "textures": {
+    "cushion": "minecraft:block/purple_wool"
+  }
+}

@@ -109,7 +109,8 @@ final class JobPool {
         if (job == null
                 || job.type() == JobType.DELIVER_ITEMS
                 || job.type() == JobType.EAT_FOOD
-                || job.type() == JobType.FETCH_FOOD) {
+                || job.type() == JobType.FETCH_FOOD
+                || job.type() == JobType.SLEEP) {
             return;
         }
         job.release(gameTime);

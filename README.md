@@ -28,6 +28,8 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
   summary's Info page names them, in the box beside the experience bar. Hover either for the full
   list.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
+- **Sleep and beds** — pastured workers sleep in their species' hours (see [Sleep](#sleep)). Give
+  them **straw** or **wool beds**, large ones for large Pokémon, or they wake Tired and work slower the next day.
 - **Hunger and troughs** — work makes workers hungry (see [Hunger](#hunger)). Fill a **trough** with
   Cobblemon berries or Aprijuice and they walk over and eat from it. A worker
   that's run out of food works at a quarter speed until it eats.
@@ -80,6 +82,10 @@ settings that aren't per-Pokémon:
     "idle_drain_per_day": 0.25,
     "trough_fill_fraction": 0.5,
     "empty_work_speed": 0.25
+  },
+  "sleep": {
+    "enabled": true,
+    "tired_work_speed": 0.75
   }
 }
 ```
@@ -106,6 +112,9 @@ settings that aren't per-Pokémon:
   - **`trough_fill_fraction`** (0 to 1): how full troughs fill a worker, as a share of its max
     fullness. The rest is left for hand-feeding. 0 and troughs never feed.
   - **`empty_work_speed`** (0.1 to 1): how fast a worker with no fullness left works and walks.
+- **`sleep`**: how pastured workers sleep (see [Sleep](#sleep)).
+  - **`enabled`**: `false` turns it off: pastured workers' sleep is then Cobblemon's alone.
+  - **`tired_work_speed`** (0.1 to 1): how fast a Tired worker works and walks.
 
 Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
 the server logs a warning and uses the defaults. Changes apply the next time the server starts.
@@ -158,6 +167,42 @@ Aprijuices. Datapacks can add to the tag, and set how much feed an item is worth
 }
 ```
 
+## Sleep
+
+Pastured workers keep a sleep schedule, as a Palworld base's pals do. Party workers never do: they
+stay awake with you, as Cobblemon's party Pokémon do.
+
+- **When:** each sleeps in its species' Cobblemon sleep hours: most at night, nocturnal ones by day
+  (they work the night shift), some at their own hours. Species Cobblemon lets sleep at any time
+  sleep at night. A species Cobblemon gives no sleep animation still sleeps, lying still.
+- **Where:** at its bedtime it finishes what it's doing and goes to a free **bed** it fits
+  in, one worker to a bed: the smallest it fits, so big beds are left for big Pokémon, and of those
+  the nearest. With none to be had, it sleeps where it is.
+- **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
+  walks at three quarters of its speed, with a "z" over its head, until it next sleeps.
+- **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It
+  stays up for a minute, then goes back to bed if it's still its bedtime. What it slept before
+  still counts towards whether it wakes Tired.
+- **Naps:** Cobblemon's own sleep is left alone: an idle pastured worker still naps when it gets
+  drowsy, and isn't given work until it wakes. It just doesn't doze off in the middle of a job.
+
+Beds come in three sizes, for Pokémon up to as wide as the bed:
+
+| Bed | Size | Fits | Crafted from |
+|---|---|---|---|
+| Straw Bed | 1 by 1 | up to 1 block wide (Bulbasaur, Machamp) | 3 wheat over 3 wooden slabs |
+| Large Straw Bed | 2 by 2 | up to 2 wide (Charizard, Gyarados) | 4 straw beds |
+| Huge Straw Bed | 3 by 3 | up to 3 wide (Snorlax, Wailord), and wider if the space round it is clear | 9 straw beds |
+
+**Wool beds** are the nicer kind, in all 16 colours: a Red Wool Bed is 3 red wool over 3 wooden
+slabs, a Large Red Wool Bed 4 red wool beds and a Huge one 9. Like a vanilla bed, a wool bed of any
+size is dyed another colour by crafting it with that dye. For now they sleep just as straw beds do.
+
+A large or huge bed is placed whole, like a vanilla bed: out from where you place it, forward and to
+your right. Breaking any part of it breaks it all. A bed is a quarter of a block high, like a slab: a
+worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's sleep is Cobblemon's
+alone.
+
 ### Display settings
 
 `config/palworks-client.json` (written with the defaults the first time the game starts) holds each
@@ -169,8 +214,8 @@ player's own display settings:
 }
 ```
 
-- **`show_status_icons`**: whether workers show what's holding their work back (a half hunger
-  shank when they're out of food) over their heads.
+- **`show_status_icons`**: whether workers show what's holding their work back over their heads: a
+  half hunger shank when they're out of food, a "z" when they're Tired.
 
 ## Customizing work skills
 

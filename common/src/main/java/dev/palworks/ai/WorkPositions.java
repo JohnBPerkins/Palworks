@@ -1,8 +1,10 @@
 package dev.palworks.ai;
 
+import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.sleep.Beds;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +17,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -49,6 +52,13 @@ public final class WorkPositions {
         if (jobType == JobType.CHOP_TREE) {
             TreeStand stand = treeStandFor(level, targetPos, entity, stance);
             return stand == null ? null : stand.stand();
+        }
+        if (jobType == JobType.SLEEP) {
+            // In the bed itself (it has no collision), if its body fits there with the space round it
+            return level.getBlockState(targetPos).getBlock() instanceof WorkerBedBlock bed
+                            && Beds.fits(level, targetPos, bed, entity)
+                    ? Beds.standTile(targetPos, bed)
+                    : null;
         }
         int distance = stance.ringFor(entity);
 
@@ -250,6 +260,13 @@ public final class WorkPositions {
      * a hanging fruit). For a tree the target is the whole trunk.
      */
     public static boolean inStance(Level level, Mob entity, BlockPos targetPos, JobType jobType, WorkStance stance) {
+        if (jobType == JobType.SLEEP) {
+            // Lying in the middle of the bed, not just touching it
+            Vec3 middle = standPoint(level, targetPos, jobType, targetPos);
+            double offX = entity.getX() - middle.x;
+            double offZ = entity.getZ() - middle.z;
+            return Math.abs(entity.getY() - targetPos.getY()) < 1.0 && offX * offX + offZ * offZ <= BED_SETTLE_DIST_SQ;
+        }
         double dy = entity.getY() - targetPos.getY();
         List<BlockPos> target;
         if (jobType == JobType.CHOP_TREE) {
@@ -271,6 +288,20 @@ public final class WorkPositions {
         }
         return stance.reaches(entity.getBbWidth() / 2.0, gapTo(entity, target));
     }
+
+    /**
+     * Exactly where the worker stands for this job: the middle of {@code standPos}, its tile, except
+     * in a bed, where it lies in the middle of the bed (of a 2 by 2 bed, where its blocks meet).
+     */
+    public static Vec3 standPoint(Level level, BlockPos targetPos, JobType jobType, BlockPos standPos) {
+        if (jobType == JobType.SLEEP && level.getBlockState(targetPos).getBlock() instanceof WorkerBedBlock bed) {
+            return bed.center(targetPos);
+        }
+        return Vec3.atBottomCenterOf(standPos);
+    }
+
+    /** How far from a bed's middle a worker lying in it may be (squared, in blocks). */
+    private static final double BED_SETTLE_DIST_SQ = 0.35 * 0.35;
 
     /** How many blocks above or below a tree's base a lumberjack can chop it from (a slope). */
     private static final int TREE_HEIGHT_REACH = 1;

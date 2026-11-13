@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "group": "wool_bed",
+  "pattern": [
+    "BBB",
+    "BBB",
+    "BBB"
+  ],
+  "key": {
+    "B": {
+      "item": "palworks:orange_wool_bed"
+    }
+  },
+  "result": {
+    "id": "palworks:huge_orange_wool_bed",
+    "count": 1
+  }
+}

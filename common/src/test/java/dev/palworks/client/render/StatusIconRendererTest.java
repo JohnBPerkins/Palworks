@@ -18,6 +18,13 @@ class StatusIconRendererTest {
     }
 
     @Test
+    void aTiredHungryWorkerShowsBothInOrder() {
+        assertEquals(
+                List.of(WorkerStatus.HUNGRY, WorkerStatus.TIRED),
+                StatusIconRenderer.statusesOf(Set.of("palworks-tired", "palworks-hungry")));
+    }
+
+    @Test
     void otherAspectsShowNothing() {
         assertEquals(List.of(), StatusIconRenderer.statusesOf(Set.of("palworks-working", "shiny")));
     }

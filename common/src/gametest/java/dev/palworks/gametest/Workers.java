@@ -114,6 +114,24 @@ public final class Workers {
     }
 
     /**
+     * Send out a pastured Pokémon at a spot in the test: one kept in its owner's PC rather than a
+     * party, as a pasture's Pokémon are, which is all Palworks tells them apart by (see
+     * WorkerEligibility.isFromParty). It's sent out fed.
+     */
+    public static PokemonEntity sendOutPastured(GameTestHelper helper, String properties, BlockPos rel) {
+        ServerPlayer owner = owner(helper, rel);
+        BlockPos abs = helper.absolutePos(rel);
+        Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
+        pokemon.setCurrentFullness(pokemon.getMaxFullness());
+        Cobblemon.INSTANCE.getStorage().getPC(owner).add(pokemon);
+        PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
+        if (entity == null) {
+            helper.fail("Cobblemon didn't send out " + properties);
+        }
+        return entity;
+    }
+
+    /**
      * Fail the test the moment two of these workers hold the same job at once: the same block and
      * the same kind of job (a job's identity, see ReservationId). Checked every tick, from each
      * worker's own state, which is what it acts on. Deliveries are left out: each is a worker
