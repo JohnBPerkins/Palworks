@@ -51,22 +51,23 @@ public record Step(
         return length.applyAsInt(speciesId);
     }
 
+    /** How long it takes this worker: longer if it's slowed down (see {@link JobContext#pace}). */
     @Override
     public int ticks(JobContext ctx) {
-        return ticksFor(ctx.species());
+        return WorkAnimation.atPace(ticksFor(ctx.species()), ctx.pace());
     }
 
     @Override
     public int startTick(JobContext ctx) {
         WorkAnimation played = animationFor(ctx.species());
-        return played == null ? 0 : played.playAt(ticks(ctx));
+        return played == null ? 0 : played.playAt(ticks(ctx), ctx.pace());
     }
 
     @Override
     public void start(JobContext ctx) {
         WorkAnimation played = animationFor(ctx.species());
         if (played != null) {
-            WorkAnimator.play(ctx.entity(), played, ctx.pos());
+            WorkAnimator.play(ctx.entity(), played, ctx.pos(), ctx.pace());
         }
     }
 

@@ -71,6 +71,14 @@ public final class WorkAnimator {
 
     /** Play an animation on a worker, aimed at a block. Cuts short one of its own still playing. */
     public static void play(Mob worker, WorkAnimation animation, BlockPos target) {
+        play(worker, animation, target, 1.0);
+    }
+
+    /**
+     * {@link #play(Mob, WorkAnimation, BlockPos)}, by a worker at {@code pace} (see
+     * dev.palworks.worker.WorkSpeed): slowed, its body animation lasts longer, so it plays out longer.
+     */
+    public static void play(Mob worker, WorkAnimation animation, BlockPos target, double pace) {
         if (!(worker.level() instanceof ServerLevel level)) {
             return;
         }
@@ -104,8 +112,8 @@ public final class WorkAnimator {
                     new ArrayList<>(),
                     level);
 
-            Playing playing =
-                    new Playing(context, marker, target.immutable(), level.getGameTime() + animation.durationTicks());
+            Playing playing = new Playing(
+                    context, marker, target.immutable(), level.getGameTime() + animation.durationTicks(pace));
             UUID id = worker.getUUID();
             PLAYING.put(id, playing);
             // Only the cleanup matters; the completion future itself isn't needed. Kept until its

@@ -82,6 +82,24 @@ public record WorkAnimation(
     }
 
     /**
+     * {@code ticks} at a worker's {@code pace} (see dev.palworks.worker.WorkSpeed): longer for one
+     * slowed down (hungry, Tired...), as its animations play slower too. Unchanged at full pace.
+     */
+    public static int atPace(int ticks, double pace) {
+        return pace >= 1 ? ticks : (int) Math.ceil(ticks / Math.max(pace, 0.05));
+    }
+
+    /** {@link #playAt}, for a worker at {@code pace}: its slower animation lands later after it starts. */
+    public int playAt(int stepTicks, double pace) {
+        return Math.max(SETTLE_TICKS, stepTicks - atPace(impactTicks, pace));
+    }
+
+    /** How long its body animation lasts, played at {@code pace}. */
+    public int durationTicks(double pace) {
+        return atPace(durationTicks, pace);
+    }
+
+    /**
      * How long a step with this animation takes, given the least time its work takes: long enough
      * for the worker to settle and the animation to land.
      */

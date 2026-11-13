@@ -95,14 +95,6 @@ class WorkerStateTest {
     }
 
     @Test
-    void anEmptyWorkersRestIsNotSaved() {
-        // A reload just ends it
-        WorkerState state = new WorkerState();
-        state.setRestUntil(1234);
-        assertEquals(0, WorkerState.fromNBT(state.serializeNBT()).getRestUntil());
-    }
-
-    @Test
     void stateWithoutEnabledKeyLoadsAsEnabled() {
         assertTrue(
                 WorkerState.fromNBT(new CompoundTag()).isEnabled(),

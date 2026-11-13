@@ -74,12 +74,4 @@ class HungerMathTest {
         assertEquals(1, drained.points());
         assertEquals(0, drained.owed());
     }
-
-    @Test
-    void anEmptyWorkerRestsSoItWorksAtItsSpeed() {
-        assertEquals(60, HungerMath.restTicks(20, 0.25)); // a quarter speed: 4x as long all told
-        assertEquals(20, HungerMath.restTicks(20, 0.5));
-        assertEquals(0, HungerMath.restTicks(20, 1));
-        assertEquals(0, HungerMath.restTicks(0, 0.25));
-    }
 }

@@ -20,7 +20,6 @@ import dev.palworks.sleep.Beds;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
-import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
@@ -142,13 +141,6 @@ final class JobAssigner {
                 if (headHome(level, worker, troughs)) {
                     continue;
                 }
-            }
-
-            // An empty or Tired worker rests a while after each job, so it gets through work slower
-            // (see WorkerAI.restAfterJob); eating isn't held up by it
-            WorkerState state = pokemon == null ? null : WorkerStateManager.get(pokemon);
-            if (state != null && state.getRestUntil() > now && WorkSpeed.of(pokemon, state) < 1) {
-                continue;
             }
 
             // A transporter carrying cargo (anything but a planter's seeds) fills up before it

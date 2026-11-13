@@ -10,7 +10,6 @@ import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
-import dev.palworks.hunger.HungerMath;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
@@ -118,7 +117,6 @@ public class WorkerAI {
         // on purpose (/palworks worker disable). Respect that instead of re-enabling it. Its
         // hunger is Cobblemon's again: no rest after its last job carries over.
         if (!state.isEnabled()) {
-            state.setRestUntil(0);
             if (state.isAsleep() && entity instanceof PokemonEntity pokemonEntity) {
                 wake(pokemon, pokemonEntity, state); // and its sleep is Cobblemon's again
             }
@@ -398,7 +396,6 @@ public class WorkerAI {
             // Job complete - clear reservation
             state.clearReservation();
             state.resetPathFailures();
-            restAfterJob(pokemon, entity, level, state, reservation.getJobType());
 
             // Opt-in activity message (only players who ran /palworks debug see it)
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
@@ -626,27 +623,13 @@ public class WorkerAI {
         return jobType == JobType.EAT_FOOD || jobType == JobType.SLEEP;
     }
 
-    /**
-     * After a job, a worker with no fullness left, or Tired, rests before taking another, for long
-     * enough that it gets through its work at its slower speed (see {@link HungerMath#restTicks}).
-     * Not after eating or sleeping, which is what makes it better.
-     */
-    private static void restAfterJob(Pokemon pokemon, Mob entity, Level level, WorkerState state, JobType jobType) {
-        double speed = WorkSpeed.of(pokemon, state);
-        if (isForItsNeeds(jobType) || speed >= 1) {
-            return;
-        }
-        long rest = HungerMath.restTicks(JobHandlerRegistry.jobTicks(jobType, entity), speed);
-        state.setRestUntil(level.getGameTime() + rest);
-    }
+    // The longest a leg home may take before it stops and looks again (see walkHome): 30s
+    private static final int HOME_LEG_TICKS = 600;
 
     /**
      * How long an idle worker waits in its bedtime for a bed before it sleeps where it is: long
      * enough for JobAssigner to offer it one (it gets a turn every few ticks).
      */
-    // The longest a leg home may take before it stops and looks again (see walkHome): 30s
-    private static final int HOME_LEG_TICKS = 600;
-
     private static final int BED_SEARCH_TICKS = 40;
 
     /**
