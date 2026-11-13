@@ -120,6 +120,45 @@ class WorkerDebugTextTest {
                         .get(1));
     }
 
+    private static Details withMood(WorkerDebugPacket.Mood mood) {
+        return new Details(
+                -1,
+                -1,
+                "",
+                0,
+                0,
+                0,
+                0,
+                PathStatus.NONE,
+                0,
+                0,
+                0,
+                WorkerDebugPacket.Fullness.NONE,
+                WorkerDebugPacket.Rest.NONE,
+                mood);
+    }
+
+    @Test
+    void itsMoodIsShownAndALowOneIsAWarning() {
+        assertEquals(
+                line("mood 72", false),
+                lines(WorkActivity.IDLE, withMood(new WorkerDebugPacket.Mood(true, 72, false, false)), 0)
+                        .get(1));
+        assertEquals(
+                line("mood 31 · unhappy", true),
+                lines(WorkActivity.IDLE, withMood(new WorkerDebugPacket.Mood(true, 31, true, false)), 0)
+                        .get(1));
+        assertEquals(
+                line("mood 0 · on strike", true),
+                lines(WorkActivity.IDLE, withMood(new WorkerDebugPacket.Mood(true, 0, true, true)), 0)
+                        .get(1));
+        // Its work is off: none
+        assertEquals(
+                1,
+                lines(WorkActivity.IDLE, withMood(WorkerDebugPacket.Mood.NONE), 0)
+                        .size());
+    }
+
     @Test
     void aRestedWorkerAwakeShowsNoSleepLine() {
         assertEquals(

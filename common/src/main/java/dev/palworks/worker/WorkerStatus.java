@@ -21,7 +21,16 @@ public enum WorkerStatus {
      * It slept without a bed: it works slower until it next sleeps (see dev.palworks.sleep.Sleep).
      * A sleepy "z".
      */
-    TIRED(null, "palworks:status/tired");
+    TIRED(null, "palworks:status/tired"),
+
+    /** Its mood is low: it works slower until it cheers up (see dev.palworks.mood.Mood). A sad face. */
+    UNHAPPY(null, "palworks:status/unhappy"),
+
+    /**
+     * Its mood ran out: it does no work until it's back up a way (see dev.palworks.mood.Mood). An
+     * anger mark, shown instead of {@link #UNHAPPY}.
+     */
+    STRIKING(null, "palworks:status/striking");
 
     // Sprites in the GUI atlas, by id: the background (if any) drawn first, the icon over it
     @Nullable

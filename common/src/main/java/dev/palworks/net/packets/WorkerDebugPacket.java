@@ -71,6 +71,7 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
      *                       someone has the overlay on)
      * @param fullness       its hunger (see dev.palworks.hunger.Hunger)
      * @param rest           its sleep (see dev.palworks.sleep.Sleep)
+     * @param mood           its mood (see dev.palworks.mood.Mood)
      */
     public record Details(
             int jobAgeTicks,
@@ -85,7 +86,8 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
             int stepInTicks,
             int stillTicks,
             Fullness fullness,
-            Rest rest) {
+            Rest rest,
+            Mood mood) {
         public static final Details NONE = new Details(-1, -1, "", 0, 0, 0, 0, PathStatus.NONE, 0, 0, 0);
 
         /** These details, with no hunger shown. */
@@ -114,7 +116,8 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
                     stepInTicks,
                     stillTicks,
                     Fullness.NONE,
-                    Rest.NONE);
+                    Rest.NONE,
+                    Mood.NONE);
         }
 
         /** These details, with no sleep shown. */
@@ -144,8 +147,53 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
                     stepInTicks,
                     stillTicks,
                     fullness,
-                    Rest.NONE);
+                    Rest.NONE,
+                    Mood.NONE);
         }
+
+        /** These details, with no mood shown. */
+        public Details(
+                int jobAgeTicks,
+                int expiresInTicks,
+                String stepName,
+                int stepIndex,
+                int stepCount,
+                int stepTicks,
+                int stepLength,
+                PathStatus pathStatus,
+                int pathFailures,
+                int stepInTicks,
+                int stillTicks,
+                Fullness fullness,
+                Rest rest) {
+            this(
+                    jobAgeTicks,
+                    expiresInTicks,
+                    stepName,
+                    stepIndex,
+                    stepCount,
+                    stepTicks,
+                    stepLength,
+                    pathStatus,
+                    pathFailures,
+                    stepInTicks,
+                    stillTicks,
+                    fullness,
+                    rest,
+                    Mood.NONE);
+        }
+    }
+
+    /**
+     * A worker's mood, for the overlay.
+     *
+     * @param shown    whether mood applies to it (its work is on); if not, nothing's shown
+     * @param mood     its mood, rounded, 0 to 100
+     * @param unhappy  whether it's unhappy (works slower)
+     * @param striking whether it's on strike (does no work)
+     */
+    public record Mood(boolean shown, int mood, boolean unhappy, boolean striking) {
+        public static final Mood NONE = new Mood(false, 0, false, false);
     }
 
     /**
@@ -227,6 +275,10 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
             buffer.writeBoolean(d.rest().asleep());
             buffer.writeBoolean(d.rest().inBed());
             buffer.writeBoolean(d.rest().tired());
+            buffer.writeBoolean(d.mood().shown());
+            buffer.writeVarInt(d.mood().mood());
+            buffer.writeBoolean(d.mood().unhappy());
+            buffer.writeBoolean(d.mood().striking());
 
             writePositions(buffer, entry.unreachable());
         }
@@ -273,7 +325,8 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
                             buffer.readBoolean(),
                             buffer.readBoolean(),
                             buffer.readBoolean(),
-                            buffer.readBoolean()));
+                            buffer.readBoolean()),
+                    new Mood(buffer.readBoolean(), buffer.readVarInt(), buffer.readBoolean(), buffer.readBoolean()));
 
             List<BlockPos> unreachable = readPositions(buffer);
             entries.add(new Entry(entityId, new WorkActivity(phase, job), target, path, details, unreachable));
