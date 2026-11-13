@@ -60,6 +60,8 @@ public final class Watering {
      */
     public static boolean water(ServerLevel level, BlockPos pos, double fertilizeChance) {
         WATERED_AT.computeIfAbsent(level, l -> new ConcurrentHashMap<>()).put(pos.immutable(), level.getGameTime());
+        // Nothing changes when its cooldown's over: have the scanner look at it again then
+        dev.palworks.job.JobManager.recheckAt(level, pos, level.getGameTime() + cooldownTicks());
         hydrate(level, pos.below());
         return level.getRandom().nextDouble() < fertilizeChance && fertilize(level, pos);
     }
