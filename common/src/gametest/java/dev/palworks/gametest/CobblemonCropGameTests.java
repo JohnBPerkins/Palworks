@@ -12,8 +12,11 @@ import dev.palworks.job.JobType;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -223,15 +226,21 @@ public class CobblemonCropGameTests {
     }
 
     @GameTest(template = Templates.EMPTY)
-    public void aBerryBushWithoutItsBlockEntityIsNeverHarvested(GameTestHelper helper) {
-        // Its berries and regrowth live in its block entity. Without one (another mod's block in
-        // the berries tag, or one whose block entity is gone) there's nothing to pick, and the
-        // harvest used to "succeed" without changing it: found ripe again, harvested forever.
-        helper.setBlock(CROP.below(), Blocks.FARMLAND);
-        helper.setBlock(CROP, with(CobblemonBlocks.ORAN_BERRY.defaultBlockState(), AGE, "5"));
+    public void aBlockInTheBerriesTagWithNoBerriesOfItsOwnIsNeverHarvested(GameTestHelper helper) {
+        // Another mod's block in #cobblemon:berries has no berry block entity for Cobblemon's harvest
+        // to pick from. Its harvest used to "succeed" without changing it: found ripe again,
+        // harvested forever. (Cobblemon's own bushes always have one: the game makes a fresh one
+        // if it's gone.) The in-game tests' datapack puts the chorus flower, aged 0-5 like a bush,
+        // in the tag.
+        helper.setBlock(CROP.below(), Blocks.END_STONE);
+        helper.setBlock(CROP, with(Blocks.CHORUS_FLOWER.defaultBlockState(), AGE, "5"));
         var level = helper.getLevel();
         BlockPos pos = helper.absolutePos(CROP);
-        level.removeBlockEntity(pos);
+        helper.assertTrue(
+                level.getBlockState(pos)
+                        .is(TagKey.create(
+                                Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("cobblemon", "berries"))),
+                "in the berries tag");
 
         helper.assertFalse(CropAdapter.isFullyGrown(level, pos), "no job: it can't be picked");
         helper.assertFalse(CropAdapter.harvestCrop(level, pos), "nothing harvested");
