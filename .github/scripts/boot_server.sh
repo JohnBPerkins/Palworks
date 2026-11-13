@@ -34,7 +34,7 @@ fail() {
 case "$loader" in
   fabric)
     if [ ! -f fabric-server-launch.jar ]; then
-      curl -fsSLo fabric-server-launch.jar \
+      curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o fabric-server-launch.jar \
         "https://meta.fabricmc.net/v2/versions/loader/$MINECRAFT_VERSION/$FABRIC_LOADER_VERSION/$FABRIC_INSTALLER_VERSION/server/jar"
     fi
     server_cmd=(java -Xmx3G -jar fabric-server-launch.jar nogui)
@@ -42,9 +42,21 @@ case "$loader" in
     ;;
   neoforge)
     if [ ! -f run.sh ]; then
-      curl -fsSLo installer.jar \
+      curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o installer.jar \
         "https://maven.neoforged.net/releases/net/neoforged/neoforge/$NEOFORGE_VERSION/neoforge-$NEOFORGE_VERSION-installer.jar"
-      if ! java -jar installer.jar --install-server . > installer.log 2>&1; then
+      # It downloads the game and its libraries itself: try again if the network drops out
+      installed=false
+      for attempt in 1 2 3; do
+        if java -jar installer.jar --install-server . > installer.log 2>&1; then
+          installed=true
+          break
+        fi
+        if [ "$attempt" -lt 3 ]; then
+          echo "NeoForge installer failed (attempt $attempt of 3); retrying in $((attempt * 10))s"
+          sleep $((attempt * 10))
+        fi
+      done
+      if [ "$installed" != true ]; then
         tail -n 40 installer.log
         fail "NeoForge $NEOFORGE_VERSION installer failed."
       fi

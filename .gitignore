@@ -17,6 +17,10 @@ build
 .gradle
 .architectury-transformer
 
+# Python bytecode (the CI scripts)
+__pycache__
+*.pyc
+
 # Logs
 logs
 */logs
