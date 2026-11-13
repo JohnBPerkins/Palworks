@@ -29,7 +29,7 @@
   "palworks.ui.mood.title": "Mood: %s/100",
   "palworks.ui.mood.happy": "Happy",
   "palworks.ui.mood.content": "Content",
-  "palworks.ui.mood.unhappy": "Unhappy: works slower",
+  "palworks.ui.mood.unhappy": "Unhappy: close to going on strike",
   "palworks.ui.mood.striking": "On strike: won't work until its mood is back to %s",
   "block.palworks.oak_trough": "Oak Trough",
   "block.palworks.spruce_trough": "Spruce Trough",

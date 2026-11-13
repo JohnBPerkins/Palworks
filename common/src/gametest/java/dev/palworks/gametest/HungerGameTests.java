@@ -646,7 +646,7 @@ public class HungerGameTests {
     }
 
     @GameTest(template = Templates.EMPTY, batch = "hunger_pace_moving", timeoutTicks = 200)
-    public void anEmptyWorkerMovesAtAQuarterSpeedWhoeverMovesIt(GameTestHelper helper) {
+    public void anEmptyWorkerMovesAtThreeQuartersSpeedWhoeverMovesIt(GameTestHelper helper) {
         // On its movement speed itself, which Cobblemon's wandering and following go by as well
         Workers.isolate(helper);
         PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
@@ -655,8 +655,9 @@ public class HungerGameTests {
         helper.startSequence()
                 .thenExecute(() -> pokemon.setCurrentFullness(0))
                 .thenWaitUntil(() -> helper.assertTrue(
-                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * 0.25) < 1e-6,
-                        "empty: a quarter of " + full + ", not " + worker.getAttributeValue(Attributes.MOVEMENT_SPEED)))
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * 0.75) < 1e-6,
+                        "empty: three quarters of " + full + ", not "
+                                + worker.getAttributeValue(Attributes.MOVEMENT_SPEED)))
                 .thenExecute(() -> pokemon.setCurrentFullness(pokemon.getMaxFullness()))
                 .thenWaitUntil(() -> helper.assertTrue(
                         Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full) < 1e-6, "fed: full speed"))
@@ -672,9 +673,9 @@ public class HungerGameTests {
     }
 
     @GameTest(template = Templates.EMPTY, batch = "hunger_pace_empty", timeoutTicks = 800)
-    public void anEmptyWorkerHarvestsAtAQuarterSpeed(GameTestHelper helper) {
-        // The work itself takes 4x as long (its animation plays a quarter as fast), not a rest after
-        timeTheHarvest(helper, true, 3.5, 4.5);
+    public void anEmptyWorkerHarvestsAtThreeQuartersSpeed(GameTestHelper helper) {
+        // The work itself takes 4/3 as long (its animation plays at three quarters), not a rest after
+        timeTheHarvest(helper, true, 1.25, 1.55);
     }
 
     @GameTest(template = Templates.EMPTY, batch = "hunger_pace_fed", timeoutTicks = 400)

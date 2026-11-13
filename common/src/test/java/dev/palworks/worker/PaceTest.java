@@ -13,7 +13,7 @@ class PaceTest {
     @Test
     void roundedToFivePercentBetweenOneStepAndFull() {
         assertEquals(0.25, Pace.rounded(0.25), DELTA);
-        assertEquals(0.2, Pace.rounded(0.1875), DELTA); // empty and Tired: 0.25 x 0.75
+        assertEquals(0.2, Pace.rounded(0.1875), DELTA);
         assertEquals(0.75, Pace.rounded(0.74), DELTA);
         assertEquals(0.05, Pace.rounded(0.001), DELTA, "never stopped dead");
         assertEquals(Pace.FULL, Pace.rounded(1.3), DELTA);

@@ -65,8 +65,8 @@ public class PaceGameTests {
         helper.startSequence()
                 .thenExecute(() -> pokemon.setCurrentFullness(0))
                 .thenWaitUntil(() -> helper.assertTrue(
-                        worker.getAspects().contains("palworks-pace-25"),
-                        "empty: a quarter pace, " + worker.getAspects()))
+                        worker.getAspects().contains("palworks-pace-75"),
+                        "empty: three quarters pace, " + worker.getAspects()))
                 .thenExecute(() -> pokemon.setCurrentFullness(pokemon.getMaxFullness()))
                 .thenWaitUntil(() -> helper.assertTrue(
                         worker.getAspects().stream().noneMatch(aspect -> aspect.startsWith("palworks-pace-")),
