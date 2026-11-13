@@ -32,5 +32,6 @@ public final class Templates {
             WateringGameTests.class,
             WorkLevelSyncGameTests.class,
             HungerGameTests.class,
-            SleepGameTests.class);
+            SleepGameTests.class,
+            MoodGameTests.class);
 }
