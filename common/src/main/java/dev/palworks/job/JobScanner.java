@@ -497,6 +497,17 @@ final class JobScanner {
         return null;
     }
 
+    /** Whether the chunk {@code pos} is in has been scanned and is indexed. */
+    boolean isIndexed(BlockPos pos) {
+        return chunkCaches.containsKey(new ChunkPos(pos));
+    }
+
+    /** Whether the block at {@code pos} is in its chunk's index as a chest, trough, bed or furnace. */
+    boolean isKnownPlace(BlockPos pos) {
+        ChunkIndex index = chunkCaches.get(new ChunkPos(pos));
+        return index != null && index.isPlace(pos);
+    }
+
     /**
      * Whether every chunk in a worker's range has been scanned for jobs. The scan gets through a
      * couple of chunks a tick, so a worker just sent out (or arrived somewhere new) waits the few
@@ -691,6 +702,11 @@ final class JobScanner {
             troughs.remove(pos);
             beds.remove(pos);
             furnaces.remove(pos);
+        }
+
+        /** Whether the block at {@code pos} is a chest, trough, bed or furnace. */
+        boolean isPlace(BlockPos pos) {
+            return chests.contains(pos) || troughs.contains(pos) || beds.contains(pos) || furnaces.contains(pos);
         }
 
         /** Whether the block at {@code pos} is a chest or furnace, whose contents make its job. */

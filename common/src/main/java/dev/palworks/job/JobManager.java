@@ -517,6 +517,29 @@ public class JobManager {
         return assigner.unreachableFor(workerUUID, now);
     }
 
+    /** Whether a job of this type at {@code pos} is waiting for a worker (tests, debugging). */
+    public boolean isAvailable(JobType type, BlockPos pos) {
+        return pool.isAvailable(new JobKey(pos, type));
+    }
+
+    /** Where the jobs of this type waiting for a worker are (tests, debugging). */
+    public List<BlockPos> availablePositions(JobType type) {
+        return pool.available().stream()
+                .filter(job -> job.type() == type)
+                .map(JobRecord::position)
+                .toList();
+    }
+
+    /** Whether the chunk {@code pos} is in has been scanned and is indexed (tests, debugging). */
+    public boolean isIndexed(BlockPos pos) {
+        return scanner.isIndexed(pos);
+    }
+
+    /** Whether the scanner knows the block at {@code pos} as a chest, trough, bed or furnace (tests). */
+    public boolean isKnownPlace(BlockPos pos) {
+        return scanner.isKnownPlace(pos);
+    }
+
     /** The {@code /palworks jobs} report: lines of formatted text. */
     public List<String> getJobsDebugInfo(ServerLevel level) {
         return JobsDebugReport.build(level, pool, workers, assigner);

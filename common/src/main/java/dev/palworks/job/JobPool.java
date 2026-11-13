@@ -77,6 +77,10 @@ final class JobPool {
         return reserved.values();
     }
 
+    boolean isAvailable(JobKey key) {
+        return available.containsKey(key);
+    }
+
     boolean isReserved(JobKey key) {
         return reserved.containsKey(key);
     }
