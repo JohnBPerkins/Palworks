@@ -61,10 +61,10 @@ public final class Sleep {
     }
 
     /**
-     * How long a worker stays awake after something wakes it in the night (a minute), before it goes
+     * How long a worker stays awake after something wakes it in the night (15 seconds), before it goes
      * back to bed if it's still its bedtime.
      */
-    public static final long WOKEN_TICKS = 1_200;
+    public static final long WOKEN_TICKS = 300;
 
     /**
      * Something disturbed this worker (it was hit or hurt): if it's asleep, or in its bed, it wakes
