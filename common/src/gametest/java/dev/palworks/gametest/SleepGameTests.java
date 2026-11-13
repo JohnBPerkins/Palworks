@@ -167,8 +167,7 @@ public class SleepGameTests {
                 .thenWaitUntil(() -> assertWokenAndUp(helper, squirtle))
                 .thenIdle(100)
                 .thenExecute(() -> assertWokenAndUp(helper, squirtle))
-                // Its minute up, still night: back to bed
-                .thenExecute(() -> stateOf(squirtle).setWokenUntil(0))
+                // 15 seconds on, and still night: back to bed by itself
                 .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "back in its bed"))
                 .thenSucceed();
     }
