@@ -64,6 +64,13 @@ final class JobScanner {
     // off the server thread (mods), so it's a concurrent set.
     private final Set<BlockPos> changed = ConcurrentHashMap.newKeySet();
 
+    // Blocks to look at again at a set time, with nothing changing to say so: a watered crop wanting
+    // water again once its cooldown's over. Earliest first; only the server thread uses it.
+    private final java.util.Queue<Recheck> rechecks =
+            new java.util.PriorityQueue<>(Comparator.comparingLong(Recheck::at));
+
+    private record Recheck(long at, BlockPos pos) {}
+
     // Blocks of trees already validated during the current chunk scan, so a tree with several base
     // blocks only gets one tree search and one job. Cleared at the start of each chunk scan.
     private final Set<BlockPos> treeBlocksSeenThisScan = new HashSet<>();
@@ -127,11 +134,33 @@ final class JobScanner {
     }
 
     /**
+     * A block entity's contents changed (JobManager#onContainerChanged): if it's a chest or furnace
+     * an index knows (seeds put in or taken out, a furnace loaded or burnt out), it's looked at again
+     * next tick. Called very often (every hopper move, every furnace that's burning), so a map lookup
+     * and a set lookup for anything else.
+     */
+    void onContainerChanged(BlockPos pos) {
+        ChunkIndex index = chunkCaches.get(new ChunkPos(pos));
+        if (index != null && index.holdsWork(pos)) {
+            changed.add(pos.immutable());
+        }
+    }
+
+    /** Look at the block at {@code pos} again at game time {@code at} (a crop watered, wanting water again then). */
+    void recheckAt(BlockPos pos, long at) {
+        rechecks.add(new Recheck(at, pos.immutable()));
+    }
+
+    /**
      * Look again at each block that changed (see {@link #onBlockChanged}), in its chunk's index: the
      * place it is (a chest, a trough, a bed) and the job it gives, if any. A job it gave before and
      * doesn't now leaves the pool, unless another block of the chunk still gives it.
      */
     private void updateChanged(ServerLevel level) {
+        long gameTime = level.getGameTime();
+        while (!rechecks.isEmpty() && rechecks.peek().at() <= gameTime) {
+            changed.add(rechecks.poll().pos());
+        }
         if (changed.isEmpty()) {
             return;
         }
@@ -566,6 +595,7 @@ final class JobScanner {
         private final Set<BlockPos> chests = new LinkedHashSet<>(); // delivery targets
         private final Set<BlockPos> troughs = new LinkedHashSet<>(); // where workers eat
         private final Set<BlockPos> beds = new LinkedHashSet<>(); // where pastured workers sleep
+        private final Set<BlockPos> furnaces = new LinkedHashSet<>(); // what kindlers light
         private boolean dirty;
 
         ChunkIndex(long scanTime, int minY, int maxY) {
@@ -613,6 +643,8 @@ final class JobScanner {
                 troughs.add(pos);
             } else if (JobChecks.isBed(state)) {
                 beds.add(pos);
+            } else if (state.is(JobBlockTags.FURNACES)) {
+                furnaces.add(pos);
             }
         }
 
@@ -621,6 +653,12 @@ final class JobScanner {
             chests.remove(pos);
             troughs.remove(pos);
             beds.remove(pos);
+            furnaces.remove(pos);
+        }
+
+        /** Whether the block at {@code pos} is a chest or furnace, whose contents make its job. */
+        boolean holdsWork(BlockPos pos) {
+            return chests.contains(pos) || furnaces.contains(pos);
         }
 
         /** Chests seen in the scan. */

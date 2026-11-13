@@ -8,6 +8,7 @@
     "client.SummaryAccessor"
   ],
   "mixins": [
+    "BlockEntityChangedMixin",
     "CobblemonNetworkMixin",
     "DrowsySensorMixin",
     "PokemonEntityInteractMixin",

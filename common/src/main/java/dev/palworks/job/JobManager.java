@@ -108,6 +108,29 @@ public class JobManager {
     }
 
     /**
+     * Called whenever a block entity's contents change (see BlockEntityChangedMixin): a chest or
+     * furnace the scanner knows is looked at again (see JobScanner#onContainerChanged). Called very
+     * often, so it stays a couple of lookups.
+     */
+    public static void onContainerChanged(ServerLevel level, BlockPos pos) {
+        JobManager manager = byLevel.get(level);
+        if (manager != null) {
+            manager.scanner.onContainerChanged(pos);
+        }
+    }
+
+    /**
+     * Have the scanner look at the block at {@code pos} again at game time {@code at}, with nothing
+     * changing to say so (a watered crop, wanting water again once its cooldown's over).
+     */
+    public static void recheckAt(ServerLevel level, BlockPos pos, long at) {
+        JobManager manager = byLevel.get(level);
+        if (manager != null) {
+            manager.scanner.recheckAt(pos, at);
+        }
+    }
+
+    /**
      * Drop all per-dimension JobManager instances. Call on server stop so stale instances
      * (and their references to old ServerLevels/entities) don't leak across world reloads.
      * Instances are keyed by dimension id, which collides between worlds in the same JVM.
