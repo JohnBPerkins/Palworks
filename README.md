@@ -315,7 +315,7 @@ make an exception (Slaking's stats are a legendary's, but it loafs around).
 Levels so far change how often a Watering worker fertilizes crops (see
 [`fertilize_chance_per_level`](#server-settings)). A Pokémon's levels show in the PC and on its
 summary, for work Palworks does so far (Cooling, say, isn't shown until there's something to cool),
-and `/palworks inspect worker` shows a worker's levels.
+and `/palworks suitability get <species>` lists a species' levels.
 
 ## Customizing work animations
 

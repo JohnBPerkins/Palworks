@@ -196,7 +196,9 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
     `-Dfabric.log.debug.level=trace` (Fabric) or `-Dforge.logging.debugFile.level=trace`
     (NeoForge) to the run's JVM arguments.
   - `info` and above for what a server admin should always see.
-- **Seeing what workers do in game** (op commands):
+- **Seeing what workers do in game** (op commands, only in development runs: `runClient`,
+  `runServer` and the in-game tests; a released jar has just `/palworks worker enable|disable`,
+  `suitability` and `config`, see `PalworksCommands`):
   - `/palworks debug` toggles worker debugging for you. It posts job activity (assignments,
     completions) in chat, and shows every worker within 48 blocks in the world: its job icon and a
     label like `chop_tree · walking` above its head (through walls), the path it's walking, and a
@@ -213,7 +215,11 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
       now), each with a dark red box.
 
     Lines about something going wrong are red, and so is a path that doesn't reach its job.
-  - `/palworks inspect worker` and `/palworks jobs` dump the nearest worker's state and the job pool.
+  - `/palworks inspect worker` and `/palworks jobs` dump the nearest worker's state and the job pool;
+    `/palworks worker inventory|openinv|clearinv|clear` look into or empty the nearest worker's
+    inventory, or drop every worker's job.
+  - `/palworks sleep` makes the nearest owned Pokémon drowsy now (in its resting hours), as
+    Cobblemon does, to try beds without waiting.
   - `/palworks testarea` builds a flat test area from where you stand, east and south (about
     62 x 94 blocks; everything in it is cleared first). Its sections are:
     - smelting: a furnace, a blast furnace and a smoker with input but no fuel;

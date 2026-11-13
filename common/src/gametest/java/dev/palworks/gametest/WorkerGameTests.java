@@ -5,8 +5,10 @@ import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
+import com.mojang.brigadier.tree.CommandNode;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.animation.WorkAnimator;
+import dev.palworks.command.PalworksCommands;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -23,8 +25,10 @@ import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -878,5 +882,29 @@ public class WorkerGameTests {
                         helper.getBlockState(crop).equals(((CropBlock) Blocks.WHEAT).getStateForAge(7)),
                         "and doesn't harvest it"))
                 .thenSucceed();
+    }
+
+    private static final String WORKER = "worker"; // the /palworks worker command
+
+    @GameTest(template = Templates.EMPTY)
+    public void aReleasedModHasOnlyTheAdminCommands(GameTestHelper helper) {
+        // The developer tools are only in development runs (this is one: they're all here)
+        CommandNode<CommandSourceStack> released = PalworksCommands.build(false).build();
+        CommandNode<CommandSourceStack> dev = PalworksCommands.build(true).build();
+        for (String admin : List.of(WORKER, "suitability", "config")) {
+            helper.assertTrue(released.getChild(admin) != null, "released: /palworks " + admin);
+        }
+        for (String tool : List.of("debug", "inspect", "testarea", "sleep", "jobs")) {
+            helper.assertTrue(released.getChild(tool) == null, "not released: /palworks " + tool);
+            helper.assertTrue(dev.getChild(tool) != null, "in development: /palworks " + tool);
+        }
+        for (String admin : List.of("enable", "disable")) {
+            helper.assertTrue(released.getChild(WORKER).getChild(admin) != null, "released: worker " + admin);
+        }
+        for (String tool : List.of("inventory", "openinv", "clearinv", "clear")) {
+            helper.assertTrue(released.getChild(WORKER).getChild(tool) == null, "not released: worker " + tool);
+            helper.assertTrue(dev.getChild(WORKER).getChild(tool) != null, "in development: worker " + tool);
+        }
+        helper.succeed();
     }
 }
