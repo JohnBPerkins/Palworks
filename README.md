@@ -290,18 +290,18 @@ Which work a Pokémon can do (its *work suitabilities*) comes from datapack file
 
 ```json
 {
-  "types":   { "fighting": 1, "steel": 1 },
-  "species": { "cobblemon:scizor": 3, "cobblemon:pinsir": 2 }
+  "types":   { "fighting": 1 },
+  "species": { "cobblemon:scizor": 1, "cobblemon:pinsir": 1 }
 }
 ```
 
 - **`types`**: every Pokémon of that type can do the job. Types are named as in Cobblemon (`fire`,
   `fighting`, …). The number (1 to 5) is added to the Pokémon's [work level](#work-levels): `1` is
   the usual, `2` gives one more.
-- **`species`**: extra species that can do it, at exactly that level (1 to 5), whatever their types
-  and stats would give. A species without a namespace is Cobblemon's (`scizor` =
-  `cobblemon:scizor`). Level `0` takes the job away from that species, even if one of its types
-  gives it.
+- **`species`**: extra species that can do it. The number (1 to 5) works as a type's does: `1` is the
+  level its stats give, `2` one more. It's used instead of what the species' types give for that
+  job. A species without a namespace is Cobblemon's (`scizor` = `cobblemon:scizor`). `0` takes the
+  job away from that species, even if one of its types gives it.
 
 Files for the same job from different namespaces **merge**, like vanilla tags: an addon can add
 `data/myaddon/palworks/suitability/kindling.json` with just its own entries. Where two files give the
@@ -317,7 +317,8 @@ go over every datapack's levels, and are kept after `/reload` and restarts. They
 world, in `<world>/palworks/suitability_overrides.json`:
 
 - `/palworks suitability set <species> <job> <level>`: e.g. `/palworks suitability set bulbasaur
-  watering 3`. Like a species entry in the files, it sets the level outright; `0` takes the job away.
+  watering 3`. Unlike a species entry in the files, it sets the level outright, whatever the
+  species' stats give; `0` takes the job away.
 - `/palworks suitability get <species>`: its levels (its standard form's), and which were changed in
   game.
 - `/palworks suitability reset <species> [<job>]`: back to the datapacks' levels, for one job or all.
@@ -350,8 +351,9 @@ A type that gives the job gives one level less for each earlier form in the Pok�
 line that didn't have that type. Hisuian Typhlosion does Kindling at 3, but Nether work at only 1,
 as Cyndaquil and Quilava were Fire but not Ghost. Vaporeon waters at 2, as Eevee was Normal. With
 two types that give the job, the better level counts. A Pokémon's level only changes as it evolves
-or changes form, not as it levels up. A species entry in the files sets its level outright, to
-make an exception (Slaking's stats are a legendary's, but it loafs around).
+or changes form, not as it levels up. A species entry in the files gives the level its stats give
+(plus its number less 1), whatever its earlier forms were. To set a level outright, use
+`/palworks suitability set`.
 
 Levels so far change how often a Watering worker fertilizes crops (see
 [`fertilize_chance_per_level`](#server-settings)). A Pokémon's levels show in the PC and on its

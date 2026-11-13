@@ -84,15 +84,39 @@ class SuitabilityDataTest {
     }
 
     @Test
-    void aSpeciesLevelIsUsedAsItIs() {
+    void aSpeciesNumberAddsToItsPowerLevel() {
+        SuitabilityData data = load(Map.of(
+                "palworks:lumbering",
+                "{\"species\": {\"cobblemon:kingambit\": 1, \"cobblemon:pawniard\": 1, \"cobblemon:kartana\": 2}}"));
+        // 1 is the usual: the level its stats give (Kingambit 550: 4, Pawniard 340: 1)
+        assertEquals(
+                Map.of(LUMBERING, 4),
+                data.levels("cobblemon:kingambit", List.of(new Form(List.of("dark", "steel"), 550))));
+        assertEquals(
+                Map.of(LUMBERING, 1),
+                data.levels("cobblemon:pawniard", List.of(new Form(List.of("dark", "steel"), 340))));
+        // 2 is one more (Kartana 570: 4, so 5)
+        assertEquals(
+                Map.of(LUMBERING, 5),
+                data.levels("cobblemon:kartana", List.of(new Form(List.of("grass", "steel"), 570))));
+    }
+
+    @Test
+    void aSpeciesEntryIsUsedInsteadOfItsTypesForThatJob() {
         SuitabilityData data = load(
                 Map.of("palworks:kindling", "{\"types\": {\"fire\": 4}, \"species\": {\"cobblemon:charmander\": 2}}"));
         assertEquals(Map.of(KINDLING, 2), levels(data, List.of("fire"), "cobblemon:charmander"));
-        // Whatever its stats: Slaking's are a legendary's, but it loafs around every other turn
-        SuitabilityData slaking = load(
-                Map.of("palworks:farming", "{\"types\": {\"normal\": 1}, \"species\": {\"cobblemon:slaking\": 2}}"));
+    }
+
+    @Test
+    void aSpeciesEntryHasNoEvolutionLinePenalty() {
+        // Bibarel's own stats (410) give 2, whatever Bidoof was: the line only matters for types
+        SuitabilityData data = load(Map.of("palworks:lumbering", "{\"species\": {\"cobblemon:bibarel\": 1}}"));
         assertEquals(
-                Map.of(FARMING, 2), slaking.levels("cobblemon:slaking", List.of(new Form(List.of("normal"), 670))));
+                Map.of(LUMBERING, 2),
+                data.levels(
+                        "cobblemon:bibarel",
+                        List.of(new Form(List.of("normal", "water"), 410), new Form(List.of("normal"), 250))));
     }
 
     @Test
@@ -297,31 +321,42 @@ class SuitabilityDataTest {
         assertEquals(Map.of(MINING, 1), levels(data, List.of("rock", "ground"), "cobblemon:geodude"));
     }
 
+    /** A Pokémon's levels from its own form alone: its types and base stat total. */
+    private static Map<Suitability, Integer> levels(
+            SuitabilityData data, List<String> types, String species, int baseStatTotal) {
+        return data.levels(species, List.of(new Form(types, baseStatTotal)));
+    }
+
     @Test
-    void shippedSpeciesMatchTheOldTable() throws IOException {
+    void shippedSpeciesFollowTheirStats() throws IOException {
         SuitabilityData data = shipped();
         assertEquals(75, data.speciesCount());
-        // Fighting gives Lumbering 1; Machamp's species entry adds Handiwork 3.
-        assertEquals(Map.of(LUMBERING, 1, HANDIWORK, 3), levels(data, List.of("fighting"), "cobblemon:machamp"));
-        assertEquals(Map.of(LUMBERING, 1, HANDIWORK, 2), levels(data, List.of("fighting"), "cobblemon:machoke"));
-        assertEquals(Map.of(LUMBERING, 1, HANDIWORK, 1), levels(data, List.of("fighting"), "cobblemon:machop"));
-        assertEquals(Map.of(LUMBERING, 3), levels(data, List.of("bug", "steel"), "cobblemon:scizor"));
+        // Fighting gives Lumbering; Machamp's species entry adds Handiwork. Both from its stats.
+        assertEquals(Map.of(LUMBERING, 3, HANDIWORK, 3), levels(data, List.of("fighting"), "cobblemon:machamp", 505));
+        assertEquals(Map.of(LUMBERING, 2, HANDIWORK, 2), levels(data, List.of("fighting"), "cobblemon:machoke", 405));
+        assertEquals(Map.of(LUMBERING, 1, HANDIWORK, 1), levels(data, List.of("fighting"), "cobblemon:machop", 305));
+        assertEquals(Map.of(LUMBERING, 3), levels(data, List.of("bug", "steel"), "cobblemon:scizor", 500));
         assertEquals(
-                Map.of(LUMBERING, 2, TRANSPORTING, 1), levels(data, List.of("bug", "flying"), "cobblemon:scyther"));
-        assertEquals(Map.of(LUMBERING, 2), levels(data, List.of("bug"), "cobblemon:pinsir"));
-        assertEquals(Map.of(LUMBERING, 3, MINING, 1), levels(data, List.of("bug", "rock"), "cobblemon:kleavor"));
-        assertEquals(Map.of(LUMBERING, 1), levels(data, List.of("dark", "steel"), "cobblemon:kingambit"));
-        assertEquals(Map.of(LUMBERING, 1, NETHER, 1), levels(data, List.of("steel", "ghost"), "cobblemon:aegislash"));
+                Map.of(LUMBERING, 3, TRANSPORTING, 3),
+                levels(data, List.of("bug", "flying"), "cobblemon:scyther", 500));
+        assertEquals(Map.of(LUMBERING, 3, MINING, 3), levels(data, List.of("bug", "rock"), "cobblemon:kleavor", 500));
+        assertEquals(Map.of(LUMBERING, 4), levels(data, List.of("dark", "steel"), "cobblemon:kingambit", 550));
         assertEquals(
-                Map.of(GENERATING_ELECTRICITY, 1), levels(data, List.of("electric", "steel"), "cobblemon:magnemite"));
+                Map.of(LUMBERING, 3, NETHER, 3), levels(data, List.of("steel", "ghost"), "cobblemon:aegislash", 500));
         assertEquals(
-                Map.of(PLANTING, 1, GATHERING, 1, LUMBERING, 3),
-                levels(data, List.of("grass", "steel"), "cobblemon:kartana"));
-        assertEquals(Map.of(FARMING, 3), levels(data, List.of("normal"), "cobblemon:miltank"));
-        assertEquals(Map.of(FARMING, 2), levels(data, List.of("normal"), "cobblemon:chansey"));
+                Map.of(PLANTING, 4, GATHERING, 4, LUMBERING, 4),
+                levels(data, List.of("grass", "steel"), "cobblemon:kartana", 570));
+        assertEquals(Map.of(FARMING, 3), levels(data, List.of("normal"), "cobblemon:miltank", 490));
+        assertEquals(Map.of(FARMING, 3), levels(data, List.of("normal"), "cobblemon:chansey", 450));
         assertEquals(
-                Map.of(PLANTING, 1, GATHERING, 3, TRANSPORTING, 1, FARMING, 1),
-                levels(data, List.of("grass", "flying"), "cobblemon:tropius"));
+                Map.of(PLANTING, 3, GATHERING, 3, TRANSPORTING, 3, FARMING, 3),
+                levels(data, List.of("grass", "flying"), "cobblemon:tropius", 460));
+        // Slaking's stats are a legendary's, so it's level 5 at what it does
+        assertEquals(Map.of(FARMING, 5, HANDIWORK, 5), levels(data, List.of("normal"), "cobblemon:slaking", 670));
+        // Steel alone gives nothing
+        assertEquals(
+                Map.of(GENERATING_ELECTRICITY, 1),
+                levels(data, List.of("electric", "steel"), "cobblemon:magnemite", 325));
         assertTrue(levels(data, List.of("water"), "cobblemon:lucario").containsKey(HANDIWORK));
     }
 
@@ -348,5 +383,13 @@ class SuitabilityDataTest {
         SuitabilityData data = load(Map.of("palworks:handiwork", "{\"species\": {\"machamp\": 3}}"))
                 .withSpecies(Map.of("cobblemon:machamp", Map.of(HANDIWORK, 1)));
         assertEquals(Map.of(HANDIWORK, 1), levels(data, List.of("fighting"), "cobblemon:machamp"));
+    }
+
+    @Test
+    void anOverrideIsUsedAsItIsWhateverTheStats() {
+        SuitabilityData data = load(Map.of(
+                        "palworks:farming", "{\"types\": {\"normal\": 1}, \"species\": {\"slaking\": 1}}"))
+                .withSpecies(Map.of("cobblemon:slaking", Map.of(FARMING, 2)));
+        assertEquals(Map.of(FARMING, 2), levels(data, List.of("normal"), "cobblemon:slaking", 670));
     }
 }
