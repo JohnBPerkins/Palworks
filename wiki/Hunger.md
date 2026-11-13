@@ -14,8 +14,13 @@ stat of its own.
 - **Which troughs:** any within 32 blocks of it, or, for a pastured worker, of its pasture block.
   So a pastured worker that has wandered off for work still goes back to the troughs
   by its pasture.
-- **With no fullness left** it works and walks at a quarter speed, with a half hunger shank over
-  its head, until it eats. It never stops working.
+- **With no fullness left** it works and walks at three quarters of its speed, with a half hunger
+  shank over its head, until it eats. It never stops working.
+- **A slowed worker** (out of food, Tired, or both: a quarter off for each, so half speed at the
+  slowest) is slow at everything: each job takes longer, its animations play slower to match (its
+  legs as it walks, the move it works with, landing just as the work happens), and it moves slower
+  whether Palworks or Cobblemon is moving it. Except on its way to eat or sleep, which is never held
+  up.
 
 A **trough** comes in every wood (oak, spruce, birch, jungle, acacia, dark oak, mangrove, cherry,
 bamboo, crimson and warped), crafted from 5 of that wood's slabs (two on the top row's ends, three

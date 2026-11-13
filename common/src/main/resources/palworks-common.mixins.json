@@ -5,12 +5,14 @@
   "minVersion": "0.8",
   "client": [
     "client.PCGUIAccessor",
+    "client.PosableStateClockMixin",
     "client.SummaryAccessor"
   ],
   "mixins": [
     "BlockEntityChangedMixin",
     "CobblemonNetworkMixin",
     "DrowsySensorMixin",
+    "PauseKeyframeMixin",
     "PokemonEntityInteractMixin",
     "PokemonEntityTickMixin",
     "PokemonMetabolismMixin",

@@ -80,13 +80,13 @@ class PalworksConfigTest {
     }
 
     @Test
-    void theHungerDefaultsAreAQuarterADayAndAQuarterSpeed() {
+    void theHungerDefaultsAreAQuarterADayAndThreeQuartersSpeed() {
         PalworksConfig.HungerConfig hunger = PalworksConfig.DEFAULTS.hunger();
         assertTrue(hunger.enabled());
         assertEquals(20, hunger.workPerFullness());
         assertEquals(0.25, hunger.idleDrainPerDay());
         assertEquals(0.5, hunger.troughFillFraction());
-        assertEquals(0.25, hunger.emptyWorkSpeed());
+        assertEquals(0.75, hunger.emptyWorkSpeed());
     }
 
     @Test
@@ -110,23 +110,24 @@ class PalworksConfigTest {
         PalworksConfig config = parse(
                 "{\"mood\": {\"enabled\": false, \"work_per_point\": 4, \"hungry_drain_per_day\": 80,"
                         + " \"tired_drain_per_day\": 10, \"recovery_per_day\": 60, \"unhappy_below\": 40,"
-                        + " \"unhappy_work_speed\": 0.5, \"strike_until\": 20}}",
+                        + " \"strike_until\": 20}}",
                 warnings);
         assertEquals(List.of(), warnings);
-        assertEquals(new PalworksConfig.MoodConfig(false, 4, 80, 10, 60, 40, 0.5, 20), config.mood());
+        assertEquals(new PalworksConfig.MoodConfig(false, 4, 80, 10, 60, 40, 20), config.mood());
         assertEquals(PalworksConfig.DEFAULTS.withMood(config.mood()), config);
     }
 
     @Test
     void theMoodDefaults() {
-        assertEquals(new PalworksConfig.MoodConfig(true, 2, 50, 25, 100, 50, 0.75, 30), PalworksConfig.DEFAULTS.mood());
+        assertEquals(new PalworksConfig.MoodConfig(true, 2, 50, 25, 100, 50, 30), PalworksConfig.DEFAULTS.mood());
     }
 
     @Test
-    void anUnhappySpeedOfNothingIsRefused() {
+    void anOldUnhappySpeedIsIgnored() {
+        // Unhappy workers used to work slower; a config from then still loads, the setting dropped
         List<String> warnings = new ArrayList<>();
-        assertEquals(PalworksConfig.DEFAULTS, parse("{\"mood\": {\"unhappy_work_speed\": 0}}", warnings));
-        assertEquals(1, warnings.size());
+        assertEquals(PalworksConfig.DEFAULTS, parse("{\"mood\": {\"unhappy_work_speed\": 0.5}}", warnings));
+        assertEquals(List.of(), warnings);
     }
 
     @Test

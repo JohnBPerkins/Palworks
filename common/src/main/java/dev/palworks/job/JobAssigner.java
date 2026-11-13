@@ -21,7 +21,6 @@ import dev.palworks.sleep.Beds;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
-import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
@@ -174,13 +173,6 @@ final class JobAssigner {
             // A worker on strike (its mood ran out) does no work until it's back up a way; it still
             // eats and sleeps, above, which is how it gets there (see Mood)
             if (pokemon != null && Mood.isStriking(pokemon, WorkerStateManager.get(pokemon))) {
-                continue;
-            }
-
-            // An empty or Tired worker rests a while after each job, so it gets through work slower
-            // (see WorkerAI.restAfterJob); eating isn't held up by it
-            WorkerState state = pokemon == null ? null : WorkerStateManager.get(pokemon);
-            if (state != null && state.getRestUntil() > now && WorkSpeed.of(pokemon, state) < 1) {
                 continue;
             }
 

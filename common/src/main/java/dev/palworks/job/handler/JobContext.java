@@ -4,7 +4,9 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
@@ -22,6 +24,16 @@ public record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState s
 
     String name() {
         return pokemon.getSpecies().getName();
+    }
+
+    /**
+     * How fast it works, as a share of its usual speed (see WorkSpeed): its steps take that much
+     * longer, and its animations play that much slower. Eating and sleeping, what it does to get
+     * better, aren't slowed.
+     */
+    double pace() {
+        JobType job = reservation.getJobType();
+        return job == JobType.EAT_FOOD || job == JobType.SLEEP ? 1.0 : WorkSpeed.of(pokemon, state);
     }
 
     /** The worker's species id, which its animations can be particular to. */

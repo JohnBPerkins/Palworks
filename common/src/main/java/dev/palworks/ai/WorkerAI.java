@@ -10,7 +10,6 @@ import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
-import dev.palworks.hunger.HungerMath;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
@@ -25,9 +24,9 @@ import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.sleep.SleepPose;
 import dev.palworks.sleep.SleepSchedule;
+import dev.palworks.worker.Pace;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
-import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import dev.palworks.worker.WorkerStatusSync;
@@ -123,10 +122,9 @@ public class WorkerAI {
 
         // New workers start enabled (see WorkerState), so a disabled state means it was turned off
         // on purpose (/palworks worker disable). Respect that instead of re-enabling it. One with
-        // no work it can do (it lost its last work skill) is no worker either. Its hunger is
-        // Cobblemon's again: no rest after its last job carries over.
+        // no work it can do (it lost its last work skill) is no worker either.
         if (!dev.palworks.worker.WorkerEligibility.works(pokemon, state)) {
-            state.setRestUntil(0);
+            Pace.applyTo(entity, 1.0); // its speed is its own again
             if (state.isAsleep() && entity instanceof PokemonEntity pokemonEntity) {
                 wake(pokemon, pokemonEntity, state); // and its sleep is Cobblemon's again
             }
@@ -154,6 +152,10 @@ public class WorkerAI {
         Hunger.tick(pokemon, state);
         // Its mood: down while Hungry or Tired, back up while it's neither and not at work (see Mood)
         Mood.tick(pokemon, state);
+
+        // Slowed (hungry, Tired...), it moves slower whoever's moving it, Palworks or Cobblemon; but
+        // not on its way to eat or sleep
+        Pace.applyTo(entity, Pace.now(pokemon, state));
 
         // A pastured worker sleeps in its bedtime (see Sleep): asleep where it is, it does nothing else
         if (entity instanceof PokemonEntity pokemonEntity && tickSleep(pokemon, pokemonEntity, state)) {
@@ -234,7 +236,7 @@ public class WorkerAI {
             entity.getNavigation().stop();
             return false;
         }
-        navigateToJob(entity, leg, walkSpeed(pokemon, state, JobType.EAT_FOOD), true);
+        navigateToJob(entity, leg, walkSpeed(), true);
         return true;
     }
 
@@ -409,7 +411,6 @@ public class WorkerAI {
             // Job complete - clear reservation
             state.clearReservation();
             state.resetPathFailures();
-            restAfterJob(pokemon, entity, level, state, reservation.getJobType());
 
             // Opt-in activity message (only players who ran /palworks debug see it)
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
@@ -463,11 +464,7 @@ public class WorkerAI {
         if (state.getStepTicks() > 0) {
             state.restartStep();
         }
-        navigateToJob(
-                entity,
-                standPos,
-                walkSpeed(pokemon, state, reservation.getJobType()),
-                isForItsNeeds(reservation.getJobType()));
+        navigateToJob(entity, standPos, walkSpeed(), isForItsNeeds(reservation.getJobType()));
         state.setWalkedToJob(true);
         state.resetStepIn();
 
@@ -622,9 +619,12 @@ public class WorkerAI {
         WorkerNavigator.walkTo(entity, standPos, speed, farTrip);
     }
 
-    /** Normal walking speed (0.6), slower for a worker with no fullness left; never on its way to eat. */
-    private static double walkSpeed(Pokemon pokemon, WorkerState state, JobType jobType) {
-        return isForItsNeeds(jobType) ? 0.6 : 0.6 * WorkSpeed.of(pokemon, state);
+    /**
+     * Normal walking speed (0.6). A slowed worker walks slower all the same: its pace is on its
+     * movement speed itself (see Pace), whoever's walking it.
+     */
+    private static double walkSpeed() {
+        return 0.6;
     }
 
     /** Eating and going to bed: what makes it better, so never slowed down. */
@@ -632,27 +632,13 @@ public class WorkerAI {
         return !jobType.isWork();
     }
 
-    /**
-     * After a job, a worker with no fullness left, or Tired, rests before taking another, for long
-     * enough that it gets through its work at its slower speed (see {@link HungerMath#restTicks}).
-     * Not after eating or sleeping, which is what makes it better.
-     */
-    private static void restAfterJob(Pokemon pokemon, Mob entity, Level level, WorkerState state, JobType jobType) {
-        double speed = WorkSpeed.of(pokemon, state);
-        if (isForItsNeeds(jobType) || speed >= 1) {
-            return;
-        }
-        long rest = HungerMath.restTicks(JobHandlerRegistry.jobTicks(jobType, entity), speed);
-        state.setRestUntil(level.getGameTime() + rest);
-    }
+    // The longest a leg home may take before it stops and looks again (see walkHome): 30s
+    private static final int HOME_LEG_TICKS = 600;
 
     /**
      * How long an idle worker waits in its bedtime for a bed before it sleeps where it is: long
      * enough for JobAssigner to offer it one (it gets a turn every few ticks).
      */
-    // The longest a leg home may take before it stops and looks again (see walkHome): 30s
-    private static final int HOME_LEG_TICKS = 600;
-
     private static final int BED_SEARCH_TICKS = 40;
 
     /**

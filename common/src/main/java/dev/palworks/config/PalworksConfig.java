@@ -117,7 +117,7 @@ public record PalworksConfig(
     /**
      * How a worker's mood (0 to 100, separate from friendship) goes down and back up. Work wears it
      * down, and being Hungry or Tired too; while it's neither, and not at work, it comes back up. Below
-     * {@code unhappyBelow} it works slower, and at 0 it goes on strike: no work (it still eats and
+     * {@code unhappyBelow} it's unhappy (a warning, nothing more), and at 0 it goes on strike: no work (it still eats and
      * sleeps) until it's back to {@code strikeUntil}. With its work off, or in its ball, it holds.
      *
      * @param enabled whether workers have a mood at all. Off, nothing here applies
@@ -125,8 +125,7 @@ public record PalworksConfig(
      * @param hungryDrainPerDay the points it loses over a Minecraft day while Hungry (no fullness left)
      * @param tiredDrainPerDay the points it loses over a day while Tired (it slept without a bed)
      * @param recoveryPerDay the points it gains back over a day while it's neither, and not at work
-     * @param unhappyBelow the mood below which it's unhappy, and works slower
-     * @param unhappyWorkSpeed how fast an unhappy worker works and walks, as a share of its normal speed
+     * @param unhappyBelow the mood below which it's unhappy: on its way to a strike
      * @param strikeUntil the mood a worker on strike has to be back to before it works again
      */
     public record MoodConfig(
@@ -136,9 +135,8 @@ public record PalworksConfig(
             double tiredDrainPerDay,
             double recoveryPerDay,
             int unhappyBelow,
-            double unhappyWorkSpeed,
             int strikeUntil) {
-        public static final MoodConfig DEFAULTS = new MoodConfig(true, 2, 50, 25, 100, 50, 0.75, 30);
+        public static final MoodConfig DEFAULTS = new MoodConfig(true, 2, 50, 25, 100, 50, 30);
 
         public static final Codec<MoodConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                         field(Codec.BOOL, "enabled", DEFAULTS.enabled()).forGetter(MoodConfig::enabled),
@@ -152,8 +150,6 @@ public record PalworksConfig(
                                 .forGetter(MoodConfig::recoveryPerDay),
                         field(Codec.intRange(0, 100), "unhappy_below", DEFAULTS.unhappyBelow())
                                 .forGetter(MoodConfig::unhappyBelow),
-                        field(Codec.doubleRange(0.1, 1.0), "unhappy_work_speed", DEFAULTS.unhappyWorkSpeed())
-                                .forGetter(MoodConfig::unhappyWorkSpeed),
                         field(Codec.intRange(1, 100), "strike_until", DEFAULTS.strikeUntil())
                                 .forGetter(MoodConfig::strikeUntil))
                 .apply(instance, MoodConfig::new));
@@ -201,7 +197,7 @@ public record PalworksConfig(
             double idleDrainPerDay,
             double troughFillFraction,
             double emptyWorkSpeed) {
-        public static final HungerConfig DEFAULTS = new HungerConfig(true, 20, 0.25, 0.5, 0.25);
+        public static final HungerConfig DEFAULTS = new HungerConfig(true, 20, 0.25, 0.5, 0.75);
 
         public static final Codec<HungerConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                         field(Codec.BOOL, "enabled", DEFAULTS.enabled()).forGetter(HungerConfig::enabled),

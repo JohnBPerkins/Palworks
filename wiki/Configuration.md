@@ -18,7 +18,7 @@ settings that aren't per-Pokémon:
     "work_per_fullness": 20,
     "idle_drain_per_day": 0.25,
     "trough_fill_fraction": 0.5,
-    "empty_work_speed": 0.25
+    "empty_work_speed": 0.75
   },
   "sleep": {
     "enabled": true,
@@ -31,7 +31,6 @@ settings that aren't per-Pokémon:
     "tired_drain_per_day": 25,
     "recovery_per_day": 100,
     "unhappy_below": 50,
-    "unhappy_work_speed": 0.75,
     "strike_until": 30
   }
 }
@@ -59,18 +58,19 @@ settings that aren't per-Pokémon:
   - **`trough_fill_fraction`** (0 to 1): how full troughs fill a worker, as a share of its max
     fullness. The rest is left for hand-feeding. 0 and troughs never feed.
   - **`empty_work_speed`** (0.1 to 1): how fast a worker with no fullness left works and walks.
+    Slowdowns add up (out of food and Tired is both taken off), but never below half speed.
 - **`sleep`**: how pastured workers sleep (see [Sleep](Sleep)).
   - **`enabled`**: `false` turns it off: pastured workers' sleep is then Cobblemon's alone.
   - **`tired_work_speed`** (0.1 to 1): how fast a Tired worker works and walks.
 - **`mood`**: how workers' mood goes down and back up (see [Mood](Mood)).
-  - **`enabled`**: `false` turns mood off: no slowdown, no strikes.
+  - **`enabled`**: `false` turns mood off: no strikes.
   - **`work_per_point`** (1 to 500): how many units of work (as for hunger) take a point off.
   - **`hungry_drain_per_day`**, **`tired_drain_per_day`** (0 to 1000): the points a worker loses
     over a Minecraft day while Hungry, or while Tired.
   - **`recovery_per_day`** (0 to 1000): the points it gains back over a day while it's neither,
     and not at work.
-  - **`unhappy_below`** (0 to 100): the mood below which it's unhappy and works slower.
-  - **`unhappy_work_speed`** (0.1 to 1): how fast an unhappy worker works and walks.
+  - **`unhappy_below`** (0 to 100): the mood below which it shows it's unhappy, a warning that
+    it's on its way to a strike.
   - **`strike_until`** (1 to 100): the mood a worker on strike has to be back to before it works.
 
 Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,

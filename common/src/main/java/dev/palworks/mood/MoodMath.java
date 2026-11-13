@@ -46,7 +46,7 @@ public final class MoodMath {
         return mood <= 0 || (wasStriking && mood < strikeUntil);
     }
 
-    /** Whether a worker in this mood is unhappy, and works slower. */
+    /** Whether a worker in this mood is unhappy: on its way to a strike. */
     public static boolean unhappy(double mood, int unhappyBelow) {
         return mood < unhappyBelow;
     }

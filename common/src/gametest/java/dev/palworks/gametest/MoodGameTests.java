@@ -37,7 +37,7 @@ import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 
 /**
  * Worker mood: work, hunger and no rest wear it down; fed and rested it comes back up while not at
- * work; unhappy it works slower, and at 0 it goes on strike until it's back up a way.
+ * work; unhappy it shows it (no slower for it), and at 0 it goes on strike until it's back up a way.
  */
 public class MoodGameTests {
     private static final BlockPos START = new BlockPos(1, 1, 1);
@@ -129,7 +129,7 @@ public class MoodGameTests {
     // ---- Unhappy, and on strike ----
 
     @GameTest(template = Templates.EMPTY, batch = "mood_unhappy", timeoutTicks = 200)
-    public void anUnhappyWorkerIsSlowerAndShowsIt(GameTestHelper helper) {
+    public void anUnhappyWorkerShowsItButIsNoSlower(GameTestHelper helper) {
         Workers.isolate(helper);
         PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
         Pokemon pokemon = worker.getPokemon();
@@ -137,7 +137,7 @@ public class MoodGameTests {
         helper.assertTrue(WorkSpeed.of(pokemon, state) == 1.0, "happy: full speed");
 
         state.setMood(40);
-        helper.assertTrue(WorkSpeed.of(pokemon, state) == 0.75, "unhappy: three quarters");
+        helper.assertTrue(WorkSpeed.of(pokemon, state) == 1.0, "unhappy: no slower for it");
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(
                         worker.getAspects().contains(WorkerStatus.UNHAPPY.aspect()), "unhappy over its head"))
@@ -269,8 +269,8 @@ public class MoodGameTests {
                     sent.equals(Optional.of(new WorkerMoodPacket.Shown(32, true, false))), "then sent " + sent);
 
             // Mood turned off (as /palworks config can): the player is told to drop what it was sent
-            PalworksConfig.setCurrent(PalworksConfig.DEFAULTS.withMood(
-                    new PalworksConfig.MoodConfig(false, 2, 50, 25, 100, 50, 0.75, 30)));
+            PalworksConfig.setCurrent(
+                    PalworksConfig.DEFAULTS.withMood(new PalworksConfig.MoodConfig(false, 2, 50, 25, 100, 50, 30)));
             WorkLevelSync.syncParty(owner);
             helper.assertTrue(WorkLevelSync.lastSentMood(player, pokemon).isEmpty(), "dropped: mood is off");
         } finally {
