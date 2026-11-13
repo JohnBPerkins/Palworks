@@ -44,7 +44,11 @@ public final class PalworksCommands {
                 .then(Commands.literal("testarea").executes(ctx -> run(ctx, DebugCommand::buildTestArea)))
 
                 // Dump current job state (available/reserved/workers + assignment analysis)
-                .then(Commands.literal("jobs").executes(ctx -> run(ctx, DebugCommand::showJobsInfo)));
+                .then(Commands.literal("jobs").executes(ctx -> run(ctx, DebugCommand::showJobsInfo)))
+
+                // Change species' work suitabilities over the datapacks', saved with the world.
+                // Also from the server console
+                .then(SuitabilityCommand.build());
     }
 
     // Not a player: Brigadier tells the sender. Anything else is a bug, which Minecraft logs and
