@@ -19,20 +19,20 @@ class JobScannerTest {
 
     @Test
     void neverScannedFirstThenTheOldestScan() {
+        long now = 20_000L;
         Map<ChunkPos, Long> lastScan = Map.of(
-                A, 100L, // stale
-                B, 50L, // staler
+                A, now - JobScanner.RESCAN_TICKS - 100, // stale
+                B, now - JobScanner.RESCAN_TICKS - 150, // staler
                 C, JobScanner.NEVER_SCANNED,
-                D, 190L); // fresh
-        long now = 200L;
+                D, now - 10); // fresh
         assertEquals(List.of(C, B, A), JobScanner.dueChunks(List.of(A, B, C, D), lastScan::get, now));
     }
 
     @Test
     void aChunkScannedWithinItsLifetimeIsNotDue() {
         long now = 1000L;
-        long justFresh = now - JobScanner.JOB_CACHE_LIFETIME_TICKS + 1;
-        long justStale = now - JobScanner.JOB_CACHE_LIFETIME_TICKS;
+        long justFresh = now - JobScanner.RESCAN_TICKS + 1;
+        long justStale = now - JobScanner.RESCAN_TICKS;
         Map<ChunkPos, Long> lastScan = Map.of(A, justFresh, B, justStale);
         assertEquals(List.of(B), JobScanner.dueChunks(List.of(A, B), lastScan::get, now));
     }

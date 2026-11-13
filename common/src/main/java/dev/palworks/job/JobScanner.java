@@ -43,8 +43,10 @@ final class JobScanner {
     // Soft cap on blocks scanned per tick. Checked between chunks (a started chunk always
     // finishes), so a tick may overshoot by up to one chunk's band. ~2 chunk-bands at 32 vertical.
     private static final int MAX_BLOCKS_SCANNED_PER_TICK = 32768;
-    // 2s: max staleness of a chunk's job scan (also bounds furnace/crop discovery latency)
-    static final int JOB_CACHE_LIFETIME_TICKS = 40;
+    // 5 minutes: how often a chunk already indexed is scanned again in full. Its index is kept up to
+    // date as blocks and containers change (onBlockChanged, onContainerChanged), so this only catches
+    // what changes without the game saying so (a world editor writing a chunk directly)
+    static final int RESCAN_TICKS = 6000;
     // What a chunk counts against MAX_BLOCKS_SCANNED_PER_TICK however little of it is scanned
     // (looking it up, its sections' palettes, replacing its cache): at most 32 a tick, enough to
     // keep 1280 fresh, so a server's many mostly empty chunks are spread over the ticks
@@ -56,8 +58,8 @@ final class JobScanner {
     // What each scanned chunk holds: its jobs and the places workers use
     private final Map<ChunkPos, ChunkIndex> chunkCaches = new ConcurrentHashMap<>();
 
-    // The chunks in some worker's range at the last scan: their caches are kept (dropStaleCaches)
-    private Set<ChunkPos> chunksNearWorkers = Set.of();
+    // How often (ticks) to drop the indexes of chunks that have unloaded
+    private static final int DROP_UNLOADED_TICKS = 100;
 
     // Blocks that changed in indexed chunks since the last tick, and the blocks next to them whose
     // jobs can depend on them: looked at again next tick (see onBlockChanged). Changes can come from
@@ -89,11 +91,16 @@ final class JobScanner {
         // What changed since last tick, in chunks already scanned: just those blocks, looked at again
         updateChanged(level);
 
-        // Get chunks near active workers, each with the Y band to scan (around worker height).
+        // Get chunks near active workers, each with the Y band to scan (around worker height). One
+        // already indexed but not over all of that band counts as never scanned.
         Map<ChunkPos, int[]> scanRanges = getChunkScanRangesNearWorkers(level, workers);
-        chunksNearWorkers = scanRanges.keySet();
+        ToLongFunction<ChunkPos> lastScan = chunk -> {
+            int[] band = scanRanges.get(chunk);
+            ChunkIndex index = chunkCaches.get(chunk);
+            return index != null && !index.coversBand(band[0], band[1]) ? NEVER_SCANNED : lastScan(chunk);
+        };
 
-        for (ChunkPos chunk : dueChunks(scanRanges.keySet(), this::lastScan, currentTime)) {
+        for (ChunkPos chunk : dueChunks(scanRanges.keySet(), lastScan, currentTime)) {
             // Block budget is checked between chunks; a chunk we start always finishes.
             if (blocksScannedThisTick >= MAX_BLOCKS_SCANNED_PER_TICK) {
                 break;
@@ -178,10 +185,12 @@ final class JobScanner {
             JobKey before = index.removeJob(pos);
             JobKey now = null;
             JobRecord job = scanPositionForJob(level, pos, state);
-            if (job != null && !pool.isReserved(JobKey.of(job))) {
+            if (job != null) {
                 now = JobKey.of(job);
-                pool.offer(job);
                 index.addJob(pos, now);
+                if (!pool.isReserved(now)) {
+                    pool.offer(job);
+                }
             }
             if (before != null && !before.equals(now) && !index.hasJob(before)) {
                 pool.removeScanned(before);
@@ -211,7 +220,7 @@ final class JobScanner {
         List<Due> due = new ArrayList<>();
         for (ChunkPos chunk : chunks) {
             long last = lastScan.applyAsLong(chunk);
-            if (last == NEVER_SCANNED || now - last >= JOB_CACHE_LIFETIME_TICKS) {
+            if (last == NEVER_SCANNED || now - last >= RESCAN_TICKS) {
                 due.add(new Due(chunk, last));
             }
         }
@@ -276,8 +285,20 @@ final class JobScanner {
     /**
      * Scan a single chunk for job opportunities.
      */
-    private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int scanMinY, int scanMaxY) {
+    private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int wantMinY, int wantMaxY) {
         ChunkIndex previous = chunkCaches.get(chunkPos);
+        // Whole sections, with one more each way, so a worker stepping up or down a block doesn't
+        // ask for a band this scan doesn't cover; and never less than the last scan covered
+        int scanMinY = Math.max(
+                level.getMinBuildHeight(),
+                SectionPos.sectionToBlockCoord(SectionPos.blockToSectionCoord(wantMinY) - 1));
+        int scanMaxY = Math.min(
+                level.getMaxBuildHeight(),
+                SectionPos.sectionToBlockCoord(SectionPos.blockToSectionCoord(wantMaxY - 1) + 2));
+        if (previous != null) {
+            scanMinY = Math.min(scanMinY, previous.minY());
+            scanMaxY = Math.max(scanMaxY, previous.maxY());
+        }
         ChunkIndex cache = new ChunkIndex(level.getGameTime(), scanMinY, scanMaxY);
         treeBlocksSeenThisScan.clear();
 
@@ -336,6 +357,11 @@ final class JobScanner {
 
                         // Check for job opportunities at this position
                         JobRecord job = scanPositionForJob(level, pos, state);
+                        // Indexed even if a worker has it: when it's done, or given back, the
+                        // block's next change says whether it's still there
+                        if (job != null) {
+                            cache.addJob(pos.immutable(), JobKey.of(job));
+                        }
                         if (job != null && !pool.isReserved(JobKey.of(job))) {
                             if (Palworks.LOGGER.isTraceEnabled()) {
                                 Palworks.LOGGER.trace(
@@ -346,7 +372,6 @@ final class JobScanner {
                                         job.position());
                             }
                             pool.offer(job);
-                            cache.addJob(pos.immutable(), JobKey.of(job));
                         }
                     }
                 }
@@ -561,23 +586,22 @@ final class JobScanner {
     }
 
     /**
-     * Remove stale chunk caches (older than twice the cache lifetime) of chunks no worker is near,
-     * and their jobs: nothing will rescan those, so nothing would ever notice their jobs
-     * disappearing. A chunk near a worker keeps its cache until it's rescanned, however long that
-     * takes: when the scan falls behind (more chunks than it gets through in a lifetime), dropping
-     * those too left most of them looking never scanned, so no worker was ever given a job
-     * ({@link #hasScannedAround}).
+     * Drop the indexes of chunks that have unloaded, and their jobs. A chunk's index is kept for as
+     * long as it's loaded, worker near or not, so the troughs and beds by a pasture are still known
+     * when its workers have wandered off. Nothing changes in an unloaded chunk (but by a world
+     * editor), and one loaded again is scanned afresh when a worker's near it.
      */
-    void dropStaleCaches(long gameTime) {
+    void dropUnloaded(ServerLevel level) {
+        if (level.getGameTime() % DROP_UNLOADED_TICKS != 0) {
+            return;
+        }
         chunkCaches.entrySet().removeIf(entry -> {
-            ChunkIndex cache = entry.getValue();
-            boolean stale = !chunksNearWorkers.contains(entry.getKey())
-                    && !cache.isDirty()
-                    && (gameTime - cache.scanTime()) > JOB_CACHE_LIFETIME_TICKS * 2;
-            if (stale) {
-                removeJobsOf(cache);
+            ChunkPos chunk = entry.getKey();
+            boolean unloaded = !level.hasChunk(chunk.x, chunk.z);
+            if (unloaded) {
+                removeJobsOf(entry.getValue());
             }
-            return stale;
+            return unloaded;
         });
     }
 
@@ -607,6 +631,19 @@ final class JobScanner {
         /** Whether a block at this height is in the band scanned. */
         boolean covers(int y) {
             return y >= minY && y < maxY;
+        }
+
+        /** Whether the band scanned covers all of [minY, maxY). */
+        boolean coversBand(int from, int to) {
+            return from >= minY && to <= maxY;
+        }
+
+        int minY() {
+            return minY;
+        }
+
+        int maxY() {
+            return maxY;
         }
 
         /** Game time of the scan. */

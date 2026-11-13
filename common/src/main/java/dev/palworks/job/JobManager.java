@@ -466,7 +466,7 @@ public class JobManager {
             pool.dropGoneFollowUps(level);
             Watering.forgetExpired(level);
         }
-        scanner.dropStaleCaches(currentTime);
+        scanner.dropUnloaded(level);
         pool.expire(currentTime, JOB_POOL_EXPIRY_TICKS);
         assigner.expireUnreachable(currentTime);
 
