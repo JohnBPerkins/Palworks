@@ -5,6 +5,7 @@ import dev.palworks.config.PalworksConfig;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,14 +39,15 @@ public final class Mood {
     }
 
     /**
-     * Whether mood applies to this Pokémon now: mood is on, it's owned and out in the world, and its
-     * work is on. {@code state} is its worker state, or null if it has none yet.
+     * Whether mood applies to this Pokémon now: mood is on, it's owned and out in the world, and it
+     * works ({@link WorkerEligibility#works}: its work is on, and it has work it can do). {@code
+     * state} is its worker state, or null if it has none yet.
      */
     public static boolean appliesTo(Pokemon pokemon, @Nullable WorkerState state) {
         return enabled()
                 && pokemon.getOwnerUUID() != null
                 && pokemon.getEntity() != null
-                && (state == null || state.isEnabled());
+                && WorkerEligibility.works(pokemon, state);
     }
 
     /** Whether it's unhappy: its mood is low enough that it works slower. */

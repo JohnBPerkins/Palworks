@@ -27,15 +27,20 @@ import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -49,6 +54,8 @@ final class JobAssigner {
     private static final int MAX_PATH_CHECKS_PER_WORKER = 8; // Cap expensive createPath() calls per assignment
     private static final int DELIVERY_SEARCH_RADIUS = 32; // Horizontal reach for picking a delivery chest
     private static final int DELIVERY_SEARCH_VERTICAL = 4; // Y reach for picking a delivery chest
+    // The skills that plant (farmland seeds, nether wart), in the order a worker with both fetches for them
+    private static final List<Suitability> PLANTING_SKILLS = List.of(Suitability.PLANTING, Suitability.NETHER);
     // Heading home to a trough or bed it can't get to (see headHome): how far a leg goes, and how
     // near the trough or bed it stops heading home
     private static final int HOME_LEG = 12;
@@ -62,6 +69,8 @@ final class JobAssigner {
     private final JobPool pool;
     private final JobScanner scanner;
     private final WorkerRegistry workers;
+    // Beds non-workers have, which no worker is offered (it never turns one out)
+    private final NonWorkerBeds nonWorkerBeds;
 
     // Per-worker memory of job positions the worker couldn't reach, either because the path check
     // failed at assignment or it got stuck walking there (Pokemon UUID -> job position -> game tick
@@ -76,11 +85,13 @@ final class JobAssigner {
     // workers that have waited longest (Turns.longestWaiting).
     private final Map<UUID, Long> lastConsidered = new ConcurrentHashMap<>();
 
-    JobAssigner(ServerLevel level, JobPool pool, JobScanner scanner, WorkerRegistry workers) {
+    JobAssigner(
+            ServerLevel level, JobPool pool, JobScanner scanner, WorkerRegistry workers, NonWorkerBeds nonWorkerBeds) {
         this.level = level;
         this.pool = pool;
         this.scanner = scanner;
         this.workers = workers;
+        this.nonWorkerBeds = nonWorkerBeds;
     }
 
     /**
@@ -365,6 +376,7 @@ final class JobAssigner {
             if (JobChecks.isBed(level.getBlockState(bedPos))
                     && level.getBlockState(bedPos).getBlock() instanceof WorkerBedBlock bed
                     && !pool.isReserved(new JobPool.JobKey(bedPos, JobType.SLEEP))
+                    && !nonWorkerBeds.isClaimed(bedPos)
                     && Beds.fits(level, bedPos, bed, entity)) {
                 beds.add(bedPos);
             }
@@ -411,10 +423,10 @@ final class JobAssigner {
     private List<JobRecord> poolCandidates(WorkerInfo worker) {
         Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
         WorkerInventory inventory = pokemon != null ? WorkerInventoryManager.getOrCreate(pokemon) : null;
-        boolean carriesSeeds = inventory != null && inventory.hasAnySeed();
 
-        // Open farmland in its range, worked out only if there's a seed chest to consider
-        List<BlockPos> openFarmland = null;
+        // Open planting spots in its range, by the skill that plants them, worked out only if
+        // there's a seed chest to consider
+        Map<Suitability, List<BlockPos>> openSpots = new EnumMap<>(Suitability.class);
 
         // Collect viable candidates and score them cheaply (NO pathfinding in this pass). Only the
         // jobs it has the suitabilities for: the pool keeps them grouped that way.
@@ -428,22 +440,19 @@ final class JobAssigner {
                     continue;
                 }
 
-                // Planters fetch seeds only once they've run out (then plant until the stack is
-                // gone); room to carry them is canWorkerDo's. For farmland, "run out" means of seeds
-                // the open farmland in range can take, and it only goes for a chest with some of
-                // those: seeds that grow elsewhere (medicinal leek, cocoa beans) don't count either way.
-                if (job.type() == JobType.GET_SEEDS && inventory != null) {
-                    if (job.requiredSuitabilities().contains(Suitability.PLANTING)) {
-                        if (openFarmland == null) {
-                            openFarmland = openFarmlandSpots(worker.position);
-                        }
-                        if (carriesSeedForAny(inventory, openFarmland)
-                                || seedToFetch(job.position(), openFarmland) == null) {
-                            continue;
-                        }
-                    } else if (carriesSeeds) {
-                        continue;
-                    }
+                // A seed chest only for a worker with something to take from it (see seedToFetch):
+                // it fetches once it's run out, then plants until the stack is gone. Room to carry
+                // them is canWorkerDo's.
+                if (job.type() == JobType.GET_SEEDS
+                        && (inventory == null
+                                || seedToFetch(
+                                                job.position(),
+                                                worker.suitabilities,
+                                                inventory,
+                                                skill -> openSpots.computeIfAbsent(
+                                                        skill, s -> openPlantingSpots(worker.position, s)))
+                                        == null)) {
+                    continue;
                 }
 
                 candidates.add(new ScoredJob(job, scoreJob(worker, job)));
@@ -769,14 +778,14 @@ final class JobAssigner {
     }
 
     /**
-     * The open farmland planting spots within work range of {@code workerPos} (anywhere, if null):
-     * where seeds are wanted right now.
+     * The open planting spots needing {@code skill} (Planting: farmland; Nether: soul sand) within
+     * work range of {@code workerPos} (anywhere, if null): where seeds are wanted right now.
      */
-    private List<BlockPos> openFarmlandSpots(@Nullable BlockPos workerPos) {
+    private List<BlockPos> openPlantingSpots(@Nullable BlockPos workerPos, Suitability skill) {
         List<BlockPos> spots = new ArrayList<>();
         for (JobRecord job : pool.available()) {
             if (job.type() == JobType.PLANT_SEEDS
-                    && job.requiredSuitabilities().contains(Suitability.PLANTING)
+                    && job.requiredSuitabilities().contains(skill)
                     && (workerPos == null || WorkRange.contains(workerPos, job.position()))) {
                 spots.add(job.position());
             }
@@ -795,25 +804,39 @@ final class JobAssigner {
     }
 
     /**
-     * The seed a planter at {@code workerPos} should take from the chest at {@code chestPos}: the
-     * first farmland seed in it that one of the open spots in its range can take, or null if none
-     * can. Seeds that grow somewhere else (medicinal leek grows in water), or that nothing in range
-     * is waiting for, are left in the chest: carried, they'd count as the seeds it has, and it
-     * would never go back for ones it can plant.
+     * The seed a worker at {@code workerPos} should take from the chest at {@code chestPos}, or null
+     * if none. Each planting skill counts on its own, so a worker with both fetches whichever it's
+     * out of: with Planting, a farmland seed that open farmland in its range can take, if it carries
+     * none; with Nether, nether wart, if open soul sand in its range is waiting and it carries none.
+     * Seeds that grow somewhere else (medicinal leek grows in water), or that nothing in range is
+     * waiting for, are left in the chest: carried, they'd count as the seeds it has, and it would
+     * never go back for ones it can plant.
      */
     @Nullable
-    Item seedToFetch(BlockPos chestPos, @Nullable BlockPos workerPos) {
-        return seedToFetch(chestPos, openFarmlandSpots(workerPos));
+    Item seedToFetch(
+            BlockPos chestPos, @Nullable BlockPos workerPos, Set<Suitability> skills, WorkerInventory inventory) {
+        return seedToFetch(chestPos, skills, inventory, skill -> openPlantingSpots(workerPos, skill));
     }
 
     @Nullable
-    private Item seedToFetch(BlockPos chestPos, List<BlockPos> openSpots) {
-        if (openSpots.isEmpty()) {
-            return null;
-        }
-        for (Item seed : ChestHelper.itemsMatching(level, chestPos, JobChecks::isFarmlandSeed)) {
-            if (plantableOnAny(seed, openSpots)) {
-                return seed;
+    private Item seedToFetch(
+            BlockPos chestPos,
+            Set<Suitability> skills,
+            WorkerInventory inventory,
+            Function<Suitability, List<BlockPos>> openSpots) {
+        for (Suitability skill : PLANTING_SKILLS) {
+            if (!skills.contains(skill)) {
+                continue;
+            }
+            List<BlockPos> spots = openSpots.apply(skill);
+            if (spots.isEmpty() || carriesSeedForAny(inventory, spots)) {
+                continue;
+            }
+            Predicate<Item> seeds = skill == Suitability.NETHER ? Items.NETHER_WART::equals : JobChecks::isFarmlandSeed;
+            for (Item seed : ChestHelper.itemsMatching(level, chestPos, seeds)) {
+                if (plantableOnAny(seed, spots)) {
+                    return seed;
+                }
             }
         }
         return null;

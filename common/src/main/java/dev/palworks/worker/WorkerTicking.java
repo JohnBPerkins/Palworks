@@ -7,6 +7,7 @@ import dev.palworks.ai.WorkerAI;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
+import dev.palworks.sleep.NonWorkerSleep;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
@@ -44,6 +45,15 @@ public final class WorkerTicking {
         Pokemon pokemon = entity.getPokemon();
         if (pokemon == null || pokemon.getOwnerUUID() == null || pokemon.getEntity() == null) {
             return; // Only owned Pokémon that are out in the world
+        }
+        // One that isn't working (no work skills, or its work off) sleeps in a free bed if it's
+        // pastured and Cobblemon makes it drowsy
+        NonWorkerSleep.tick(entity, level);
+        // No work it can do, and never a worker: not one. (One that was, and lost its last work
+        // skill, carries on as one whose work is off: it lets its job go and wakes up.)
+        if (!WorkerEligibility.canWork(pokemon) && !WorkerStateManager.hasWorkerState(pokemon)) {
+            WorkerStatusSync.update(pokemon, null); // asleep in a bed, if its species can't show it
+            return;
         }
         JobManager.getInstance(level).registerWorker(pokemon, entity, level);
         WorkerAI.tick(pokemon, entity, level);

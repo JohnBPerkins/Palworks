@@ -3,6 +3,7 @@ package dev.palworks.inventory;
 import dev.palworks.suitability.Suitability;
 import java.util.Set;
 import java.util.UUID;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -245,16 +246,6 @@ public class WorkerInventory implements Container {
         return false;
     }
 
-    /** Whether it carries any seed or other plantable item. */
-    public boolean hasAnySeed() {
-        for (ItemStack stack : items) {
-            if (!stack.isEmpty() && dev.palworks.crop.CropAdapter.isSeed(stack.getItem())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /**
      * Get the first item stack in the inventory (for compatibility with old single-slot system).
      */
@@ -279,9 +270,10 @@ public class WorkerInventory implements Container {
     }
 
     /**
-     * Serialize to NBT.
+     * Serialize to NBT. Items' data-driven parts (enchantments, say) are saved by registry id, so it
+     * needs the server's registries.
      */
-    public CompoundTag serializeNBT() {
+    public CompoundTag serializeNBT(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         ListTag itemsTag = new ListTag();
 
@@ -290,7 +282,7 @@ public class WorkerInventory implements Container {
             if (!stack.isEmpty()) {
                 CompoundTag slotTag = new CompoundTag();
                 slotTag.putByte("Slot", (byte) i);
-                itemsTag.add(stack.save(net.minecraft.core.RegistryAccess.EMPTY, slotTag));
+                itemsTag.add(stack.save(registries, slotTag));
             }
         }
 
@@ -299,9 +291,9 @@ public class WorkerInventory implements Container {
     }
 
     /**
-     * Deserialize from NBT.
+     * Deserialize from NBT, with the server's registries (see {@link #serializeNBT}).
      */
-    public void deserializeNBT(CompoundTag tag) {
+    public void deserializeNBT(CompoundTag tag, HolderLookup.Provider registries) {
         items.clear();
         for (int i = 0; i < INVENTORY_SIZE; i++) {
             items.set(i, ItemStack.EMPTY);
@@ -313,10 +305,7 @@ public class WorkerInventory implements Container {
                 CompoundTag slotTag = itemsTag.getCompound(i);
                 int slot = slotTag.getByte("Slot") & 255;
                 if (slot < INVENTORY_SIZE) {
-                    items.set(
-                            slot,
-                            ItemStack.parse(net.minecraft.core.RegistryAccess.EMPTY, slotTag)
-                                    .orElse(ItemStack.EMPTY));
+                    items.set(slot, ItemStack.parse(registries, slotTag).orElse(ItemStack.EMPTY));
                 }
             }
         }
@@ -325,9 +314,9 @@ public class WorkerInventory implements Container {
     /**
      * Create from NBT.
      */
-    public static WorkerInventory fromNBT(UUID ownerUUID, CompoundTag tag) {
+    public static WorkerInventory fromNBT(UUID ownerUUID, CompoundTag tag, HolderLookup.Provider registries) {
         WorkerInventory inventory = new WorkerInventory(ownerUUID);
-        inventory.deserializeNBT(tag);
+        inventory.deserializeNBT(tag, registries);
         return inventory;
     }
 }

@@ -8,11 +8,13 @@ import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.crop.Watering;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.WorkerDebugSync;
+import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
@@ -22,6 +24,7 @@ import dev.palworks.worker.WorkerStatusSync;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
@@ -59,6 +62,7 @@ public class JobManager {
     private final JobScanner scanner;
     private final JobAssigner assigner;
     private final PickupQueue pickups;
+    private final NonWorkerBeds nonWorkerBeds = new NonWorkerBeds(pool);
 
     /**
      * Private constructor for singleton pattern.
@@ -66,7 +70,7 @@ public class JobManager {
     private JobManager(ServerLevel level) {
         this.level = level;
         this.scanner = new JobScanner(pool);
-        this.assigner = new JobAssigner(level, pool, scanner, workers);
+        this.assigner = new JobAssigner(level, pool, scanner, workers, nonWorkerBeds);
         this.pickups = new PickupQueue(pool, workers, assigner);
     }
 
@@ -176,6 +180,42 @@ public class JobManager {
     }
 
     // ============================================
+    // Non-workers' beds (see NonWorkerBeds, sleep.NonWorkerSleep)
+    // ============================================
+
+    /** A bed a non-worker has, the game time it got it, and whether it's lying in it yet. */
+    public record NonWorkerBed(BlockPos pos, long since, boolean inBed) {}
+
+    /** The bed this non-worker has, if any. Ask every tick it has one: one that stops asking loses it. */
+    @Nullable
+    public NonWorkerBed nonWorkerBed(UUID pokemon) {
+        NonWorkerBeds.Claim claim = nonWorkerBeds.claimOf(pokemon, level.getGameTime());
+        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since(), claim.inBed());
+    }
+
+    /** This non-worker wants a bed: it takes a free one, if there is one (see NonWorkerBeds). */
+    @Nullable
+    public NonWorkerBed claimNonWorkerBed(PokemonEntity entity) {
+        NonWorkerBeds.Claim claim = nonWorkerBeds.claim(level, entity);
+        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since(), claim.inBed());
+    }
+
+    /** This non-worker has got to its bed, and lies in it. */
+    public void settleNonWorkerInBed(UUID pokemon) {
+        nonWorkerBeds.settle(pokemon);
+    }
+
+    /** This non-worker is done with its bed. */
+    public void releaseNonWorkerBed(UUID pokemon) {
+        nonWorkerBeds.release(pokemon);
+    }
+
+    /** This non-worker couldn't get to its bed: it lets it go, and doesn't ask again for a while. */
+    public void giveUpNonWorkerBed(UUID pokemon) {
+        nonWorkerBeds.giveUp(pokemon, level.getGameTime());
+    }
+
+    // ============================================
     // Worker Registry Methods
     // ============================================
 
@@ -201,12 +241,17 @@ public class JobManager {
             DebugManager.broadcastActivity(serverLevel, pokemon.getSpecies().getName() + " is now a worker");
         }
 
-        // Disabled workers get no jobs. If one was registered before being disabled, drop it from
-        // the registry and free its job, or assignment would keep handing it work.
-        if (!state.isEnabled()) {
+        // Not a worker now: its work is off, or it has no work it can do (it lost its last work
+        // skill). If it was registered, drop it from the registry and free its job, or assignment
+        // would keep handing it work; and it lets its own job go.
+        if (!WorkerEligibility.works(pokemon, state)) {
             WorkerInfo removed = workers.remove(uuid);
             if (removed != null && removed.currentReservation != null) {
                 pool.release(JobKey.of(removed.currentReservation), level.getGameTime());
+            }
+            if (state.getCurrentReservation() != null) {
+                state.clearReservation();
+                WorkerStateManager.save(pokemon, state);
             }
             return;
         }
@@ -226,6 +271,17 @@ public class JobManager {
                     "{} dropped its reservation; released job at {} back to the pool",
                     pokemon.getSpecies().getName(),
                     info.currentReservation.getStationPos());
+        }
+
+        // A job it has that the registry doesn't (saved with it, before a restart or its chunk
+        // unloading) is still its own: claim it in the pool, or the scan offers it again and
+        // another worker is given it too. If another worker has it already, that one keeps it.
+        if (stateReservation != null
+                && !stateReservation.equals(info.currentReservation)
+                && !pool.adopt(stateReservation, uuid, level.getGameTime())) {
+            state.clearReservation();
+            WorkerStateManager.save(pokemon, state);
+            stateReservation = null;
         }
 
         BlockPos entityPos = entity.blockPosition();
@@ -472,6 +528,7 @@ public class JobManager {
             Watering.forgetExpired(level);
         }
         scanner.dropUnloaded(level);
+        nonWorkerBeds.dropStale(currentTime);
         pool.expire(currentTime, JOB_POOL_EXPIRY_TICKS);
         assigner.expireUnreachable(currentTime);
 
@@ -509,12 +566,13 @@ public class JobManager {
     }
 
     /**
-     * The seed a planter at {@code workerPos} should take from the chest at {@code chestPos}, or
-     * null if none of its seeds can go anywhere open in range (see JobAssigner).
+     * The seed (or nether wart) a worker at {@code workerPos} with these skills, carrying {@code
+     * inventory}, should take from the chest at {@code chestPos}, or null if none (see JobAssigner).
      */
     @Nullable
-    public Item seedToFetch(BlockPos chestPos, @Nullable BlockPos workerPos) {
-        return assigner.seedToFetch(chestPos, workerPos);
+    public Item seedToFetch(
+            BlockPos chestPos, @Nullable BlockPos workerPos, Set<Suitability> skills, WorkerInventory inventory) {
+        return assigner.seedToFetch(chestPos, workerPos, skills, inventory);
     }
 
     /** The spots this worker currently remembers it couldn't reach (for the debug overlay). */

@@ -54,7 +54,8 @@ public final class WorkPositions {
             return stand == null ? null : stand.stand();
         }
         if (jobType == JobType.SLEEP) {
-            // In the bed itself (it has no collision), if its body fits there with the space round it
+            // On the bed itself (it's solid, 4px high: it stands on top), if its body fits there
+            // with the space round it
             return level.getBlockState(targetPos).getBlock() instanceof WorkerBedBlock bed
                             && Beds.fits(level, targetPos, bed, entity)
                     ? Beds.standTile(targetPos, bed)

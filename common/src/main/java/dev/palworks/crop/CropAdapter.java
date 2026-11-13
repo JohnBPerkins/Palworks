@@ -64,7 +64,7 @@ public class CropAdapter {
             return true;
         }
 
-        // Soul sand for nether wart (requires both PLANTING and NETHER suitabilities)
+        // Soul sand for nether wart (Nether work)
         if (state.is(Blocks.SOUL_SAND)) {
             return true;
         }
@@ -178,12 +178,14 @@ public class CropAdapter {
             return age != null && state.getValue(age) >= GALARICA_RIPE_AGE;
         }
 
-        // Cobblemon berries - harvestable at age 5
-        // Cobblemon berry blocks use an AGE property (0-5)
+        // Cobblemon berries: ripe at age 5 (their own AGE property, 0-5). Their berries and regrowth
+        // are in their block entity, which harvestCrop picks them through: without one (another
+        // mod's block in the tag, say) there's nothing to pick, and it would be "harvested" forever
         if (state.is(COBBLEMON_BERRIES)) {
-            // Cobblemon berries use their own AGE property; no age property, not harvestable
             IntegerProperty age = ageProperty(state);
-            return age != null && state.getValue(age) >= BERRY_RIPE_AGE;
+            return age != null
+                    && state.getValue(age) >= BERRY_RIPE_AGE
+                    && level.getBlockEntity(pos) instanceof com.cobblemon.mod.common.block.entity.BerryBlockEntity;
         }
 
         return false;
@@ -439,7 +441,7 @@ public class CropAdapter {
                 return true;
             }
 
-            return true;
+            return false; // a berry block it can't pick (see isFullyGrown)
         }
 
         // Hearty grains: harvested as Cobblemon has it by hand, by cutting the top half (its grains,

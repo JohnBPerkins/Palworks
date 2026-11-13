@@ -5,9 +5,9 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Something wrong with a worker that it shows over its head (see WorkerStatusSync and, on the
- * client, StatusIconRenderer): only ever things that hold its work back. Each is an aspect on the
- * Pokémon, which Cobblemon syncs to everyone nearby.
+ * What a Pokémon shows over its head (see WorkerStatusSync and, on the client, StatusIconRenderer):
+ * what holds a worker's work back, and its sleep where nothing else shows it. Each is an aspect on
+ * the Pokémon, which Cobblemon syncs to everyone nearby.
  */
 public enum WorkerStatus {
     /**
@@ -30,7 +30,14 @@ public enum WorkerStatus {
      * Its mood ran out: it does no work until it's back up a way (see dev.palworks.mood.Mood). An
      * anger mark, shown instead of {@link #UNHAPPY}.
      */
-    STRIKING(null, "palworks:status/striking");
+    STRIKING(null, "palworks:status/striking"),
+
+    /**
+     * Asleep (a worker in its bedtime, or a non-worker in a bed: see dev.palworks.sleep), for a
+     * species with no sleep animation of its own, which only lies still. A crescent moon: not
+     * Tired's "z", which is a worker awake and slow.
+     */
+    ASLEEP(null, "palworks:status/asleep");
 
     // Sprites in the GUI atlas, by id: the background (if any) drawn first, the icon over it
     @Nullable

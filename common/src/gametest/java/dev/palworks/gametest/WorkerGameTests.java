@@ -5,31 +5,46 @@ import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
+import com.mojang.brigadier.tree.CommandNode;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.animation.WorkAnimator;
+import dev.palworks.command.PalworksCommands;
+import dev.palworks.hunger.Hunger;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityData;
 import dev.palworks.suitability.SuitabilityDetector;
+import dev.palworks.suitability.SuitabilityOverrides;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import java.io.IOException;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
@@ -645,6 +660,47 @@ public class WorkerGameTests {
                 helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, "harvested and reset"));
     }
 
+    /** Soul sand for nether wart along z=5, and a chest holding these, for a planting test. */
+    private static ChestBlockEntity soulSandAndChest(GameTestHelper helper, ItemStack... contents) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        for (int x = 2; x <= 4; x++) {
+            helper.setBlock(x, 0, 5, Blocks.SOUL_SAND);
+        }
+        BlockPos chestPos = new BlockPos(6, 1, 2);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        ChestBlockEntity chest = (ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos));
+        for (int i = 0; i < contents.length; i++) {
+            chest.setItem(i, contents[i]);
+        }
+        return chest;
+    }
+
+    private static void assertWartPlanted(GameTestHelper helper) {
+        for (int x = 2; x <= 4; x++) {
+            helper.assertBlockPresent(Blocks.NETHER_WART, new BlockPos(x, 1, 5));
+        }
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_mixed_chest", timeoutTicks = 1000)
+    public void aGhostTypeFetchesNetherWartFromAChestWithSeedsInItToo(GameTestHelper helper) {
+        // A chest with seeds and wart used to be a seed chest for planters only
+        soulSandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8), new ItemStack(Items.NETHER_WART, 8));
+        Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether only
+
+        helper.succeedWhen(() -> assertWartPlanted(helper));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_planter", timeoutTicks = 1000)
+    public void aPlanterThatIsAGhostTypeFetchesNetherWartToo(GameTestHelper helper) {
+        // Nether work is all wart needs, whatever else it can do: a planter used to look for
+        // farmland seeds in the chest instead, and take nothing
+        soulSandAndChest(helper, new ItemStack(Items.NETHER_WART, 8));
+        Workers.sendOut(helper, "phantump level=20", START); // Ghost/Grass: Planting, Gathering, Nether
+
+        helper.succeedWhen(() -> assertWartPlanted(helper));
+    }
+
     // ---- Handing a job over ----
 
     @GameTest(template = Templates.EMPTY, batch = "worker_handover", timeoutTicks = 1600)
@@ -756,5 +812,99 @@ public class WorkerGameTests {
                     "within a second and a half of the crop going, took " + (helper.getTick() - harvestedAt[0])
                             + " ticks");
         });
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void anEnchantedItemSurvivesTheInventoryBeingSavedAndLoaded(GameTestHelper helper) {
+        // Not sent out: its inventory is saved in its own data either way
+        Pokemon pidgey = PokemonProperties.Companion.parse("pidgey level=20").create(); // Flying: Transporting
+        ItemStack sword = new ItemStack(Items.IRON_SWORD);
+        Holder<Enchantment> sharpness = helper.getLevel()
+                .registryAccess()
+                .registryOrThrow(Registries.ENCHANTMENT)
+                .getHolderOrThrow(Enchantments.SHARPNESS);
+        sword.enchant(sharpness, 3);
+        WorkerInventoryManager.getOrCreate(pidgey).setItem(0, sword); // saved as it changes
+
+        WorkerInventoryManager.unload(pidgey.getUuid()); // as if its chunk unloaded: read back from its data
+        ItemStack loaded = WorkerInventoryManager.getOrCreate(pidgey).getItem(0);
+        WorkerInventoryManager.unload(pidgey.getUuid());
+        helper.assertTrue(loaded.is(Items.IRON_SWORD), "the sword is still there: " + loaded);
+        helper.assertTrue(
+                EnchantmentHelper.getItemEnchantmentLevel(sharpness, loaded) == 3,
+                "still Sharpness 3: " + loaded.getEnchantments());
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, timeoutTicks = 200)
+    public void aPokemonWithNoWorkSkillsIsntAWorker(GameTestHelper helper) {
+        Workers.isolate(helper);
+        PokemonEntity ekans = Workers.sendOutPastured(helper, "ekans level=20", new BlockPos(2, 1, 2)); // Poison
+        helper.runAfterDelay(40, () -> {
+            Pokemon pokemon = ekans.getPokemon();
+            helper.assertTrue(SuitabilityDetector.getSuitabilities(pokemon).isEmpty(), "no work it can do");
+            helper.assertFalse(WorkerStateManager.hasWorkerState(pokemon), "never made a worker");
+            helper.assertFalse(Hunger.pausesCobblemonDrain(pokemon), "Cobblemon drains its fullness as usual");
+            helper.assertFalse(Sleep.appliesTo(pokemon, null), "it sleeps as Cobblemon has it");
+            helper.succeed();
+        });
+    }
+
+    @AfterBatch(batch = "lost_last_skill")
+    public void afterLostLastSkill(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "lost_last_skill", timeoutTicks = 400)
+    public void aWorkerThatLosesItsLastWorkSkillLetsItsJobGo(GameTestHelper helper) {
+        // Changes every Bulbasaur's skills, so it's in a batch of its own, undone after it
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos crop = new BlockPos(6, 1, 5);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+        PokemonEntity bulbasaur = Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(1, 1, 1));
+        WorkerState state = WorkerStateManager.getOrCreate(bulbasaur.getPokemon());
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(state.getCurrentReservation() != null, "it takes the harvest"))
+                .thenExecute(() -> {
+                    try { // Grass: Planting and Gathering, both taken away (as an admin's change does)
+                        SuitabilityOverrides.set("cobblemon:bulbasaur", Suitability.PLANTING, 0);
+                        SuitabilityOverrides.set("cobblemon:bulbasaur", Suitability.GATHERING, 0);
+                    } catch (IOException e) {
+                        helper.fail("couldn't change its skills: " + e);
+                    }
+                })
+                .thenWaitUntil(() -> helper.assertTrue(state.getCurrentReservation() == null, "it lets the job go"))
+                .thenIdle(60)
+                .thenExecute(() -> helper.assertTrue(
+                        helper.getBlockState(crop).equals(((CropBlock) Blocks.WHEAT).getStateForAge(7)),
+                        "and doesn't harvest it"))
+                .thenSucceed();
+    }
+
+    private static final String WORKER = "worker"; // the /palworks worker command
+
+    @GameTest(template = Templates.EMPTY)
+    public void aReleasedModHasOnlyTheAdminCommands(GameTestHelper helper) {
+        // The developer tools are only in development runs (this is one: they're all here)
+        CommandNode<CommandSourceStack> released = PalworksCommands.build(false).build();
+        CommandNode<CommandSourceStack> dev = PalworksCommands.build(true).build();
+        for (String admin : List.of(WORKER, "suitability", "config")) {
+            helper.assertTrue(released.getChild(admin) != null, "released: /palworks " + admin);
+        }
+        for (String tool : List.of("debug", "inspect", "testarea", "sleep", "jobs")) {
+            helper.assertTrue(released.getChild(tool) == null, "not released: /palworks " + tool);
+            helper.assertTrue(dev.getChild(tool) != null, "in development: /palworks " + tool);
+        }
+        for (String admin : List.of("enable", "disable")) {
+            helper.assertTrue(released.getChild(WORKER).getChild(admin) != null, "released: worker " + admin);
+        }
+        for (String tool : List.of("inventory", "openinv", "clearinv", "clear")) {
+            helper.assertTrue(released.getChild(WORKER).getChild(tool) == null, "not released: worker " + tool);
+            helper.assertTrue(dev.getChild(WORKER).getChild(tool) != null, "in development: worker " + tool);
+        }
+        helper.succeed();
     }
 }

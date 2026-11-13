@@ -154,7 +154,7 @@ public class WorkerState {
      * one (the count itself is only reset at the next failure).
      */
     public int getRecentPathFailCount() {
-        return System.currentTimeMillis() - lastPathFailTime > 5000 ? 0 : pathFailCount;
+        return System.currentTimeMillis() - lastPathFailTime > PATH_FAILURE_RESET_MS ? 0 : pathFailCount;
     }
 
     /** Path failures within 5 seconds of each other after which a worker gives its job up. */

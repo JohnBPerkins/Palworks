@@ -99,6 +99,12 @@ public class WorkerAI {
         // What's holding it back (hungry), shown over its head
         WorkerStatusSync.update(pokemon, state);
         WorkAnimator.update(entity, state);
+        // Its state lives in WorkerStateManager's cache, which goes when its chunk unloads or the
+        // server stops: flush it to its data now and then (staggered), whatever it's doing (working,
+        // asleep where it is, paused in a battle), so little is lost
+        if ((level.getGameTime() + entity.getId()) % WORK_SAVE_INTERVAL == 0) {
+            WorkerStateManager.save(pokemon, state);
+        }
         return handled;
     }
 
@@ -116,9 +122,10 @@ public class WorkerAI {
                 eating.isEmpty() ? WorkerInventoryManager.getOrCreate(pokemon).getFirstItem() : eating);
 
         // New workers start enabled (see WorkerState), so a disabled state means it was turned off
-        // on purpose (/palworks worker disable). Respect that instead of re-enabling it. Its
-        // hunger is Cobblemon's again: no rest after its last job carries over.
-        if (!state.isEnabled()) {
+        // on purpose (/palworks worker disable). Respect that instead of re-enabling it. One with
+        // no work it can do (it lost its last work skill) is no worker either. Its hunger is
+        // Cobblemon's again: no rest after its last job carries over.
+        if (!dev.palworks.worker.WorkerEligibility.works(pokemon, state)) {
             state.setRestUntil(0);
             if (state.isAsleep() && entity instanceof PokemonEntity pokemonEntity) {
                 wake(pokemon, pokemonEntity, state); // and its sleep is Cobblemon's again
@@ -165,7 +172,7 @@ public class WorkerAI {
             }
 
             // A saved job far outside any work range (e.g. the Pokémon was recalled and sent out
-            // somewhere else) is dropped rather than walked to. Work range is 32 blocks.
+            // somewhere else) is dropped rather than walked to: 100 blocks is past any work range.
             BlockPos entityPos = entity.blockPosition();
             double distanceSq = entityPos.distSqr(reservation.getStationPos());
             if (distanceSq > 100 * 100) {
@@ -412,9 +419,8 @@ public class WorkerAI {
             }
         }
 
-        // Work progress lives in the WorkerStateManager cache; flush to NBT on completion
-        // (a transition) or on a staggered heartbeat - not every tick.
-        if (workComplete || (level.getGameTime() + entity.getId()) % WORK_SAVE_INTERVAL == 0) {
+        // Flush on completion (a transition); otherwise tick's periodic save covers it
+        if (workComplete) {
             WorkerStateManager.save(pokemon, state);
         }
         return true;
@@ -485,10 +491,6 @@ public class WorkerAI {
             }
         }
 
-        // Path/idle state lives in the cache; flush periodically (staggered) for durability.
-        if ((level.getGameTime() + entity.getId()) % WORK_SAVE_INTERVAL == 0) {
-            WorkerStateManager.save(pokemon, state);
-        }
         return true;
     }
 
@@ -690,7 +692,7 @@ public class WorkerAI {
                     lieDown(entity, reservation.getStationPos());
                     state.setInBed(true);
                 }
-                fallAsleep(state);
+                fallAsleep(pokemon, state);
                 state.addSleepTick(true);
                 SleepPose.hold(entity);
             }
@@ -715,7 +717,7 @@ public class WorkerAI {
             Palworks.LOGGER.debug(
                     "{} found no bed, and sleeps where it is",
                     pokemon.getSpecies().getName());
-            fallAsleep(state);
+            fallAsleep(pokemon, state);
         }
         return false;
     }
@@ -741,11 +743,12 @@ public class WorkerAI {
     }
 
     /** It falls asleep: Tired no more (it's sleeping it off), and it stops looking for a bed. */
-    private static void fallAsleep(WorkerState state) {
+    private static void fallAsleep(Pokemon pokemon, WorkerState state) {
         if (!state.isAsleep()) {
             state.setAsleep(true);
             state.setTired(false);
             state.resetBedtimeIdleTicks();
+            WorkerStateManager.save(pokemon, state);
         }
     }
 

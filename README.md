@@ -217,12 +217,19 @@ stay awake with you, as Cobblemon's party Pokémon do.
   the nearest. Like troughs, beds by its pasture block count however far it has wandered. With none
   to be had, it sleeps where it is.
 - **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
-  walks at three quarters of its speed, with a "z" over its head, until it next sleeps.
+  walks at three quarters of its speed, with a "z" over its head, until it next sleeps. One whose
+  species has no sleep animation (it only lies still) shows a moon over its head while it sleeps.
 - **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It
   stays up for 15 seconds, then goes back to bed if it's still its bedtime. What it slept before
   still counts towards whether it wakes Tired.
 - **Naps:** Cobblemon's own sleep is left alone: an idle pastured worker still naps when it gets
   drowsy, and isn't given work until it wakes. It just doesn't doze off in the middle of a job.
+- **Pokémon that aren't working** (no work skills, or their work switched off) use beds too: a
+  pastured one goes to a free bed by its pasture when it gets sleepy, and sleeps there as a worker
+  does. Sleepy is when Cobblemon makes it drowsy, until Cobblemon would wake it; for a species
+  Cobblemon never lets sleep, its bedtime, as for a worker. Workers come first: it only takes a bed
+  no worker has, and keeps it till it wakes. With none free, it sleeps where Cobblemon has it (or,
+  if Cobblemon never lets it sleep, stays up). It never wakes Tired.
 
 Beds come in three sizes, for Pokémon up to as wide as the bed:
 
@@ -238,8 +245,8 @@ size is dyed another colour by crafting it with that dye. For now they sleep jus
 
 A large or huge bed is placed whole, like a vanilla bed: out from where you place it, forward and to
 your right. Breaking any part of it breaks it all. A bed is a quarter of a block high, like a slab: a
-worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's sleep is Cobblemon's
-alone.
+worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's
+sleep is Cobblemon's (napping when it gets drowsy), but in a free bed if there is one.
 
 ## Mood
 
@@ -270,9 +277,10 @@ player's own display settings:
 }
 ```
 
-- **`show_status_icons`**: whether workers show what's holding their work back over their heads: a
+- **`show_status_icons`**: whether Pokémon show over their heads what's holding their work back (a
   half hunger shank when they're out of food, a "z" when they're Tired, a sad face when they're
-  unhappy and an anger mark when they're on strike.
+  unhappy and an anger mark when they're on strike), and a moon while they're asleep, if their
+  species has no sleep animation to show it.
 
 ## Customizing work skills
 
@@ -348,7 +356,7 @@ make an exception (Slaking's stats are a legendary's, but it loafs around).
 Levels so far change how often a Watering worker fertilizes crops (see
 [`fertilize_chance_per_level`](#server-settings)). A Pokémon's levels show in the PC and on its
 summary, for work Palworks does so far (Cooling, say, isn't shown until there's something to cool),
-and `/palworks inspect worker` shows a worker's levels.
+and `/palworks suitability get <species>` lists a species' levels.
 
 ## Customizing work animations
 
