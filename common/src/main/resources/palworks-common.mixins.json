@@ -11,10 +11,12 @@
     "BlockEntityChangedMixin",
     "CobblemonNetworkMixin",
     "DrowsySensorMixin",
+    "LeavesBlockMixin",
     "PokemonEntityInteractMixin",
     "PokemonEntityTickMixin",
     "PokemonMetabolismMixin",
-    "ServerLevelMixin"
+    "ServerLevelMixin",
+    "ServerPlayerGameModeMixin"
   ],
   "injectors": {
     "defaultRequire": 1

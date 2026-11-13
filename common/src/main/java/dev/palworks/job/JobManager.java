@@ -31,6 +31,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -72,6 +73,7 @@ public class JobManager {
         this.scanner = new JobScanner(pool);
         this.assigner = new JobAssigner(level, pool, scanner, workers, nonWorkerBeds);
         this.pickups = new PickupQueue(pool, workers, assigner);
+        assigner.onUnreachablePickup(pos -> pickups.outOfReach(pos, level.getGameTime()));
     }
 
     /**
@@ -396,15 +398,10 @@ public class JobManager {
 
         // Handle consecutive jobs for harvesting
         if (completedReservation.getJobType() == JobType.HARVEST_CROPS) {
-            long currentTime = level.getGameTime();
-
             // No replant job: harvesting resets the crop in place (paid for with one of its seeds),
-            // and berries regrow on their own. See CropAdapter.harvestCrop.
-            Palworks.LOGGER.debug("Queuing pickup job for harvest at {}", jobPos);
-            DebugManager.broadcastActivity(serverLevel, "  §7→ Queued §eCOLLECT_DROPS§7");
-
-            // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
-            pickups.add(jobPos, workerUUID, currentTime + PickupQueue.DROPS_SPAWN_DELAY);
+            // and berries regrow on their own. See CropAdapter.harvestCrop. Its drops get their
+            // pickup jobs as they land (see onTrackedItemAdded).
+            DebugManager.broadcastActivity(serverLevel, "  §7→ Drops to §eCOLLECT_DROPS§7");
         }
 
         // A pickup that left items behind (they didn't fit): they get a job of their own again, for
@@ -497,24 +494,18 @@ public class JobManager {
 
     /**
      * Called when a worker completes chopping a tree (which it also replants, as part of the chop).
-     * Queues a job to collect the drops.
+     * Its drops get their pickup jobs as they land (see onTrackedItemAdded).
      */
     public void onTreeChopped(Pokemon pokemon, BlockPos basePos, Level level) {
         if (!(level instanceof ServerLevel serverLevel)) return;
-
-        UUID workerUUID = pokemon.getUuid();
-        long currentTime = level.getGameTime();
 
         Palworks.LOGGER.debug("{} chopped tree at base {}", pokemon.getSpecies().getName(), basePos);
 
         DebugManager.broadcastActivity(
                 serverLevel,
                 String.format(
-                        "§a%s§f chopped tree, queuing §eCOLLECT_DROPS§f",
+                        "§a%s§f chopped tree, drops to §eCOLLECT_DROPS§f",
                         pokemon.getSpecies().getName()));
-
-        // Queue 1: Collect dropped items (delay 2 ticks for items to spawn)
-        pickups.add(basePos, workerUUID, currentTime + PickupQueue.DROPS_SPAWN_DELAY);
     }
 
     /**
@@ -563,6 +554,22 @@ public class JobManager {
      */
     public void queuePickup(BlockPos pos, @Nullable UUID suggestedWorker, long gameTime) {
         pickups.add(pos, suggestedWorker, gameTime);
+    }
+
+    /**
+     * An item to pick up has come into the level (see TrackedDrops): spawned by a worker's work
+     * or a player, or loaded back in with its chunk. It gets a pickup job once it's landed (one
+     * dropped by decaying leaves, with the rest of its batch): at {@code source}, where it was
+     * dropped (the crop, the tree), if it's landed near it, else where it is. Offered first to
+     * {@code suggestedWorker}, the worker that dropped it, if given.
+     */
+    public static void onTrackedItemAdded(
+            ServerLevel level,
+            ItemEntity item,
+            @Nullable UUID suggestedWorker,
+            @Nullable BlockPos source,
+            boolean decay) {
+        getInstance(level).pickups.track(item, suggestedWorker, source, decay, level.getGameTime());
     }
 
     /**

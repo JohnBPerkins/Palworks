@@ -7,6 +7,7 @@ import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.crop.Watering;
+import dev.palworks.drops.TrackedDrops;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
@@ -151,12 +152,15 @@ public final class JobChecks {
         return false;
     }
 
-    /** The items lying round a pickup job's spot. */
+    /**
+     * The items to pick up lying round a pickup job's spot: only what workers and players dropped
+     * (see TrackedDrops), never a farm's or a mob's.
+     */
     public static List<ItemEntity> itemsToPickUp(Level level, BlockPos pos) {
         return level.getEntitiesOfClass(
                 ItemEntity.class,
                 new AABB(pos).inflate(pickupRadius()),
-                item -> item.isAlive() && !item.getItem().isEmpty());
+                item -> item.isAlive() && !item.getItem().isEmpty() && TrackedDrops.isTracked(item));
     }
 
     /** Whether the worker carries a seed that can be planted at {@code plantPos}. */

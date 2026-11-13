@@ -5,6 +5,8 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.architectury.platform.Platform;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.config.PalworksConfig;
+import dev.palworks.drops.DecayingCanopies;
+import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
 import dev.palworks.sleep.NonWorkerSleep;
@@ -30,7 +32,10 @@ public final class WorkerTicking {
     public static void onServerTick(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
             JobManager.getInstance(level).tick(level);
+            // Chopped trees' leaves that are done decaying stop counting as the worker's
+            DecayingCanopies.get(level).tick(level);
         }
+        TrackedDrops.resetAfterTick();
     }
 
     /**
