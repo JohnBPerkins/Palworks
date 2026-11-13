@@ -32,8 +32,8 @@ final class NonWorkerBeds {
     // After it couldn't get to a bed, how long before it asks again (30s)
     private static final long RETRY_TICKS = 600;
 
-    /** A bed a non-worker has, since when, and when it last reported in. */
-    record Claim(BlockPos bed, long since, long lastSeen) {}
+    /** A bed a non-worker has, since when, when it last reported in, and whether it's lying in it yet. */
+    record Claim(BlockPos bed, long since, long lastSeen, boolean inBed) {}
 
     private final JobPool pool;
     private final Map<UUID, Claim> claims = new HashMap<>();
@@ -50,7 +50,7 @@ final class NonWorkerBeds {
         if (claim == null) {
             return null;
         }
-        Claim seen = new Claim(claim.bed(), claim.since(), now);
+        Claim seen = new Claim(claim.bed(), claim.since(), now, claim.inBed());
         claims.put(pokemon, seen);
         return seen;
     }
@@ -81,9 +81,15 @@ final class NonWorkerBeds {
         if (bed == null) {
             return null;
         }
-        Claim claim = new Claim(bed, now, now);
+        Claim claim = new Claim(bed, now, now, false);
         claims.put(uuid, claim);
         return claim;
+    }
+
+    /** It's got there, and lies in its bed. */
+    void settle(UUID pokemon) {
+        claims.computeIfPresent(
+                pokemon, (uuid, claim) -> new Claim(claim.bed(), claim.since(), claim.lastSeen(), true));
     }
 
     /** It's done with its bed (woke, recalled, got there and found it gone...). */

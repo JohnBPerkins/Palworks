@@ -183,21 +183,26 @@ public class JobManager {
     // Non-workers' beds (see NonWorkerBeds, sleep.NonWorkerSleep)
     // ============================================
 
-    /** A bed a non-worker has, and the game time it got it. */
-    public record NonWorkerBed(BlockPos pos, long since) {}
+    /** A bed a non-worker has, the game time it got it, and whether it's lying in it yet. */
+    public record NonWorkerBed(BlockPos pos, long since, boolean inBed) {}
 
     /** The bed this non-worker has, if any. Ask every tick it has one: one that stops asking loses it. */
     @Nullable
     public NonWorkerBed nonWorkerBed(UUID pokemon) {
         NonWorkerBeds.Claim claim = nonWorkerBeds.claimOf(pokemon, level.getGameTime());
-        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since());
+        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since(), claim.inBed());
     }
 
     /** This non-worker wants a bed: it takes a free one, if there is one (see NonWorkerBeds). */
     @Nullable
     public NonWorkerBed claimNonWorkerBed(PokemonEntity entity) {
         NonWorkerBeds.Claim claim = nonWorkerBeds.claim(level, entity);
-        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since());
+        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since(), claim.inBed());
+    }
+
+    /** This non-worker has got to its bed, and lies in it. */
+    public void settleNonWorkerInBed(UUID pokemon) {
+        nonWorkerBeds.settle(pokemon);
     }
 
     /** This non-worker is done with its bed. */

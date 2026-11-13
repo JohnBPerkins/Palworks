@@ -11,6 +11,7 @@ import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Beds;
+import dev.palworks.sleep.NonWorkerSleep;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
@@ -168,15 +169,24 @@ public class SleepGameTests {
     }
 
     private static boolean drowsy(PokemonEntity pokemon) {
-        return pokemon.getBrain().getMemory(CobblemonMemories.POKEMON_DROWSY).orElse(false);
+        return NonWorkerSleep.drowsy(pokemon);
     }
 
-    /** Whether Cobblemon has it asleep in the middle of the straw bed at {@code bedRel}. */
+    /**
+     * Whether it's asleep in the middle of the straw bed at {@code bedRel}: lying in it (its bed, as
+     * a non-worker's), in its sleep pose if its species has one.
+     */
     private static boolean asleepInStrawBed(GameTestHelper helper, PokemonEntity pokemon, BlockPos bedRel) {
         Vec3 middle = ((WorkerBedBlock) ModBlocks.STRAW_BED.get()).center(helper.absolutePos(bedRel));
         double dx = pokemon.getX() - middle.x;
         double dz = pokemon.getZ() - middle.z;
-        return Sleep.cobblemonHasItAsleep(pokemon) && dx * dx + dz * dz < 0.35 * 0.35;
+        JobManager.NonWorkerBed bed = JobManager.getInstance(helper.getLevel())
+                .nonWorkerBed(pokemon.getPokemon().getUuid());
+        return bed != null
+                && bed.inBed()
+                && bed.pos().equals(helper.absolutePos(bedRel))
+                && dx * dx + dz * dz < 0.35 * 0.35
+                && (!Sleep.hasSleepPose(pokemon) || posedAsleep(pokemon));
     }
 
     @AfterBatch(batch = "nonworker_bed")
@@ -189,6 +199,7 @@ public class SleepGameTests {
         Workers.isolate(helper);
         helper.setBlock(BED, ModBlocks.STRAW_BED.get());
         PokemonEntity nidoran = Workers.sendOutPastured(helper, NIDORAN, new BlockPos(1, 1, 1));
+        Workers.tetherTo(helper, nidoran, new BlockPos(1, 1, 3)); // in a pasture, as in play
         setTime(helper, MIDNIGHT);
         drowsyUntilAsleep(helper, nidoran);
 
@@ -207,7 +218,7 @@ public class SleepGameTests {
                         .nonWorkerBed(pokemon.getPokemon().getUuid())
                 + ", fits " + Beds.fits(helper.getLevel(), bed, (WorkerBedBlock) ModBlocks.STRAW_BED.get(), pokemon)
                 + ", Cobblemon would let it sleep there " + pokemon.canSleepAt(stand.below())
-                + ", drowsy " + brain.getMemory(CobblemonMemories.POKEMON_DROWSY)
+                + ", drowsy " + NonWorkerSleep.drowsy(pokemon)
                 + ", asleep " + Sleep.cobblemonHasItAsleep(pokemon)
                 + ", walking to "
                 + brain.getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
@@ -233,6 +244,34 @@ public class SleepGameTests {
         helper.succeedWhen(() -> helper.assertTrue(
                 asleepInStrawBed(helper, squirtle, BED),
                 "asleep in the bed, as Cobblemon has it sleep: " + nonWorkerSleep(helper, squirtle, BED)));
+    }
+
+    @AfterBatch(batch = "nonworker_bed_no_pose")
+    public void afterNoPoseBed(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "nonworker_bed_no_pose", timeoutTicks = 800)
+    public void oneCobblemonNeverLetsSleepLiesInAFreeBedAtItsBedtime(GameTestHelper helper) {
+        // Cobblemon never makes it drowsy (no sleep animation), so it goes to bed at its bedtime
+        // (its Cobblemon hours, any time: night), and lies there still till it's over
+        Workers.isolate(helper);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity trubbish = Workers.sendOutPastured(helper, "trubbish level=20", new BlockPos(1, 1, 1));
+        helper.assertFalse(Sleep.hasSleepPose(trubbish), "Cobblemon doesn't let a Trubbish sleep");
+        setTime(helper, MIDNIGHT);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(
+                        asleepInStrawBed(helper, trubbish, BED),
+                        "lying in the bed: " + nonWorkerSleep(helper, trubbish, BED)))
+                .thenExecute(() -> setTime(helper, MORNING))
+                .thenWaitUntil(() -> helper.assertTrue(
+                        JobManager.getInstance(helper.getLevel())
+                                        .nonWorkerBed(trubbish.getPokemon().getUuid())
+                                == null,
+                        "up in the morning"))
+                .thenSucceed();
     }
 
     @AfterBatch(batch = "sleep_command")

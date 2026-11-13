@@ -18,15 +18,22 @@ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * A pastured Pokémon that isn't working (no work skills, or its work switched off) sleeps in a bed if
- * one's free. Its
- * sleep stays Cobblemon's: the moment Cobblemon makes it drowsy ({@link #onDrowsinessChecked}), it
- * takes a free bed by its pasture (JobManager's non-worker beds: none a worker has) and walks there,
- * as a worker does ({@link WorkerNavigator}: Cobblemon's own walking can't get onto a bed). On the
- * way it isn't drowsy, as far as Cobblemon is concerned, or Cobblemon would put it to sleep on the
- * spot (it does that in the same brain tick it makes it drowsy). In the middle of the bed it's
- * drowsy again, and Cobblemon puts it to sleep there, and wakes it, as anywhere else. No bed free,
- * or it can't get to one: it sleeps where Cobblemon has it. It never gets Tired: it doesn't work.
+ * A pastured Pokémon that isn't working (no work skills, or its work switched off) sleeps in a bed
+ * if one's free. When it gets sleepy it takes a free bed by its pasture (JobManager's non-worker
+ * beds: none a worker has) and walks there, as a worker does ({@link WorkerNavigator}: Cobblemon's
+ * own walking can't get onto a bed); in it, Palworks holds it asleep, as it does a worker
+ * ({@link SleepPose}: its sleep pose if its species has one, else lying still), until it's no longer
+ * sleepy. No bed free, or it can't get to one: as without beds. It never gets Tired: it doesn't work.
+ * <ul>
+ *   <li>A species Cobblemon lets sleep is sleepy while Cobblemon has it drowsy: it takes a bed the
+ *       moment Cobblemon makes it drowsy ({@link #onDrowsinessChecked}), and on its way it isn't
+ *       drowsy as far as Cobblemon's concerned, or Cobblemon would put it to sleep on the spot (it
+ *       does, in the same brain tick it makes it drowsy). Cobblemon stops it being drowsy as its
+ *       resting hours end, which wakes it. With no bed, Cobblemon sleeps it where it is.</li>
+ *   <li>One Cobblemon never lets sleep (and never makes drowsy) is sleepy in its bedtime, as a
+ *       worker's ({@link Sleep#isBedtime}): it goes to a free bed then, and lies there till it's over.
+ *       With no bed, it stays up, as Cobblemon has it.</li>
+ * </ul>
  * Pastured workers sleep by Palworks' own schedule instead ({@link Sleep}); party Pokémon are left to
  * Cobblemon (it never makes one sent out from the party drowsy).
  */
@@ -35,11 +42,8 @@ public final class NonWorkerSleep {
     private static final double ARRIVED = 0.35;
     // Its walk speed to bed (a worker's)
     private static final double WALK_SPEED = 0.6;
-    // The longest it may take to get to its bed before it gives up and sleeps where it is (30s)
+    // The longest it may take to get to its bed before it gives up (30s)
     private static final long WALK_TICKS = 600;
-    // How long, in its bed, for Cobblemon to put it to sleep: Cobblemon's own search for a resting
-    // place waits that long (its path cooldown), so it isn't walked off somewhere else meanwhile
-    private static final long SETTLE_TICKS = 40;
     // How many times /palworks sleep runs Cobblemon's drowsiness check (a chance of 1 in 300 or so
     // each, for the sleepiest species 1 in 30) before saying it won't
     private static final int MAKE_DROWSY_TRIES = 100_000;
@@ -74,16 +78,10 @@ public final class NonWorkerSleep {
         JobManager jobs = JobManager.getInstance(level);
         NonWorkerBed bed = jobs.nonWorkerBed(pokemon.getUuid());
         if (bed == null) {
-            bed = jobs.claimNonWorkerBed(entity);
-            Palworks.LOGGER.debug(
-                    "{} is drowsy: {}",
-                    pokemon.getSpecies().getName(),
-                    bed == null
-                            ? "no bed free, it sleeps where it is"
-                            : "off to the bed at " + bed.pos().toShortString());
+            bed = claim(jobs, entity);
         }
-        if (bed != null && !there(entity, level, bed)) {
-            entity.getBrain().eraseMemory(CobblemonMemories.POKEMON_DROWSY); // until it's there
+        if (bed != null && !bed.inBed()) {
+            entity.getBrain().eraseMemory(CobblemonMemories.POKEMON_DROWSY); // until it's in its bed
         }
     }
 
@@ -93,72 +91,97 @@ public final class NonWorkerSleep {
         JobManager jobs = JobManager.getInstance(level);
         NonWorkerBed bed = jobs.nonWorkerBed(pokemon.getUuid());
         if (bed == null) {
-            return; // it takes one as it gets drowsy (onDrowsinessChecked)
+            // One Cobblemon never makes drowsy goes to bed at its bedtime
+            if (!Sleep.hasSleepPose(entity) && appliesTo(pokemon) && Sleep.isBedtime(entity)) {
+                claim(jobs, entity);
+            }
+            return;
         }
         if (!appliesTo(pokemon)) {
-            letGo(jobs, entity, "it's working now, or no longer in a pasture", false);
+            letGo(jobs, entity, bed, "it's working now, or no longer in a pasture");
             return;
         }
         if (!(level.getBlockState(bed.pos()).getBlock() instanceof WorkerBedBlock bedBlock)) {
-            letGo(jobs, entity, "its bed is gone", true); // broken: it sleeps where it is
+            letGo(jobs, entity, bed, "its bed is gone");
             return;
         }
-        boolean there = there(entity, level, bed);
-        if (Sleep.cobblemonHasItAsleep(entity)) {
-            if (!there) {
-                letGo(jobs, entity, "it's asleep somewhere else", false);
-            }
-            return; // asleep in its bed: Cobblemon wakes it
-        }
-        long since = level.getGameTime() - bed.since();
-        Brain<?> brain = entity.getBrain();
-        if (there) {
-            if (since > WALK_TICKS + SETTLE_TICKS) {
-                letGo(jobs, entity, "Cobblemon doesn't put it to sleep there", false);
+        Vec3 middle = bedBlock.center(bed.pos());
+        if (bed.inBed()) {
+            if (!sleepy(entity)) {
+                letGo(jobs, entity, bed, "it woke up");
                 return;
             }
-            // In the middle, on top, and drowsy again: Cobblemon puts it to sleep here
-            Vec3 middle = bedBlock.center(bed.pos());
-            entity.moveTo(middle.x, middle.y, middle.z, entity.getYRot(), entity.getXRot());
-            WorkerNavigator.forget(entity);
-            brain.eraseMemory(MemoryModuleType.WALK_TARGET);
-            brain.setMemory(CobblemonMemories.POKEMON_DROWSY, true);
-            brain.setMemoryWithExpiry(CobblemonMemories.PATH_COOLDOWN, true, SETTLE_TICKS);
+            SleepPose.hold(entity); // asleep in its bed till it isn't sleepy
             return;
         }
-        if (since > WALK_TICKS) {
-            letGo(jobs, entity, "it couldn't get to its bed at " + bed.pos().toShortString(), true);
+        if (there(entity, bedBlock, bed, middle)) {
+            // In the middle, on top: it lies down, and sleeps
+            entity.moveTo(middle.x, middle.y, middle.z, entity.getYRot(), entity.getXRot());
+            WorkerNavigator.forget(entity);
+            entity.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+            if (Sleep.hasSleepPose(entity)) {
+                entity.getBrain().setMemory(CobblemonMemories.POKEMON_DROWSY, true); // still sleepy
+            }
+            jobs.settleNonWorkerInBed(pokemon.getUuid());
+            SleepPose.hold(entity);
+            return;
+        }
+        if (level.getGameTime() - bed.since() > WALK_TICKS) {
+            letGo(
+                    jobs,
+                    entity,
+                    bed,
+                    "it couldn't get to its bed at " + bed.pos().toShortString());
             jobs.giveUpNonWorkerBed(pokemon.getUuid());
             return;
         }
         WorkerNavigator.walkTo(entity, Beds.standTile(bed.pos(), bedBlock), WALK_SPEED);
     }
 
+    /** It takes a free bed, if there is one (null if not), and says so in the debug log. */
+    private static NonWorkerBed claim(JobManager jobs, PokemonEntity entity) {
+        NonWorkerBed bed = jobs.claimNonWorkerBed(entity);
+        Palworks.LOGGER.debug(
+                "{} is sleepy: {}",
+                entity.getPokemon().getSpecies().getName(),
+                bed == null ? "no bed free" : "off to the bed at " + bed.pos().toShortString());
+        return bed;
+    }
+
+    /**
+     * Whether it's still sleepy, in its bed: Cobblemon has it drowsy (or asleep), or, for a species
+     * Cobblemon never lets sleep, it's its bedtime.
+     */
+    private static boolean sleepy(PokemonEntity entity) {
+        return Sleep.hasSleepPose(entity)
+                ? drowsy(entity) || Sleep.cobblemonHasItAsleep(entity)
+                : Sleep.isBedtime(entity);
+    }
+
     /**
      * Whether it's got to its bed: on the tile it walks to (the bed's middle one: where its walk
-     * ends, not always the exact middle), or near the middle. It's then put in the very middle.
+     * ends, not always the exact middle), or near the middle.
      */
-    private static boolean there(PokemonEntity entity, ServerLevel level, NonWorkerBed bed) {
-        if (!(level.getBlockState(bed.pos()).getBlock() instanceof WorkerBedBlock bedBlock)) {
-            return false;
-        }
+    private static boolean there(PokemonEntity entity, WorkerBedBlock bedBlock, NonWorkerBed bed, Vec3 middle) {
         if (entity.blockPosition().equals(Beds.standTile(bed.pos(), bedBlock))) {
             return true;
         }
-        Vec3 middle = bedBlock.center(bed.pos());
         double dx = entity.getX() - middle.x;
         double dz = entity.getZ() - middle.z;
         return dx * dx + dz * dz < ARRIVED * ARRIVED;
     }
 
     /**
-     * It's done with its bed. {@code stillSleepy}: it hasn't slept yet (its bed's gone, it can't get
-     * there), so it's drowsy again, and Cobblemon puts it to sleep where it is.
+     * It's done with its bed: up out of it if it was lying in it. If it never got that far (its
+     * bed's gone, it can't get there) and Cobblemon had it drowsy, it's drowsy again, so Cobblemon
+     * puts it to sleep where it is.
      */
-    private static void letGo(JobManager jobs, PokemonEntity entity, String why, boolean stillSleepy) {
+    private static void letGo(JobManager jobs, PokemonEntity entity, NonWorkerBed bed, String why) {
         jobs.releaseNonWorkerBed(entity.getPokemon().getUuid());
         WorkerNavigator.forget(entity);
-        if (stillSleepy) {
+        if (bed.inBed()) {
+            SleepPose.wake(entity);
+        } else if (Sleep.hasSleepPose(entity) && appliesTo(entity.getPokemon())) {
             entity.getBrain().setMemory(CobblemonMemories.POKEMON_DROWSY, true);
         }
         Palworks.LOGGER.debug(
@@ -177,13 +200,13 @@ public final class NonWorkerSleep {
             return false;
         }
         JobManager jobs = JobManager.getInstance(level);
-        for (int i = 0; i < MAKE_DROWSY_TRIES && !sleepy(entity, jobs); i++) {
+        for (int i = 0; i < MAKE_DROWSY_TRIES && !madeSleepy(entity, jobs); i++) {
             DrowsySensor.Companion.drowsyLogic(entity);
         }
-        return sleepy(entity, jobs);
+        return madeSleepy(entity, jobs);
     }
 
-    private static boolean sleepy(PokemonEntity entity, JobManager jobs) {
+    private static boolean madeSleepy(PokemonEntity entity, JobManager jobs) {
         return drowsy(entity)
                 || Sleep.cobblemonHasItAsleep(entity)
                 || jobs.nonWorkerBed(entity.getPokemon().getUuid()) != null;
