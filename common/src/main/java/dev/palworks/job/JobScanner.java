@@ -145,27 +145,41 @@ final class JobScanner {
         int verticalRadius = WorkRange.vertical(); // Y range above/below a worker to scan
 
         for (WorkerInfo worker : workers) {
-            BlockPos workerPos = worker.position;
-            int loY = Math.max(worldMinY, workerPos.getY() - verticalRadius);
-            int hiY = Math.min(worldMaxY, workerPos.getY() + verticalRadius + 1); // exclusive
-            int baseChunkX = workerPos.getX() >> 4;
-            int baseChunkZ = workerPos.getZ() >> 4;
-
-            for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
-                for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
-                    ChunkPos chunk = new ChunkPos(baseChunkX + dx, baseChunkZ + dz);
-                    int[] range = ranges.get(chunk);
-                    if (range == null) {
-                        ranges.put(chunk, new int[] {loY, hiY});
-                    } else {
-                        range[0] = Math.min(range[0], loY);
-                        range[1] = Math.max(range[1], hiY);
-                    }
-                }
+            addScanRange(ranges, worker.position, chunkRadius, verticalRadius, worldMinY, worldMaxY);
+            // Round its home too (its pasture block), where its troughs and beds are, so
+            // they're still known however far it's wandered for work
+            if (worker.home != null) {
+                addScanRange(ranges, worker.home, chunkRadius, verticalRadius, worldMinY, worldMaxY);
             }
         }
 
         return ranges;
+    }
+
+    /** Add the chunks within {@code chunkRadius} of {@code center} to scan, in a band round its height. */
+    private static void addScanRange(
+            Map<ChunkPos, int[]> ranges,
+            BlockPos center,
+            int chunkRadius,
+            int verticalRadius,
+            int worldMinY,
+            int worldMaxY) {
+        int loY = Math.max(worldMinY, center.getY() - verticalRadius);
+        int hiY = Math.min(worldMaxY, center.getY() + verticalRadius + 1); // exclusive
+        int baseChunkX = center.getX() >> 4;
+        int baseChunkZ = center.getZ() >> 4;
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                ChunkPos chunk = new ChunkPos(baseChunkX + dx, baseChunkZ + dz);
+                int[] range = ranges.get(chunk);
+                if (range == null) {
+                    ranges.put(chunk, new int[] {loY, hiY});
+                } else {
+                    range[0] = Math.min(range[0], loY);
+                    range[1] = Math.max(range[1], hiY);
+                }
+            }
+        }
     }
 
     /**

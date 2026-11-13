@@ -10,6 +10,7 @@ import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import kotlin.Unit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -129,6 +130,32 @@ public final class Workers {
             helper.fail("Cobblemon didn't send out " + properties);
         }
         return entity;
+    }
+
+    /**
+     * Tether a pastured worker to a pasture block at {@code pastureRel}, as Cobblemon does when it's
+     * put in a pasture: its home (see JobManager), with Cobblemon's usual roam box round it. No
+     * pasture block is placed: the worker only needs to know where it is.
+     */
+    public static void tetherTo(GameTestHelper helper, PokemonEntity worker, BlockPos pastureRel) {
+        BlockPos pasture = helper.absolutePos(pastureRel);
+        int roam = 64; // Cobblemon's pastureMaxWanderDistance
+        Pokemon pokemon = worker.getPokemon();
+        UUID tetheringId = UUID.randomUUID();
+        ServerPlayer owner = pokemon.getOwnerPlayer();
+        pokemon.setTetheringId(tetheringId);
+        worker.setTethering(new com.cobblemon.mod.common.block.entity.PokemonPastureBlockEntity.Tethering(
+                pasture.offset(-roam, -roam, -roam),
+                pasture.offset(roam, roam, roam),
+                pokemon.getOwnerUUID(),
+                owner == null ? "" : owner.getGameProfile().getName(),
+                tetheringId,
+                pokemon.getUuid(),
+                owner == null
+                        ? UUID.randomUUID()
+                        : Cobblemon.INSTANCE.getStorage().getPC(owner).getUuid(),
+                worker.getId(),
+                pasture));
     }
 
     /**

@@ -144,6 +144,9 @@ stat of its own.
   a time, until it's half full. The other half is left for you: a full Pokémon refuses Mochi and
   berries fed by hand. Eating from a trough only fills it up; the food's own effects (EVs,
   friendship, healing) don't happen.
+- **Which troughs:** any within 32 blocks of it, or, for a pastured worker, of its pasture block.
+  So a pastured worker that has wandered off for work still goes back to the troughs
+  by its pasture.
 - **With no fullness left** it works and walks at a quarter speed, with a half hunger shank over
   its head, until it eats. It never stops working.
 
@@ -189,7 +192,8 @@ stay awake with you, as Cobblemon's party Pokémon do.
   sleep at night. A species Cobblemon gives no sleep animation still sleeps, lying still.
 - **Where:** at its bedtime it finishes what it's doing and goes to a free **bed** it fits
   in, one worker to a bed: the smallest it fits, so big beds are left for big Pokémon, and of those
-  the nearest. With none to be had, it sleeps where it is.
+  the nearest. Like troughs, beds by its pasture block count however far it has wandered. With none
+  to be had, it sleeps where it is.
 - **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
   walks at three quarters of its speed, with a "z" over its head, until it next sleeps.
 - **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It

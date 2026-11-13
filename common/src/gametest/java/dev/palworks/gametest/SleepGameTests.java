@@ -207,6 +207,73 @@ public class SleepGameTests {
                 .thenSucceed();
     }
 
+    @AfterBatch(batch = "sleep_home")
+    public void afterHome(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_home", timeoutTicks = 1200)
+    public void aPasturedWorkerFarFromItsBedFindsItByItsPasture(GameTestHelper helper) {
+        Workers.isolate(helper);
+        for (int x = 0; x <= 40; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+        BlockPos bed = new BlockPos(2, 1, 2);
+        helper.setBlock(bed, ModBlocks.STRAW_BED.get());
+        // Loaded all the way to where it looks round itself, as round a player in game, and scanned
+        // before night falls
+        Runnable unload = Scenes.keepLoaded(helper, new BlockPos(-40, 0, -40), new BlockPos(80, 0, 40));
+        // 36 off, past the 32 it looks round itself, but its pasture is right by the bed
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(38, 1, 2));
+        Workers.tetherTo(helper, squirtle, new BlockPos(2, 1, 4));
+        helper.startSequence()
+                .thenIdle(100)
+                .thenExecute(() -> setTime(helper, MIDNIGHT))
+                .thenWaitUntil(() -> {
+                    helper.assertTrue(inBed(squirtle), "asleep in the bed by its pasture");
+                    helper.assertTrue(
+                            stateOf(squirtle)
+                                    .getCurrentReservation()
+                                    .getStationPos()
+                                    .equals(helper.absolutePos(bed)),
+                            "that one");
+                })
+                .thenExecute(unload)
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_head_home", timeoutTicks = 1200)
+    public void aWorkerThatCantGetToItsBedHeadsHomeToSleep(GameTestHelper helper) {
+        // Its bed is by its pasture but glassed in: at bedtime it heads home, and sleeps there,
+        // not out where it was working
+        Workers.isolate(helper);
+        Runnable unload = Scenes.keepLoaded(helper, new BlockPos(-40, 0, -40), new BlockPos(80, 0, 40));
+        BlockPos bed = new BlockPos(2, 1, 4);
+        helper.setBlock(bed, ModBlocks.STRAW_BED.get());
+        HungerGameTests.glassIn(helper, bed, 1, false); // walled in, but a bed it'd fit, if it could get there
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(38, 1, 6));
+        Workers.tetherTo(helper, squirtle, new BlockPos(4, 1, 6));
+        BlockPos bedAbs = helper.absolutePos(bed);
+        helper.startSequence()
+                .thenIdle(100) // the chunks scanned before night falls, as round a player in game
+                .thenExecute(() -> setTime(helper, MIDNIGHT))
+                .thenWaitUntil(() -> {
+                    helper.assertTrue(stateOf(squirtle).isAsleep(), "asleep");
+                    helper.assertTrue(
+                            squirtle.blockPosition().closerThan(bedAbs, 10),
+                            "by its pasture: " + helper.relativePos(squirtle.blockPosition()));
+                })
+                .thenExecute(unload)
+                .thenSucceed();
+    }
+
+    @AfterBatch(batch = "sleep_head_home")
+    public void afterHeadHome(ServerLevel level) {
+        morningAfter(level);
+    }
+
     // ---- Bed sizes ----
 
     /** A bed of this block, its corner at {@code origin}, every block of it in place. */

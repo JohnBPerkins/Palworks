@@ -48,6 +48,10 @@ final class JobAssigner {
     private static final int MAX_PATH_CHECKS_PER_WORKER = 8; // Cap expensive createPath() calls per assignment
     private static final int DELIVERY_SEARCH_RADIUS = 32; // Horizontal reach for picking a delivery chest
     private static final int DELIVERY_SEARCH_VERTICAL = 4; // Y reach for picking a delivery chest
+    // Heading home to a trough or bed it can't get to (see headHome): how far a leg goes, and how
+    // near the trough or bed it stops heading home
+    private static final int HOME_LEG = 12;
+    private static final int HOME_CLOSE_ENOUGH = 8;
     // A worker won't retry a job it couldn't reach until terrain near it changes, it moves
     // UNREACHABLE_FORGET_MOVE_DIST blocks, or this backstop runs out (see recentlyFailedJobs).
     static final int JOB_FAILURE_BLACKLIST_TICKS = 600; // 30s backstop
@@ -109,11 +113,15 @@ final class JobAssigner {
             if (pokemon != null && entity != null) {
                 WorkerState sleeper = WorkerStateManager.get(pokemon);
                 if (Sleep.isBedtimeFor(entity, sleeper)) {
-                    // Woken in the night: up a while before it goes back to bed, and no work meanwhile
-                    if (!Sleep.isWoken(entity, sleeper)
-                            && (sleeper == null || !sleeper.isAsleep())
-                            && assignFirstReachable(worker, bedCandidates(level, worker, entity)) != null) {
-                        assignedCount++;
+                    // Woken in the night: up a while before it goes back to bed, and no work meanwhile.
+                    // No bed it can get to from here, but one by its pasture: it heads home.
+                    if (!Sleep.isWoken(entity, sleeper) && (sleeper == null || !sleeper.isAsleep())) {
+                        List<JobRecord> beds = bedCandidates(level, worker, entity);
+                        if (assignFirstReachable(worker, beds) != null) {
+                            assignedCount++;
+                        } else {
+                            headHome(level, worker, beds);
+                        }
                     }
                     continue;
                 }
@@ -123,10 +131,15 @@ final class JobAssigner {
             }
 
             // A hungry worker eats before anything else, at the nearest trough with food it can
-            // reach. If there's none, it carries on working (slower once it's empty).
+            // reach. If there's none it can get to from here but one by its pasture, it heads home;
+            // with none at all, it carries on working (slower once it's empty).
             if (pokemon != null && Hunger.wantsFood(pokemon)) {
-                if (assignFirstReachable(worker, troughCandidates(level, worker)) != null) {
+                List<JobRecord> troughs = troughCandidates(level, worker);
+                if (assignFirstReachable(worker, troughs) != null) {
                     assignedCount++;
+                    continue;
+                }
+                if (headHome(level, worker, troughs)) {
                     continue;
                 }
             }
@@ -225,7 +238,7 @@ final class JobAssigner {
         List<BlockPos> troughs = new ArrayList<>();
         net.minecraft.world.item.ItemStack food = carriedTroughFood(inventory, worker);
         if (!food.isEmpty()) {
-            for (BlockPos troughPos : troughsInReach(workerPos)) {
+            for (BlockPos troughPos : troughsInReach(worker)) {
                 if (nearEnoughToOwner(worker, troughPos)
                         && JobChecks.isTrough(level.getBlockState(troughPos))
                         && ChestHelper.canAcceptItems(level, troughPos, food)) {
@@ -263,17 +276,33 @@ final class JobAssigner {
         return net.minecraft.world.item.ItemStack.EMPTY;
     }
 
-    /** The troughs the chunk scan found within delivery reach of {@code workerPos} (may be a scan old). */
-    private List<BlockPos> troughsInReach(BlockPos workerPos) {
-        List<BlockPos> troughs = new ArrayList<>();
-        for (BlockPos troughPos : scanner.troughsNear(workerPos, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
-            if (Math.abs(troughPos.getX() - workerPos.getX()) <= DELIVERY_SEARCH_RADIUS
-                    && Math.abs(troughPos.getZ() - workerPos.getZ()) <= DELIVERY_SEARCH_RADIUS
-                    && Math.abs(troughPos.getY() - workerPos.getY()) <= DELIVERY_SEARCH_VERTICAL) {
-                troughs.add(troughPos);
+    /** The troughs the chunk scan found in reach of the worker or its home (may be a scan old). */
+    private List<BlockPos> troughsInReach(WorkerInfo worker) {
+        return nearWorkerOrHome(worker, scanner::troughsNear);
+    }
+
+    /**
+     * What {@code found} (the scanner's troughs or beds round a spot) has within reach of the worker
+     * or of its home ({@link WorkerInfo#home}): {@link #DELIVERY_SEARCH_RADIUS} out each way, and up
+     * and down as far as it works. Round its home too, so a worker that's wandered off for work
+     * still finds the troughs and beds it lives by. Each once.
+     */
+    private List<BlockPos> nearWorkerOrHome(
+            WorkerInfo worker, java.util.function.BiFunction<BlockPos, Integer, List<BlockPos>> found) {
+        List<BlockPos> centers = worker.home == null || worker.home.equals(worker.position)
+                ? List.of(worker.position)
+                : List.of(worker.position, worker.home);
+        java.util.Set<BlockPos> inReach = new java.util.LinkedHashSet<>();
+        for (BlockPos center : centers) {
+            for (BlockPos pos : found.apply(center, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
+                if (Math.abs(pos.getX() - center.getX()) <= DELIVERY_SEARCH_RADIUS
+                        && Math.abs(pos.getZ() - center.getZ()) <= DELIVERY_SEARCH_RADIUS
+                        && Math.abs(pos.getY() - center.getY()) <= WorkRange.vertical()) {
+                    inReach.add(pos);
+                }
             }
         }
-        return troughs;
+        return new ArrayList<>(inReach);
     }
 
     /**
@@ -288,7 +317,7 @@ final class JobAssigner {
         }
         BlockPos workerPos = worker.position;
         boolean troughLow = false;
-        for (BlockPos troughPos : troughsInReach(workerPos)) {
+        for (BlockPos troughPos : troughsInReach(worker)) {
             if (nearEnoughToOwner(worker, troughPos)
                     && level.getBlockEntity(troughPos) instanceof dev.palworks.block.TroughBlockEntity trough
                     && trough.isLow()) {
@@ -325,11 +354,8 @@ final class JobAssigner {
     private List<JobRecord> bedCandidates(ServerLevel level, WorkerInfo worker, PokemonEntity entity) {
         BlockPos workerPos = worker.position;
         List<BlockPos> beds = new ArrayList<>();
-        for (BlockPos bedPos : scanner.bedsNear(workerPos, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
-            if (Math.abs(bedPos.getX() - workerPos.getX()) <= DELIVERY_SEARCH_RADIUS
-                    && Math.abs(bedPos.getZ() - workerPos.getZ()) <= DELIVERY_SEARCH_RADIUS
-                    && Math.abs(bedPos.getY() - workerPos.getY()) <= DELIVERY_SEARCH_VERTICAL
-                    && JobChecks.isBed(level.getBlockState(bedPos))
+        for (BlockPos bedPos : nearWorkerOrHome(worker, scanner::bedsNear)) {
+            if (JobChecks.isBed(level.getBlockState(bedPos))
                     && level.getBlockState(bedPos).getBlock() instanceof WorkerBedBlock bed
                     && !pool.isReserved(new JobPool.JobKey(bedPos, JobType.SLEEP))
                     && Beds.fits(level, bedPos, bed, entity)) {
@@ -355,12 +381,7 @@ final class JobAssigner {
     private List<JobRecord> troughCandidates(ServerLevel level, WorkerInfo worker) {
         BlockPos workerPos = worker.position;
         List<BlockPos> troughs = new ArrayList<>();
-        for (BlockPos troughPos : scanner.troughsNear(workerPos, (DELIVERY_SEARCH_RADIUS >> 4) + 1)) {
-            if (Math.abs(troughPos.getX() - workerPos.getX()) > DELIVERY_SEARCH_RADIUS
-                    || Math.abs(troughPos.getZ() - workerPos.getZ()) > DELIVERY_SEARCH_RADIUS
-                    || Math.abs(troughPos.getY() - workerPos.getY()) > DELIVERY_SEARCH_VERTICAL) {
-                continue;
-            }
+        for (BlockPos troughPos : troughsInReach(worker)) {
             // The cached position may be up to one scan old: re-check it's a trough, with food
             if (JobChecks.isJobStillThere(level, JobType.EAT_FOOD, troughPos)) {
                 troughs.add(troughPos);
@@ -474,14 +495,15 @@ final class JobAssigner {
             // over from one) would send it off across the world, and checking a path to it loads
             // chunks out there. A party Pokémon's must be near its owner too.
             if (!canDoJob(worker, job)
-                    || !inWorkRange(worker, job.position())
+                    || !(inWorkRange(worker, job.position()) || isNeedNearHome(worker, job))
                     || isRecentlyUnreachable(worker, job.position())
                     || !canWorkerDo(worker, job)) {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position(), job.type(), entity);
-            WorkerPathfinder.Result path =
-                    standPos == null ? new WorkerPathfinder.Result(Reach.NO, null) : canPathTo(entity, standPos);
+            WorkerPathfinder.Result path = standPos == null
+                    ? new WorkerPathfinder.Result(Reach.NO, null)
+                    : canPathTo(entity, standPos, isNeed(job.type()));
             Reach reach = path.reach();
             if (reach == Reach.UNKNOWN) {
                 // The worker can't pathfind at all right now (e.g. it was just sent out and is still
@@ -522,6 +544,99 @@ final class JobAssigner {
     private boolean canWorkerDo(WorkerInfo worker, JobRecord job) {
         Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
         return pokemon != null && JobChecks.canWorkerDo(level, pokemon, job.type(), job.position());
+    }
+
+    /**
+     * Whether this is a trough or bed by the worker's home (see {@link #nearWorkerOrHome}), which it
+     * goes back to however far it's wandered for work.
+     */
+    private static boolean isNeedNearHome(WorkerInfo worker, JobRecord job) {
+        return isNeed(job.type()) && isNearHome(worker, job.position());
+    }
+
+    /** Whether {@code pos} is within reach of the worker's home (its pasture block), if it has one. */
+    private static boolean isNearHome(WorkerInfo worker, BlockPos pos) {
+        return worker.home != null
+                && Math.abs(pos.getX() - worker.home.getX()) <= DELIVERY_SEARCH_RADIUS
+                && Math.abs(pos.getZ() - worker.home.getZ()) <= DELIVERY_SEARCH_RADIUS
+                && Math.abs(pos.getY() - worker.home.getY()) <= WorkRange.vertical();
+    }
+
+    /**
+     * A pastured worker that needs a trough or bed (in {@code needs}) and can't get to one from
+     * where it is, though there's one by its pasture: it heads home, a leg of {@link #HOME_LEG}
+     * blocks at a time towards the nearest of them (see WorkerAI.walkHome), and between legs it
+     * looks for a way to them again (a worker that's moved forgets what it couldn't reach). Once it's
+     * within {@link #HOME_CLOSE_ENOUGH} of one, heading home can't help any more. Returns whether
+     * it's on its way.
+     */
+    private boolean headHome(ServerLevel level, WorkerInfo worker, List<JobRecord> needs) {
+        Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
+        PokemonEntity entity = workers.entity(worker.pokemonUUID);
+        WorkerState state = pokemon == null ? null : WorkerStateManager.get(pokemon);
+        if (entity == null || state == null || worker.home == null) {
+            return false;
+        }
+        BlockPos target = needs.stream()
+                .map(JobRecord::position)
+                .filter(pos -> isNearHome(worker, pos))
+                .min(Comparator.comparingDouble(worker.position::distSqr))
+                .orElse(null);
+        if (target == null || worker.position.closerThan(target, HOME_CLOSE_ENOUGH)) {
+            state.setHomeward(null, level.getGameTime());
+            return false;
+        }
+        if (state.getHomeward() != null) {
+            return true; // on its way
+        }
+        BlockPos leg = legToward(entity, target);
+        if (leg == null) {
+            return false;
+        }
+        state.setHomeward(leg, level.getGameTime());
+        return true;
+    }
+
+    /** The tile it could stand on in this column, nearest its own height (up to 4 up or down), or null. */
+    @Nullable
+    private BlockPos standableNear(PokemonEntity entity, int x, int z, int headroom) {
+        for (int dy : new int[] {0, 1, -1, 2, -2, 3, -3, 4, -4}) {
+            BlockPos tile = new BlockPos(x, entity.getBlockY() + dy, z);
+            if (WorkPositions.isStandable(level, tile, headroom)) {
+                return tile;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The end of the worker's next leg home: a tile it can stand on, and get to, about
+     * {@link #HOME_LEG} blocks (or, failing that, half as far) along the way to {@code target}.
+     * Null if it can't find one.
+     */
+    @Nullable
+    private BlockPos legToward(PokemonEntity entity, BlockPos target) {
+        double dx = target.getX() + 0.5 - entity.getX();
+        double dz = target.getZ() + 0.5 - entity.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        int headroom = WorkPositions.headroomFor(entity);
+        for (int along : new int[] {HOME_LEG, HOME_LEG / 2}) {
+            double step = Math.min(along, distance);
+            int x = net.minecraft.util.Mth.floor(entity.getX() + dx / distance * step);
+            int z = net.minecraft.util.Mth.floor(entity.getZ() + dz / distance * step);
+            BlockPos tile = standableNear(entity, x, z, headroom);
+            if (tile == null) {
+                continue;
+            }
+            WorkerPathfinder.Result path = canPathTo(entity, tile, true);
+            if (path.reach() == Reach.YES) {
+                if (path.path() != null) {
+                    WorkerNavigator.offer(entity, tile, path.path());
+                }
+                return tile;
+            }
+        }
+        return null;
     }
 
     /**
@@ -578,6 +693,7 @@ final class JobAssigner {
         // WorkerState (NBT) is the single source of truth for the reservation.
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
         state.setCurrentReservation(reservation);
+        state.setHomeward(null, level.getGameTime()); // it's got where it can get one
         state.setAssignedJob(job.type());
         // Start from the job's first step, or from where the previous worker left it (handed over)
         state.startJob(job.resumeStep(), job.resumeData());
@@ -622,11 +738,21 @@ final class JobAssigner {
      * reach the tile (standPos is a standable tile, not the worked block, so canReach() is right).
      */
     WorkerPathfinder.Result canPathTo(Mob entity, BlockPos standPos) {
+        return canPathTo(entity, standPos, false);
+    }
+
+    /** A trough or bed: what a worker goes to for itself, searched for further round (a far trip). */
+    private static boolean isNeed(JobType type) {
+        return type == JobType.EAT_FOOD || type == JobType.SLEEP;
+    }
+
+    /** {@link #canPathTo(Mob, BlockPos)}, searching further round if it's a {@code farTrip}. */
+    WorkerPathfinder.Result canPathTo(Mob entity, BlockPos standPos, boolean farTrip) {
         if (entity == null) {
             return new WorkerPathfinder.Result(Reach.UNKNOWN, null);
         }
         if (WorkerPathfinder.handles(entity)) {
-            return WorkerPathfinder.find(entity, standPos);
+            return WorkerPathfinder.find(entity, standPos, farTrip);
         }
         net.minecraft.world.level.pathfinder.Path path = entity.getNavigation().createPath(standPos, 1);
         if (path == null) {

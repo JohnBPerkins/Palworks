@@ -98,6 +98,12 @@ final class WorkerRegistry {
         @Nullable
         BlockPos ownerPosition; // Where its owner is, for one from a party (null if not in this level)
 
+        // Where it lives: its pasture block, for a pastured worker (null for one from a party, which
+        // stays near its owner anyway). Troughs and beds round it are always in reach, however far
+        // it's wandered for work.
+        @Nullable
+        BlockPos home;
+
         Set<Suitability> suitabilities = EnumSet.noneOf(Suitability.class);
 
         @Nullable
