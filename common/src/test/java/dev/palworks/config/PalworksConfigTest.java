@@ -105,6 +105,31 @@ class PalworksConfigTest {
     }
 
     @Test
+    void moodSettingsAreReadFromTheirOwnObject() {
+        List<String> warnings = new ArrayList<>();
+        PalworksConfig config = parse(
+                "{\"mood\": {\"enabled\": false, \"work_per_point\": 4, \"hungry_drain_per_day\": 80,"
+                        + " \"tired_drain_per_day\": 10, \"recovery_per_day\": 60, \"unhappy_below\": 40,"
+                        + " \"unhappy_work_speed\": 0.5, \"strike_until\": 20}}",
+                warnings);
+        assertEquals(List.of(), warnings);
+        assertEquals(new PalworksConfig.MoodConfig(false, 4, 80, 10, 60, 40, 0.5, 20), config.mood());
+        assertEquals(PalworksConfig.DEFAULTS.withMood(config.mood()), config);
+    }
+
+    @Test
+    void theMoodDefaults() {
+        assertEquals(new PalworksConfig.MoodConfig(true, 2, 50, 25, 100, 50, 0.75, 30), PalworksConfig.DEFAULTS.mood());
+    }
+
+    @Test
+    void anUnhappySpeedOfNothingIsRefused() {
+        List<String> warnings = new ArrayList<>();
+        assertEquals(PalworksConfig.DEFAULTS, parse("{\"mood\": {\"unhappy_work_speed\": 0}}", warnings));
+        assertEquals(1, warnings.size());
+    }
+
+    @Test
     void anEmptySpeedOfNothingIsRefused() {
         // A worker that never works would be stuck: at least a tenth
         List<String> warnings = new ArrayList<>();

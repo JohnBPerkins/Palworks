@@ -35,6 +35,7 @@ import java.util.function.Consumer;
  * @param wateringCooldownSeconds how long after a crop is watered until it can be watered again
  * @param hunger how workers get hungry and eat (the {@code hunger} object in the file)
  * @param sleep how pastured workers sleep (the {@code sleep} object in the file)
+ * @param mood how workers' mood goes down and back up (the {@code mood} object in the file)
  */
 public record PalworksConfig(
         int workRangeHorizontal,
@@ -44,11 +45,12 @@ public record PalworksConfig(
         double fertilizeChancePerLevel,
         int wateringCooldownSeconds,
         HungerConfig hunger,
-        SleepConfig sleep) {
-    public static final PalworksConfig DEFAULTS =
-            new PalworksConfig(32, 32, 24, 3.0, 0.1, 60, HungerConfig.DEFAULTS, SleepConfig.DEFAULTS);
+        SleepConfig sleep,
+        MoodConfig mood) {
+    public static final PalworksConfig DEFAULTS = new PalworksConfig(
+            32, 32, 24, 3.0, 0.1, 60, HungerConfig.DEFAULTS, SleepConfig.DEFAULTS, MoodConfig.DEFAULTS);
 
-    /** These settings, with the default hunger settings. */
+    /** These settings, with the default hunger, sleep and mood settings. */
     public PalworksConfig(
             int workRangeHorizontal,
             int workRangeVertical,
@@ -64,7 +66,8 @@ public record PalworksConfig(
                 fertilizeChancePerLevel,
                 wateringCooldownSeconds,
                 HungerConfig.DEFAULTS,
-                SleepConfig.DEFAULTS);
+                SleepConfig.DEFAULTS,
+                MoodConfig.DEFAULTS);
     }
 
     /** These settings with other hunger settings. */
@@ -77,7 +80,8 @@ public record PalworksConfig(
                 fertilizeChancePerLevel,
                 wateringCooldownSeconds,
                 hunger,
-                sleep);
+                sleep,
+                mood);
     }
 
     /** These settings with other sleep settings. */
@@ -90,7 +94,67 @@ public record PalworksConfig(
                 fertilizeChancePerLevel,
                 wateringCooldownSeconds,
                 hunger,
-                sleep);
+                sleep,
+                mood);
+    }
+
+    /** These settings with other mood settings. */
+    public PalworksConfig withMood(MoodConfig mood) {
+        return new PalworksConfig(
+                workRangeHorizontal,
+                workRangeVertical,
+                ownerRange,
+                pickupRadius,
+                fertilizeChancePerLevel,
+                wateringCooldownSeconds,
+                hunger,
+                sleep,
+                mood);
+    }
+
+    /**
+     * How a worker's mood (0 to 100, separate from friendship) goes down and back up. Work wears it
+     * down, and being Hungry or Tired too; while it's neither, and not at work, it comes back up. Below
+     * {@code unhappyBelow} it works slower, and at 0 it goes on strike: no work (it still eats and
+     * sleeps) until it's back to {@code strikeUntil}. With its work off, or in its ball, it holds.
+     *
+     * @param enabled whether workers have a mood at all. Off, nothing here applies
+     * @param workPerPoint how many units of work (as for hunger) take one point off
+     * @param hungryDrainPerDay the points it loses over a Minecraft day while Hungry (no fullness left)
+     * @param tiredDrainPerDay the points it loses over a day while Tired (it slept without a bed)
+     * @param recoveryPerDay the points it gains back over a day while it's neither, and not at work
+     * @param unhappyBelow the mood below which it's unhappy, and works slower
+     * @param unhappyWorkSpeed how fast an unhappy worker works and walks, as a share of its normal speed
+     * @param strikeUntil the mood a worker on strike has to be back to before it works again
+     */
+    public record MoodConfig(
+            boolean enabled,
+            int workPerPoint,
+            double hungryDrainPerDay,
+            double tiredDrainPerDay,
+            double recoveryPerDay,
+            int unhappyBelow,
+            double unhappyWorkSpeed,
+            int strikeUntil) {
+        public static final MoodConfig DEFAULTS = new MoodConfig(true, 2, 50, 25, 100, 50, 0.75, 30);
+
+        public static final Codec<MoodConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                        field(Codec.BOOL, "enabled", DEFAULTS.enabled()).forGetter(MoodConfig::enabled),
+                        field(Codec.intRange(1, 500), "work_per_point", DEFAULTS.workPerPoint())
+                                .forGetter(MoodConfig::workPerPoint),
+                        field(Codec.doubleRange(0.0, 1000.0), "hungry_drain_per_day", DEFAULTS.hungryDrainPerDay())
+                                .forGetter(MoodConfig::hungryDrainPerDay),
+                        field(Codec.doubleRange(0.0, 1000.0), "tired_drain_per_day", DEFAULTS.tiredDrainPerDay())
+                                .forGetter(MoodConfig::tiredDrainPerDay),
+                        field(Codec.doubleRange(0.0, 1000.0), "recovery_per_day", DEFAULTS.recoveryPerDay())
+                                .forGetter(MoodConfig::recoveryPerDay),
+                        field(Codec.intRange(0, 100), "unhappy_below", DEFAULTS.unhappyBelow())
+                                .forGetter(MoodConfig::unhappyBelow),
+                        field(Codec.doubleRange(0.1, 1.0), "unhappy_work_speed", DEFAULTS.unhappyWorkSpeed())
+                                .forGetter(MoodConfig::unhappyWorkSpeed),
+                        field(Codec.intRange(1, 100), "strike_until", DEFAULTS.strikeUntil())
+                                .forGetter(MoodConfig::strikeUntil))
+                .apply(instance, MoodConfig::new));
     }
 
     /**
@@ -164,7 +228,8 @@ public record PalworksConfig(
                     field(Codec.intRange(5, 600), "watering_cooldown_seconds", DEFAULTS.wateringCooldownSeconds())
                             .forGetter(PalworksConfig::wateringCooldownSeconds),
                     field(HungerConfig.CODEC, "hunger", DEFAULTS.hunger()).forGetter(PalworksConfig::hunger),
-                    field(SleepConfig.CODEC, "sleep", DEFAULTS.sleep()).forGetter(PalworksConfig::sleep))
+                    field(SleepConfig.CODEC, "sleep", DEFAULTS.sleep()).forGetter(PalworksConfig::sleep),
+                    field(MoodConfig.CODEC, "mood", DEFAULTS.mood()).forGetter(PalworksConfig::mood))
             .apply(instance, PalworksConfig::new));
 
     private static final String FILE_NAME = "palworks.json";
