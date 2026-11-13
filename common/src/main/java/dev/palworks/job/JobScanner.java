@@ -146,7 +146,7 @@ final class JobScanner {
 
         for (WorkerInfo worker : workers) {
             addScanRange(ranges, worker.position, chunkRadius, verticalRadius, worldMinY, worldMaxY);
-            // Round its home too (its pasture, or its owner), where its troughs and beds are, so
+            // Round its home too (its pasture block), where its troughs and beds are, so
             // they're still known however far it's wandered for work
             if (worker.home != null) {
                 addScanRange(ranges, worker.home, chunkRadius, verticalRadius, worldMinY, worldMaxY);

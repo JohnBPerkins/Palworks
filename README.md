@@ -132,8 +132,8 @@ stat of its own.
   a time, until it's half full. The other half is left for you: a full Pokémon refuses Mochi and
   berries fed by hand. Eating from a trough only fills it up; the food's own effects (EVs,
   friendship, healing) don't happen.
-- **Which troughs:** any within 32 blocks of it, or of its home: its pasture block, or you for a
-  party Pokémon. So a pastured worker that has wandered off for work still goes back to the troughs
+- **Which troughs:** any within 32 blocks of it, or, for a pastured worker, of its pasture block.
+  So a pastured worker that has wandered off for work still goes back to the troughs
   by its pasture.
 - **With no fullness left** it works and walks at a quarter speed, with a half hunger shank over
   its head, until it eats. It never stops working.
