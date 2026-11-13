@@ -46,14 +46,13 @@ public final class WorkerTicking {
         if (pokemon == null || pokemon.getOwnerUUID() == null || pokemon.getEntity() == null) {
             return; // Only owned Pokémon that are out in the world
         }
-        // No work it can do: not a worker, but it sleeps in a free bed if it's pastured. One that
-        // never was a worker is nothing more; one that was, and lost its last work skill, carries
-        // on as one whose work is off (it lets its job go and wakes up).
-        if (!WorkerEligibility.canWork(pokemon)) {
-            NonWorkerSleep.tick(entity, level);
-            if (!WorkerStateManager.hasWorkerState(pokemon)) {
-                return;
-            }
+        // One that isn't working (no work skills, or its work off) sleeps in a free bed if it's
+        // pastured and Cobblemon makes it drowsy
+        NonWorkerSleep.tick(entity, level);
+        // No work it can do, and never a worker: not one. (One that was, and lost its last work
+        // skill, carries on as one whose work is off: it lets its job go and wakes up.)
+        if (!WorkerEligibility.canWork(pokemon) && !WorkerStateManager.hasWorkerState(pokemon)) {
+            return;
         }
         JobManager.getInstance(level).registerWorker(pokemon, entity, level);
         WorkerAI.tick(pokemon, entity, level);

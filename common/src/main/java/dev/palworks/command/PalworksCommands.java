@@ -43,6 +43,9 @@ public final class PalworksCommands {
                 // Build a test area (smelting, every crop and tree) from where the player stands
                 .then(Commands.literal("testarea").executes(ctx -> run(ctx, DebugCommand::buildTestArea)))
 
+                // Make the nearest owned Pokémon drowsy now, as Cobblemon does (in its resting hours)
+                .then(Commands.literal("sleep").executes(ctx -> run(ctx, DebugCommand::makeNearestDrowsy)))
+
                 // Dump current job state (available/reserved/workers + assignment analysis)
                 .then(Commands.literal("jobs").executes(ctx -> run(ctx, DebugCommand::showJobsInfo)))
 

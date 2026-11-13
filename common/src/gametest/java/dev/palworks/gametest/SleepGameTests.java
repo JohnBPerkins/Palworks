@@ -21,6 +21,7 @@ import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -212,6 +213,49 @@ public class SleepGameTests {
                 + brain.getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
                         .map(t -> t.getTarget().currentBlockPosition().toShortString())
                 + ", at " + pokemon.position() + " (bed " + bed.toShortString() + ")";
+    }
+
+    @AfterBatch(batch = "nonworker_bed_off")
+    public void afterWorkOffBed(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "nonworker_bed_off", timeoutTicks = 800)
+    public void aPokemonWithItsWorkOffSleepsInAFreeBedToo(GameTestHelper helper) {
+        // It could work, but it's switched off: it isn't working, so it's as one with no work skills
+        Workers.isolate(helper);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
+        WorkerStateManager.setEnabled(squirtle.getPokemon(), false);
+        setTime(helper, MIDNIGHT);
+        drowsyUntilAsleep(helper, squirtle);
+
+        helper.succeedWhen(() -> helper.assertTrue(
+                asleepInStrawBed(helper, squirtle, BED),
+                "asleep in the bed, as Cobblemon has it sleep: " + nonWorkerSleep(helper, squirtle, BED)));
+    }
+
+    @AfterBatch(batch = "sleep_command")
+    public void afterSleepCommand(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_command", timeoutTicks = 800)
+    public void palworksSleepMakesTheNearestPokemonDrowsy(GameTestHelper helper) {
+        // /palworks sleep, from its owner: drowsy now, by Cobblemon's own check, so off to the bed
+        Workers.isolate(helper);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity nidoran = Workers.sendOutPastured(helper, NIDORAN, new BlockPos(1, 1, 1));
+        setTime(helper, MIDNIGHT);
+        ServerPlayer owner = nidoran.getPokemon().getOwnerPlayer();
+        helper.getLevel()
+                .getServer()
+                .getCommands()
+                .performPrefixedCommand(
+                        owner.createCommandSourceStack().withPermission(2).withSuppressedOutput(), "palworks sleep");
+
+        helper.succeedWhen(() -> helper.assertTrue(
+                asleepInStrawBed(helper, nidoran, BED), "asleep in the bed: " + nonWorkerSleep(helper, nidoran, BED)));
     }
 
     @AfterBatch(batch = "nonworker_bed_kept")

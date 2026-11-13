@@ -13,7 +13,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A level's beds taken by Pokémon that aren't workers (pastured ones with no work skills): the
+ * A level's beds taken by Pokémon that aren't working (pastured ones with no work skills, or their
+ * work switched off): the
  * moment Cobblemon makes one drowsy it takes a free bed by its pasture, and goes there to sleep
  * instead of where it is (see {@code sleep.NonWorkerSleep}). It has to be then: Cobblemon puts a
  * drowsy Pokémon to sleep in the same brain tick, unless it has somewhere to walk. Workers come

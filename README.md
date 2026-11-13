@@ -201,8 +201,9 @@ stay awake with you, as Cobblemon's party Pokémon do.
   still counts towards whether it wakes Tired.
 - **Naps:** Cobblemon's own sleep is left alone: an idle pastured worker still naps when it gets
   drowsy, and isn't given work until it wakes. It just doesn't doze off in the middle of a job.
-- **Pokémon that can't work** (no work skills) use beds too: a pastured one that Cobblemon makes
-  drowsy goes to a free bed by its pasture to sleep, and Cobblemon wakes it as usual. Workers come
+- **Pokémon that aren't working** (no work skills, or their work switched off) use beds too: a
+  pastured one that Cobblemon makes drowsy goes to a free bed by its pasture to sleep, and Cobblemon
+  wakes it as usual. Workers come
   first: it only takes a bed no worker has, and keeps it till it wakes. With none free, it sleeps
   where it is. It never wakes Tired.
 
@@ -220,8 +221,8 @@ size is dyed another colour by crafting it with that dye. For now they sleep jus
 
 A large or huge bed is placed whole, like a vanilla bed: out from where you place it, forward and to
 your right. Breaking any part of it breaks it all. A bed is a quarter of a block high, like a slab: a
-worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's sleep is Cobblemon's
-alone.
+worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's
+sleep is Cobblemon's (napping when it gets drowsy), but in a free bed if there is one.
 
 ### Display settings
 
