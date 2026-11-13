@@ -18,8 +18,8 @@ import java.util.function.Consumer;
  * {@code data/palworks/palworks/suitability/lumbering.json}:
  * <pre>{@code
  * {
- *   "types":   { "fighting": 1, "steel": 1 },
- *   "species": { "cobblemon:scizor": 3, "cobblemon:pinsir": 2 }
+ *   "types":   { "fighting": 1 },
+ *   "species": { "cobblemon:scizor": 1, "cobblemon:kartana": 2 }
  * }
  * }</pre>
  * <ul>
@@ -27,8 +27,9 @@ import java.util.function.Consumer;
  *   <li>{@code types}: every Pokémon of that type (its Showdown id, {@code fire}) can do the job. Its
  *       number is added to the Pokémon's own level (see below): 1 is the usual, 2 gives one more.</li>
  *   <li>{@code species}: extra species, by id ({@code cobblemon:scizor}; without a namespace it's
- *       Cobblemon's), at exactly that level, whatever its types and stats would give. Level 0 takes
- *       the job away from that species even if one of its types gives it.</li>
+ *       Cobblemon's). Its number is added to the species' own level as a type's is (1 the usual, 2
+ *       one more), and is used instead of what its types give for that job. 0 takes the job away
+ *       from that species even if one of its types gives it.</li>
  *   <li>Levels go from 1 to {@value #MAX_LEVEL} (0 too, for species).</li>
  * </ul>
  * Files for the same job from different namespaces merge, like vanilla tags, so an addon can add a
@@ -43,7 +44,8 @@ import java.util.function.Consumer;
  * gives that level, plus its own number less 1, less one for each earlier form in its evolution
  * line that didn't have the type: Hisuian Typhlosion is Kindling 3 but Nether 1, as Cyndaquil and
  * Quilava were Fire but not Ghost. Its level is the best of its types', at least 1, unless its
- * species has a level of its own. Pure logic (no Minecraft types), so it's unit-tested;
+ * species has an entry of its own: that gives its own level plus the entry's number less 1, with no
+ * evolution line penalty. An admin's in-game level is used as it is. Pure logic (no Minecraft types), so it's unit-tested;
  * {@link SuitabilityReloadListener} feeds it and {@link DatapackSuitabilityProvider} reads it.
  */
 public final class SuitabilityData {
@@ -60,23 +62,27 @@ public final class SuitabilityData {
 
     private static final String DEFAULT_SPECIES_NAMESPACE = "cobblemon";
 
-    public static final SuitabilityData EMPTY = new SuitabilityData(Map.of(), Map.of(), 0);
+    public static final SuitabilityData EMPTY = new SuitabilityData(Map.of(), Map.of(), Map.of(), 0);
 
     private static volatile SuitabilityData current = EMPTY;
 
     /** Type Showdown id -> job levels. */
     private final Map<String, Map<Suitability, Integer>> types;
-    /** Species id ("cobblemon:scizor") -> job levels; 0 removes a job. */
+    /** Species id ("cobblemon:scizor") -> job levels, added to its power level as a type's; 0 removes a job. */
     private final Map<String, Map<Suitability, Integer>> species;
+    /** Admins' in-game levels: species id -> job levels, used as they are; 0 removes a job. */
+    private final Map<String, Map<Suitability, Integer>> fixed;
 
     private final int jobCount;
 
     private SuitabilityData(
             Map<String, Map<Suitability, Integer>> types,
             Map<String, Map<Suitability, Integer>> species,
+            Map<String, Map<Suitability, Integer>> fixed,
             int jobCount) {
         this.types = types;
         this.species = species;
+        this.fixed = fixed;
         this.jobCount = jobCount;
     }
 
@@ -130,10 +136,10 @@ public final class SuitabilityData {
      */
     public Map<Suitability, Integer> levels(String speciesId, List<Form> line) {
         Map<Suitability, Integer> result = new EnumMap<>(Suitability.class);
+        int power = line.isEmpty() ? 1 : powerLevel(line.get(0).baseStatTotal());
         if (!line.isEmpty()) {
             Form form = line.get(0);
             List<Form> earlier = line.subList(1, line.size());
-            int power = powerLevel(form.baseStatTotal());
             for (String typeId : form.typeIds()) {
                 int notThisType = 0;
                 for (Form before : earlier) {
@@ -143,39 +149,52 @@ public final class SuitabilityData {
                 }
                 for (Map.Entry<Suitability, Integer> e :
                         types.getOrDefault(typeId, Map.of()).entrySet()) {
-                    int level = Math.max(1, Math.min(MAX_LEVEL, power + e.getValue() - 1 - notThisType));
-                    result.merge(e.getKey(), level, Math::max);
+                    result.merge(e.getKey(), level(power, e.getValue() - notThisType), Math::max);
                 }
             }
         }
         for (Map.Entry<Suitability, Integer> e :
                 species.getOrDefault(speciesId, Map.of()).entrySet()) {
-            if (e.getValue() == 0) {
-                result.remove(e.getKey());
-            } else {
-                result.put(e.getKey(), e.getValue());
-            }
+            put(result, e.getKey(), e.getValue() == 0 ? 0 : level(power, e.getValue()));
+        }
+        for (Map.Entry<Suitability, Integer> e :
+                fixed.getOrDefault(speciesId, Map.of()).entrySet()) {
+            put(result, e.getKey(), e.getValue());
         }
         return result;
     }
 
+    /** A power level plus a file's number less 1, kept to 1 to {@value #MAX_LEVEL}. */
+    private static int level(int power, int number) {
+        return Math.max(1, Math.min(MAX_LEVEL, power + number - 1));
+    }
+
+    private static void put(Map<Suitability, Integer> levels, Suitability job, int level) {
+        if (level == 0) {
+            levels.remove(job);
+        } else {
+            levels.put(job, level);
+        }
+    }
+
     /**
      * This data with these species' levels put over its own, as admins set them in game
-     * ({@link SuitabilityOverrides}): each job given is the species' level for it, as if a datapack
-     * gave it (0 takes the job away); the species' other jobs are left as they were.
+     * ({@link SuitabilityOverrides}): each job given is the species' level for it, outright, whatever
+     * its stats and the datapacks give (0 takes the job away); the species' other jobs are left as
+     * they were.
      */
     public SuitabilityData withSpecies(Map<String, Map<Suitability, Integer>> overrides) {
         if (overrides.isEmpty()) {
             return this;
         }
-        Map<String, Map<Suitability, Integer>> merged = new HashMap<>(species);
+        Map<String, Map<Suitability, Integer>> merged = new HashMap<>(fixed);
         overrides.forEach((id, jobs) -> {
             Map<Suitability, Integer> levels = new EnumMap<>(Suitability.class);
-            levels.putAll(species.getOrDefault(id, Map.of()));
+            levels.putAll(fixed.getOrDefault(id, Map.of()));
             levels.putAll(jobs);
             merged.put(id, Collections.unmodifiableMap(levels));
         });
-        return new SuitabilityData(types, Map.copyOf(merged), jobCount);
+        return new SuitabilityData(types, species, Map.copyOf(merged), jobCount);
     }
 
     /** One job file's parsed contents. */
@@ -221,7 +240,7 @@ public final class SuitabilityData {
         });
         types.replaceAll((k, v) -> Collections.unmodifiableMap(v));
         species.replaceAll((k, v) -> Collections.unmodifiableMap(v));
-        return new SuitabilityData(Map.copyOf(types), Map.copyOf(species), byJob.size());
+        return new SuitabilityData(Map.copyOf(types), Map.copyOf(species), Map.of(), byJob.size());
     }
 
     private static List<String> allJobIds() {
