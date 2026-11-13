@@ -25,6 +25,21 @@ class StatusIconRendererTest {
     }
 
     @Test
+    void anUnhappyOrStrikingWorkerShowsItAfterItsNeeds() {
+        assertEquals(
+                List.of(WorkerStatus.HUNGRY, WorkerStatus.UNHAPPY),
+                StatusIconRenderer.statusesOf(Set.of("palworks-unhappy", "palworks-hungry")));
+        assertEquals(
+                List.of(WorkerStatus.TIRED, WorkerStatus.STRIKING),
+                StatusIconRenderer.statusesOf(Set.of("palworks-striking", "palworks-tired")));
+    }
+
+    @Test
+    void oneAsleepWithNoSleepAnimationShowsAsleep() {
+        assertEquals(List.of(WorkerStatus.ASLEEP), StatusIconRenderer.statusesOf(Set.of("palworks-asleep")));
+    }
+
+    @Test
     void otherAspectsShowNothing() {
         assertEquals(List.of(), StatusIconRenderer.statusesOf(Set.of("palworks-working", "shiny")));
     }

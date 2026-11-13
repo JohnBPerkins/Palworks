@@ -4,6 +4,10 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
+import dev.palworks.job.JobType;
+import dev.palworks.reservation.ReservationId;
+import dev.palworks.worker.WorkerState;
+import dev.palworks.worker.WorkerStateManager;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
@@ -228,5 +232,31 @@ public class SharedJobGameTests {
             }
         }
         return total;
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "shared_restart", timeoutTicks = 800)
+    public void aJobSavedWithItsWorkerIsntGivenToAnotherAfterARestart(GameTestHelper helper) {
+        // A worker's job is saved with it; after a restart (or its chunk loading again) the new
+        // JobManager knew nothing of it, so the scan offered the same crop again and another worker
+        // took it too.
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos crop = new BlockPos(6, 1, 5);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        PokemonEntity saved = Workers.sendOut(helper, BULBASAUR, new BlockPos(1, 1, 1));
+        PokemonEntity beside = Workers.sendOut(helper, BULBASAUR, new BlockPos(6, 1, 4));
+        WorkerState state = WorkerStateManager.getOrCreate(saved.getPokemon());
+        state.setCurrentReservation(new ReservationId(
+                helper.absolutePos(crop),
+                JobType.HARVEST_CROPS,
+                helper.getLevel().getGameTime()));
+        state.setAssignedJob(JobType.HARVEST_CROPS);
+        state.startJob(0, null);
+        WorkerStateManager.save(saved.getPokemon(), state);
+        Workers.neverShareAJob(helper, saved, beside);
+        Map<BlockPos, Integer> harvests = countHarvests(helper, java.util.List.of(crop));
+
+        helper.succeedWhen(() -> helper.assertValueEqual(harvests.get(crop), 1, "harvests of the crop"));
     }
 }

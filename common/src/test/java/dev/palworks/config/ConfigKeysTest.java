@@ -15,6 +15,7 @@ class ConfigKeysTest {
     private static final PalworksConfig DEFAULTS = PalworksConfig.DEFAULTS;
     private static final String WORK_RANGE = "work_range_horizontal";
     private static final String HUNGER_ENABLED = "hunger.enabled";
+    private static final String MOOD_ENABLED = "mood.enabled";
 
     private static PalworksConfig set(PalworksConfig config, String name, String value) {
         DataResult<PalworksConfig> result = ConfigKeys.set(config, name, value);
@@ -35,8 +36,10 @@ class ConfigKeysTest {
         assertTrue(names.contains("fertilize_chance_per_level"), names.toString());
         assertTrue(names.contains(HUNGER_ENABLED), names.toString());
         assertTrue(names.contains("sleep.tired_work_speed"), names.toString());
+        assertTrue(names.contains(MOOD_ENABLED), names.toString());
+        assertTrue(names.contains("mood.strike_until"), names.toString());
         assertFalse(names.contains("hunger"), "objects aren't settings themselves");
-        assertEquals(13, names.size(), names.toString());
+        assertEquals(21, names.size(), names.toString());
     }
 
     @Test
@@ -61,6 +64,10 @@ class ConfigKeysTest {
 
         assertEquals(0.5, set(DEFAULTS, "sleep.tired_work_speed", "0.5").sleep().tiredWorkSpeed());
         assertEquals(4.0, set(DEFAULTS, "pickup_radius", "4").pickupRadius(), "a whole number for a decimal one");
+        assertFalse(set(DEFAULTS, MOOD_ENABLED, "false").mood().enabled());
+        assertEquals(40, set(DEFAULTS, "mood.unhappy_below", "40").mood().unhappyBelow());
+        assertEquals(
+                80.0, set(DEFAULTS, "mood.hungry_drain_per_day", "80").mood().hungryDrainPerDay());
     }
 
     @Test
@@ -70,6 +77,8 @@ class ConfigKeysTest {
         assertRefused(WORK_RANGE, "lots");
         assertRefused(HUNGER_ENABLED, "yes");
         assertRefused("sleep.tired_work_speed", "NaN");
+        assertRefused("mood.unhappy_work_speed", "0"); // at least a tenth: a worker that never works is stuck
+        assertRefused("mood.strike_until", "0");
         assertRefused("hunger", "1");
         assertRefused("nope", "1");
     }

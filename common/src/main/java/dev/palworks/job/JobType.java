@@ -7,7 +7,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Represents what needs doing NOW.
  * Separate from Suitability to allow flexible job definitions. Only jobs a worker can actually do
- * are listed; add a value together with its handler (WorkerAI) and its scan (JobManager).
+ * are listed; add a value together with its handler (JobHandlerRegistry) and how it's found
+ * (JobScanner, or JobAssigner for jobs made per worker, like deliveries).
  */
 public enum JobType {
     // Priorities: 0-10, higher is taken first (see JobManager's job scoring)
@@ -17,7 +18,9 @@ public enum JobType {
 
     // Planting
     PLANT_SEEDS(Suitability.PLANTING, 5),
-    GET_SEEDS(Suitability.PLANTING, 6), // Get seeds from a chest for planting
+    // Get seeds from a chest for planting: farmland seeds for Planting, nether wart for Nether work.
+    // No one skill, as what a worker takes depends on its (see JobAssigner.seedToFetch)
+    GET_SEEDS(null, 6),
 
     // Gathering
     HARVEST_CROPS(Suitability.GATHERING, 8),
@@ -60,7 +63,15 @@ public enum JobType {
         return priority;
     }
 
-    /** The work skill this job needs, or null for one any worker does (eating). */
+    /**
+     * Whether it's work, not something a worker does for itself: eating and sleeping aren't. Not
+     * "has a work skill": fetching seeds is work, though it takes no one skill (Planting or Nether).
+     */
+    public boolean isWork() {
+        return this != EAT_FOOD && this != SLEEP;
+    }
+
+    /** The work skill this job needs, or null for one it doesn't decide alone (eating, sleeping, seeds). */
     @Nullable
     public Suitability getRequiredSuitability() {
         return requiredSuitability;

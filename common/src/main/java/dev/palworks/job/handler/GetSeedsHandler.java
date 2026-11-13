@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 final class GetSeedsHandler implements JobHandler {
@@ -38,57 +39,31 @@ final class GetSeedsHandler implements JobHandler {
             return;
         }
 
+        // What it's out of (farmland seeds for Planting, nether wart for Nether: see
+        // JobManager.seedToFetch), and only what the open spots round it can take
         Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
-        if (suitabilities.contains(Suitability.PLANTING)) {
-            // A seed the open farmland around it can take (see JobManager.seedToFetch)
-            net.minecraft.world.item.Item seed = ctx.level() instanceof ServerLevel serverLevel
-                    ? JobManager.getInstance(serverLevel)
-                            .seedToFetch(targetPos, ctx.entity().blockPosition())
-                    : null;
-            ItemStack extracted = seed == null
-                    ? ItemStack.EMPTY
-                    : dev.palworks.station.ChestHelper.extractItems(ctx.level(), targetPos, seed, 64);
-            if (!extracted.isEmpty()) {
-                int leftover = inventory.addItem(extracted);
-                ChestHelper.returnLeftover(ctx.level(), targetPos, extracted, leftover);
-                ctx.didWork(1);
-                Palworks.LOGGER.debug(
-                        "{} got {} {} seeds from chest at {} ({} leftover)",
-                        ctx.name(),
-                        extracted.getCount() - leftover,
-                        extracted.getItem().toString(),
-                        targetPos,
-                        leftover);
-            } else {
-                Palworks.LOGGER.debug(
-                        "{} FAILED to get seeds from chest at {} - chest might be empty, treating as complete",
-                        ctx.name(),
-                        targetPos);
-            }
-        } else if (suitabilities.contains(Suitability.NETHER)) {
-            ItemStack extracted = dev.palworks.station.ChestHelper.extractItems(
-                    ctx.level(), targetPos, net.minecraft.world.item.Items.NETHER_WART, 64);
-            if (!extracted.isEmpty()) {
-                int leftover = inventory.addItem(extracted);
-                ChestHelper.returnLeftover(ctx.level(), targetPos, extracted, leftover);
-                ctx.didWork(1);
-                Palworks.LOGGER.debug(
-                        "{} got {} nether wart from chest at {} ({} leftover)",
-                        ctx.name(),
-                        extracted.getCount() - leftover,
-                        targetPos,
-                        leftover);
-            } else {
-                Palworks.LOGGER.debug(
-                        "{} FAILED to get nether wart from chest at {} - chest might be empty, treating as complete",
-                        ctx.name(),
-                        targetPos);
-            }
+        Item seed = ctx.level() instanceof ServerLevel serverLevel
+                ? JobManager.getInstance(serverLevel)
+                        .seedToFetch(targetPos, ctx.entity().blockPosition(), suitabilities, inventory)
+                : null;
+        ItemStack extracted =
+                seed == null ? ItemStack.EMPTY : ChestHelper.extractItems(ctx.level(), targetPos, seed, 64);
+        if (!extracted.isEmpty()) {
+            int leftover = inventory.addItem(extracted);
+            ChestHelper.returnLeftover(ctx.level(), targetPos, extracted, leftover);
+            ctx.didWork(1);
+            Palworks.LOGGER.debug(
+                    "{} got {} {} from chest at {} ({} leftover)",
+                    ctx.name(),
+                    extracted.getCount() - leftover,
+                    extracted.getItem(),
+                    targetPos,
+                    leftover);
         } else {
             Palworks.LOGGER.debug(
-                    "{} has GET_SEEDS job but lacks PLANTING/NETHER suitability! Suitabilities: {}",
+                    "{} got nothing from chest at {} (none it needs left), treating as complete",
                     ctx.name(),
-                    suitabilities);
+                    targetPos);
         }
     }
 }

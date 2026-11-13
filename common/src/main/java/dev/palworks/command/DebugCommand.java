@@ -1,5 +1,6 @@
 package dev.palworks.command;
 
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.debug.DebugInfo;
 import dev.palworks.debug.DebugManager;
@@ -8,6 +9,8 @@ import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
+import dev.palworks.sleep.NonWorkerSleep;
+import dev.palworks.sleep.Sleep;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.network.chat.Component;
@@ -236,6 +239,38 @@ public class DebugCommand {
         WorkerStateManager.setEnabled(pokemon, false);
         player.sendSystemMessage(
                 Component.literal("Disabled " + pokemon.getSpecies().getName() + " as a worker"));
+    }
+
+    /**
+     * Make the nearest owned Pokémon drowsy now, by Cobblemon's own drowsiness check (see
+     * NonWorkerSleep.makeDrowsy), and say what it does: to a free bed, or asleep where it is.
+     */
+    public static void makeNearestDrowsy(ServerPlayer player) {
+        Pokemon pokemon = findNearestOwnedPokemon(player);
+        PokemonEntity entity = pokemon == null ? null : pokemon.getEntity();
+        if (entity == null) {
+            player.sendSystemMessage(Component.literal(NO_POKEMON_NEARBY));
+            return;
+        }
+        String name = pokemon.getSpecies().getName();
+        if (!NonWorkerSleep.makeDrowsy(entity)) {
+            player.sendSystemMessage(Component.literal(name
+                    + " isn't sleepy: it's outside its resting hours (or Cobblemon never lets it sleep,"
+                    + " or it's a worker with a job or in its bedtime)"));
+            return;
+        }
+        JobManager.NonWorkerBed bed =
+                JobManager.getInstance(player.serverLevel()).nonWorkerBed(pokemon.getUuid());
+        if (bed != null) {
+            player.sendSystemMessage(Component.literal(
+                    name + " is drowsy, and off to the bed at " + bed.pos().toShortString()));
+        } else if (Sleep.cobblemonHasItAsleep(entity)) {
+            player.sendSystemMessage(Component.literal(name + " is asleep"));
+        } else {
+            player.sendSystemMessage(Component.literal(name
+                    + " is drowsy, and sleeps where it is (no free bed it fits, or it isn't a pastured"
+                    + " non-worker)"));
+        }
     }
 
     /** Find the nearest owned Pokemon to the player. */

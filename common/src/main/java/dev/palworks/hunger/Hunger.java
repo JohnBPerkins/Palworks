@@ -2,6 +2,7 @@ package dev.palworks.hunger;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.config.PalworksConfig;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import org.jetbrains.annotations.Nullable;
@@ -21,8 +22,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>An empty one works and walks slower ({@link #workSpeed}), but never stops.</li>
  * </ul>
  *
- * <p>With its work off (or hunger off in the config), none of this applies: the Pokémon is left
- * entirely to Cobblemon.
+ * <p>With its work off, no work it can do, or hunger off in the config, none of this applies: the
+ * Pokémon is left entirely to Cobblemon.
  */
 public final class Hunger {
     private Hunger() {}
@@ -38,14 +39,14 @@ public final class Hunger {
 
     /**
      * Whether Palworks' hunger applies to this Pokémon now: hunger is on, it's owned and out in the
-     * world (sent out, or in a pasture), and its work is on. {@code state} is its worker state, or
-     * null if it has none yet (a new worker starts with its work on).
+     * world (sent out, or in a pasture), and it works ({@link WorkerEligibility#works}: its work is on
+     * and it has work it can do). {@code state} is its worker state, or null if it has none yet.
      */
     public static boolean appliesTo(Pokemon pokemon, @Nullable WorkerState state) {
         return enabled()
                 && pokemon.getOwnerUUID() != null
                 && pokemon.getEntity() != null
-                && (state == null || state.isEnabled());
+                && WorkerEligibility.works(pokemon, state);
     }
 
     /**

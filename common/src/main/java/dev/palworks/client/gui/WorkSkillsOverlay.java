@@ -7,10 +7,12 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.architectury.event.events.client.ClientGuiEvent;
 import dev.architectury.event.events.client.ClientPlayerEvent;
+import dev.palworks.Palworks;
 import dev.palworks.client.ClientWorkerData;
 import dev.palworks.mixin.client.PCGUIAccessor;
 import dev.palworks.mixin.client.SummaryAccessor;
 import dev.palworks.net.packets.RequestPcWorkLevelsPacket;
+import dev.palworks.net.packets.WorkerMoodPacket;
 import dev.palworks.suitability.Suitability;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +38,11 @@ import org.jetbrains.annotations.Nullable;
  * WorkLevelSync): the party's are kept up to date, and the PC's are asked for as it opens. Nothing is
  * shown for a Pokémon whose levels haven't come.
  *
+ * <p>A worker's mood (see dev.palworks.mood.Mood) shows in the portrait's bottom-left corner, on the PC
+ * and the summary: a face (happy, content, unhappy or on strike) and the number, with a tooltip saying
+ * what it means. Only for a Pokémon that can work, and only once the server has sent it (never while
+ * mood is off).
+ *
  * <p>Drawn over the screen once it's drawn (Architectury's screen render event, on both loaders),
  * lifted to {@link #OVERLAY_Z}. The layouts are copied from PCGUI and Summary, the same in
  * Cobblemon 1.7 and 1.8.
@@ -60,6 +67,8 @@ public final class WorkSkillsOverlay {
     private static final int SUMMARY_HEIGHT = 161;
     private static final float SUMMARY_PORTRAIT_X = 6;
     private static final float SUMMARY_PORTRAIT_Y = 32;
+    // Both screens' portraits are this square (PCGUI and Summary's PORTRAIT_SIZE, in 1.7 and 1.8)
+    private static final float PORTRAIT_SIZE = 66;
     private static final int SUMMARY_INFO_PAGE = 0;
     private static final float BOX_X = 77 + 5; // the Info page is at 77, 12; the box at 5, 123 in it
     private static final float BOX_Y = 12 + 123;
@@ -78,6 +87,9 @@ public final class WorkSkillsOverlay {
     private static final float TEXT_DROP = 2; // half-size text sits this far down an 8-high row
     private static final int WHITE = 0xFFFFFFFF;
     private static final int GREY = 0xFFA0A0A0;
+
+    // A worker this happy or more has the happy face; below it, content, down to unhappy
+    private static final int HAPPY_FROM = 75;
 
     private WorkSkillsOverlay() {}
 
@@ -113,6 +125,7 @@ public final class WorkSkillsOverlay {
                 int left = (screen.width - PC_WIDTH) / 2;
                 int top = (screen.height - PC_HEIGHT) / 2;
                 drawCorner(graphics, pokemon, left + PC_PORTRAIT_X, top + PC_PORTRAIT_Y, mouseX, mouseY);
+                drawMood(graphics, pokemon, left + PC_PORTRAIT_X, top + PC_PORTRAIT_Y, mouseX, mouseY);
             }
         } else if (screen instanceof Summary) {
             SummaryAccessor summary = (SummaryAccessor) (Object) screen;
@@ -120,6 +133,7 @@ public final class WorkSkillsOverlay {
             int left = (screen.width - SUMMARY_WIDTH) / 2;
             int top = (screen.height - SUMMARY_HEIGHT) / 2;
             drawCorner(graphics, pokemon, left + SUMMARY_PORTRAIT_X, top + SUMMARY_PORTRAIT_Y, mouseX, mouseY);
+            drawMood(graphics, pokemon, left + SUMMARY_PORTRAIT_X, top + SUMMARY_PORTRAIT_Y, mouseX, mouseY);
             if (summary.palworks$mainScreenIndex() == SUMMARY_INFO_PAGE) {
                 drawBox(graphics, pokemon, left + BOX_X, top + BOX_Y, mouseX, mouseY);
             }
@@ -148,6 +162,47 @@ public final class WorkSkillsOverlay {
         if (within(mouseX, mouseY, x, y, width, rows * ROW_HEIGHT)) {
             drawTooltip(graphics, font, shown, mouseX, mouseY);
         }
+    }
+
+    /** Its mood's face and number, in the portrait's bottom-left corner. */
+    private static void drawMood(
+            GuiGraphics graphics, Pokemon pokemon, float portraitX, float portraitY, int mouseX, int mouseY) {
+        WorkerMoodPacket.Shown mood = ClientWorkerData.mood(pokemon.getUuid());
+        Map<Suitability, Integer> levels = ClientWorkerData.workLevels(pokemon.getUuid());
+        if (mood == null || levels == null || levels.isEmpty()) {
+            return; // not sent, mood off, or it can't work
+        }
+        Font font = Minecraft.getInstance().font;
+        float x = portraitX + CORNER_INSET_X;
+        float y = portraitY + PORTRAIT_SIZE - ICON_SIZE - CORNER_INSET_Y;
+        drawIcon(graphics, Palworks.id("textures/gui/mood/" + face(mood) + ".png"), x, y);
+        String number = String.valueOf(mood.mood());
+        drawText(graphics, font, number, x + ICON_SIZE + 1.5F, y + TEXT_DROP, WHITE);
+        float width = ICON_SIZE + 1.5F + font.width(number) * TEXT_SCALE;
+        if (within(mouseX, mouseY, x, y, width, ICON_SIZE)) {
+            List<Component> lines = new ArrayList<>();
+            lines.add(Component.translatable("palworks.ui.mood.title", mood.mood()));
+            if (mood.striking()) {
+                lines.add(Component.translatable("palworks.ui.mood.striking", ClientWorkerData.strikeUntil()));
+            } else if (mood.unhappy()) {
+                lines.add(Component.translatable("palworks.ui.mood.unhappy"));
+            } else {
+                lines.add(Component.translatable(
+                        mood.mood() >= HAPPY_FROM ? "palworks.ui.mood.happy" : "palworks.ui.mood.content"));
+            }
+            graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
+        }
+    }
+
+    /** Which face a mood shows: its texture's name. */
+    private static String face(WorkerMoodPacket.Shown mood) {
+        if (mood.striking()) {
+            return "striking";
+        }
+        if (mood.unhappy()) {
+            return "unhappy";
+        }
+        return mood.mood() >= HAPPY_FROM ? "happy" : "content";
     }
 
     /** The summary's work box: each job by name with its level, or as many as fit. */

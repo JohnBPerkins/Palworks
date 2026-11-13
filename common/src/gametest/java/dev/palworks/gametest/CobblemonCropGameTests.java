@@ -12,8 +12,11 @@ import dev.palworks.job.JobType;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -31,6 +34,7 @@ import net.minecraft.world.level.block.state.properties.Property;
  */
 public class CobblemonCropGameTests {
     private static final String IT_HARVESTS = "it harvests";
+    private static final String AGE = "age";
 
     private static final BlockPos CROP = new BlockPos(3, 1, 3);
 
@@ -52,7 +56,7 @@ public class CobblemonCropGameTests {
     }
 
     private static int age(BlockState state) {
-        return Integer.parseInt(valueOf(state, "age"));
+        return Integer.parseInt(valueOf(state, AGE));
     }
 
     /** {@code state} with the named property set to the named value (for Cobblemon's own enums). */
@@ -198,7 +202,7 @@ public class CobblemonCropGameTests {
     public void galaricaNutsGiveWhatPickingThemDoes(GameTestHelper helper) {
         // NutBushBlock.useWithoutItem: 1-2 nuts, back to age 1. Ours used to give 1-3.
         helper.setBlock(CROP.below(), Blocks.GRASS_BLOCK);
-        BlockState ripe = with(CobblemonBlocks.GALARICA_NUT_BUSH.defaultBlockState(), "age", "3");
+        BlockState ripe = with(CobblemonBlocks.GALARICA_NUT_BUSH.defaultBlockState(), AGE, "3");
         CropGameTests.assertEachHarvestGives(helper, ripe, CobblemonItems.GALARICA_NUTS, 1, 2);
         helper.assertTrue(age(helper.getBlockState(CROP)) == 1, "back to age 1");
         helper.succeed();
@@ -209,7 +213,7 @@ public class CobblemonCropGameTests {
         // A bush's berries are worked out as it grows. One set straight to ripe (a command, another
         // mod) has none, and picking it by hand gives nothing. Ours used to make up 1-3 berries.
         helper.setBlock(CROP.below(), Blocks.FARMLAND);
-        helper.setBlock(CROP, with(CobblemonBlocks.ORAN_BERRY.defaultBlockState(), "age", "5"));
+        helper.setBlock(CROP, with(CobblemonBlocks.ORAN_BERRY.defaultBlockState(), AGE, "5"));
         var level = helper.getLevel();
         helper.assertTrue(CropAdapter.isFullyGrown(level, helper.absolutePos(CROP)), "it looks ripe");
 
@@ -218,6 +222,28 @@ public class CobblemonCropGameTests {
         helper.assertTrue(
                 helper.getBlockState(CROP).is(CobblemonBlocks.ORAN_BERRY) && age(helper.getBlockState(CROP)) == 3,
                 "back to growing (age 3), got " + helper.getBlockState(CROP));
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aBlockInTheBerriesTagWithNoBerriesOfItsOwnIsNeverHarvested(GameTestHelper helper) {
+        // Another mod's block in #cobblemon:berries has no berry block entity for Cobblemon's harvest
+        // to pick from. Its harvest used to "succeed" without changing it: found ripe again,
+        // harvested forever. (Cobblemon's own bushes always have one: the game makes a fresh one
+        // if it's gone.) The in-game tests' datapack puts the chorus flower, aged 0-5 like a bush,
+        // in the tag.
+        helper.setBlock(CROP.below(), Blocks.END_STONE);
+        helper.setBlock(CROP, with(Blocks.CHORUS_FLOWER.defaultBlockState(), AGE, "5"));
+        var level = helper.getLevel();
+        BlockPos pos = helper.absolutePos(CROP);
+        helper.assertTrue(
+                level.getBlockState(pos)
+                        .is(TagKey.create(
+                                Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("cobblemon", "berries"))),
+                "in the berries tag");
+
+        helper.assertFalse(CropAdapter.isFullyGrown(level, pos), "no job: it can't be picked");
+        helper.assertFalse(CropAdapter.harvestCrop(level, pos), "nothing harvested");
         helper.succeed();
     }
 

@@ -95,6 +95,30 @@ class WorkerStateTest {
     }
 
     @Test
+    void itsMoodSurvivesSaveAndLoad() {
+        WorkerState state = new WorkerState();
+        assertEquals(WorkerState.MAX_MOOD, state.getMood()); // a new worker is in the best of moods
+        state.setMood(12.5);
+        state.setStriking(true);
+        WorkerState loaded = WorkerState.fromNBT(state.serializeNBT());
+        assertEquals(12.5, loaded.getMood());
+        assertTrue(loaded.isStriking());
+
+        WorkerState fresh = WorkerState.fromNBT(new CompoundTag()); // saved before mood
+        assertEquals(WorkerState.MAX_MOOD, fresh.getMood());
+        assertFalse(fresh.isStriking());
+    }
+
+    @Test
+    void moodStaysBetweenNoneAndTheMost() {
+        WorkerState state = new WorkerState();
+        state.setMood(-5);
+        assertEquals(0, state.getMood());
+        state.setMood(250);
+        assertEquals(WorkerState.MAX_MOOD, state.getMood());
+    }
+
+    @Test
     void stateWithoutEnabledKeyLoadsAsEnabled() {
         assertTrue(
                 WorkerState.fromNBT(new CompoundTag()).isEnabled(),

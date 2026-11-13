@@ -30,6 +30,8 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
 - **Sleep and beds** — pastured workers sleep in their species' hours (see [Sleep](#sleep)). Give
   them **straw** or **wool beds**, large ones for large Pokémon, or they wake Tired and work slower the next day.
+- **Mood** — overwork, hunger and no rest wear a worker's mood down (see [Mood](#mood)). Unhappy
+  workers work slower, and one whose mood runs out goes on strike until it cheers up.
 - **Hunger and troughs** — work makes workers hungry (see [Hunger](#hunger)). Fill a **trough** with
   Cobblemon berries or Aprijuice and they walk over and eat from it. A worker
   that's run out of food works at a quarter speed until it eats.
@@ -86,6 +88,16 @@ settings that aren't per-Pokémon:
   "sleep": {
     "enabled": true,
     "tired_work_speed": 0.75
+  },
+  "mood": {
+    "enabled": true,
+    "work_per_point": 2,
+    "hungry_drain_per_day": 50,
+    "tired_drain_per_day": 25,
+    "recovery_per_day": 100,
+    "unhappy_below": 50,
+    "unhappy_work_speed": 0.75,
+    "strike_until": 30
   }
 }
 ```
@@ -115,6 +127,16 @@ settings that aren't per-Pokémon:
 - **`sleep`**: how pastured workers sleep (see [Sleep](#sleep)).
   - **`enabled`**: `false` turns it off: pastured workers' sleep is then Cobblemon's alone.
   - **`tired_work_speed`** (0.1 to 1): how fast a Tired worker works and walks.
+- **`mood`**: how workers' mood goes down and back up (see [Mood](#mood)).
+  - **`enabled`**: `false` turns mood off: no slowdown, no strikes.
+  - **`work_per_point`** (1 to 500): how many units of work (as for hunger) take a point off.
+  - **`hungry_drain_per_day`**, **`tired_drain_per_day`** (0 to 1000): the points a worker loses
+    over a Minecraft day while Hungry, or while Tired.
+  - **`recovery_per_day`** (0 to 1000): the points it gains back over a day while it's neither,
+    and not at work.
+  - **`unhappy_below`** (0 to 100): the mood below which it's unhappy and works slower.
+  - **`unhappy_work_speed`** (0.1 to 1): how fast an unhappy worker works and walks.
+  - **`strike_until`** (1 to 100): the mood a worker on strike has to be back to before it works.
 
 Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
 the server logs a warning and uses the defaults. Changes to the file apply the next time the server
@@ -199,12 +221,19 @@ stay awake with you, as Cobblemon's party Pokémon do.
   the nearest. Like troughs, beds by its pasture block count however far it has wandered. With none
   to be had, it sleeps where it is.
 - **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
-  walks at three quarters of its speed, with a "z" over its head, until it next sleeps.
+  walks at three quarters of its speed, with a "z" over its head, until it next sleeps. One whose
+  species has no sleep animation (it only lies still) shows a moon over its head while it sleeps.
 - **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It
   stays up for 15 seconds, then goes back to bed if it's still its bedtime. What it slept before
   still counts towards whether it wakes Tired.
 - **Naps:** Cobblemon's own sleep is left alone: an idle pastured worker still naps when it gets
   drowsy, and isn't given work until it wakes. It just doesn't doze off in the middle of a job.
+- **Pokémon that aren't working** (no work skills, or their work switched off) use beds too: a
+  pastured one goes to a free bed by its pasture when it gets sleepy, and sleeps there as a worker
+  does. Sleepy is when Cobblemon makes it drowsy, until Cobblemon would wake it; for a species
+  Cobblemon never lets sleep, its bedtime, as for a worker. Workers come first: it only takes a bed
+  no worker has, and keeps it till it wakes. With none free, it sleeps where Cobblemon has it (or,
+  if Cobblemon never lets it sleep, stays up). It never wakes Tired.
 
 Beds come in three sizes, for Pokémon up to as wide as the bed:
 
@@ -220,8 +249,26 @@ size is dyed another colour by crafting it with that dye. For now they sleep jus
 
 A large or huge bed is placed whole, like a vanilla bed: out from where you place it, forward and to
 your right. Breaking any part of it breaks it all. A bed is a quarter of a block high, like a slab: a
-worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's sleep is Cobblemon's
-alone.
+worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's
+sleep is Cobblemon's (napping when it gets drowsy), but in a free bed if there is one.
+
+## Mood
+
+Each worker has a mood, from 0 to 100, separate from its friendship. It starts at 100.
+
+- **What lowers it:** the work it does (a point for every 2 units of work, as hunger counts them),
+  and being Hungry or Tired.
+- **What brings it back:** while it's neither Hungry nor Tired, it cheers up whenever it isn't at
+  work: idle, eating or asleep. A fed worker with a bed stays about level through a busy day and night.
+- **Unhappy (below 50):** it works and walks at three quarters of its speed, on top of any slowdown
+  for hunger or sleep, with a sad face over its head.
+- **On strike (at 0):** it finishes what it's doing, then does no work until its mood is back to
+  30, with an anger mark over its head. It still eats and sleeps, which is how it gets there.
+- **Where to see it:** its mood shows in the bottom-left corner of its portrait on the PC and its
+  summary: a face and the number. Hover it to see what it means.
+
+Party workers have a mood too, but never sleep, so they're never Tired. With its work off, or in
+its ball, a worker's mood holds where it is.
 
 ### Display settings
 
@@ -234,8 +281,10 @@ player's own display settings:
 }
 ```
 
-- **`show_status_icons`**: whether workers show what's holding their work back over their heads: a
-  half hunger shank when they're out of food, a "z" when they're Tired.
+- **`show_status_icons`**: whether Pokémon show over their heads what's holding their work back (a
+  half hunger shank when they're out of food, a "z" when they're Tired, a sad face when they're
+  unhappy and an anger mark when they're on strike), and a moon while they're asleep, if their
+  species has no sleep animation to show it.
 
 ## Customizing work skills
 
@@ -311,7 +360,7 @@ make an exception (Slaking's stats are a legendary's, but it loafs around).
 Levels so far change how often a Watering worker fertilizes crops (see
 [`fertilize_chance_per_level`](#server-settings)). A Pokémon's levels show in the PC and on its
 summary, for work Palworks does so far (Cooling, say, isn't shown until there's something to cool),
-and `/palworks inspect worker` shows a worker's levels.
+and `/palworks suitability get <species>` lists a species' levels.
 
 ## Customizing work animations
 

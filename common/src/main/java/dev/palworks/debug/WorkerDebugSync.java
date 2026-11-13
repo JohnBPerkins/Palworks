@@ -8,6 +8,7 @@ import dev.palworks.hunger.Hunger;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.mood.Mood;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
@@ -151,7 +152,16 @@ public final class WorkerDebugSync {
                 state.getStepInTicks(),
                 stillTicks(entity, activity, now),
                 fullness(entity.getPokemon(), state),
-                rest(entity, state, reservation));
+                rest(entity, state, reservation),
+                mood(entity.getPokemon(), state));
+    }
+
+    private static WorkerDebugPacket.Mood mood(Pokemon pokemon, WorkerState state) {
+        return new WorkerDebugPacket.Mood(
+                Mood.appliesTo(pokemon, state),
+                (int) Math.round(state.getMood()),
+                Mood.isUnhappy(pokemon, state),
+                Mood.isStriking(pokemon, state));
     }
 
     private static WorkerDebugPacket.Rest rest(PokemonEntity entity, WorkerState state, ReservationId reservation) {
