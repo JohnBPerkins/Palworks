@@ -24,7 +24,7 @@ public class OpenInventoryHandler implements ServerNetworkPacketHandler<OpenInve
     @Override
     public void handle(
             @NotNull OpenInventoryPacket packet, @NotNull MinecraftServer server, @NotNull ServerPlayer player) {
-        UUID entityUUID = packet.getPokemonUUID();
+        UUID entityUUID = packet.getEntityUUID();
 
         // The UUID from the interact wheel is the entity UUID, not the Pokemon storage UUID
         // Find the entity in the world first

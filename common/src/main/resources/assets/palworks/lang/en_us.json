@@ -6,7 +6,7 @@
   "palworks.message.worker.disabled": "%s stopped working",
   "palworks.message.worker.not_found": "Pokemon not found",
   "palworks.message.worker.not_owner": "You can only change your own Pokemon's work",
-  "palworks.message.inventory.not_found": "Pokemon not found in your party",
+  "palworks.message.inventory.not_found": "Pokemon not found",
   "palworks.message.inventory.not_owner": "You can only open your own Pokemon's inventory",
   "palworks.message.inventory.carries_nothing": "%s doesn't carry anything",
   "palworks.work_skill.kindling": "Kindling",
