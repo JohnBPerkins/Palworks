@@ -39,3 +39,26 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+// The wiki (see "Wiki" in .github/CONTRIBUTING.md): the hand-written pages in wiki/ with their generated tables filled
+// in, plus a page per work skill listing every Pokémon that can do it, written to build/wiki. The
+// generator lives in the test sources so it isn't in the mod jar; it reads Cobblemon's species data
+// straight from its jar (wiki_cobblemon_version), so it needs no game.
+def wikiCobblemon = configurations.detachedConfiguration(
+        dependencies.create("com.cobblemon:mod:${rootProject.wiki_cobblemon_version}+${rootProject.minecraft_version}"))
+wikiCobblemon.transitive = false
+
+tasks.register('generateWiki', JavaExec) {
+    group = 'documentation'
+    description = 'Builds the wiki pages, with their Pokémon tables, into build/wiki.'
+    def pages = rootProject.file('wiki')
+    def out = rootProject.layout.buildDirectory.dir('wiki')
+    inputs.files(wikiCobblemon)
+    inputs.dir(pages)
+    outputs.dir(out)
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.palworks.wiki.WikiGenerator'
+    argumentProviders.add({
+        [wikiCobblemon.singleFile.path, rootProject.wiki_cobblemon_version, pages.path, out.get().asFile.path]
+    } as CommandLineArgumentProvider)
+}
