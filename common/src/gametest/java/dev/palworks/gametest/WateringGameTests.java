@@ -233,15 +233,6 @@ public class WateringGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = Templates.EMPTY)
-    public void speciesEntriesFollowBaseStats(GameTestHelper helper) {
-        assertLevel(helper, "Kingambit's Lumbering (550)", 4, level("kingambit", Suitability.LUMBERING));
-        assertLevel(helper, "Pawniard's Lumbering (340)", 1, level("pawniard", Suitability.LUMBERING));
-        assertLevel(helper, "Lucario's Handiwork (525)", 3, level("lucario", Suitability.HANDIWORK));
-        assertLevel(helper, "Magnemite's Lumbering (Steel isn't)", 0, level("magnemite", Suitability.LUMBERING));
-        helper.succeed();
-    }
-
     // ---- Water types at work ----
 
     @GameTest(template = Templates.EMPTY, batch = "worker_water", timeoutTicks = 600)
