@@ -138,6 +138,16 @@ public final class NonWorkerSleep {
         WorkerNavigator.walkTo(entity, Beds.standTile(bed.pos(), bedBlock), WALK_SPEED);
     }
 
+    /** Whether it's a non-worker lying in its bed, asleep (Palworks holding it so). */
+    public static boolean isInBed(PokemonEntity entity) {
+        if (!(entity.level() instanceof ServerLevel level)) {
+            return false;
+        }
+        NonWorkerBed bed =
+                JobManager.getInstance(level).nonWorkerBed(entity.getPokemon().getUuid());
+        return bed != null && bed.inBed();
+    }
+
     /** It takes a free bed, if there is one (null if not), and says so in the debug log. */
     private static NonWorkerBed claim(JobManager jobs, PokemonEntity entity) {
         NonWorkerBed bed = jobs.claimNonWorkerBed(entity);

@@ -52,6 +52,7 @@ public final class WorkerTicking {
         // No work it can do, and never a worker: not one. (One that was, and lost its last work
         // skill, carries on as one whose work is off: it lets its job go and wakes up.)
         if (!WorkerEligibility.canWork(pokemon) && !WorkerStateManager.hasWorkerState(pokemon)) {
+            WorkerStatusSync.update(pokemon, null); // asleep in a bed, if its species can't show it
             return;
         }
         JobManager.getInstance(level).registerWorker(pokemon, entity, level);

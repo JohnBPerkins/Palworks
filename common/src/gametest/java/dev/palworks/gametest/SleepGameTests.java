@@ -265,12 +265,17 @@ public class SleepGameTests {
                 .thenWaitUntil(() -> helper.assertTrue(
                         asleepInStrawBed(helper, trubbish, BED),
                         "lying in the bed: " + nonWorkerSleep(helper, trubbish, BED)))
+                // With no sleep animation, it shows it's asleep over its head
+                .thenWaitUntil(() -> helper.assertTrue(
+                        trubbish.getAspects().contains(WorkerStatus.ASLEEP.aspect()), "showing it's asleep"))
                 .thenExecute(() -> setTime(helper, MORNING))
                 .thenWaitUntil(() -> helper.assertTrue(
                         JobManager.getInstance(helper.getLevel())
                                         .nonWorkerBed(trubbish.getPokemon().getUuid())
                                 == null,
                         "up in the morning"))
+                .thenWaitUntil(() -> helper.assertFalse(
+                        trubbish.getAspects().contains(WorkerStatus.ASLEEP.aspect()), "no longer showing it"))
                 .thenSucceed();
     }
 

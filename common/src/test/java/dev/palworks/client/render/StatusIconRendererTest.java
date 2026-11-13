@@ -25,6 +25,11 @@ class StatusIconRendererTest {
     }
 
     @Test
+    void oneAsleepWithNoSleepAnimationShowsAsleep() {
+        assertEquals(List.of(WorkerStatus.ASLEEP), StatusIconRenderer.statusesOf(Set.of("palworks-asleep")));
+    }
+
+    @Test
     void otherAspectsShowNothing() {
         assertEquals(List.of(), StatusIconRenderer.statusesOf(Set.of("palworks-working", "shiny")));
     }

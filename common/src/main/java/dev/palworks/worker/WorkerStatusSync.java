@@ -2,8 +2,10 @@ package dev.palworks.worker;
 
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.aspect.AspectProvider;
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.hunger.Hunger;
+import dev.palworks.sleep.NonWorkerSleep;
 import dev.palworks.sleep.Sleep;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -36,22 +38,31 @@ public final class WorkerStatusSync {
     }
 
     /**
-     * What's wrong with this worker now: only while Palworks' hunger or sleep applies to it (its work
-     * is on; sleep only for a pastured one).
+     * What it shows now: what's wrong with it as a worker, only while Palworks' hunger or sleep
+     * applies to it (its work is on; sleep only for a pastured one); and that it's asleep, if its
+     * species has no sleep animation to show it. {@code state} is its worker state, null if it has
+     * none (it was never a worker).
      */
-    public static Set<WorkerStatus> statusesOf(Pokemon pokemon, WorkerState state) {
+    public static Set<WorkerStatus> statusesOf(Pokemon pokemon, @Nullable WorkerState state) {
         Set<WorkerStatus> statuses = EnumSet.noneOf(WorkerStatus.class);
-        if (Hunger.isEmpty(pokemon, state)) {
+        if (state != null && Hunger.isEmpty(pokemon, state)) {
             statuses.add(WorkerStatus.HUNGRY);
         }
-        if (state.isTired() && Sleep.appliesTo(pokemon, state)) {
+        boolean sleeps = state != null && Sleep.appliesTo(pokemon, state);
+        if (sleeps && state.isTired()) {
             statuses.add(WorkerStatus.TIRED);
+        }
+        PokemonEntity entity = pokemon.getEntity();
+        if (entity != null
+                && !Sleep.hasSleepPose(entity)
+                && ((sleeps && state.isAsleep()) || NonWorkerSleep.isInBed(entity))) {
+            statuses.add(WorkerStatus.ASLEEP);
         }
         return statuses;
     }
 
-    /** After each worker tick: show its statuses, if they've changed. */
-    public static void update(Pokemon pokemon, WorkerState state) {
+    /** After each tick of an owned Pokémon out in the world: show its statuses, if they've changed. */
+    public static void update(Pokemon pokemon, @Nullable WorkerState state) {
         Set<String> wanted = new HashSet<>();
         for (WorkerStatus status : statusesOf(pokemon, state)) {
             wanted.add(status.aspect());

@@ -195,7 +195,8 @@ stay awake with you, as Cobblemon's party Pokémon do.
   the nearest. Like troughs, beds by its pasture block count however far it has wandered. With none
   to be had, it sleeps where it is.
 - **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
-  walks at three quarters of its speed, with a "z" over its head, until it next sleeps.
+  walks at three quarters of its speed, with a "z" over its head, until it next sleeps. One whose
+  species has no sleep animation (it only lies still) shows a moon over its head while it sleeps.
 - **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It
   stays up for 15 seconds, then goes back to bed if it's still its bedtime. What it slept before
   still counts towards whether it wakes Tired.
@@ -236,8 +237,9 @@ player's own display settings:
 }
 ```
 
-- **`show_status_icons`**: whether workers show what's holding their work back over their heads: a
-  half hunger shank when they're out of food, a "z" when they're Tired.
+- **`show_status_icons`**: whether Pokémon show over their heads what's holding their work back (a
+  half hunger shank when they're out of food, a "z" when they're Tired), and a moon while they're
+  asleep, if their species has no sleep animation to show it.
 
 ## Customizing work skills
 
