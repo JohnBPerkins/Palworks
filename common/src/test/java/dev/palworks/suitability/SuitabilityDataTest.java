@@ -318,4 +318,29 @@ class SuitabilityDataTest {
                 levels(data, List.of("grass", "flying"), "cobblemon:tropius"));
         assertTrue(levels(data, List.of("water"), "cobblemon:lucario").containsKey(HANDIWORK));
     }
+
+    @Test
+    void speciesOverridesGoOverTheFiles() {
+        SuitabilityData files = load(Map.of(
+                "palworks:planting", "{\"types\": {\"grass\": 1}}",
+                "palworks:handiwork", "{\"species\": {\"machamp\": 3}}"));
+        SuitabilityData data = files.withSpecies(Map.of(
+                "cobblemon:bulbasaur", Map.of(WATERING, 3, PLANTING, 0),
+                "cobblemon:machamp", Map.of(LUMBERING, 2)));
+
+        // Watering added, Planting (from its type) taken away
+        assertEquals(Map.of(WATERING, 3), levels(data, List.of("grass", "poison"), "cobblemon:bulbasaur"));
+        // The file's species level is kept beside the override
+        assertEquals(Map.of(HANDIWORK, 3, LUMBERING, 2), levels(data, List.of("fighting"), "cobblemon:machamp"));
+        // Other species, and the data it was made from, are as they were
+        assertEquals(Map.of(PLANTING, 1), levels(data, List.of("grass"), "cobblemon:oddish"));
+        assertEquals(Map.of(PLANTING, 1), levels(files, List.of("grass", "poison"), "cobblemon:bulbasaur"));
+    }
+
+    @Test
+    void anOverrideReplacesTheFilesLevelForItsJob() {
+        SuitabilityData data = load(Map.of("palworks:handiwork", "{\"species\": {\"machamp\": 3}}"))
+                .withSpecies(Map.of("cobblemon:machamp", Map.of(HANDIWORK, 1)));
+        assertEquals(Map.of(HANDIWORK, 1), levels(data, List.of("fighting"), "cobblemon:machamp"));
+    }
 }

@@ -198,8 +198,36 @@ public class WorkerAI {
             return executeJob(pokemon, entity, level, state, reservation);
         }
 
+        // Heading home, to a trough or bed it couldn't get to from where it was
+        if (entity instanceof PokemonEntity pokemonEntity && walkHome(pokemon, pokemonEntity, level, state)) {
+            return true;
+        }
+
         // No reservation - idle (JobManager will assign work), once its last job's animation is over
         return holdForAnimation(entity);
+    }
+
+    /**
+     * Walk the leg home JobAssigner gave it (see JobAssigner#headHome), while it still needs the
+     * trough or bed. At the leg's end (or if it's taken too long), it stops, and JobAssigner looks
+     * for a way to them again, or gives it its next leg. Returns whether it's walking home.
+     */
+    private static boolean walkHome(Pokemon pokemon, PokemonEntity entity, Level level, WorkerState state) {
+        BlockPos leg = state.getHomeward();
+        if (leg == null) {
+            return false;
+        }
+        boolean stillNeeds = Hunger.wantsFood(pokemon) || Sleep.isBedtimeFor(entity, state);
+        if (!stillNeeds
+                || entity.blockPosition().closerThan(leg, 2)
+                || level.getGameTime() - state.getHomewardSince() > HOME_LEG_TICKS) {
+            state.setHomeward(null, level.getGameTime());
+            WorkerNavigator.forget(entity);
+            entity.getNavigation().stop();
+            return false;
+        }
+        navigateToJob(entity, leg, walkSpeed(pokemon, state, JobType.EAT_FOOD), true);
+        return true;
     }
 
     /**
@@ -428,7 +456,11 @@ public class WorkerAI {
         if (state.getStepTicks() > 0) {
             state.restartStep();
         }
-        navigateToJob(entity, standPos, walkSpeed(pokemon, state, reservation.getJobType()));
+        navigateToJob(
+                entity,
+                standPos,
+                walkSpeed(pokemon, state, reservation.getJobType()),
+                isForItsNeeds(reservation.getJobType()));
         state.setWalkedToJob(true);
         state.resetStepIn();
 
@@ -580,10 +612,11 @@ public class WorkerAI {
     /**
      * Walk the worker to its stand tile, at normal walking speed, along a path its whole body fits
      * along (see {@link WorkerNavigator}). The path ends on the tile itself, so a stance only just
-     * off its tile (right up against a trunk) gets there too.
+     * off its tile (right up against a trunk) gets there too. Going to eat or sleep (a far trip), it
+     * looks further round obstacles for a way.
      */
-    private static void navigateToJob(Mob entity, BlockPos standPos, double speed) {
-        WorkerNavigator.walkTo(entity, standPos, speed);
+    private static void navigateToJob(Mob entity, BlockPos standPos, double speed, boolean farTrip) {
+        WorkerNavigator.walkTo(entity, standPos, speed, farTrip);
     }
 
     /** Normal walking speed (0.6), slower for a worker with no fullness left; never on its way to eat. */
@@ -614,6 +647,9 @@ public class WorkerAI {
      * How long an idle worker waits in its bedtime for a bed before it sleeps where it is: long
      * enough for JobAssigner to offer it one (it gets a turn every few ticks).
      */
+    // The longest a leg home may take before it stops and looks again (see walkHome): 30s
+    private static final int HOME_LEG_TICKS = 600;
+
     private static final int BED_SEARCH_TICKS = 40;
 
     /**
@@ -669,6 +705,10 @@ public class WorkerAI {
             state.addSleepTick(false);
             SleepPose.hold(entity);
             return true;
+        }
+        if (state.getHomeward() != null) {
+            state.resetBedtimeIdleTicks(); // on its way home to a bed: it doesn't drop off on the way
+            return false;
         }
         state.addBedtimeIdleTick();
         if (state.getBedtimeIdleTicks() > BED_SEARCH_TICKS) {

@@ -184,4 +184,17 @@ class PalworksConfigTest {
         PalworksConfig.load(configDir);
         assertEquals(16, PalworksConfig.current().ownerRange());
     }
+
+    @Test
+    void savingUsesTheSettingsAndWritesTheFileItWasLoadedFrom(@TempDir Path configDir) throws IOException {
+        PalworksConfig.load(configDir);
+        PalworksConfig changed =
+                PalworksConfig.DEFAULTS.withHunger(new PalworksConfig.HungerConfig(false, 20, 0.25, 0.5, 0.25));
+        PalworksConfig.save(changed);
+        assertEquals(changed, PalworksConfig.current());
+
+        PalworksConfig.setCurrent(PalworksConfig.DEFAULTS);
+        PalworksConfig.load(configDir);
+        assertEquals(changed, PalworksConfig.current(), "read back from the file");
+    }
 }

@@ -60,6 +60,13 @@ public class WorkerState {
     private long wokenUntil;
     // Ticks it's been idle in its bedtime without being put to bed (not saved)
     private int bedtimeIdleTicks;
+    // The end of the leg it's walking on its way home, to a trough or bed it couldn't get to from
+    // where it was, and when it set off on it (see JobAssigner.headHome). Not saved: a reload just
+    // has it look again.
+    @Nullable
+    private BlockPos homeward;
+
+    private long homewardSince;
 
     // Mood (see dev.palworks.mood.Mood), 0 to MAX_MOOD, and whether it's on strike: it reached 0 and
     // hasn't come back up enough yet. Saved, so neither is lost in the PC or a reload.
@@ -327,6 +334,23 @@ public class WorkerState {
 
     public void addBedtimeIdleTick() {
         bedtimeIdleTicks++;
+    }
+
+    /** The end of the leg it's walking on its way home, or null if it isn't heading home. */
+    @Nullable
+    public BlockPos getHomeward() {
+        return homeward;
+    }
+
+    /** When it set off on its leg home. */
+    public long getHomewardSince() {
+        return homewardSince;
+    }
+
+    /** Set off home on a leg ending at {@code leg} (null: it isn't heading home), at game time {@code now}. */
+    public void setHomeward(@Nullable BlockPos leg, long now) {
+        this.homeward = leg;
+        this.homewardSince = now;
     }
 
     public void resetBedtimeIdleTicks() {

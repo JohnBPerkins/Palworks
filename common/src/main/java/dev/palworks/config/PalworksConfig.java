@@ -17,11 +17,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Server settings players and modpacks can tune, from {@code config/palworks.json}. Every field
  * is optional (left out, it keeps its default), and each must be in its range, or the file is
- * ignored with a warning and the defaults are used. Read when the server starts.
+ * ignored with a warning and the defaults are used. Read when the server starts; admins can also
+ * change each setting in game ({@code /palworks config}, see {@link ConfigKeys}), which writes the file.
  *
  * @param workRangeHorizontal how far (blocks, each way) round itself a worker looks for and takes
  *     jobs
@@ -243,6 +245,9 @@ public record PalworksConfig(
     }
 
     private static volatile PalworksConfig current = DEFAULTS;
+    // The file read by load, which save writes: none until then (in tests, and in-game tests)
+    @Nullable
+    private static volatile Path loadedFrom;
 
     /** The settings in use: the defaults until {@link #load} has run. */
     public static PalworksConfig current() {
@@ -260,6 +265,7 @@ public record PalworksConfig(
      */
     public static void load(Path configDir) {
         Path file = configDir.resolve(FILE_NAME);
+        loadedFrom = file;
         try {
             if (Files.notExists(file)) {
                 Files.createDirectories(configDir);
@@ -274,6 +280,19 @@ public record PalworksConfig(
             Palworks.LOGGER.warn("Couldn't read or write config/{}; using the defaults", FILE_NAME, e);
             current = DEFAULTS;
         }
+    }
+
+    /**
+     * Use these settings from now on ({@code /palworks config}), and write them to {@code palworks.json}
+     * (once {@link #load} has read it). If they can't be written, nothing changes.
+     */
+    public static void save(PalworksConfig config) throws IOException {
+        Path file = loadedFrom;
+        if (file != null) {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, toJson(config), StandardCharsets.UTF_8);
+        }
+        current = config;
     }
 
     /** The settings in {@code json}, or the defaults (and a warning) if it isn't valid. */

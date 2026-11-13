@@ -33,5 +33,6 @@ public final class Templates {
             WorkLevelSyncGameTests.class,
             HungerGameTests.class,
             SleepGameTests.class,
-            MoodGameTests.class);
+            MoodGameTests.class,
+            JobIndexGameTests.class);
 }

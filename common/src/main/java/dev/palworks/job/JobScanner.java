@@ -12,10 +12,10 @@ import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,16 +35,18 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Finds a level's jobs: scans the chunks round its workers, a few a tick, putting what it finds in
- * the {@link JobPool} and taking out what's gone. Each chunk's scan is cached
- * ({@link ChunkJobCache}) until it's stale or something in it changes.
+ * the {@link JobPool} and taking out what's gone. What each chunk's scan found is kept in its
+ * {@link ChunkIndex} until it's stale or something in it changes.
  */
 final class JobScanner {
 
     // Soft cap on blocks scanned per tick. Checked between chunks (a started chunk always
     // finishes), so a tick may overshoot by up to one chunk's band. ~2 chunk-bands at 32 vertical.
     private static final int MAX_BLOCKS_SCANNED_PER_TICK = 32768;
-    // 2s: max staleness of a chunk's job scan (also bounds furnace/crop discovery latency)
-    static final int JOB_CACHE_LIFETIME_TICKS = 40;
+    // 5 minutes: how often a chunk already indexed is scanned again in full. Its index is kept up to
+    // date as blocks and containers change (onBlockChanged, onContainerChanged), so this only catches
+    // what changes without the game saying so (a world editor writing a chunk directly)
+    static final int RESCAN_TICKS = 6000;
     // What a chunk counts against MAX_BLOCKS_SCANNED_PER_TICK however little of it is scanned
     // (looking it up, its sections' palettes, replacing its cache): at most 32 a tick, enough to
     // keep 1280 fresh, so a server's many mostly empty chunks are spread over the ticks
@@ -53,11 +55,23 @@ final class JobScanner {
 
     private final JobPool pool;
 
-    // Chunk-based job cache (performance optimization)
-    private final Map<ChunkPos, ChunkJobCache> chunkCaches = new ConcurrentHashMap<>();
+    // What each scanned chunk holds: its jobs and the places workers use
+    private final Map<ChunkPos, ChunkIndex> chunkCaches = new ConcurrentHashMap<>();
 
-    // The chunks in some worker's range at the last scan: their caches are kept (dropStaleCaches)
-    private Set<ChunkPos> chunksNearWorkers = Set.of();
+    // How often (ticks) to drop the indexes of chunks that have unloaded
+    private static final int DROP_UNLOADED_TICKS = 100;
+
+    // Blocks that changed in indexed chunks since the last tick, and the blocks next to them whose
+    // jobs can depend on them: looked at again next tick (see onBlockChanged). Changes can come from
+    // off the server thread (mods), so it's a concurrent set.
+    private final Set<BlockPos> changed = ConcurrentHashMap.newKeySet();
+
+    // Blocks to look at again at a set time, with nothing changing to say so: a watered crop wanting
+    // water again once its cooldown's over. Earliest first; only the server thread uses it.
+    private final java.util.Queue<Recheck> rechecks =
+            new java.util.PriorityQueue<>(Comparator.comparingLong(Recheck::at));
+
+    private record Recheck(long at, BlockPos pos) {}
 
     // Blocks of trees already validated during the current chunk scan, so a tree with several base
     // blocks only gets one tree search and one job. Cleared at the start of each chunk scan.
@@ -74,11 +88,19 @@ final class JobScanner {
         int blocksScannedThisTick = 0;
         long currentTime = level.getGameTime();
 
-        // Get chunks near active workers, each with the Y band to scan (around worker height).
-        Map<ChunkPos, int[]> scanRanges = getChunkScanRangesNearWorkers(level, workers);
-        chunksNearWorkers = scanRanges.keySet();
+        // What changed since last tick, in chunks already scanned: just those blocks, looked at again
+        updateChanged(level);
 
-        for (ChunkPos chunk : dueChunks(scanRanges.keySet(), this::lastScan, currentTime)) {
+        // Get chunks near active workers, each with the Y band to scan (around worker height). One
+        // already indexed but not over all of that band counts as never scanned.
+        Map<ChunkPos, int[]> scanRanges = getChunkScanRangesNearWorkers(level, workers);
+        ToLongFunction<ChunkPos> lastScan = chunk -> {
+            int[] band = scanRanges.get(chunk);
+            ChunkIndex index = chunkCaches.get(chunk);
+            return index != null && !index.coversBand(band[0], band[1]) ? NEVER_SCANNED : lastScan(chunk);
+        };
+
+        for (ChunkPos chunk : dueChunks(scanRanges.keySet(), lastScan, currentTime)) {
             // Block budget is checked between chunks; a chunk we start always finishes.
             if (blocksScannedThisTick >= MAX_BLOCKS_SCANNED_PER_TICK) {
                 break;
@@ -98,12 +120,90 @@ final class JobScanner {
         }
     }
 
+    /**
+     * A block changed (every change on the server comes through here: see
+     * JobManager#onBlockStateChange). If its chunk is indexed, it and the blocks whose jobs can
+     * depend on it are looked at again next tick: the farmland under it (planting needs air above),
+     * the block above it, and the four beside it (a stem's fruit). Must stay cheap: a map lookup
+     * for a chunk that isn't indexed.
+     */
+    void onBlockChanged(BlockPos pos) {
+        if (!chunkCaches.containsKey(new ChunkPos(pos))) {
+            return;
+        }
+        changed.add(pos.immutable());
+        changed.add(pos.below());
+        changed.add(pos.above());
+        changed.add(pos.north());
+        changed.add(pos.south());
+        changed.add(pos.east());
+        changed.add(pos.west());
+    }
+
+    /**
+     * A block entity's contents changed (JobManager#onContainerChanged): if it's a chest or furnace
+     * an index knows (seeds put in or taken out, a furnace loaded or burnt out), it's looked at again
+     * next tick. Called very often (every hopper move, every furnace that's burning), so a map lookup
+     * and a set lookup for anything else.
+     */
+    void onContainerChanged(BlockPos pos) {
+        ChunkIndex index = chunkCaches.get(new ChunkPos(pos));
+        if (index != null && index.holdsWork(pos)) {
+            changed.add(pos.immutable());
+        }
+    }
+
+    /** Look at the block at {@code pos} again at game time {@code at} (a crop watered, wanting water again then). */
+    void recheckAt(BlockPos pos, long at) {
+        rechecks.add(new Recheck(at, pos.immutable()));
+    }
+
+    /**
+     * Look again at each block that changed (see {@link #onBlockChanged}), in its chunk's index: the
+     * place it is (a chest, a trough, a bed) and the job it gives, if any. A job it gave before and
+     * doesn't now leaves the pool, unless another block of the chunk still gives it.
+     */
+    private void updateChanged(ServerLevel level) {
+        long gameTime = level.getGameTime();
+        while (!rechecks.isEmpty() && rechecks.peek().at() <= gameTime) {
+            changed.add(rechecks.poll().pos());
+        }
+        if (changed.isEmpty()) {
+            return;
+        }
+        List<BlockPos> blocks = new ArrayList<>(changed);
+        changed.removeAll(blocks);
+        treeBlocksSeenThisScan.clear();
+        for (BlockPos pos : blocks) {
+            ChunkIndex index = chunkCaches.get(new ChunkPos(pos));
+            if (index == null || index.isDirty() || !index.covers(pos.getY()) || !level.isLoaded(pos)) {
+                continue; // not indexed (a neighbour over the edge), or due a full scan anyway
+            }
+            BlockState state = level.getBlockState(pos);
+            index.removePlace(pos);
+            index.addPlace(pos, state);
+            JobKey before = index.removeJob(pos);
+            JobKey now = null;
+            JobRecord job = scanPositionForJob(level, pos, state);
+            if (job != null) {
+                now = JobKey.of(job);
+                index.addJob(pos, now);
+                if (!pool.isReserved(now)) {
+                    pool.offer(job);
+                }
+            }
+            if (before != null && !before.equals(now) && !index.hasJob(before)) {
+                pool.removeScanned(before);
+            }
+        }
+    }
+
     /** {@link #dueChunks}' "last scanned" for a chunk never scanned, or changed since its scan. */
     static final long NEVER_SCANNED = Long.MIN_VALUE;
 
     /** When a chunk was last scanned, or {@link #NEVER_SCANNED} if it never was or it's changed since. */
     private long lastScan(ChunkPos chunk) {
-        ChunkJobCache cache = chunkCaches.get(chunk);
+        ChunkIndex cache = chunkCaches.get(chunk);
         return cache == null || cache.isDirty() ? NEVER_SCANNED : cache.scanTime();
     }
 
@@ -120,7 +220,7 @@ final class JobScanner {
         List<Due> due = new ArrayList<>();
         for (ChunkPos chunk : chunks) {
             long last = lastScan.applyAsLong(chunk);
-            if (last == NEVER_SCANNED || now - last >= JOB_CACHE_LIFETIME_TICKS) {
+            if (last == NEVER_SCANNED || now - last >= RESCAN_TICKS) {
                 due.add(new Due(chunk, last));
             }
         }
@@ -145,35 +245,61 @@ final class JobScanner {
         int verticalRadius = WorkRange.vertical(); // Y range above/below a worker to scan
 
         for (WorkerInfo worker : workers) {
-            BlockPos workerPos = worker.position;
-            int loY = Math.max(worldMinY, workerPos.getY() - verticalRadius);
-            int hiY = Math.min(worldMaxY, workerPos.getY() + verticalRadius + 1); // exclusive
-            int baseChunkX = workerPos.getX() >> 4;
-            int baseChunkZ = workerPos.getZ() >> 4;
-
-            for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
-                for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
-                    ChunkPos chunk = new ChunkPos(baseChunkX + dx, baseChunkZ + dz);
-                    int[] range = ranges.get(chunk);
-                    if (range == null) {
-                        ranges.put(chunk, new int[] {loY, hiY});
-                    } else {
-                        range[0] = Math.min(range[0], loY);
-                        range[1] = Math.max(range[1], hiY);
-                    }
-                }
+            addScanRange(ranges, worker.position, chunkRadius, verticalRadius, worldMinY, worldMaxY);
+            // Round its home too (its pasture block), where its troughs and beds are, so
+            // they're still known however far it's wandered for work
+            if (worker.home != null) {
+                addScanRange(ranges, worker.home, chunkRadius, verticalRadius, worldMinY, worldMaxY);
             }
         }
 
         return ranges;
     }
 
+    /** Add the chunks within {@code chunkRadius} of {@code center} to scan, in a band round its height. */
+    private static void addScanRange(
+            Map<ChunkPos, int[]> ranges,
+            BlockPos center,
+            int chunkRadius,
+            int verticalRadius,
+            int worldMinY,
+            int worldMaxY) {
+        int loY = Math.max(worldMinY, center.getY() - verticalRadius);
+        int hiY = Math.min(worldMaxY, center.getY() + verticalRadius + 1); // exclusive
+        int baseChunkX = center.getX() >> 4;
+        int baseChunkZ = center.getZ() >> 4;
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                ChunkPos chunk = new ChunkPos(baseChunkX + dx, baseChunkZ + dz);
+                int[] range = ranges.get(chunk);
+                if (range == null) {
+                    ranges.put(chunk, new int[] {loY, hiY});
+                } else {
+                    range[0] = Math.min(range[0], loY);
+                    range[1] = Math.max(range[1], hiY);
+                }
+            }
+        }
+    }
+
     /**
      * Scan a single chunk for job opportunities.
      */
-    private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int scanMinY, int scanMaxY) {
-        ChunkJobCache previous = chunkCaches.get(chunkPos);
-        ChunkJobCache cache = new ChunkJobCache(level.getGameTime());
+    private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int wantMinY, int wantMaxY) {
+        ChunkIndex previous = chunkCaches.get(chunkPos);
+        // Whole sections, with one more each way, so a worker stepping up or down a block doesn't
+        // ask for a band this scan doesn't cover; and never less than the last scan covered
+        int scanMinY = Math.max(
+                level.getMinBuildHeight(),
+                SectionPos.sectionToBlockCoord(SectionPos.blockToSectionCoord(wantMinY) - 1));
+        int scanMaxY = Math.min(
+                level.getMaxBuildHeight(),
+                SectionPos.sectionToBlockCoord(SectionPos.blockToSectionCoord(wantMaxY - 1) + 2));
+        if (previous != null) {
+            scanMinY = Math.min(scanMinY, previous.minY());
+            scanMaxY = Math.max(scanMaxY, previous.maxY());
+        }
+        ChunkIndex cache = new ChunkIndex(level.getGameTime(), scanMinY, scanMaxY);
         treeBlocksSeenThisScan.clear();
 
         // Counted against the budget even if every section is skipped: otherwise empty chunks
@@ -225,18 +351,17 @@ final class JobScanner {
 
                         BlockState state = level.getBlockState(pos);
 
-                        // Remember chests and troughs so delivery and eating can pick one without
-                        // their own block search
-                        if (JobChecks.isChest(state)) {
-                            cache.addChest(pos.immutable());
-                        } else if (JobChecks.isTrough(state)) {
-                            cache.addTrough(pos.immutable());
-                        } else if (JobChecks.isBed(state)) {
-                            cache.addBed(pos.immutable());
-                        }
+                        // Remember the places workers use (chests, troughs, beds), so
+                        // delivery, eating and sleeping can pick one without a block search
+                        cache.addPlace(pos.immutable(), state);
 
                         // Check for job opportunities at this position
                         JobRecord job = scanPositionForJob(level, pos, state);
+                        // Indexed even if a worker has it: when it's done, or given back, the
+                        // block's next change says whether it's still there
+                        if (job != null) {
+                            cache.addJob(pos.immutable(), JobKey.of(job));
+                        }
                         if (job != null && !pool.isReserved(JobKey.of(job))) {
                             if (Palworks.LOGGER.isTraceEnabled()) {
                                 Palworks.LOGGER.trace(
@@ -247,7 +372,6 @@ final class JobScanner {
                                         job.position());
                             }
                             pool.offer(job);
-                            cache.addJob(job.type(), job.position());
                         }
                     }
                 }
@@ -266,20 +390,18 @@ final class JobScanner {
     }
 
     /** Remove the available jobs an earlier scan found that a newer scan of the same chunk didn't. */
-    private void removeJobsNotFoundAgain(ChunkJobCache previous, ChunkJobCache current) {
-        previous.jobs().forEach((type, positions) -> {
-            List<BlockPos> stillThere = current.jobs().getOrDefault(type, List.of());
-            for (BlockPos pos : positions) {
-                if (!stillThere.contains(pos)) {
-                    pool.removeScanned(new JobKey(pos, type));
-                }
+    private void removeJobsNotFoundAgain(ChunkIndex previous, ChunkIndex current) {
+        Set<JobKey> stillThere = current.jobs();
+        for (JobKey job : previous.jobs()) {
+            if (!stillThere.contains(job)) {
+                pool.removeScanned(job);
             }
-        });
+        }
     }
 
-    /** Remove all of a chunk cache's available jobs (when the cache itself is dropped). */
-    private void removeJobsOf(ChunkJobCache cache) {
-        cache.jobs().forEach((type, positions) -> positions.forEach(pos -> pool.removeScanned(new JobKey(pos, type))));
+    /** Remove all of a chunk's available jobs (when its index itself is dropped). */
+    private void removeJobsOf(ChunkIndex cache) {
+        cache.jobs().forEach(pool::removeScanned);
     }
 
     /**
@@ -375,6 +497,17 @@ final class JobScanner {
         return null;
     }
 
+    /** Whether the chunk {@code pos} is in has been scanned and is indexed. */
+    boolean isIndexed(BlockPos pos) {
+        return chunkCaches.containsKey(new ChunkPos(pos));
+    }
+
+    /** Whether the block at {@code pos} is in its chunk's index as a chest, trough, bed or furnace. */
+    boolean isKnownPlace(BlockPos pos) {
+        ChunkIndex index = chunkCaches.get(new ChunkPos(pos));
+        return index != null && index.isPlace(pos);
+    }
+
     /**
      * Whether every chunk in a worker's range has been scanned for jobs. The scan gets through a
      * couple of chunks a tick, so a worker just sent out (or arrived somewhere new) waits the few
@@ -387,7 +520,7 @@ final class JobScanner {
         int baseChunkZ = worker.position.getZ() >> 4;
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
-                ChunkJobCache cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
+                ChunkIndex cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
                 if (cache == null || cache.isDirty()) {
                     return false;
                 }
@@ -415,7 +548,7 @@ final class JobScanner {
     private void markForRescan(int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ) {
         for (int x = minChunkX; x <= maxChunkX; x++) {
             for (int z = minChunkZ; z <= maxChunkZ; z++) {
-                ChunkJobCache cache = chunkCaches.get(new ChunkPos(x, z));
+                ChunkIndex cache = chunkCaches.get(new ChunkPos(x, z));
                 if (cache != null) {
                     cache.markDirty();
                 }
@@ -428,7 +561,7 @@ final class JobScanner {
      * {@code center}'s (delivery targets). Up to a scan old: check they're still chests.
      */
     List<BlockPos> chestsNear(BlockPos center, int chunkRadius) {
-        return near(center, chunkRadius, ChunkJobCache::chests);
+        return near(center, chunkRadius, ChunkIndex::chests);
     }
 
     /**
@@ -436,7 +569,7 @@ final class JobScanner {
      * {@code center}'s (where workers eat). Up to a scan old: check they're still troughs.
      */
     List<BlockPos> troughsNear(BlockPos center, int chunkRadius) {
-        return near(center, chunkRadius, ChunkJobCache::troughs);
+        return near(center, chunkRadius, ChunkIndex::troughs);
     }
 
     /**
@@ -444,17 +577,17 @@ final class JobScanner {
      * {@code center}'s (where pastured workers sleep). Up to a scan old: check they're still beds.
      */
     List<BlockPos> bedsNear(BlockPos center, int chunkRadius) {
-        return near(center, chunkRadius, ChunkJobCache::beds);
+        return near(center, chunkRadius, ChunkIndex::beds);
     }
 
     private List<BlockPos> near(
-            BlockPos center, int chunkRadius, java.util.function.Function<ChunkJobCache, List<BlockPos>> found) {
+            BlockPos center, int chunkRadius, java.util.function.Function<ChunkIndex, Set<BlockPos>> found) {
         List<BlockPos> positions = new ArrayList<>();
         int baseChunkX = center.getX() >> 4;
         int baseChunkZ = center.getZ() >> 4;
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
-                ChunkJobCache cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
+                ChunkIndex cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
                 if (cache != null) {
                     positions.addAll(found.apply(cache));
                 }
@@ -464,37 +597,64 @@ final class JobScanner {
     }
 
     /**
-     * Remove stale chunk caches (older than twice the cache lifetime) of chunks no worker is near,
-     * and their jobs: nothing will rescan those, so nothing would ever notice their jobs
-     * disappearing. A chunk near a worker keeps its cache until it's rescanned, however long that
-     * takes: when the scan falls behind (more chunks than it gets through in a lifetime), dropping
-     * those too left most of them looking never scanned, so no worker was ever given a job
-     * ({@link #hasScannedAround}).
+     * Drop the indexes of chunks that have unloaded, and their jobs. A chunk's index is kept for as
+     * long as it's loaded, worker near or not, so the troughs and beds by a pasture are still known
+     * when its workers have wandered off. Nothing changes in an unloaded chunk (but by a world
+     * editor), and one loaded again is scanned afresh when a worker's near it.
      */
-    void dropStaleCaches(long gameTime) {
+    void dropUnloaded(ServerLevel level) {
+        if (level.getGameTime() % DROP_UNLOADED_TICKS != 0) {
+            return;
+        }
         chunkCaches.entrySet().removeIf(entry -> {
-            ChunkJobCache cache = entry.getValue();
-            boolean stale = !chunksNearWorkers.contains(entry.getKey())
-                    && !cache.isDirty()
-                    && (gameTime - cache.scanTime()) > JOB_CACHE_LIFETIME_TICKS * 2;
-            if (stale) {
-                removeJobsOf(cache);
+            ChunkPos chunk = entry.getKey();
+            boolean unloaded = !level.hasChunk(chunk.x, chunk.z);
+            if (unloaded) {
+                removeJobsOf(entry.getValue());
             }
-            return stale;
+            return unloaded;
         });
     }
 
-    /** What the last scan of one chunk found, so it isn't rescanned every tick. */
-    private static final class ChunkJobCache {
+    /**
+     * What a chunk holds, as its last scan found it: its jobs, each by the block it was found from
+     * (a ripe crop is its own; a pumpkin stem's is its pumpkin; a log at a tree's base, the tree's),
+     * and the places workers use. Kept so the chunk isn't rescanned every tick.
+     */
+    private static final class ChunkIndex {
         private final long scanTime;
-        private final Map<JobType, List<BlockPos>> jobs = new EnumMap<>(JobType.class);
-        private final List<BlockPos> chests = new ArrayList<>(); // delivery targets
-        private final List<BlockPos> troughs = new ArrayList<>(); // where workers eat
-        private final List<BlockPos> beds = new ArrayList<>(); // where pastured workers sleep
+        // The band of heights scanned, [minY, maxY): changes outside it are left alone
+        private final int minY;
+        private final int maxY;
+        private final Map<BlockPos, JobKey> jobsBySource = new HashMap<>();
+        private final Set<BlockPos> chests = new LinkedHashSet<>(); // delivery targets
+        private final Set<BlockPos> troughs = new LinkedHashSet<>(); // where workers eat
+        private final Set<BlockPos> beds = new LinkedHashSet<>(); // where pastured workers sleep
+        private final Set<BlockPos> furnaces = new LinkedHashSet<>(); // what kindlers light
         private boolean dirty;
 
-        ChunkJobCache(long scanTime) {
+        ChunkIndex(long scanTime, int minY, int maxY) {
             this.scanTime = scanTime;
+            this.minY = minY;
+            this.maxY = maxY;
+        }
+
+        /** Whether a block at this height is in the band scanned. */
+        boolean covers(int y) {
+            return y >= minY && y < maxY;
+        }
+
+        /** Whether the band scanned covers all of [minY, maxY). */
+        boolean coversBand(int from, int to) {
+            return from >= minY && to <= maxY;
+        }
+
+        int minY() {
+            return minY;
+        }
+
+        int maxY() {
+            return maxY;
         }
 
         /** Game time of the scan. */
@@ -502,40 +662,71 @@ final class JobScanner {
             return scanTime;
         }
 
-        /** Job positions found, by type. */
-        Map<JobType, List<BlockPos>> jobs() {
-            return jobs;
+        /** Every job found in the chunk. */
+        Set<JobKey> jobs() {
+            return new HashSet<>(jobsBySource.values());
         }
 
-        void addJob(JobType type, BlockPos pos) {
-            jobs.computeIfAbsent(type, k -> new ArrayList<>()).add(pos);
+        /** A job found from the block at {@code source}. */
+        void addJob(BlockPos source, JobKey job) {
+            jobsBySource.put(source, job);
+        }
+
+        /** Forget the job found from the block at {@code source}, returning it (null if none). */
+        @Nullable
+        JobKey removeJob(BlockPos source) {
+            return jobsBySource.remove(source);
+        }
+
+        /** Whether some block of the chunk gives this job. */
+        boolean hasJob(JobKey job) {
+            return jobsBySource.containsValue(job);
+        }
+
+        /** Remember the block at {@code pos} if it's a place workers use. */
+        void addPlace(BlockPos pos, BlockState state) {
+            if (JobChecks.isChest(state)) {
+                chests.add(pos);
+            } else if (JobChecks.isTrough(state)) {
+                troughs.add(pos);
+            } else if (JobChecks.isBed(state)) {
+                beds.add(pos);
+            } else if (state.is(JobBlockTags.FURNACES)) {
+                furnaces.add(pos);
+            }
+        }
+
+        /** Forget the block at {@code pos} as a place (it's changed: see addPlace for what it is now). */
+        void removePlace(BlockPos pos) {
+            chests.remove(pos);
+            troughs.remove(pos);
+            beds.remove(pos);
+            furnaces.remove(pos);
+        }
+
+        /** Whether the block at {@code pos} is a chest, trough, bed or furnace. */
+        boolean isPlace(BlockPos pos) {
+            return chests.contains(pos) || troughs.contains(pos) || beds.contains(pos) || furnaces.contains(pos);
+        }
+
+        /** Whether the block at {@code pos} is a chest or furnace, whose contents make its job. */
+        boolean holdsWork(BlockPos pos) {
+            return chests.contains(pos) || furnaces.contains(pos);
         }
 
         /** Chests seen in the scan. */
-        List<BlockPos> chests() {
+        Set<BlockPos> chests() {
             return chests;
         }
 
-        void addChest(BlockPos pos) {
-            chests.add(pos);
-        }
-
         /** Troughs seen in the scan. */
-        List<BlockPos> troughs() {
+        Set<BlockPos> troughs() {
             return troughs;
         }
 
-        void addTrough(BlockPos pos) {
-            troughs.add(pos);
-        }
-
-        /** beds seen in the scan. */
-        List<BlockPos> beds() {
+        /** Beds seen in the scan. */
+        Set<BlockPos> beds() {
             return beds;
-        }
-
-        void addBed(BlockPos pos) {
-            beds.add(pos);
         }
 
         /** Whether something in the chunk changed since, so it needs scanning again. */
