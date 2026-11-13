@@ -1,7 +1,6 @@
 {
   "types": {
-    "fighting": 1,
-    "steel": 1
+    "fighting": 1
   },
   "species": {
     "cobblemon:treecko": 1,
@@ -11,10 +10,25 @@
     "cobblemon:heracross": 1,
     "cobblemon:scyther": 2,
     "cobblemon:scizor": 3,
+    "cobblemon:kleavor": 3,
     "cobblemon:durant": 1,
     "cobblemon:escavalier": 1,
     "cobblemon:kartana": 3,
     "cobblemon:trevenant": 1,
-    "cobblemon:phantump": 1
+    "cobblemon:phantump": 1,
+    "cobblemon:pawniard": 1,
+    "cobblemon:bisharp": 1,
+    "cobblemon:kingambit": 1,
+    "cobblemon:honedge": 1,
+    "cobblemon:doublade": 1,
+    "cobblemon:aegislash": 1,
+    "cobblemon:farfetchd": 1,
+    "cobblemon:leavanny": 1,
+    "cobblemon:fomantis": 1,
+    "cobblemon:lurantis": 1,
+    "cobblemon:ceruledge": 1,
+    "cobblemon:kabutops": 1,
+    "cobblemon:skarmory": 1,
+    "cobblemon:ironleaves": 1
   }
 }

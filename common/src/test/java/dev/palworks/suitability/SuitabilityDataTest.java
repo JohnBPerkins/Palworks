@@ -283,13 +283,14 @@ class SuitabilityDataTest {
         assertEquals(Map.of(GENERATING_ELECTRICITY, 1), levels(data, List.of("electric"), "x:y"));
         assertEquals(Map.of(COOLING, 1), levels(data, List.of("ice"), "x:y"));
         assertEquals(Map.of(LUMBERING, 1), levels(data, List.of("fighting"), "x:y"));
-        assertEquals(Map.of(LUMBERING, 1), levels(data, List.of("steel"), "x:y"));
         assertEquals(Map.of(MINING, 1), levels(data, List.of("rock"), "x:y"));
         assertEquals(Map.of(MINING, 1), levels(data, List.of("ground"), "x:y"));
         assertEquals(Map.of(TRANSPORTING, 1), levels(data, List.of("flying"), "x:y"));
         assertEquals(Map.of(MEDICINE_PRODUCTION, 1), levels(data, List.of("psychic"), "x:y"));
         assertEquals(Map.of(NETHER, 1), levels(data, List.of("ghost"), "x:y"));
-        for (String none : List.of("poison", "bug", "dragon", "dark", "fairy")) {
+        // Steel isn't Lumbering: most Steel types have nothing to cut with (Magnemite, Klink,
+        // Bronzor); the blade users are species entries.
+        for (String none : List.of("poison", "bug", "dragon", "dark", "fairy", "steel")) {
             assertEquals(Map.of(), levels(data, List.of(none), "x:y"), none);
         }
         // Rock/Ground: both types give Mining, at the same level.
@@ -299,7 +300,7 @@ class SuitabilityDataTest {
     @Test
     void shippedSpeciesMatchTheOldTable() throws IOException {
         SuitabilityData data = shipped();
-        assertEquals(60, data.speciesCount());
+        assertEquals(75, data.speciesCount());
         // Fighting gives Lumbering 1; Machamp's species entry adds Handiwork 3.
         assertEquals(Map.of(LUMBERING, 1, HANDIWORK, 3), levels(data, List.of("fighting"), "cobblemon:machamp"));
         assertEquals(Map.of(LUMBERING, 1, HANDIWORK, 2), levels(data, List.of("fighting"), "cobblemon:machoke"));
@@ -308,6 +309,11 @@ class SuitabilityDataTest {
         assertEquals(
                 Map.of(LUMBERING, 2, TRANSPORTING, 1), levels(data, List.of("bug", "flying"), "cobblemon:scyther"));
         assertEquals(Map.of(LUMBERING, 2), levels(data, List.of("bug"), "cobblemon:pinsir"));
+        assertEquals(Map.of(LUMBERING, 3, MINING, 1), levels(data, List.of("bug", "rock"), "cobblemon:kleavor"));
+        assertEquals(Map.of(LUMBERING, 1), levels(data, List.of("dark", "steel"), "cobblemon:kingambit"));
+        assertEquals(Map.of(LUMBERING, 1, NETHER, 1), levels(data, List.of("steel", "ghost"), "cobblemon:aegislash"));
+        assertEquals(
+                Map.of(GENERATING_ELECTRICITY, 1), levels(data, List.of("electric", "steel"), "cobblemon:magnemite"));
         assertEquals(
                 Map.of(PLANTING, 1, GATHERING, 1, LUMBERING, 3),
                 levels(data, List.of("grass", "steel"), "cobblemon:kartana"));
