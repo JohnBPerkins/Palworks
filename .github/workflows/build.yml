@@ -20,6 +20,7 @@ permissions:
 #   oldest: cobblemon_version in gradle.properties (what `build` compiles and releases against)
 #   newest: the last version in the compile/boot matrices below
 #   players: the Cobblemon range in fabric.mod.json and neoforge.mods.toml
+#   wiki: wiki_cobblemon_version in gradle.properties (whose Pokémon the wiki lists; see wiki.yml)
 # To support a newer Cobblemon, update the matrices and widen both metadata ranges.
 env:
   FABRIC_INSTALLER_VERSION: "1.1.2"
