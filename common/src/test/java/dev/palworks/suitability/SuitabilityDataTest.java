@@ -330,7 +330,7 @@ class SuitabilityDataTest {
     @Test
     void shippedSpeciesFollowTheirStats() throws IOException {
         SuitabilityData data = shipped();
-        assertEquals(75, data.speciesCount());
+        assertEquals(80, data.speciesCount());
         // Fighting gives Lumbering; Machamp's species entry adds Handiwork. Both from its stats.
         assertEquals(Map.of(LUMBERING, 3, HANDIWORK, 3), levels(data, List.of("fighting"), "cobblemon:machamp", 505));
         assertEquals(Map.of(LUMBERING, 2, HANDIWORK, 2), levels(data, List.of("fighting"), "cobblemon:machoke", 405));
@@ -346,6 +346,10 @@ class SuitabilityDataTest {
         assertEquals(
                 Map.of(PLANTING, 4, GATHERING, 4, LUMBERING, 4),
                 levels(data, List.of("grass", "steel"), "cobblemon:kartana", 570));
+        assertEquals(Map.of(LUMBERING, 3), levels(data, List.of("dragon"), "cobblemon:haxorus", 540));
+        assertEquals(
+                Map.of(LUMBERING, 2, WATERING, 2, FARMING, 2),
+                levels(data, List.of("normal", "water"), "cobblemon:bibarel", 410));
         assertEquals(Map.of(FARMING, 3), levels(data, List.of("normal"), "cobblemon:miltank", 490));
         assertEquals(Map.of(FARMING, 3), levels(data, List.of("normal"), "cobblemon:chansey", 450));
         assertEquals(
