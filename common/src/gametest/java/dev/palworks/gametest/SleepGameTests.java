@@ -112,6 +112,33 @@ public class SleepGameTests {
                 .thenSucceed();
     }
 
+    @AfterBatch(batch = "sleep_saved")
+    public void afterSaved(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_saved", timeoutTicks = 600)
+    public void sleepingWithoutABedIsSavedAsItSleeps(GameTestHelper helper) {
+        // Its state lives in a cache, flushed to its data now and then; the cache goes when its
+        // chunk unloads or the server stops. Asleep on the ground, it used to be flushed only once it
+        // woke, so an unload in the night lost that it was asleep and how long it had slept.
+        Workers.isolate(helper);
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
+        setTime(helper, MIDNIGHT);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(stateOf(squirtle).isAsleep(), "asleep, with no bed"))
+                .thenIdle(40) // past a periodic save
+                .thenExecute(() -> {
+                    Pokemon pokemon = squirtle.getPokemon();
+                    WorkerStateManager.unload(pokemon.getUuid()); // as its chunk unloading does
+                    WorkerState saved = WorkerStateManager.get(pokemon); // read back from its data
+                    helper.assertTrue(saved != null && saved.isAsleep(), "saved asleep");
+                    helper.assertTrue(saved.getGroundSleepTicks() > 0, "with how long it has slept");
+                })
+                .thenSucceed();
+    }
+
     // ---- In the bed, and woken from it ----
 
     @AfterBatch(batch = WOKEN)
