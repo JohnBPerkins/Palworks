@@ -425,7 +425,11 @@ public class WorkerAI {
         if (state.getStepTicks() > 0) {
             state.restartStep();
         }
-        navigateToJob(entity, standPos, walkSpeed(pokemon, state, reservation.getJobType()));
+        navigateToJob(
+                entity,
+                standPos,
+                walkSpeed(pokemon, state, reservation.getJobType()),
+                isForItsNeeds(reservation.getJobType()));
         state.setWalkedToJob(true);
         state.resetStepIn();
 
@@ -577,10 +581,11 @@ public class WorkerAI {
     /**
      * Walk the worker to its stand tile, at normal walking speed, along a path its whole body fits
      * along (see {@link WorkerNavigator}). The path ends on the tile itself, so a stance only just
-     * off its tile (right up against a trunk) gets there too.
+     * off its tile (right up against a trunk) gets there too. Going to eat or sleep (a far trip), it
+     * looks further round obstacles for a way.
      */
-    private static void navigateToJob(Mob entity, BlockPos standPos, double speed) {
-        WorkerNavigator.walkTo(entity, standPos, speed);
+    private static void navigateToJob(Mob entity, BlockPos standPos, double speed, boolean farTrip) {
+        WorkerNavigator.walkTo(entity, standPos, speed, farTrip);
     }
 
     /** Normal walking speed (0.6), slower for a worker with no fullness left; never on its way to eat. */

@@ -488,8 +488,9 @@ final class JobAssigner {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position(), job.type(), entity);
-            WorkerPathfinder.Result path =
-                    standPos == null ? new WorkerPathfinder.Result(Reach.NO, null) : canPathTo(entity, standPos);
+            WorkerPathfinder.Result path = standPos == null
+                    ? new WorkerPathfinder.Result(Reach.NO, null)
+                    : canPathTo(entity, standPos, isNeed(job.type()));
             Reach reach = path.reach();
             if (reach == Reach.UNKNOWN) {
                 // The worker can't pathfind at all right now (e.g. it was just sent out and is still
@@ -538,7 +539,7 @@ final class JobAssigner {
      */
     private static boolean isNeedNearHome(WorkerInfo worker, JobRecord job) {
         BlockPos pos = job.position();
-        return (job.type() == JobType.EAT_FOOD || job.type() == JobType.SLEEP)
+        return isNeed(job.type())
                 && worker.home != null
                 && Math.abs(pos.getX() - worker.home.getX()) <= DELIVERY_SEARCH_RADIUS
                 && Math.abs(pos.getZ() - worker.home.getZ()) <= DELIVERY_SEARCH_RADIUS
@@ -643,11 +644,21 @@ final class JobAssigner {
      * reach the tile (standPos is a standable tile, not the worked block, so canReach() is right).
      */
     WorkerPathfinder.Result canPathTo(Mob entity, BlockPos standPos) {
+        return canPathTo(entity, standPos, false);
+    }
+
+    /** A trough or bed: what a worker goes to for itself, searched for further round (a far trip). */
+    private static boolean isNeed(JobType type) {
+        return type == JobType.EAT_FOOD || type == JobType.SLEEP;
+    }
+
+    /** {@link #canPathTo(Mob, BlockPos)}, searching further round if it's a {@code farTrip}. */
+    WorkerPathfinder.Result canPathTo(Mob entity, BlockPos standPos, boolean farTrip) {
         if (entity == null) {
             return new WorkerPathfinder.Result(Reach.UNKNOWN, null);
         }
         if (WorkerPathfinder.handles(entity)) {
-            return WorkerPathfinder.find(entity, standPos);
+            return WorkerPathfinder.find(entity, standPos, farTrip);
         }
         net.minecraft.world.level.pathfinder.Path path = entity.getNavigation().createPath(standPos, 1);
         if (path == null) {

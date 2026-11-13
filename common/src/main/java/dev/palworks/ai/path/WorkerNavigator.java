@@ -69,6 +69,14 @@ public final class WorkerNavigator {
      * nothing while it's walking a good path there.
      */
     public static void walkTo(Mob mob, BlockPos goal, double speed) {
+        walkTo(mob, goal, speed, false);
+    }
+
+    /**
+     * {@link #walkTo(Mob, BlockPos, double)}, planning further round if it's a {@code farTrip} (to a
+     * trough or a bed: see WorkerPathfinder.find).
+     */
+    public static void walkTo(Mob mob, BlockPos goal, double speed, boolean farTrip) {
         PathNavigation navigation = mob.getNavigation();
         if (!WorkerPathfinder.handles(mob)) {
             // Flying or swimming: Cobblemon's navigation plans that
@@ -86,7 +94,7 @@ public final class WorkerNavigator {
                     // On its way. Now and then, make sure nothing has got in its way since.
                     if ((now + mob.getId()) % RECHECK_TICKS == 0
                             && !WorkerPathfinder.stillClear(mob, ours, RECHECK_MOVES)) {
-                        plan(mob, goal, speed, now);
+                        plan(mob, goal, speed, now, farTrip);
                     }
                     return;
                 }
@@ -106,7 +114,7 @@ public final class WorkerNavigator {
                 return;
             }
         }
-        plan(mob, goal, speed, now);
+        plan(mob, goal, speed, now, farTrip);
     }
 
     /**
@@ -127,8 +135,8 @@ public final class WorkerNavigator {
         WALKS.remove(mob);
     }
 
-    private static void plan(Mob mob, BlockPos goal, double speed, long now) {
-        WorkerPathfinder.Result result = WorkerPathfinder.find(mob, goal);
+    private static void plan(Mob mob, BlockPos goal, double speed, long now, boolean farTrip) {
+        WorkerPathfinder.Result result = WorkerPathfinder.find(mob, goal, farTrip);
         switch (result.reach()) {
             case YES -> start(mob, new Walk(goal.immutable(), result.path(), now), speed);
             case NO -> {

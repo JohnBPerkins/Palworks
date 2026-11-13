@@ -391,6 +391,39 @@ public class HungerGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "hunger_far_trip", timeoutTicks = 1200)
+    public void aHungryWorkerGoesRoundAWallToItsTrough(GameTestHelper helper) {
+        // The trough 28 blocks off, behind a wall further across than an ordinary search looks round
+        Workers.isolate(helper);
+        Runnable unload = Scenes.keepLoaded(helper, new BlockPos(-40, 0, -40), new BlockPos(60, 0, 50));
+        for (int z = -6; z <= 26; z++) {
+            for (int y = 1; y <= 3; y++) {
+                helper.setBlock(new BlockPos(16, y, z), Blocks.STONE);
+            }
+        }
+        BlockPos trough = new BlockPos(30, 1, 10);
+        trough(helper, trough).addFood(berries(9));
+        PokemonEntity worker = Workers.sendOutPastured(helper, WORKER, new BlockPos(2, 1, 10));
+        Pokemon pokemon = worker.getPokemon();
+        pokemon.setCurrentFullness(0);
+        // Which side of the wall it set off for the trough from: its own, not after wandering round
+        double[] setOffAtX = {Double.NaN};
+        double wallX = helper.absolutePos(new BlockPos(16, 1, 10)).getX();
+        boolean startSideLow = worker.getX() < wallX;
+        helper.onEachTick(() -> {
+            ReservationId job = WorkerStateManager.getOrCreate(pokemon).getCurrentReservation();
+            if (Double.isNaN(setOffAtX[0]) && job != null && job.getJobType() == JobType.EAT_FOOD) {
+                setOffAtX[0] = worker.getX();
+            }
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(pokemon.getCurrentFullness() > 0, "it got round and ate"))
+                .thenExecute(() -> helper.assertTrue(
+                        (setOffAtX[0] < wallX) == startSideLow, "it set off from its own side of the wall"))
+                .thenExecute(unload)
+                .thenSucceed();
+    }
+
     /**
      * The worker's body is up against the trough (no more space between them than a lumberjack has
      * at its trunk) and in line with it, not off at a corner.
