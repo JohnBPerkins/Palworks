@@ -933,6 +933,14 @@ public class SleepGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "sleep_nap_no_food", timeoutTicks = 1200)
+    public void aHungryTiredWorkerWithNoFoodToBeHadStillNaps(GameTestHelper helper) {
+        // Eating comes first only when there's food: with none, it doesn't wait for some to nap
+        PokemonEntity squirtle = tiredInTheMorning(helper);
+        squirtle.getPokemon().setCurrentFullness(0);
+        helper.succeedWhen(() -> helper.assertTrue(inBed(squirtle), "it naps, hungry"));
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "sleep_nap_strike", timeoutTicks = 2400)
     public void aFedWorkerOnStrikeNapsThenCheersUp(GameTestHelper helper) {
         // Fed but Tired, its mood would only go down until it next went to bed at night
