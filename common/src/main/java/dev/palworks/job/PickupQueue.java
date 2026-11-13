@@ -4,24 +4,26 @@ import dev.palworks.Palworks;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Pickup jobs waiting to be created: for items to pick up as they come into the world (see
- * TrackedDrops), once they've landed, wherever that is; or for the items round a spot (what a
- * pickup left behind). A job is made where the items are, one for the items within
- * {@link JobChecks#pickupRadius} of each other, unless a pickup job there already covers them.
- * Each is offered first to the worker that made the drops, then goes to the pool for any
- * transporter.
+ * Pickup jobs for the items to pick up (see TrackedDrops). Every such item in the level is kept
+ * track of from when it comes into the world (spawned, or loaded with its chunk) till it's gone,
+ * and every {@link #SWEEP_TICKS} one that's landed with no pickup job round it gets one, where it
+ * is: so an item a job missed (it rolled off, the job went, the worker had no room) is never left
+ * lying there. Also pickups for the items round a spot (what a pickup left behind). A job is
+ * offered first to the worker that made the drops, then goes to the pool for any transporter.
  */
 final class PickupQueue {
 
@@ -33,6 +35,8 @@ final class PickupQueue {
      * while they keep coming, see JobAssigner).
      */
     static final int DECAY_BATCH_TICKS = 600;
+    /** How often (ticks) items with no pickup job round them are given one. */
+    static final int SWEEP_TICKS = 20;
 
     private final JobPool pool;
     private final WorkerRegistry workers;
@@ -40,6 +44,8 @@ final class PickupQueue {
 
     // Ordered by due time, since process() stops at the first request not yet due
     private final Queue<PickupRequest> queue = new PriorityQueue<>(Comparator.comparingLong(PickupRequest::dueTime));
+    // The items to pick up in the level (by entity UUID), till they're gone
+    private final Map<UUID, Tracked> tracked = new LinkedHashMap<>();
 
     PickupQueue(JobPool pool, WorkerRegistry workers, JobAssigner assigner) {
         this.pool = pool;
@@ -53,48 +59,82 @@ final class PickupQueue {
      * offered it first (still only if it's a transporter with room for them).
      */
     void add(BlockPos pos, @Nullable UUID suggestedWorker, long gameTime) {
-        queue.add(new PickupRequest(pos.immutable(), null, suggestedWorker, gameTime));
+        queue.add(new PickupRequest(pos.immutable(), suggestedWorker, gameTime));
     }
 
     /**
-     * Queue a pickup for an item that's just come into the world, once it's landed (or, for one a
-     * decaying leaf dropped, with the rest of its batch).
+     * Keep track of an item to pick up that's just come into the world: it gets a pickup job once
+     * it's landed (or, for one a decaying leaf dropped, with the rest of its batch).
      */
     void track(ItemEntity item, @Nullable UUID suggestedWorker, boolean decay, long gameTime) {
         long due = decay ? (gameTime / DECAY_BATCH_TICKS + 1) * DECAY_BATCH_TICKS : gameTime + LANDING_DELAY;
-        queue.add(new PickupRequest(null, item.getUUID(), suggestedWorker, due));
+        tracked.put(item.getUUID(), new Tracked(due, suggestedWorker));
     }
 
-    /** Create the queued pickup jobs that are due. */
+    /** Create the queued pickup jobs that are due, and jobs for items with none round them. */
     void process(ServerLevel level) {
         long currentTime = level.getGameTime();
         while (!queue.isEmpty() && queue.peek().dueTime() <= currentTime) {
             PickupRequest request = queue.poll();
-            if (request.pos() != null) {
-                createCollectDropsJob(level, request.pos(), request.suggestedWorker());
-                continue;
-            }
-            Entity entity = level.getEntity(request.item());
-            if (entity instanceof ItemEntity item && item.isAlive() && !covered(item)) {
-                // Where it landed: the job there takes this item and any others round it
-                createCollectDropsJob(level, item.blockPosition(), request.suggestedWorker());
-            }
+            createCollectDropsJob(level, request.pos(), request.suggestedWorker());
+        }
+        if (currentTime % SWEEP_TICKS == 0 && !tracked.isEmpty()) {
+            sweep(level, currentTime);
         }
     }
 
-    /** Whether a pickup job (waiting, or a worker's) already takes this item. */
-    private boolean covered(ItemEntity item) {
+    /**
+     * Give every item to pick up that's landed, with no pickup job round it, one where it is (which
+     * takes the others round it too). One that's gone (picked up, despawned, or its chunk unloaded:
+     * it's tracked again if that loads) is let go.
+     */
+    private void sweep(ServerLevel level, long now) {
+        List<AABB> jobs = new ArrayList<>();
         double radius = JobChecks.pickupRadius();
-        AABB bounds = item.getBoundingBox();
         for (JobRecord job : pool.available()) {
-            if (job.type() == JobType.COLLECT_DROPS
-                    && new AABB(job.position()).inflate(radius).intersects(bounds)) {
-                return true;
+            if (job.type() == JobType.COLLECT_DROPS) {
+                jobs.add(new AABB(job.position()).inflate(radius));
             }
         }
         for (JobRecord job : pool.reserved()) {
-            if (job.type() == JobType.COLLECT_DROPS
-                    && new AABB(job.position()).inflate(radius).intersects(bounds)) {
+            if (job.type() == JobType.COLLECT_DROPS) {
+                jobs.add(new AABB(job.position()).inflate(radius));
+            }
+        }
+        for (Iterator<Map.Entry<UUID, Tracked>> it = tracked.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Tracked> entry = it.next();
+            Tracked item = entry.getValue();
+            if (item.due > now) {
+                continue;
+            }
+            if (!(level.getEntity(entry.getKey()) instanceof ItemEntity entity) || !entity.isAlive()) {
+                it.remove();
+                continue;
+            }
+            if (covered(entity, jobs)) {
+                continue;
+            }
+            BlockPos at = spotOf(entity);
+            createCollectDropsJob(level, at, item.suggestedWorker);
+            jobs.add(new AABB(at).inflate(radius));
+            item.suggestedWorker = null; // only its first job is offered to the worker that dropped it
+        }
+    }
+
+    /**
+     * The spot a pickup job for this item goes at: the block it's lying in. Not the one under its
+     * feet: an item lying on farmland (or a slab, a path) is within the top of that block, and a
+     * job there is in a solid block, which nowhere to stand is found round, so it was never
+     * picked up.
+     */
+    static BlockPos spotOf(ItemEntity item) {
+        return BlockPos.containing(item.getX(), item.getY() + 0.5, item.getZ());
+    }
+
+    private static boolean covered(ItemEntity item, List<AABB> jobs) {
+        AABB bounds = item.getBoundingBox();
+        for (AABB job : jobs) {
+            if (job.intersects(bounds)) {
                 return true;
             }
         }
@@ -125,13 +165,24 @@ final class PickupQueue {
     }
 
     /**
-     * A pickup job waiting to be created, at game time {@code dueTime}: for the items round
-     * {@code pos}, or for the item {@code item} wherever it is then (one or the other). Offered
-     * first to {@code suggestedWorker}, if given.
+     * A pickup job waiting to be created, at game time {@code dueTime}, for the items round
+     * {@code pos}. Offered first to {@code suggestedWorker}, if given.
      */
-    private record PickupRequest(
-            @Nullable BlockPos pos,
-            @Nullable UUID item,
-            @Nullable UUID suggestedWorker,
-            long dueTime) {}
+    private record PickupRequest(BlockPos pos, @Nullable UUID suggestedWorker, long dueTime) {}
+
+    /**
+     * An item to pick up: it's given a pickup job from game time {@code due} on (once it's landed),
+     * the first offered to {@code suggestedWorker}, the worker that dropped it, if given.
+     */
+    private static final class Tracked {
+        final long due;
+
+        @Nullable
+        UUID suggestedWorker;
+
+        Tracked(long due, @Nullable UUID suggestedWorker) {
+            this.due = due;
+            this.suggestedWorker = suggestedWorker;
+        }
+    }
 }
