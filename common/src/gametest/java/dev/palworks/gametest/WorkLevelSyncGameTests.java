@@ -12,10 +12,12 @@ import io.netty.buffer.Unpooled;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -69,6 +71,39 @@ public class WorkLevelSyncGameTests {
                     sent.equals(Optional.of(Map.of(Suitability.WATERING, 5))), "after the reload, sent " + sent);
         } finally {
             SuitabilityData.setCurrent(loaded);
+            WorkLevelSync.forget(player);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "work_level_sync")
+    public void anAdminsChangeIsSentAndResettingItPutsTheDatapacksBack(GameTestHelper helper) {
+        // Changes the data for every test, so it's in this batch, and undone within this tick
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        Pokemon blastoise =
+                PokemonProperties.Companion.parse("blastoise level=50").create();
+        Cobblemon.INSTANCE.getStorage().getParty(owner).add(blastoise);
+        UUID player = owner.getUUID();
+        UUID pokemon = blastoise.getUuid();
+        MinecraftServer server = helper.getLevel().getServer();
+        CommandSourceStack admin = server.createCommandSourceStack().withSuppressedOutput();
+        try {
+            WorkLevelSync.syncParty(owner);
+            server.getCommands().performPrefixedCommand(admin, "palworks suitability set blastoise watering 1");
+            server.getCommands().performPrefixedCommand(admin, "palworks suitability set blastoise lumbering 2");
+            WorkLevelSync.syncParty(owner);
+            Optional<Map<Suitability, Integer>> sent = WorkLevelSync.lastSent(player, pokemon);
+            helper.assertTrue(
+                    sent.equals(Optional.of(Map.of(Suitability.WATERING, 1, Suitability.LUMBERING, 2))),
+                    "after the admin's changes, sent " + sent);
+
+            server.getCommands().performPrefixedCommand(admin, "palworks suitability reset blastoise");
+            WorkLevelSync.syncParty(owner);
+            sent = WorkLevelSync.lastSent(player, pokemon);
+            helper.assertTrue(
+                    sent.equals(Optional.of(Map.of(Suitability.WATERING, 3))), "after the reset, sent " + sent);
+        } finally {
+            server.getCommands().performPrefixedCommand(admin, "palworks suitability reset all");
             WorkLevelSync.forget(player);
         }
         helper.succeed();

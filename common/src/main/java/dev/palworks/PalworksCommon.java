@@ -13,11 +13,13 @@ import dev.palworks.block.TroughBlock;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.hunger.TroughFoodReloadListener;
 import dev.palworks.inventory.ModMenuTypes;
+import dev.palworks.suitability.SuitabilityOverrides;
 import dev.palworks.suitability.SuitabilityReloadListener;
 import dev.palworks.worker.WorkLevelSync;
 import dev.palworks.worker.WorkerStatusSync;
 import dev.palworks.worker.WorkerTicking;
 import net.minecraft.server.packs.PackType;
+import net.minecraft.world.level.storage.LevelResource;
 
 /**
  * Sets Palworks up, the same on both loaders: each loader's entry point calls {@link #init} once,
@@ -52,6 +54,11 @@ public final class PalworksCommon {
         LifecycleEvent.SERVER_STARTING.register(server -> WorkerTicking.onServerStarting());
         TickEvent.SERVER_POST.register(WorkerTicking::onServerTick);
         LifecycleEvent.SERVER_STOPPED.register(server -> WorkerTicking.onServerStopped());
+
+        // Admins' in-game changes to work suitabilities (/palworks suitability), saved with the world
+        LifecycleEvent.SERVER_STARTING.register(server -> SuitabilityOverrides.load(
+                server.getWorldPath(LevelResource.ROOT).resolve(Palworks.MOD_ID).normalize()));
+        LifecycleEvent.SERVER_STOPPED.register(server -> SuitabilityOverrides.clear());
 
         // Work levels for the PC and summary screens: each player's party's as they change
         TickEvent.SERVER_POST.register(WorkLevelSync::onServerTick);
