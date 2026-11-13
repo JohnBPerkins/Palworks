@@ -23,7 +23,7 @@ How well it does it depends on how strong it is.
 ## Looking after workers
 
 - **[Hunger](Hunger)**: work makes workers hungry; fill **troughs** and they eat from them.
-- **[Sleep](Sleep)**: pastured workers sleep in **beds** at their species' hours, or wake Tired.
+- **[Sleep](Sleep)**: pastured workers sleep in **beds** at their species' hours, or wake Tired and nap in one by day.
 - **[Mood](Mood)**: overwork, hunger and no rest wear their mood down, and an unhappy worker goes on
   strike.
 

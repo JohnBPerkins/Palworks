@@ -13,6 +13,10 @@ stay awake with you, as Cobblemon's party Pokémon do.
 - **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
   walks at three quarters of its speed, with a "z" over its head, until it next sleeps. One whose
   species has no sleep animation (it only lies still) shows a moon over its head while it sleeps.
+- **Sleeping it off:** a Tired worker doesn't have to wait for night: it naps in a free bed for a
+  minute, and gets up rested. If it's hungry too it eats first, when there's food to be had; with
+  none, it naps anyway. Woken before the minute's up, it's still
+  Tired, and goes back for another nap 15 seconds later. With no bed, it works on, Tired.
 - **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It
   stays up for 15 seconds, then goes back to bed if it's still its bedtime. What it slept before
   still counts towards whether it wakes Tired.

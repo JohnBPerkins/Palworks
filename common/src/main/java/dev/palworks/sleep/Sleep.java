@@ -20,7 +20,9 @@ import org.jetbrains.annotations.Nullable;
  * ({@code behaviour.resting.times}), at night if those are the whole day, every species alike, even
  * one Cobblemon gives no sleep animation (it lies still in its normal pose, see {@link SleepPose}).
  * It sleeps in a free bed it can reach, or where it is, and then it wakes Tired (see
- * {@link SleepSchedule#wakesTired}): slower until it next sleeps.
+ * {@link SleepSchedule#wakesTired}): slower until it next sleeps. A Tired one doesn't have to wait
+ * for night: it naps in a free bed in the day ({@link #wantsNap}), and once it's slept it off it's
+ * Tired no more.
  *
  * <p>Cobblemon's own sleep is left alone: an idle pastured worker still naps when Cobblemon makes it
  * drowsy. Palworks only keeps it from dozing off mid-job, or in its bedtime, which it takes over
@@ -77,9 +79,41 @@ public final class Sleep {
         }
     }
 
-    /** Whether it's awake after being woken in the night, and stays up a while yet. */
+    /** Whether it's awake after being woken (from its night's sleep or a nap), and stays up a while yet. */
     public static boolean isWoken(PokemonEntity entity, @Nullable WorkerState state) {
         return state != null && state.getWokenUntil() > entity.level().getGameTime();
+    }
+
+    /**
+     * How long a Tired worker naps in a bed in the day to sleep it off: a minute. Woken before then,
+     * it's still Tired.
+     */
+    public static final long NAP_TICKS = 1200;
+
+    /**
+     * Whether this worker would nap in a bed now: its sleep applies, it's Tired, it isn't its bedtime
+     * (when it goes to bed anyway), and nothing has just woken it. With no bed to be had, it doesn't:
+     * it carries on, Tired.
+     */
+    public static boolean wantsNap(PokemonEntity entity, @Nullable WorkerState state) {
+        return state != null
+                && state.isTired()
+                && appliesTo(entity.getPokemon(), state)
+                && !isBedtime(entity)
+                && !isWoken(entity, state);
+    }
+
+    /**
+     * Whether a worker in a bed is napping (it stays Tired while it does), and hasn't yet slept it
+     * off: it isn't its bedtime, and it's slept less than {@link #NAP_TICKS} in the bed.
+     */
+    public static boolean isNapping(PokemonEntity entity, WorkerState state) {
+        return state.isTired() && !isBedtime(entity) && state.getBedSleepTicks() < NAP_TICKS;
+    }
+
+    /** Whether this worker wants a bed now: it's its bedtime, or it's Tired for a nap. */
+    public static boolean wantsBed(PokemonEntity entity, @Nullable WorkerState state) {
+        return isBedtimeFor(entity, state) || wantsNap(entity, state);
     }
 
     /** Whether Palworks has this worker go to sleep now: its sleep applies, and it's its bedtime. */

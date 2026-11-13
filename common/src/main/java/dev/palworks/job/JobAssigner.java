@@ -155,6 +155,21 @@ final class JobAssigner {
                 }
             }
 
+            // A Tired pastured worker naps in a free bed before it works, rather than waiting for
+            // its bedtime (see Sleep.wantsNap). Food comes first, above, but only if there's some
+            // to be had: with none, it naps hungry. With no bed it can get to from
+            // here but one by its pasture, it heads home; with none at all, it works on, Tired.
+            if (pokemon != null && entity != null && Sleep.wantsNap(entity, WorkerStateManager.get(pokemon))) {
+                List<JobRecord> beds = bedCandidates(level, worker, entity);
+                if (assignFirstReachable(worker, beds) != null) {
+                    assignedCount++;
+                    continue;
+                }
+                if (headHome(level, worker, beds)) {
+                    continue;
+                }
+            }
+
             // A worker on strike (its mood ran out) does no work until it's back up a way; it still
             // eats and sleeps, above, which is how it gets there (see Mood)
             if (pokemon != null && Mood.isStriking(pokemon, WorkerStateManager.get(pokemon))) {
@@ -356,10 +371,10 @@ final class JobAssigner {
     }
 
     /**
-     * SLEEP candidates for a pastured worker at its bedtime: the beds in reach (that the chunk
-     * scan found) that no other worker has and that its body fits in (see Beds), the smallest first,
-     * then the nearest. Like
-     * deliveries, they aren't in the pool; the one it takes is reserved, so it's its own for the night.
+     * SLEEP candidates for a pastured worker at its bedtime, or Tired for a nap: the beds in reach
+     * (that the chunk scan found) that no other worker has and that its body fits in (see Beds), the
+     * smallest first, then the nearest. Like deliveries, they aren't in the pool; the one it takes is
+     * reserved, so it's its own for the night (or nap).
      */
     private List<JobRecord> bedCandidates(ServerLevel level, WorkerInfo worker, PokemonEntity entity) {
         BlockPos workerPos = worker.position;

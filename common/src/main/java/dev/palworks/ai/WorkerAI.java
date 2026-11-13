@@ -226,7 +226,8 @@ public class WorkerAI {
         if (leg == null) {
             return false;
         }
-        boolean stillNeeds = Hunger.wantsFood(pokemon) || Sleep.isBedtimeFor(entity, state);
+        boolean stillNeeds =
+                Hunger.wantsFood(pokemon) || Sleep.isBedtimeFor(entity, state) || Sleep.wantsNap(entity, state);
         if (!stillNeeds
                 || entity.blockPosition().closerThan(leg, 2)
                 || level.getGameTime() - state.getHomewardSince() > HOME_LEG_TICKS) {
@@ -643,14 +644,24 @@ public class WorkerAI {
     /**
      * A pastured worker's sleep (see {@link Sleep}), each tick. Returns true while it sleeps where it
      * is, so does nothing else; in a bed, it's its SLEEP job that runs (and it sleeps once it's lying
-     * there). Outside its bedtime it wakes, Tired if under half its sleep was in a bed.
+     * there). Outside its bedtime it wakes, Tired if under half its sleep was in a bed, unless it's
+     * napping Tired in a bed (see {@link #tickNap}).
      */
     private static boolean tickSleep(Pokemon pokemon, PokemonEntity entity, WorkerState state) {
+        ReservationId bedJob = state.getCurrentReservation();
+        if (bedJob != null
+                && bedJob.getJobType() == JobType.SLEEP
+                && state.isTired()
+                && Sleep.appliesTo(pokemon, state)
+                && !Sleep.isBedtime(entity)) {
+            tickNap(pokemon, entity, state, bedJob);
+            return false;
+        }
         if (!Sleep.appliesTo(pokemon, state) || !Sleep.isBedtime(entity)) {
+            // (Its woken time runs out by itself: woken from a nap, it stays up a while before another)
             state.resetBedtimeIdleTicks();
-            state.setWokenUntil(0);
             if (state.isAsleep() || state.isInBed() || state.getBedSleepTicks() + state.getGroundSleepTicks() > 0) {
-                wake(pokemon, entity, state); // its night's over, however much of it it slept
+                wake(pokemon, entity, state); // its night (or nap) is over, however much of it it slept
             }
             return false;
         }
@@ -708,6 +719,41 @@ public class WorkerAI {
         return false;
     }
 
+    /**
+     * A Tired worker's nap in a bed in the day (see {@link Sleep#wantsNap}): once it's at the bed it
+     * lies down and sleeps, until it's slept it off ({@link Sleep#NAP_TICKS}: it wakes rested, and
+     * lets the bed go). It stays Tired while it naps, so woken first (hit, hurt, its bed broken,
+     * recalled) it's still Tired, and starts its next nap afresh.
+     */
+    private static void tickNap(Pokemon pokemon, PokemonEntity entity, WorkerState state, ReservationId bedJob) {
+        if (Sleep.isWoken(entity, state)) {
+            state.resetSleepTicks();
+            if (state.isAsleep() || state.isInBed()) {
+                interruptSleep(pokemon, entity, state);
+            }
+            dropJob(pokemon, entity, state);
+            return;
+        }
+        if (state.getBedSleepTicks() >= Sleep.NAP_TICKS) {
+            wake(pokemon, entity, state); // it's slept it off: rested
+            dropJob(pokemon, entity, state);
+            return;
+        }
+        if (!state.isWorking()) {
+            return; // on its way to the bed, awake
+        }
+        if (!state.isInBed()) {
+            lieDown(entity, bedJob.getStationPos());
+            state.setInBed(true);
+        }
+        if (!state.isAsleep()) {
+            state.setAsleep(true); // not fallAsleep: it's Tired until it's slept it off
+            WorkerStateManager.save(pokemon, state);
+        }
+        state.addSleepTick(true);
+        SleepPose.hold(entity);
+    }
+
     /** It lies down in the very middle of its bed, on top of it, however near its walk got it. */
     private static void lieDown(PokemonEntity entity, BlockPos bedPos) {
         if (entity.level().getBlockState(bedPos).getBlock() instanceof WorkerBedBlock bed) {
@@ -738,9 +784,14 @@ public class WorkerAI {
         }
     }
 
-    /** It wakes: Tired if under half its sleep was in a bed, and out of its sleep pose. */
+    /**
+     * It wakes, and out of its sleep pose. From a night's sleep, Tired if under half of it was in a
+     * bed; from a nap (it was still Tired: see {@link #tickNap}), Tired unless it slept it off.
+     */
     private static void wake(Pokemon pokemon, PokemonEntity entity, WorkerState state) {
-        boolean tired = SleepSchedule.wakesTired(state.getBedSleepTicks(), state.getGroundSleepTicks());
+        boolean tired = state.isTired()
+                ? state.getBedSleepTicks() < Sleep.NAP_TICKS
+                : SleepSchedule.wakesTired(state.getBedSleepTicks(), state.getGroundSleepTicks());
         Palworks.LOGGER.debug(
                 "{} wakes up{} ({} ticks in a bed, {} without)",
                 pokemon.getSpecies().getName(),
