@@ -3,6 +3,8 @@ package dev.palworks.job.handler;
 import dev.palworks.Palworks;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.animation.WorkAnimations;
+import dev.palworks.drops.DecayingCanopies;
+import dev.palworks.drops.TrackedDrops;
 import dev.palworks.hunger.HungerMath;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
@@ -19,9 +21,19 @@ final class ChopTreeHandler implements JobHandler {
     // replant (1s later). The replant spots and sapling are saved in the job's data at the
     // chop, so a paused job, or one another lumberjack takes over, still replants.
     private final List<Step> steps = List.of(
-            Step.of("clear leaves", 20, Step.effect(ChopTreeHandler::clearLeaves))
+            Step.of(
+                            "clear leaves",
+                            20,
+                            Step.effect(
+                                    ctx -> TrackedDrops.breaking(ctx.pokemon().getUuid(), () -> clearLeaves(ctx))))
                     .onlyIf(ChopTreeHandler::leavesInTheWay),
-            Step.animated("chop", 60, WorkAnimations.CHOP, ChopTreeHandler::chop),
+            // What the tree drops (and its leaves, as they decay) is the worker's, for
+            // transporters to pick up (see TrackedDrops)
+            Step.animated(
+                    "chop",
+                    60,
+                    WorkAnimations.CHOP,
+                    ctx -> TrackedDrops.breaking(ctx.pokemon().getUuid(), () -> chop(ctx))),
             // The tree's gone by now: it was just chopped
             Step.of("replant", 20, Step.effect(ChopTreeHandler::replant)).outlivesItsTarget());
 
@@ -90,6 +102,11 @@ final class ChopTreeHandler implements JobHandler {
         java.util.Set<BlockPos> canopy = TreeDetector.isNetherStem(level.getBlockState(treePos))
                 ? TreeDetector.findNetherCanopyToBreak(level, treeResult.getLogPositions(), treePos)
                 : java.util.Set.of();
+
+        // Its leaves will decay: what they drop is picked up too
+        if (level instanceof ServerLevel serverLevel) {
+            DecayingCanopies.get(serverLevel).add(treeResult.getLogPositions());
+        }
 
         int logsChopped = 0;
         for (BlockPos logPos : treeResult.getLogPositions()) {

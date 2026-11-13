@@ -2,6 +2,7 @@ package dev.palworks.job;
 
 import dev.palworks.Palworks;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -9,25 +10,35 @@ import java.util.Queue;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Pickup jobs waiting to be created: for a harvest's or a chop's drops, once they've had a tick
- * or two to spawn, or for items a pickup left behind. Each is offered first to the worker that
- * made the drops, then goes to the pool for any transporter.
+ * Pickup jobs waiting to be created: for items to pick up as they come into the world (see
+ * TrackedDrops), once they've landed, wherever that is; or for the items round a spot (what a
+ * pickup left behind). A job is made where the items are, one for the items within
+ * {@link JobChecks#pickupRadius} of each other, unless a pickup job there already covers them.
+ * Each is offered first to the worker that made the drops, then goes to the pool for any
+ * transporter.
  */
 final class PickupQueue {
 
-    /** Ticks to wait after a harvest or chop for its items to spawn. */
-    static final int DROPS_SPAWN_DELAY = 2;
+    /** Ticks to wait for a new item to land (a log's drops fall from up the trunk). */
+    static final int LANDING_DELAY = 20;
+    /**
+     * Decaying leaves drop a few items at a time for minutes: they're picked up in batches, every
+     * this many ticks, so a transporter isn't sent off for every sapling (and kept from delivering
+     * while they keep coming, see JobAssigner).
+     */
+    static final int DECAY_BATCH_TICKS = 600;
 
     private final JobPool pool;
     private final WorkerRegistry workers;
     private final JobAssigner assigner;
 
-    // Ordered by due time, since process() stops at the first request not yet due (a FIFO would
-    // only be correct while every request uses the same delay).
+    // Ordered by due time, since process() stops at the first request not yet due
     private final Queue<PickupRequest> queue = new PriorityQueue<>(Comparator.comparingLong(PickupRequest::dueTime));
 
     PickupQueue(JobPool pool, WorkerRegistry workers, JobAssigner assigner) {
@@ -42,77 +53,85 @@ final class PickupQueue {
      * offered it first (still only if it's a transporter with room for them).
      */
     void add(BlockPos pos, @Nullable UUID suggestedWorker, long gameTime) {
-        queue.add(new PickupRequest(pos.immutable(), suggestedWorker, gameTime));
+        queue.add(new PickupRequest(pos.immutable(), null, suggestedWorker, gameTime));
     }
 
     /**
-     * Create the queued pickup jobs that are due (their items have had time to spawn).
+     * Queue a pickup for an item that's just come into the world, once it's landed (or, for one a
+     * decaying leaf dropped, with the rest of its batch).
      */
+    void track(ItemEntity item, @Nullable UUID suggestedWorker, boolean decay, long gameTime) {
+        long due = decay ? (gameTime / DECAY_BATCH_TICKS + 1) * DECAY_BATCH_TICKS : gameTime + LANDING_DELAY;
+        queue.add(new PickupRequest(null, item.getUUID(), suggestedWorker, due));
+    }
+
+    /** Create the queued pickup jobs that are due. */
     void process(ServerLevel level) {
         long currentTime = level.getGameTime();
-
-        if (Palworks.LOGGER.isTraceEnabled() && !queue.isEmpty()) {
-            Palworks.LOGGER.trace(
-                    "Processing consecutive job queue ({} jobs queued, current time: {})", queue.size(), currentTime);
-        }
-
-        // Process all ready requests
-        while (!queue.isEmpty()) {
-            PickupRequest request = queue.peek();
-
-            // Check if ready to process (delay elapsed)
-            if (currentTime < request.dueTime()) {
-                if (Palworks.LOGGER.isTraceEnabled()) {
-                    Palworks.LOGGER.trace(
-                            "Next pickup not ready yet - {} ticks remaining", request.dueTime() - currentTime);
-                }
-                break; // Not ready yet, and queue is ordered
+        while (!queue.isEmpty() && queue.peek().dueTime() <= currentTime) {
+            PickupRequest request = queue.poll();
+            if (request.pos() != null) {
+                createCollectDropsJob(level, request.pos(), request.suggestedWorker());
+                continue;
             }
-
-            queue.poll();
-
-            Palworks.LOGGER.debug("Creating pickup job at {}", request.pos());
-            createCollectDropsJob(level, request);
+            Entity entity = level.getEntity(request.item());
+            if (entity instanceof ItemEntity item && item.isAlive() && !covered(item)) {
+                // Where it landed: the job there takes this item and any others round it
+                createCollectDropsJob(level, item.blockPosition(), request.suggestedWorker());
+            }
         }
     }
 
-    /**
-     * Create a collect drops job for items at a location.
-     */
-    private void createCollectDropsJob(ServerLevel level, PickupRequest request) {
-        // Scan for items at harvest location
-        List<ItemEntity> items = JobChecks.itemsToPickUp(level, request.pos());
+    /** Whether a pickup job (waiting, or a worker's) already takes this item. */
+    private boolean covered(ItemEntity item) {
+        double radius = JobChecks.pickupRadius();
+        AABB bounds = item.getBoundingBox();
+        for (JobRecord job : pool.available()) {
+            if (job.type() == JobType.COLLECT_DROPS
+                    && new AABB(job.position()).inflate(radius).intersects(bounds)) {
+                return true;
+            }
+        }
+        for (JobRecord job : pool.reserved()) {
+            if (job.type() == JobType.COLLECT_DROPS
+                    && new AABB(job.position()).inflate(radius).intersects(bounds)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
+    /** Create a pickup job for the items round a spot, if there are any. */
+    private void createCollectDropsJob(ServerLevel level, BlockPos pos, @Nullable UUID suggested) {
+        List<ItemEntity> items = new ArrayList<>(JobChecks.itemsToPickUp(level, pos));
         if (items.isEmpty()) {
-            Palworks.LOGGER.debug("No items found at {} for collect drops job", request.pos());
+            Palworks.LOGGER.debug("No items found at {} for collect drops job", pos);
             return;
         }
 
-        // Create collect drops job
-        JobRecord collectJob = JobRecord.followUp(
-                JobType.COLLECT_DROPS, request.pos(), level.getGameTime(), request.suggestedWorker());
+        JobRecord collectJob = JobRecord.followUp(JobType.COLLECT_DROPS, pos, level.getGameTime(), suggested);
 
         // Offer it to the suggested worker first (same checks as any job: suitability, reachable);
         // otherwise it goes to the pool for anyone
-        WorkerInfo suggestedWorker = request.suggestedWorker() == null ? null : workers.get(request.suggestedWorker());
+        WorkerInfo suggestedWorker = suggested == null ? null : workers.get(suggested);
         if (suggestedWorker != null
                 && suggestedWorker.idle
                 && assigner.assignFirstReachable(suggestedWorker, List.of(collectJob)) != null) {
-            Palworks.LOGGER.debug("Assigned consecutive collect drops job to original harvester at {}", request.pos());
+            Palworks.LOGGER.debug("Assigned collect drops job at {} to the worker that dropped them", pos);
         } else {
-            // Otherwise add to available jobs
             pool.offer(collectJob);
-
-            Palworks.LOGGER.debug(
-                    "Added consecutive collect drops job to available pool at {} ({} items)",
-                    request.pos(),
-                    items.size());
+            Palworks.LOGGER.debug("Added collect drops job to the pool at {} ({} items)", pos, items.size());
         }
     }
 
     /**
-     * A pickup job waiting to be created: for the items lying round {@code pos}, once they've had
-     * time to spawn ({@code dueTime}, game time), offered first to {@code suggestedWorker} if given.
+     * A pickup job waiting to be created, at game time {@code dueTime}: for the items round
+     * {@code pos}, or for the item {@code item} wherever it is then (one or the other). Offered
+     * first to {@code suggestedWorker}, if given.
      */
-    private record PickupRequest(BlockPos pos, @Nullable UUID suggestedWorker, long dueTime) {}
+    private record PickupRequest(
+            @Nullable BlockPos pos,
+            @Nullable UUID item,
+            @Nullable UUID suggestedWorker,
+            long dueTime) {}
 }

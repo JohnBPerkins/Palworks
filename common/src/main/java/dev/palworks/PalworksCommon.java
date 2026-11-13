@@ -1,6 +1,7 @@
 package dev.palworks;
 
 import dev.architectury.event.events.common.CommandRegistrationEvent;
+import dev.architectury.event.events.common.EntityEvent;
 import dev.architectury.event.events.common.InteractionEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
@@ -11,6 +12,7 @@ import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.ModBlocks;
 import dev.palworks.block.TroughBlock;
 import dev.palworks.command.PalworksCommands;
+import dev.palworks.drops.TrackedDrops;
 import dev.palworks.hunger.TroughFoodReloadListener;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.suitability.SuitabilityOverrides;
@@ -54,6 +56,10 @@ public final class PalworksCommon {
         LifecycleEvent.SERVER_STARTING.register(server -> WorkerTicking.onServerStarting());
         TickEvent.SERVER_POST.register(WorkerTicking::onServerTick);
         LifecycleEvent.SERVER_STOPPED.register(server -> WorkerTicking.onServerStopped());
+
+        // What workers and players drop is picked up by transporters, and nothing else on the
+        // ground: marked as it spawns, and given a pickup job as it comes into the world
+        EntityEvent.ADD.register(TrackedDrops::onEntityAdded);
 
         // Admins' in-game changes to work suitabilities (/palworks suitability), saved with the world
         LifecycleEvent.SERVER_STARTING.register(server -> SuitabilityOverrides.load(

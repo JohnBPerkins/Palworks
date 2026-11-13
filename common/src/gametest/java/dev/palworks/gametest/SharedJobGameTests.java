@@ -3,7 +3,6 @@ package dev.palworks.gametest;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
-import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.worker.WorkerState;
@@ -14,7 +13,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -199,19 +197,7 @@ public class SharedJobGameTests {
         Item[] items = {Items.WHEAT, Items.CARROT, Items.POTATO, Items.BEETROOT};
         BlockPos[] spots = {new BlockPos(1, 1, 6), new BlockPos(3, 1, 6), new BlockPos(5, 1, 6), new BlockPos(6, 1, 4)};
         for (int i = 0; i < items.length; i++) {
-            BlockPos abs = helper.absolutePos(spots[i]);
-            helper.getLevel()
-                    .addFreshEntity(new ItemEntity(
-                            helper.getLevel(),
-                            abs.getX() + 0.5,
-                            abs.getY(),
-                            abs.getZ() + 0.5,
-                            new ItemStack(items[i], 5),
-                            0,
-                            0,
-                            0));
-            JobManager.getInstance(helper.getLevel())
-                    .queuePickup(abs, null, helper.getLevel().getGameTime());
+            Scenes.dropToPickUp(helper, spots[i], new ItemStack(items[i], 5));
         }
         WorkerInventory firstBag = WorkerInventoryManager.getOrCreate(first.getPokemon());
         WorkerInventory secondBag = WorkerInventoryManager.getOrCreate(second.getPokemon());

@@ -30,6 +30,8 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
  */
 public class RealTreeGameTests {
     private static final String MACHOP = "machop";
+    // Ticks after a chop for the leaves' distances to catch up (one block a tick, at most 7)
+    private static final int LEAVES_SETTLE_TICKS = 20;
 
     /** Where trees grow in the arena (relative), on its grass floor. */
     static final BlockPos TREE = new BlockPos(8, 1, 9);
@@ -388,5 +390,63 @@ public class RealTreeGameTests {
     @GameTest(template = Templates.ARENA, batch = "real_oak_hedged", timeoutTicks = 300)
     public void playerPlacedLeavesAreNeverClearedToGetToATree(GameTestHelper helper) {
         fencedInTreeIsLeftAlone(helper, Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+    }
+
+    /**
+     * What a chopped tree drops is the worker's, and so is what its leaves drop as they decay,
+     * minutes later: all of it is for transporters to pick up (see TrackedDrops, DecayingCanopies).
+     * Leaves decay on random ticks, which are rare, so once the tree's down the test gives every
+     * decaying leaf its random tick itself (the game's own randomTick, so LeavesBlockMixin runs).
+     */
+    @GameTest(template = Templates.ARENA, batch = "real_oak_decay", timeoutTicks = 400)
+    public void whatAChoppedTreeAndItsDecayingLeavesDropIsAllToPickUp(GameTestHelper helper) {
+        Workers.isolate(helper);
+        arenaFloor(helper, Blocks.GRASS_BLOCK);
+        grow(helper, TreeFeatures.OAK, 1);
+        Workers.sendOut(helper, MACHOP + " level=30", new BlockPos(8, 1, 3));
+        var level = helper.getLevel();
+
+        // Ticks since the last log went (the leaves' distances take a few ticks to catch up)
+        int[] sinceChopped = {-1};
+        boolean[] decayed = {false};
+        helper.onEachTick(() -> {
+            if (decayed[0] || !treeBlocks(helper).isEmpty()) {
+                return;
+            }
+            sinceChopped[0]++;
+            if (sinceChopped[0] < LEAVES_SETTLE_TICKS) {
+                return;
+            }
+            helper.assertTrue(
+                    dev.palworks.drops.DecayingCanopies.get(level).contains(helper.absolutePos(TREE.above(4))),
+                    "the chopped tree's canopy is noted as decaying");
+            BlockPos.betweenClosedStream(helper.getBounds()).forEach(pos -> {
+                BlockState state = level.getBlockState(pos);
+                if (state.getBlock() instanceof LeavesBlock && state.isRandomlyTicking()) {
+                    state.randomTick(level, pos.immutable(), level.getRandom());
+                }
+            });
+            decayed[0] = true;
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(decayed[0], "the tree was chopped and its leaves decayed");
+            int leaves = 0;
+            for (BlockPos pos : BlockPos.betweenClosed(BlockPos.ZERO, new BlockPos(15, 23, 15))) {
+                if (helper.getBlockState(pos).getBlock() instanceof LeavesBlock) {
+                    leaves++;
+                }
+            }
+            helper.assertValueEqual(leaves, 0, "leaves left");
+            var items = level.getEntitiesOfClass(
+                    net.minecraft.world.entity.item.ItemEntity.class,
+                    helper.getBounds().inflate(4));
+            helper.assertTrue(!items.isEmpty(), "the tree dropped something");
+            for (var item : items) {
+                helper.assertTrue(
+                        dev.palworks.drops.TrackedDrops.isTracked(item),
+                        item.getItem() + " on the ground isn't marked to pick up");
+            }
+        });
     }
 }
