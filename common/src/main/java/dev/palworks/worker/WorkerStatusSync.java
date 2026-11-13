@@ -56,6 +56,11 @@ public final class WorkerStatusSync {
         for (WorkerStatus status : statusesOf(pokemon, state)) {
             wanted.add(status.aspect());
         }
+        // And how slowed it is, for clients to slow its animations to match (see Pace)
+        String pace = Pace.aspect(Pace.now(pokemon, state));
+        if (pace != null) {
+            wanted.add(pace);
+        }
         UUID id = pokemon.getUuid();
         Set<String> shown = SHOWN.getOrDefault(id, Set.of());
         if (wanted.equals(shown)) {
