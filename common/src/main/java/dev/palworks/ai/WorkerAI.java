@@ -497,9 +497,9 @@ public class WorkerAI {
         StepRunner.Outcome outcome = StepRunner.tick(steps, state, ctx, handler::repeatAfterComplete);
         if (outcome == StepRunner.Outcome.REPEATING
                 && reservation.getJobType() != JobType.SLEEP
-                && entity instanceof PokemonEntity pokemonEntity
-                && Sleep.isBedtimeFor(pokemonEntity, state)) {
-            // Its bedtime: it doesn't go round again (it's off to bed)
+                && ((entity instanceof PokemonEntity pokemonEntity && Sleep.isBedtimeFor(pokemonEntity, state))
+                        || Mood.isStriking(pokemon, state))) {
+            // Its bedtime (it's off to bed), or it's gone on strike: it doesn't go round again
             state.resetJobProgress();
             return StepRunner.Outcome.FINISHED;
         }
