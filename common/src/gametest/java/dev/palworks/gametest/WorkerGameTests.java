@@ -116,7 +116,7 @@ public class WorkerGameTests {
         }
         Workers.sendOut(helper, BULBASAUR, new BlockPos(2, platformY + 1, 2));
 
-        // The scan goes over each chunk at least every 2 seconds (JobScanner.JOB_CACHE_LIFETIME_TICKS)
+        // By then the chunk is scanned and indexed: the crop is found as it's put there
         helper.runAfterDelay(100, () -> {
             helper.assertFalse(
                     section.maybeHas(state -> !JobChecks.canNeverBeWork(state)),

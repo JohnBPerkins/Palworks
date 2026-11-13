@@ -108,13 +108,14 @@ class JobPoolTest {
     }
 
     @Test
-    void expiredJobsAreNoLongerOffered() {
+    void oldFollowUpsExpireButScannedJobsStay() {
+        // Scanned jobs are the scanner's index's to take out; a pickup nobody took goes after a while
         JobPool pool = farmAndForest();
-        pool.offer(JobRecord.of(JobType.HARVEST_CROPS, new BlockPos(3, 64, 1), 1000L));
+        pool.offer(JobRecord.followUp(JobType.COLLECT_DROPS, new BlockPos(3, 64, 1), 0L, null));
+        pool.offer(JobRecord.followUp(JobType.COLLECT_DROPS, new BlockPos(4, 64, 1), 1000L, null));
         pool.expire(1000L, 500L);
-        assertEquals(1, pool.available().size(), "only the job found at 1000 is young enough");
-        assertEquals(1, offeredTo(pool, FARMER).size());
-        assertTrue(offeredTo(pool, NETHER_LUMBERJACK).isEmpty());
+        assertEquals(5, pool.available().size(), "the four scanned jobs and the young pickup");
+        assertTrue(pool.available().stream().noneMatch(job -> job.position().equals(new BlockPos(3, 64, 1))));
         assertGroupsMatch(pool);
     }
 

@@ -78,6 +78,10 @@ final class JobPool {
         return reserved.values();
     }
 
+    boolean isAvailable(JobKey key) {
+        return available.containsKey(key);
+    }
+
     boolean isReserved(JobKey key) {
         return reserved.containsKey(key);
     }
@@ -184,11 +188,13 @@ final class JobPool {
     }
 
     /**
-     * Remove jobs that have been available longer than {@code maxAge} (game time, so a paused game
-     * doesn't count: that used to drop every job, handed-over ones included, after a 5-minute pause).
+     * Remove follow-up and handed-over jobs that have been available longer than {@code maxAge}
+     * (game time, so a paused game doesn't count: that used to drop every job, handed-over ones
+     * included, after a 5-minute pause). Jobs a chunk scan found are left: the scanner's index
+     * keeps them, and takes them out when they're gone (see JobScanner).
      */
     void expire(long gameTime, long maxAge) {
-        removeAvailableIf(job -> (gameTime - job.discoveryTime()) > maxAge);
+        removeAvailableIf(job -> (job.isFollowUp() || job.isHandedOver()) && (gameTime - job.discoveryTime()) > maxAge);
     }
 
     /** Reserved jobs whose worker is no longer registered. */
