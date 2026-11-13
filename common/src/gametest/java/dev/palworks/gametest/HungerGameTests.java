@@ -23,6 +23,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -642,6 +643,32 @@ public class HungerGameTests {
                     times >= from && times <= to,
                     "the harvest took " + working[0] + " ticks, " + times + "x its " + fullSpeed + " at full speed");
         });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_moving", timeoutTicks = 200)
+    public void anEmptyWorkerMovesAtAQuarterSpeedWhoeverMovesIt(GameTestHelper helper) {
+        // On its movement speed itself, which Cobblemon's wandering and following go by as well
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
+        Pokemon pokemon = worker.getPokemon();
+        double full = worker.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        helper.startSequence()
+                .thenExecute(() -> pokemon.setCurrentFullness(0))
+                .thenWaitUntil(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * 0.25) < 1e-6,
+                        "empty: a quarter of " + full + ", not " + worker.getAttributeValue(Attributes.MOVEMENT_SPEED)))
+                .thenExecute(() -> pokemon.setCurrentFullness(pokemon.getMaxFullness()))
+                .thenWaitUntil(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full) < 1e-6, "fed: full speed"))
+                // Empty again, then its work switched off: its speed is its own again
+                .thenExecute(() -> pokemon.setCurrentFullness(0))
+                .thenWaitUntil(() ->
+                        helper.assertTrue(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) < full, "slowed again"))
+                .thenExecute(() -> WorkerStateManager.setEnabled(pokemon, false))
+                .thenWaitUntil(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full) < 1e-6,
+                        "work off: full speed"))
+                .thenSucceed();
     }
 
     @GameTest(template = Templates.EMPTY, batch = "hunger_pace_empty", timeoutTicks = 800)
