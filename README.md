@@ -29,7 +29,8 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
   list.
 - **Per-Pokémon inventory** — each worker carries a small inventory for the items it gathers.
 - **Sleep and beds** — pastured workers sleep in their species' hours (see [Sleep](#sleep)). Give
-  them **straw** or **wool beds**, large ones for large Pokémon, or they wake Tired and work slower the next day.
+  them **straw** or **wool beds**, large ones for large Pokémon, or they wake Tired and work slower
+  until they nap in one.
 - **Mood** — overwork, hunger and no rest wear a worker's mood down (see [Mood](#mood)). Unhappy
   workers work slower, and one whose mood runs out goes on strike until it cheers up.
 - **Hunger and troughs** — work makes workers hungry (see [Hunger](#hunger)). Fill a **trough** with
@@ -219,6 +220,9 @@ stay awake with you, as Cobblemon's party Pokémon do.
 - **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
   walks at three quarters of its speed, with a "z" over its head, until it next sleeps. One whose
   species has no sleep animation (it only lies still) shows a moon over its head while it sleeps.
+- **Sleeping it off:** a Tired worker doesn't have to wait for night. Once it's eaten, if there's a
+  free bed it naps in it for a minute, and gets up rested. Woken before the minute's up, it's still
+  Tired, and goes back for another nap 15 seconds later. With no bed, it works on, Tired.
 - **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It
   stays up for 15 seconds, then goes back to bed if it's still its bedtime. What it slept before
   still counts towards whether it wakes Tired.
