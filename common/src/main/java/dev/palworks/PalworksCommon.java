@@ -62,6 +62,8 @@ public final class PalworksCommon {
         WorkAspectSync.register();
         // And what's holding them back (hungry), for clients to show over their heads
         WorkerStatusSync.register();
+        // Hit or hurt in its sleep, a worker wakes
+        dev.palworks.sleep.SleepDisturbances.register();
 
         // CI's server boot test looks for this line (.github/scripts/boot_server.sh)
         Palworks.LOGGER.info("Palworks initialized!");

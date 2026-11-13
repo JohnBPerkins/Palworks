@@ -109,7 +109,9 @@ final class JobAssigner {
             if (pokemon != null && entity != null) {
                 WorkerState sleeper = WorkerStateManager.get(pokemon);
                 if (Sleep.isBedtimeFor(entity, sleeper)) {
-                    if ((sleeper == null || !sleeper.isAsleep())
+                    // Woken in the night: up a while before it goes back to bed, and no work meanwhile
+                    if (!Sleep.isWoken(entity, sleeper)
+                            && (sleeper == null || !sleeper.isAsleep())
                             && assignFirstReachable(worker, bedCandidates(level, worker, entity)) != null) {
                         assignedCount++;
                     }

@@ -180,6 +180,9 @@ stay awake with you, as Cobblemon's party Pokémon do.
   the nearest. With none to be had, it sleeps where it is.
 - **Tired:** a worker that slept less than half the night in a bed wakes **Tired**: it works and
   walks at three quarters of its speed, with a "z" over its head, until it next sleeps.
+- **Waking:** hitting or hurting a sleeping worker, breaking its bed, or recalling it wakes it. It
+  stays up for a minute, then goes back to bed if it's still its bedtime. What it slept before
+  still counts towards whether it wakes Tired.
 - **Naps:** Cobblemon's own sleep is left alone: an idle pastured worker still naps when it gets
   drowsy, and isn't given work until it wakes. It just doesn't doze off in the middle of a job.
 
@@ -196,8 +199,8 @@ slabs, a Large Red Wool Bed 4 red wool beds and a Huge one 9. Like a vanilla bed
 size is dyed another colour by crafting it with that dye. For now they sleep just as straw beds do.
 
 A large or huge bed is placed whole, like a vanilla bed: out from where you place it, forward and to
-your right. Breaking any part of it breaks it all. Beds have no collision: a worker walks in and
-lies down in the middle of it. With its work off, a pastured Pokémon's sleep is Cobblemon's
+your right. Breaking any part of it breaks it all. A bed is a quarter of a block high, like a slab: a
+worker steps up onto it and lies down in the very middle. With its work off, a pastured Pokémon's sleep is Cobblemon's
 alone.
 
 ### Display settings

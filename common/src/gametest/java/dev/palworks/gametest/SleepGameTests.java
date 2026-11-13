@@ -37,6 +37,9 @@ public class SleepGameTests {
     private static final long MORNING = 1_000;
     private static final long MIDNIGHT = 18_000;
     private static final BlockPos BED = new BlockPos(5, 1, 5);
+    private static final String SQUIRTLE = "squirtle level=20";
+    private static final String WOKEN = "sleep_woken";
+    private static final String ASLEEP_IN_BED = "asleep in the bed";
 
     private static void setTime(GameTestHelper helper, long time) {
         helper.getLevel().setDayTime(time);
@@ -70,7 +73,7 @@ public class SleepGameTests {
     public void oneSleepsInTheBedTheOtherWithoutAndWakesTired(GameTestHelper helper) {
         Workers.isolate(helper);
         helper.setBlock(BED, ModBlocks.STRAW_BED.get());
-        PokemonEntity squirtle = Workers.sendOutPastured(helper, "squirtle level=20", new BlockPos(1, 1, 1));
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
         PokemonEntity rattata = Workers.sendOutPastured(helper, "rattata level=20", new BlockPos(1, 1, 6));
         setTime(helper, MIDNIGHT);
 
@@ -106,6 +109,102 @@ public class SleepGameTests {
                     PokemonEntity groundSleeper = stateOf(squirtle).isTired() ? squirtle : rattata;
                     helper.assertTrue(groundSleeper.getAspects().contains(WorkerStatus.TIRED.aspect()), "showing it");
                 })
+                .thenSucceed();
+    }
+
+    // ---- In the bed, and woken from it ----
+
+    @AfterBatch(batch = WOKEN)
+    public void afterWoken(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    /** A pastured Squirtle asleep in the bed at {@link #BED}, at midnight. */
+    private static PokemonEntity asleepInBed(GameTestHelper helper) {
+        Workers.isolate(helper);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
+        setTime(helper, MIDNIGHT);
+        return squirtle;
+    }
+
+    /** It's awake after being woken, and stays up (not even asleep where it is). */
+    private static void assertWokenAndUp(GameTestHelper helper, PokemonEntity worker) {
+        helper.assertFalse(stateOf(worker).isAsleep(), "awake");
+        helper.assertFalse(posedAsleep(worker), "up");
+        helper.assertTrue(Sleep.isWoken(worker, stateOf(worker)), "and staying up a while");
+        ReservationId job = stateOf(worker).getCurrentReservation();
+        helper.assertTrue(job == null || job.getJobType() != JobType.SLEEP, "out of its bed");
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = WOKEN, timeoutTicks = 600)
+    public void aSleeperLiesInTheMiddleOfItsBedOnTopOfIt(GameTestHelper helper) {
+        PokemonEntity squirtle = asleepInBed(helper);
+        BlockPos abs = helper.absolutePos(BED);
+        double top = helper.getBlockState(BED)
+                .getCollisionShape(helper.getLevel(), abs)
+                .max(net.minecraft.core.Direction.Axis.Y);
+        helper.assertTrue(top == WorkerBedBlock.HEIGHT, "the bed is solid to its top: " + top);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(inBed(squirtle), ASLEEP_IN_BED);
+            helper.assertTrue(
+                    Math.abs(squirtle.getX() - (abs.getX() + 0.5)) < 0.01
+                            && Math.abs(squirtle.getZ() - (abs.getZ() + 0.5)) < 0.01,
+                    "in its very middle: " + squirtle.position());
+            helper.assertTrue(
+                    Math.abs(squirtle.getY() - (abs.getY() + WorkerBedBlock.HEIGHT)) < 0.01,
+                    "lying on top of it: " + squirtle.getY());
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = WOKEN, timeoutTicks = 800)
+    public void beingHurtWakesASleeperWhichGoesBackToBedLater(GameTestHelper helper) {
+        PokemonEntity squirtle = asleepInBed(helper);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), ASLEEP_IN_BED))
+                .thenExecute(
+                        () -> squirtle.hurt(helper.getLevel().damageSources().magic(), 1))
+                .thenWaitUntil(() -> assertWokenAndUp(helper, squirtle))
+                .thenIdle(100)
+                .thenExecute(() -> assertWokenAndUp(helper, squirtle))
+                // Its minute up, still night: back to bed
+                .thenExecute(() -> stateOf(squirtle).setWokenUntil(0))
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "back in its bed"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = WOKEN, timeoutTicks = 600)
+    public void breakingItsBedWakesASleeper(GameTestHelper helper) {
+        PokemonEntity squirtle = asleepInBed(helper);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), ASLEEP_IN_BED))
+                .thenExecute(() -> helper.destroyBlock(BED))
+                .thenWaitUntil(() -> assertWokenAndUp(helper, squirtle))
+                // Not asleep on the floor instead
+                .thenIdle(100)
+                .thenExecute(() -> assertWokenAndUp(helper, squirtle))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = WOKEN, timeoutTicks = 600)
+    public void recallingASleeperWakesIt(GameTestHelper helper) {
+        PokemonEntity squirtle = asleepInBed(helper);
+        Pokemon pokemon = squirtle.getPokemon();
+        PokemonEntity[] again = new PokemonEntity[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), ASLEEP_IN_BED))
+                .thenExecute(pokemon::recall)
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    again[0] = pokemon.sendOut(
+                            helper.getLevel(),
+                            net.minecraft.world.phys.Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(1, 1, 1))),
+                            null,
+                            e -> kotlin.Unit.INSTANCE);
+                    helper.assertTrue(again[0] != null, "sent back out");
+                })
+                .thenIdle(100)
+                .thenExecute(() -> assertWokenAndUp(helper, again[0]))
                 .thenSucceed();
     }
 
@@ -284,9 +383,11 @@ public class SleepGameTests {
                     "Rattata in the small one, leaving the huge one for Snorlax");
             // In the middle of the huge bed
             helper.assertTrue(
-                    snorlax.position().distanceToSqr(helper.absoluteVec(new net.minecraft.world.phys.Vec3(5.5, 1, 2.5)))
-                            < 0.5,
-                    "lying in its middle: " + snorlax.position());
+                    snorlax.position()
+                                    .distanceToSqr(helper.absoluteVec(
+                                            new net.minecraft.world.phys.Vec3(5.5, 1 + WorkerBedBlock.HEIGHT, 2.5)))
+                            < 1e-4,
+                    "lying in its very middle, on top: " + snorlax.position());
         });
     }
 
@@ -300,7 +401,7 @@ public class SleepGameTests {
     @GameTest(template = Templates.EMPTY, batch = "sleep_party", timeoutTicks = 300)
     public void partyAndSwitchedOffWorkersDontSleep(GameTestHelper helper) {
         Workers.isolate(helper);
-        PokemonEntity party = Workers.sendOut(helper, "squirtle level=20", new BlockPos(1, 1, 1));
+        PokemonEntity party = Workers.sendOut(helper, SQUIRTLE, new BlockPos(1, 1, 1));
         PokemonEntity off = Workers.sendOutPastured(helper, "rattata level=20", new BlockPos(6, 1, 6));
         WorkerStateManager.setEnabled(off.getPokemon(), false);
         setTime(helper, MIDNIGHT);
@@ -321,7 +422,7 @@ public class SleepGameTests {
     @GameTest(template = Templates.EMPTY, batch = "sleep_hours")
     public void eachSpeciesSleepsInItsOwnHours(GameTestHelper helper) {
         Workers.isolate(helper);
-        PokemonEntity squirtle = Workers.sendOutPastured(helper, "squirtle level=20", new BlockPos(1, 1, 1));
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
         PokemonEntity oddish = Workers.sendOutPastured(helper, "oddish level=20", new BlockPos(3, 1, 1));
         PokemonEntity vulpix = Workers.sendOutPastured(helper, "vulpix level=20", new BlockPos(5, 1, 1));
         PokemonEntity zubat = Workers.sendOutPastured(helper, "zubat level=20", new BlockPos(1, 1, 5));

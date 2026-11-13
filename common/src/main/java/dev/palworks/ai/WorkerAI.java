@@ -6,6 +6,7 @@ import dev.palworks.Palworks;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
+import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
@@ -620,15 +621,36 @@ public class WorkerAI {
     private static boolean tickSleep(Pokemon pokemon, PokemonEntity entity, WorkerState state) {
         if (!Sleep.appliesTo(pokemon, state) || !Sleep.isBedtime(entity)) {
             state.resetBedtimeIdleTicks();
-            if (state.isAsleep()) {
-                wake(pokemon, entity, state);
+            state.setWokenUntil(0);
+            if (state.isAsleep() || state.isInBed() || state.getBedSleepTicks() + state.getGroundSleepTicks() > 0) {
+                wake(pokemon, entity, state); // its night's over, however much of it it slept
             }
             return false;
         }
         ReservationId reservation = state.getCurrentReservation();
-        if (reservation != null && reservation.getJobType() == JobType.SLEEP) {
+        boolean inBedJob = reservation != null && reservation.getJobType() == JobType.SLEEP;
+        if (state.isInBed() && !inBedJob) {
+            // Its bed's gone from under it (broken): that wakes it
+            state.setWokenUntil(entity.level().getGameTime() + Sleep.WOKEN_TICKS);
+        }
+        if (Sleep.isWoken(entity, state)) {
+            // Woken in the night (hit, hurt, its bed broken, recalled): up for a while, then back to bed
+            if (state.isAsleep() || state.isInBed()) {
+                interruptSleep(pokemon, entity, state);
+            }
+            if (inBedJob) {
+                dropJob(pokemon, entity, state);
+            }
+            state.resetBedtimeIdleTicks();
+            return false;
+        }
+        if (inBedJob) {
             // In its bed once it's lying there (its sleep step has begun); on its way, awake
             if (state.isWorking()) {
+                if (!state.isInBed()) {
+                    lieDown(entity, reservation.getStationPos());
+                    state.setInBed(true);
+                }
                 fallAsleep(state);
                 state.addSleepTick(true);
                 SleepPose.hold(entity);
@@ -640,7 +662,7 @@ public class WorkerAI {
             return false;
         }
         if (state.isAsleep()) {
-            // Asleep where it is (no bed, or it lost its bed in the night): there till morning
+            // Asleep where it is (no bed to be had): there till morning, unless something wakes it
             state.addSleepTick(false);
             SleepPose.hold(entity);
             return true;
@@ -653,6 +675,26 @@ public class WorkerAI {
             fallAsleep(state);
         }
         return false;
+    }
+
+    /** It lies down in the very middle of its bed, on top of it, however near its walk got it. */
+    private static void lieDown(PokemonEntity entity, BlockPos bedPos) {
+        if (entity.level().getBlockState(bedPos).getBlock() instanceof WorkerBedBlock bed) {
+            Vec3 middle = bed.center(bedPos);
+            entity.moveTo(middle.x, middle.y, middle.z, entity.getYRot(), entity.getXRot());
+        }
+    }
+
+    /**
+     * Something woke it in the night: awake, and out of its bed, but the night isn't over, so how it
+     * slept so far still counts for whether it wakes Tired in the morning.
+     */
+    private static void interruptSleep(Pokemon pokemon, PokemonEntity entity, WorkerState state) {
+        Palworks.LOGGER.debug("{} is woken in the night", pokemon.getSpecies().getName());
+        state.setAsleep(false);
+        state.setInBed(false);
+        SleepPose.wake(entity);
+        WorkerStateManager.save(pokemon, state);
     }
 
     /** It falls asleep: Tired no more (it's sleeping it off), and it stops looking for a bed. */
@@ -676,6 +718,7 @@ public class WorkerAI {
         state.setTired(tired);
         state.resetSleepTicks();
         state.setAsleep(false);
+        state.setInBed(false);
         SleepPose.wake(entity);
         WorkerStateManager.save(pokemon, state);
     }

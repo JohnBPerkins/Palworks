@@ -60,6 +60,21 @@ class WorkerStateTest {
     }
 
     @Test
+    void beingInBedAndWokenSurviveSaveAndLoad() {
+        // A recall and send-out in the night doesn't put it straight back to sleep
+        WorkerState state = new WorkerState();
+        state.setInBed(true);
+        state.setWokenUntil(12_345);
+        WorkerState loaded = WorkerState.fromNBT(state.serializeNBT());
+        assertTrue(loaded.isInBed());
+        assertEquals(12_345, loaded.getWokenUntil());
+
+        WorkerState fresh = WorkerState.fromNBT(new CompoundTag());
+        assertFalse(fresh.isInBed());
+        assertEquals(0, fresh.getWokenUntil());
+    }
+
+    @Test
     void howItSleptSurvivesSaveAndLoad() {
         // A reload in the night doesn't wake it, or forget how it slept
         WorkerState state = new WorkerState();

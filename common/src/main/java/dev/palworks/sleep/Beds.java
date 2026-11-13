@@ -1,11 +1,11 @@
 package dev.palworks.sleep;
 
-import dev.palworks.ai.WorkPositions;
 import dev.palworks.block.WorkerBedBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -33,29 +33,37 @@ public final class Beds {
         if (!bodyFits(worker.getBbWidth(), bed.size())) {
             return false;
         }
-        // Its body lying in the middle: everything it takes up must be clear (the bed itself has no
-        // collision), for its whole height
+        // Its body lying in the middle, on top of the bed: everything it takes up must be clear, for
+        // its whole height, but for the bed's own blocks under it
         Vec3 center = bed.center(origin);
         double half = worker.getBbWidth() / 2.0;
         int minX = Mth.floor(center.x - half + 1e-3);
         int maxX = Mth.floor(center.x + half - 1e-3);
         int minZ = Mth.floor(center.z - half + 1e-3);
         int maxZ = Mth.floor(center.z + half - 1e-3);
-        int headroom = WorkPositions.headroomFor(worker);
+        int headroom = Math.max(1, (int) Math.ceil(worker.getBbHeight() + WorkerBedBlock.HEIGHT - 1e-3));
         BlockPos.MutableBlockPos space = new BlockPos.MutableBlockPos();
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 for (int y = 0; y < headroom; y++) {
                     space.set(x, origin.getY() + y, z);
-                    if (!level.getBlockState(space)
-                            .getCollisionShape(level, space)
-                            .isEmpty()) {
+                    BlockState state = level.getBlockState(space);
+                    if (y == 0 && isPartOf(state, space, origin)) {
+                        continue; // the bed it lies on
+                    }
+                    if (!state.getCollisionShape(level, space).isEmpty()) {
                         return false;
                     }
                 }
             }
         }
         return true;
+    }
+
+    /** Whether {@code state}, at {@code pos}, is a block of the bed whose corner block is {@code origin}. */
+    private static boolean isPartOf(BlockState state, BlockPos pos, BlockPos origin) {
+        return state.getBlock() instanceof WorkerBedBlock
+                && WorkerBedBlock.origin(pos, state).equals(origin);
     }
 
     /** The tile a worker walks to, to lie in this bed: the one its middle is on (the bed's middle, or by it). */

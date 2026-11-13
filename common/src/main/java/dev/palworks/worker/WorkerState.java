@@ -50,6 +50,11 @@ public class WorkerState {
     private long groundSleepTicks;
     // It slept without a bed: slower until it next sleeps
     private boolean tired;
+    // Whether it's asleep in a bed (its SLEEP job), so it knows it's lost its bed if the job goes
+    private boolean inBed;
+    // Game time until which it stays awake, after something woke it in the night (hurt, its bed
+    // broken, recalled). Saved, so a recall and send-out doesn't put it straight back to sleep.
+    private long wokenUntil;
     // Ticks it's been idle in its bedtime without being put to bed (not saved)
     private int bedtimeIdleTicks;
 
@@ -271,6 +276,24 @@ public class WorkerState {
         this.tired = tired;
     }
 
+    /** Whether it's asleep in a bed (its SLEEP job). */
+    public boolean isInBed() {
+        return inBed;
+    }
+
+    public void setInBed(boolean inBed) {
+        this.inBed = inBed;
+    }
+
+    /** Game time until which it stays awake, after being woken in the night (0 if it wasn't). */
+    public long getWokenUntil() {
+        return wokenUntil;
+    }
+
+    public void setWokenUntil(long wokenUntil) {
+        this.wokenUntil = wokenUntil;
+    }
+
     /** Ticks it's been idle in its bedtime without going to bed. */
     public int getBedtimeIdleTicks() {
         return bedtimeIdleTicks;
@@ -322,6 +345,12 @@ public class WorkerState {
         if (tired) {
             tag.putBoolean("tired", true);
         }
+        if (inBed) {
+            tag.putBoolean("inBed", true);
+        }
+        if (wokenUntil > 0) {
+            tag.putLong("wokenUntil", wokenUntil);
+        }
 
         // Serialize current reservation
         if (currentReservation != null) {
@@ -360,6 +389,8 @@ public class WorkerState {
         bedSleepTicks = Math.max(0, tag.getLong("bedSleepTicks"));
         groundSleepTicks = Math.max(0, tag.getLong("groundSleepTicks"));
         tired = tag.getBoolean("tired");
+        inBed = tag.getBoolean("inBed");
+        wokenUntil = Math.max(0, tag.getLong("wokenUntil"));
 
         // Deserialize current reservation
         if (tag.contains("currentReservation")) {

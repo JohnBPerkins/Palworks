@@ -20,7 +20,6 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,8 +31,8 @@ import org.jetbrains.annotations.Nullable;
  * vanilla bed, out from where it's placed, forward and to the right; each of its blocks knows where
  * it is in it ({@link #PART_X}, {@link #PART_Z}), and breaking any breaks it all, dropping the bed.
  *
- * <p>It has no collision, as a carpet nearly has none, so a worker walks onto it and lies down in the
- * straw, in the middle of the bed.
+ * <p>It's solid a quarter of a block up, its frame and cushion, as a slab is: a worker steps up onto
+ * it and lies down on top, in the middle of the bed.
  */
 public class WorkerBedBlock extends Block {
     /**
@@ -72,8 +71,11 @@ public class WorkerBedBlock extends Block {
                     propertiesCodec())
             .apply(instance, WorkerBedBlock::new));
 
-    // What it looks like and is picked by: the frame and cushion, a quarter of a block high
-    private static final VoxelShape SHAPE = Block.box(0, 0, 0, 16, 4, 16);
+    /** How high a bed is, which a worker lying on it is lifted by: its frame and cushion. */
+    public static final double HEIGHT = 4 / 16.0;
+
+    // What it looks like, is picked by and collides as: the frame and cushion
+    private static final VoxelShape SHAPE = Block.box(0, 0, 0, 16, HEIGHT * 16, 16);
 
     private final Tier tier;
     private final int size;
@@ -110,12 +112,6 @@ public class WorkerBedBlock extends Block {
         return SHAPE;
     }
 
-    @Override
-    protected VoxelShape getCollisionShape(
-            BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return Shapes.empty();
-    }
-
     // ---- Where a bed is ----
 
     /** The north-west corner block of the bed this block is part of: where its sleeper's job is. */
@@ -128,9 +124,9 @@ public class WorkerBedBlock extends Block {
         return state.getValue(PART_X) == 0 && state.getValue(PART_Z) == 0;
     }
 
-    /** Where a worker lies in the bed whose corner block is {@code origin}: its middle, on the floor. */
+    /** Where a worker lies in the bed whose corner block is {@code origin}: its middle, on top of it. */
     public Vec3 center(BlockPos origin) {
-        return new Vec3(origin.getX() + size / 2.0, origin.getY(), origin.getZ() + size / 2.0);
+        return new Vec3(origin.getX() + size / 2.0, origin.getY() + HEIGHT, origin.getZ() + size / 2.0);
     }
 
     // ---- Placing it whole, and breaking it whole ----

@@ -60,6 +60,28 @@ public final class Sleep {
         return SleepSchedule.isBedtime(entity.level().getDayTime(), hours::contains, nightHours);
     }
 
+    /**
+     * How long a worker stays awake after something wakes it in the night (a minute), before it goes
+     * back to bed if it's still its bedtime.
+     */
+    public static final long WOKEN_TICKS = 1_200;
+
+    /**
+     * Something disturbed this worker (it was hit or hurt): if it's asleep, or in its bed, it wakes
+     * and stays up for {@link #WOKEN_TICKS}. WorkerAI wakes it on its next tick.
+     */
+    public static void disturb(PokemonEntity entity) {
+        WorkerState state = WorkerStateManager.get(entity.getPokemon());
+        if (state != null && (state.isAsleep() || state.isInBed())) {
+            state.setWokenUntil(entity.level().getGameTime() + WOKEN_TICKS);
+        }
+    }
+
+    /** Whether it's awake after being woken in the night, and stays up a while yet. */
+    public static boolean isWoken(PokemonEntity entity, @Nullable WorkerState state) {
+        return state != null && state.getWokenUntil() > entity.level().getGameTime();
+    }
+
     /** Whether Palworks has this worker go to sleep now: its sleep applies, and it's its bedtime. */
     public static boolean isBedtimeFor(PokemonEntity entity, @Nullable WorkerState state) {
         return appliesTo(entity.getPokemon(), state) && isBedtime(entity);

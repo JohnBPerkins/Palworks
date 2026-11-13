@@ -12,6 +12,7 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
@@ -25,6 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
@@ -243,6 +245,19 @@ public class JobManager {
                         "Unregistered worker {} and released job at {}",
                         pokemonUUID,
                         removed.currentReservation.getStationPos());
+            }
+        }
+        // Recalled (or knocked out) in its sleep: it wakes, and isn't sent back out asleep
+        PokemonEntity gone = workers.lastEntity(pokemonUUID);
+        if (gone != null
+                && (gone.getRemovalReason() == Entity.RemovalReason.DISCARDED
+                        || gone.getRemovalReason() == Entity.RemovalReason.KILLED)) {
+            WorkerState state = WorkerStateManager.get(gone.getPokemon());
+            if (state != null && (state.isAsleep() || state.isInBed())) {
+                state.setAsleep(false);
+                state.setInBed(false);
+                state.setWokenUntil(level.getGameTime() + Sleep.WOKEN_TICKS);
+                WorkerStateManager.save(gone.getPokemon(), state);
             }
         }
         // Drop per-worker caches so they don't leak after the worker is gone.
