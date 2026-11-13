@@ -5,6 +5,7 @@ import com.cobblemon.mod.common.api.pokemon.aspect.AspectProvider;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.hunger.Hunger;
+import dev.palworks.mood.Mood;
 import dev.palworks.sleep.NonWorkerSleep;
 import dev.palworks.sleep.Sleep;
 import java.util.EnumSet;
@@ -51,6 +52,11 @@ public final class WorkerStatusSync {
         boolean sleeps = state != null && Sleep.appliesTo(pokemon, state);
         if (sleeps && state.isTired()) {
             statuses.add(WorkerStatus.TIRED);
+        }
+        if (Mood.isStriking(pokemon, state)) {
+            statuses.add(WorkerStatus.STRIKING);
+        } else if (Mood.isUnhappy(pokemon, state)) {
+            statuses.add(WorkerStatus.UNHAPPY);
         }
         PokemonEntity entity = pokemon.getEntity();
         if (entity != null

@@ -20,6 +20,7 @@ import dev.palworks.job.handler.JobContext;
 import dev.palworks.job.handler.JobHandler;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.job.handler.Step;
+import dev.palworks.mood.Mood;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.sleep.SleepPose;
@@ -151,6 +152,8 @@ public class WorkerAI {
         // Its work uses up its fullness, a little all the time, whether it has a job or not (the work
         // it does uses up more, as it does it: see Hunger.didWork)
         Hunger.tick(pokemon, state);
+        // Its mood: down while Hungry or Tired, back up while it's neither and not at work (see Mood)
+        Mood.tick(pokemon, state);
 
         // A pastured worker sleeps in its bedtime (see Sleep): asleep where it is, it does nothing else
         if (entity instanceof PokemonEntity pokemonEntity && tickSleep(pokemon, pokemonEntity, state)) {
@@ -528,9 +531,9 @@ public class WorkerAI {
         StepRunner.Outcome outcome = StepRunner.tick(steps, state, ctx, handler::repeatAfterComplete);
         if (outcome == StepRunner.Outcome.REPEATING
                 && reservation.getJobType() != JobType.SLEEP
-                && entity instanceof PokemonEntity pokemonEntity
-                && Sleep.isBedtimeFor(pokemonEntity, state)) {
-            // Its bedtime: it doesn't go round again (it's off to bed)
+                && ((entity instanceof PokemonEntity pokemonEntity && Sleep.isBedtimeFor(pokemonEntity, state))
+                        || Mood.isStriking(pokemon, state))) {
+            // Its bedtime (it's off to bed), or it's gone on strike: it doesn't go round again
             state.resetJobProgress();
             return StepRunner.Outcome.FINISHED;
         }
@@ -625,7 +628,7 @@ public class WorkerAI {
 
     /** Eating and going to bed: what makes it better, so never slowed down. */
     private static boolean isForItsNeeds(JobType jobType) {
-        return jobType == JobType.EAT_FOOD || jobType == JobType.SLEEP;
+        return !jobType.isWork();
     }
 
     /**

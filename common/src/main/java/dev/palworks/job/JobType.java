@@ -63,6 +63,14 @@ public enum JobType {
         return priority;
     }
 
+    /**
+     * Whether it's work, not something a worker does for itself: eating and sleeping aren't. Not
+     * "has a work skill": fetching seeds is work, though it takes no one skill (Planting or Nether).
+     */
+    public boolean isWork() {
+        return this != EAT_FOOD && this != SLEEP;
+    }
+
     /** The work skill this job needs, or null for one it doesn't decide alone (eating, sleeping, seeds). */
     @Nullable
     public Suitability getRequiredSuitability() {

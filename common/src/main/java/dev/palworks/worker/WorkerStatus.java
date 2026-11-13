@@ -23,6 +23,15 @@ public enum WorkerStatus {
      */
     TIRED(null, "palworks:status/tired"),
 
+    /** Its mood is low: it works slower until it cheers up (see dev.palworks.mood.Mood). A sad face. */
+    UNHAPPY(null, "palworks:status/unhappy"),
+
+    /**
+     * Its mood ran out: it does no work until it's back up a way (see dev.palworks.mood.Mood). An
+     * anger mark, shown instead of {@link #UNHAPPY}.
+     */
+    STRIKING(null, "palworks:status/striking"),
+
     /**
      * Asleep (a worker in its bedtime, or a non-worker in a bed: see dev.palworks.sleep), for a
      * species with no sleep animation of its own, which only lies still. A crescent moon: not
