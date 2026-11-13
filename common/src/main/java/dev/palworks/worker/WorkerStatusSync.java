@@ -73,8 +73,9 @@ public final class WorkerStatusSync {
         for (WorkerStatus status : statusesOf(pokemon, state)) {
             wanted.add(status.aspect());
         }
-        // And how slowed it is, for clients to slow its animations to match (see Pace)
-        String pace = Pace.aspect(Pace.now(pokemon, state));
+        // And how slowed it is, for clients to slow its animations to match (see Pace); a non-worker
+        // isn't slowed
+        String pace = state == null ? null : Pace.aspect(Pace.now(pokemon, state));
         if (pace != null) {
             wanted.add(pace);
         }
