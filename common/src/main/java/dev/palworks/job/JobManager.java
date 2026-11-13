@@ -83,13 +83,17 @@ public class JobManager {
     }
 
     /**
-     * Called for every block change on the server (see the ServerLevel mixins). If the block's
-     * collision changed (something became passable or blocked: a gate or door toggled, a block
+     * Called for every block change on the server (see the ServerLevel mixins). A watered crop that's
+     * broken or replaced by another block loses its watering cooldown (growing, a change of age,
+     * keeps it). If the block's collision changed (something became passable or blocked: a gate or door toggled, a block
      * broken or placed), workers nearby forget which jobs they couldn't reach, so they re-check
      * on their next assignment. Must stay cheap: returns early unless some worker has failures.
      */
     @SuppressWarnings("ReferenceEquality") // identity on purpose, see below
     public static void onBlockStateChange(ServerLevel level, BlockPos pos, BlockState oldState, BlockState newState) {
+        if (oldState.getBlock() != newState.getBlock()) {
+            Watering.forget(level, pos);
+        }
         JobManager manager = byLevel.get(level);
         if (manager == null || !manager.assigner.hasUnreachable()) {
             return;
