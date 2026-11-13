@@ -135,9 +135,9 @@ public final class JobChecks {
             case EAT_FOOD -> Hunger.wantsFood(pokemon) && Hunger.appliesTo(pokemon, WorkerStateManager.get(pokemon));
             // Room for the food it fetches
             case FETCH_FOOD -> inventory.hasSpace();
-            // Its bedtime (it's woken up once that's over)
+            // Its bedtime, or a nap it's Tired for (it's woken up once that's over)
             case SLEEP ->
-                pokemon.getEntity() != null && Sleep.isBedtimeFor(pokemon.getEntity(), WorkerStateManager.get(pokemon));
+                pokemon.getEntity() != null && Sleep.wantsBed(pokemon.getEntity(), WorkerStateManager.get(pokemon));
             default -> true;
         };
     }

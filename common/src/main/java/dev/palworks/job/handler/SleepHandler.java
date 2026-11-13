@@ -7,8 +7,9 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * A pastured worker sleeps in a bed: it lies down on it and sleeps, a long step at a time,
- * for as long as it's its bedtime (see {@link Sleep}). WorkerAI holds it asleep while it's in the
- * bed and counts the night as slept in one; when its bedtime's over the job ends and it wakes.
+ * for as long as it's its bedtime (see {@link Sleep}), or, napping Tired in the day, until it's slept
+ * it off. WorkerAI holds it asleep while it's in the bed and counts the sleep as in one; when its
+ * bedtime or nap is over the job ends and it wakes.
  */
 final class SleepHandler implements JobHandler {
     /** One stretch of sleep; it sleeps stretch after stretch until its bedtime's over. */
@@ -27,10 +28,10 @@ final class SleepHandler implements JobHandler {
         return WorkStance.AGAINST;
     }
 
-    /** Another stretch while it's still its bedtime. */
+    /** Another stretch while it's still its bedtime, or its nap isn't over. */
     @Override
     public boolean repeatAfterComplete(JobContext ctx) {
         return ctx.entity() instanceof com.cobblemon.mod.common.entity.pokemon.PokemonEntity entity
-                && Sleep.isBedtimeFor(entity, ctx.state());
+                && (Sleep.isBedtimeFor(entity, ctx.state()) || Sleep.isNapping(entity, ctx.state()));
     }
 }
