@@ -117,7 +117,19 @@ settings that aren't per-Pokémon:
   - **`tired_work_speed`** (0.1 to 1): how fast a Tired worker works and walks.
 
 Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
-the server logs a warning and uses the defaults. Changes apply the next time the server starts.
+the server logs a warning and uses the defaults. Changes to the file apply the next time the server
+starts.
+
+Admins (OP level 2, or the server console) can also change them in game, straight away. Each
+setting is named by its place in the file, and the change is written to the file:
+
+- `/palworks config get [<setting>]`: one setting, or all of them, with their defaults.
+- `/palworks config set <setting> <value>`: e.g. `/palworks config set hunger.enabled false`. Values
+  must be in the same ranges as in the file.
+- `/palworks config reset <setting>` or `/palworks config reset all`: back to the defaults.
+
+The display settings in `config/palworks-client.json` are each player's own, so they're only
+changed in that file.
 
 ## Hunger
 
@@ -247,6 +259,21 @@ Files for the same job from different namespaces **merge**, like vanilla tags: a
 same type or species a level, the higher one wins, and a species' `0` wins over any level. Add
 `"replace": true` to a file to use only it for that job, ignoring the other namespaces' files. To
 change a default, put a file at the same path as ours in your datapack. `/reload` applies changes.
+
+### Changing work skills in game
+
+Admins (OP level 2, or the server console) can change a species' work skills without touching the
+datapacks. Changes apply straight away (players' PC and summary screens show them a moment later),
+go over every datapack's levels, and are kept after `/reload` and restarts. They're saved with the
+world, in `<world>/palworks/suitability_overrides.json`:
+
+- `/palworks suitability set <species> <job> <level>`: e.g. `/palworks suitability set bulbasaur
+  watering 3`. Like a species entry in the files, it sets the level outright; `0` takes the job away.
+- `/palworks suitability get <species>`: its levels (its standard form's), and which were changed in
+  game.
+- `/palworks suitability reset <species> [<job>]`: back to the datapacks' levels, for one job or all.
+- `/palworks suitability reset all`: undo every change.
+- `/palworks suitability list`: every species changed, and how.
 
 The jobs are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`, `gathering`,
 `lumbering`, `mining`, `medicine_production`, `cooling`, `transporting`, `nether` and `farming`. The
