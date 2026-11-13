@@ -60,6 +60,11 @@ public enum JobType {
         return priority;
     }
 
+    /** Whether it's work, not something a worker does for itself: eating and sleeping aren't. */
+    public boolean isWork() {
+        return requiredSuitability != null;
+    }
+
     /** The work skill this job needs, or null for one any worker does (eating). */
     @Nullable
     public Suitability getRequiredSuitability() {

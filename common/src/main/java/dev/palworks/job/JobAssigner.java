@@ -15,6 +15,7 @@ import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
+import dev.palworks.mood.Mood;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Beds;
 import dev.palworks.sleep.Sleep;
@@ -142,6 +143,12 @@ final class JobAssigner {
                 if (headHome(level, worker, troughs)) {
                     continue;
                 }
+            }
+
+            // A worker on strike (its mood ran out) does no work until it's back up a way; it still
+            // eats and sleeps, above, which is how it gets there (see Mood)
+            if (pokemon != null && Mood.isStriking(pokemon, WorkerStateManager.get(pokemon))) {
+                continue;
             }
 
             // An empty or Tired worker rests a while after each job, so it gets through work slower

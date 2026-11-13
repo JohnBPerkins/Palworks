@@ -111,6 +111,12 @@ public final class WorkerDebugText {
             lines.add(new Line(sleep, d.rest().tired()));
         }
 
+        String mood = moodLine(d.mood());
+        if (mood != null) {
+            // Unhappy or on strike is a warning: it works slower, or not at all
+            lines.add(new Line(mood, d.mood().unhappy() || d.mood().striking()));
+        }
+
         if (unreachableSpots > 0) {
             lines.add(new Line(
                     unreachableSpots + (unreachableSpots == 1 ? " unreachable spot" : " unreachable spots"), true));
@@ -136,6 +142,19 @@ public final class WorkerDebugText {
             return state == null ? "Tired" : state + " · Tired";
         }
         return state;
+    }
+
+    /** "mood 72", "mood 31 · unhappy", "mood 0 · on strike", or null when mood doesn't apply. */
+    @org.jetbrains.annotations.Nullable
+    static String moodLine(WorkerDebugPacket.Mood mood) {
+        if (!mood.shown()) {
+            return null;
+        }
+        String line = "mood " + mood.mood();
+        if (mood.striking()) {
+            return line + " · on strike";
+        }
+        return mood.unhappy() ? line + " · unhappy" : line;
     }
 
     static String seconds(int ticks) {
