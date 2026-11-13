@@ -8,6 +8,7 @@ import dev.palworks.net.handlers.ToggleWorkerHandler;
 import dev.palworks.net.handlers.WorkActivityHandler;
 import dev.palworks.net.handlers.WorkLevelsHandler;
 import dev.palworks.net.handlers.WorkerDebugHandler;
+import dev.palworks.net.handlers.WorkerMoodHandler;
 import dev.palworks.net.handlers.WorkerStatusHandler;
 import dev.palworks.net.packets.OpenInventoryPacket;
 import dev.palworks.net.packets.RequestPcWorkLevelsPacket;
@@ -15,6 +16,7 @@ import dev.palworks.net.packets.ToggleWorkerPacket;
 import dev.palworks.net.packets.WorkActivityPacket;
 import dev.palworks.net.packets.WorkLevelsPacket;
 import dev.palworks.net.packets.WorkerDebugPacket;
+import dev.palworks.net.packets.WorkerMoodPacket;
 import dev.palworks.net.packets.WorkerStatusPacket;
 import java.util.List;
 import org.spongepowered.asm.mixin.Mixin;
@@ -66,5 +68,8 @@ public abstract class CobblemonNetworkMixin {
         cir.getReturnValue()
                 .add(new PacketRegisterInfo<>(
                         WorkLevelsPacket.ID, WorkLevelsPacket::decode, new WorkLevelsHandler(), null));
+        cir.getReturnValue()
+                .add(new PacketRegisterInfo<>(
+                        WorkerMoodPacket.ID, WorkerMoodPacket::decode, new WorkerMoodHandler(), null));
     }
 }

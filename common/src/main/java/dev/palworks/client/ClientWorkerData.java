@@ -2,6 +2,7 @@ package dev.palworks.client;
 
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.net.packets.WorkerDebugPacket;
+import dev.palworks.net.packets.WorkerMoodPacket;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
@@ -22,7 +23,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>the workers near the player (WorkerDebugPacket), for the debug overlay
  *       ({@code WorkerDebugRenderer}). Empty unless the player has {@code /palworks debug} on;</li>
  *   <li>the work levels of the player's Pokémon, party and PC (WorkLevelsPacket), for the PC and
- *       summary screens ({@code WorkSkillsOverlay}), by Pokémon UUID.</li>
+ *       summary screens ({@code WorkSkillsOverlay}), by Pokémon UUID;</li>
+ *   <li>their moods (WorkerMoodPacket), for the same screens, by Pokémon UUID.</li>
  * </ul>
  * Has no client-only imports, so it is safe to load on a dedicated server (where Cobblemon still
  * constructs the client packet handlers).
@@ -35,6 +37,8 @@ public final class ClientWorkerData {
     private static final Map<UUID, Status> STATUS = new ConcurrentHashMap<>();
     private static volatile List<WorkerDebugPacket.Entry> debugEntries = List.of();
     private static final Map<UUID, Map<Suitability, Integer>> WORK_LEVELS = new ConcurrentHashMap<>();
+    private static final Map<UUID, WorkerMoodPacket.Shown> MOODS = new ConcurrentHashMap<>();
+    private static volatile int strikeUntil;
 
     private ClientWorkerData() {}
 
@@ -92,5 +96,24 @@ public final class ClientWorkerData {
 
     public static void clearWorkLevels() {
         WORK_LEVELS.clear();
+        MOODS.clear();
+    }
+
+    // --- Mood (PC and summary) ---
+
+    public static void putMoods(Map<UUID, WorkerMoodPacket.Shown> moods, int strikeUntil) {
+        MOODS.putAll(moods);
+        ClientWorkerData.strikeUntil = strikeUntil;
+    }
+
+    /** A Pokémon's mood, or null if the server hasn't said (or mood is off). */
+    @Nullable
+    public static WorkerMoodPacket.Shown mood(UUID pokemonUUID) {
+        return MOODS.get(pokemonUUID);
+    }
+
+    /** The mood a worker on strike works again at (the server's config). */
+    public static int strikeUntil() {
+        return strikeUntil;
     }
 }

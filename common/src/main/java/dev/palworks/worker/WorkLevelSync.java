@@ -2,7 +2,11 @@ package dev.palworks.worker;
 
 import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.config.PalworksConfig;
+import dev.palworks.mood.Mood;
+import dev.palworks.mood.MoodMath;
 import dev.palworks.net.packets.WorkLevelsPacket;
+import dev.palworks.net.packets.WorkerMoodPacket;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import java.util.EnumMap;
@@ -25,6 +29,9 @@ import net.minecraft.server.level.ServerPlayer;
  * </ul>
  * A Pokémon's levels are cached by its form ({@code DatapackSuitabilityProvider}), so checking a
  * party costs a few map lookups.
+ *
+ * <p>Their moods ({@link WorkerMoodPacket}, see dev.palworks.mood.Mood) go the same way, at the same
+ * times: the party's when they change (as whole points), the PC's as it opens. Not while mood is off.
  */
 public final class WorkLevelSync {
     static final int PARTY_CHECK_TICKS = 20;
@@ -32,6 +39,8 @@ public final class WorkLevelSync {
 
     // What each player was last sent about each of their party's Pokémon: player -> Pokémon -> levels
     private static final Map<UUID, Map<UUID, Map<Suitability, Integer>>> SENT = new ConcurrentHashMap<>();
+    // What each player was last sent about each of their party's Pokémon's moods
+    private static final Map<UUID, Map<UUID, WorkerMoodPacket.Shown>> SENT_MOODS = new ConcurrentHashMap<>();
     // Server tick each player last asked for their PC's levels
     private static final Map<UUID, Integer> LAST_PC_REQUEST = new ConcurrentHashMap<>();
 
@@ -44,6 +53,17 @@ public final class WorkLevelSync {
             levels.put(job, SuitabilityDetector.getSuitabilityLevel(pokemon, job));
         }
         return levels;
+    }
+
+    /** How a Pokémon's mood is shown, from what's saved of it (it may be in its ball, or the PC). */
+    public static WorkerMoodPacket.Shown moodOf(Pokemon pokemon) {
+        WorkerState state = WorkerStateManager.get(pokemon);
+        double mood = state == null ? WorkerState.MAX_MOOD : state.getMood();
+        PalworksConfig.MoodConfig config = PalworksConfig.current().mood();
+        return new WorkerMoodPacket.Shown(
+                (int) Math.round(mood),
+                MoodMath.unhappy(mood, config.unhappyBelow()),
+                state != null && state.isStriking());
     }
 
     /** Every server tick: every {@link #PARTY_CHECK_TICKS}, tell each player of any change to their party's levels. */
@@ -70,6 +90,26 @@ public final class WorkLevelSync {
         if (!changed.isEmpty()) {
             new WorkLevelsPacket(changed).sendToPlayer(player);
         }
+        syncPartyMoods(player);
+    }
+
+    /** Send the player the moods of their party's Pokémon that have changed since they were last sent. */
+    private static void syncPartyMoods(ServerPlayer player) {
+        if (!Mood.enabled()) {
+            return;
+        }
+        Map<UUID, WorkerMoodPacket.Shown> sent = SENT_MOODS.computeIfAbsent(player.getUUID(), k -> new HashMap<>());
+        Map<UUID, WorkerMoodPacket.Shown> changed = new HashMap<>();
+        for (Pokemon pokemon : Cobblemon.INSTANCE.getStorage().getParty(player)) {
+            WorkerMoodPacket.Shown mood = moodOf(pokemon);
+            if (!mood.equals(sent.get(pokemon.getUuid()))) {
+                changed.put(pokemon.getUuid(), mood);
+                sent.put(pokemon.getUuid(), mood);
+            }
+        }
+        if (!changed.isEmpty()) {
+            new WorkerMoodPacket(changed, PalworksConfig.current().mood().strikeUntil()).sendToPlayer(player);
+        }
     }
 
     /** Send the player the levels of every Pokémon in their PC, unless they asked very recently. */
@@ -86,6 +126,15 @@ public final class WorkLevelSync {
         if (!levels.isEmpty()) {
             new WorkLevelsPacket(levels).sendToPlayer(player);
         }
+        if (Mood.enabled()) {
+            Map<UUID, WorkerMoodPacket.Shown> moods = new HashMap<>();
+            for (Pokemon pokemon : Cobblemon.INSTANCE.getStorage().getPC(player)) {
+                moods.put(pokemon.getUuid(), moodOf(pokemon));
+            }
+            if (!moods.isEmpty()) {
+                new WorkerMoodPacket(moods, PalworksConfig.current().mood().strikeUntil()).sendToPlayer(player);
+            }
+        }
     }
 
     /** What this player was last sent about this party Pokémon's levels, if anything (tests). */
@@ -93,15 +142,22 @@ public final class WorkLevelSync {
         return Optional.ofNullable(SENT.getOrDefault(player, Map.of()).get(pokemon));
     }
 
+    /** What this player was last sent about this party Pokémon's mood, if anything (tests). */
+    public static Optional<WorkerMoodPacket.Shown> lastSentMood(UUID player, UUID pokemon) {
+        return Optional.ofNullable(SENT_MOODS.getOrDefault(player, Map.of()).get(pokemon));
+    }
+
     /** Forget a player who left, so their party is sent afresh when they're back. */
     public static void forget(UUID player) {
         SENT.remove(player);
+        SENT_MOODS.remove(player);
         LAST_PC_REQUEST.remove(player);
     }
 
     /** Drop everything (server stop). */
     public static void clear() {
         SENT.clear();
+        SENT_MOODS.clear();
         LAST_PC_REQUEST.clear();
     }
 }
