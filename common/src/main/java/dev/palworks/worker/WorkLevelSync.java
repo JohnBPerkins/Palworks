@@ -31,7 +31,8 @@ import net.minecraft.server.level.ServerPlayer;
  * party costs a few map lookups.
  *
  * <p>Their moods ({@link WorkerMoodPacket}, see dev.palworks.mood.Mood) go the same way, at the same
- * times: the party's when they change (as whole points), the PC's as it opens. Not while mood is off.
+ * times: the party's when they change (as whole points), the PC's as it opens. While mood is off, a
+ * player who was sent moods is told once to drop them.
  */
 public final class WorkLevelSync {
     static final int PARTY_CHECK_TICKS = 20;
@@ -96,6 +97,10 @@ public final class WorkLevelSync {
     /** Send the player the moods of their party's Pokémon that have changed since they were last sent. */
     private static void syncPartyMoods(ServerPlayer player) {
         if (!Mood.enabled()) {
+            // Turned off (it can be, in game): tell a player who was sent moods, once, to drop them
+            if (SENT_MOODS.remove(player.getUUID()) != null) {
+                WorkerMoodPacket.off().sendToPlayer(player);
+            }
             return;
         }
         Map<UUID, WorkerMoodPacket.Shown> sent = SENT_MOODS.computeIfAbsent(player.getUUID(), k -> new HashMap<>());
@@ -126,7 +131,9 @@ public final class WorkLevelSync {
         if (!levels.isEmpty()) {
             new WorkLevelsPacket(levels).sendToPlayer(player);
         }
-        if (Mood.enabled()) {
+        if (!Mood.enabled()) {
+            WorkerMoodPacket.off().sendToPlayer(player);
+        } else {
             Map<UUID, WorkerMoodPacket.Shown> moods = new HashMap<>();
             for (Pokemon pokemon : Cobblemon.INSTANCE.getStorage().getPC(player)) {
                 moods.put(pokemon.getUuid(), moodOf(pokemon));

@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.block.ModBlocks;
 import dev.palworks.block.TroughBlockEntity;
+import dev.palworks.config.PalworksConfig;
 import dev.palworks.job.JobType;
 import dev.palworks.mood.Mood;
 import dev.palworks.net.packets.WorkerMoodPacket;
@@ -238,6 +239,12 @@ public class MoodGameTests {
         WorkerMoodPacket decoded = WorkerMoodPacket.decode(buffer);
         helper.assertTrue(decoded.getMoods().equals(moods), "decoded " + decoded.getMoods());
         helper.assertTrue(decoded.getStrikeUntil() == 30, "and where a strike ends");
+        RegistryFriendlyByteBuf off =
+                new RegistryFriendlyByteBuf(Unpooled.buffer(), helper.getLevel().registryAccess());
+        WorkerMoodPacket.off().encode(off);
+        WorkerMoodPacket decodedOff = WorkerMoodPacket.decode(off);
+        helper.assertFalse(decodedOff.isEnabled(), "off stays off");
+        helper.assertTrue(decoded.isEnabled(), "and on, on");
         helper.succeed();
     }
 
@@ -249,6 +256,7 @@ public class MoodGameTests {
         Cobblemon.INSTANCE.getStorage().getParty(owner).add(bulbasaur);
         UUID player = owner.getUUID();
         UUID pokemon = bulbasaur.getUuid();
+        PalworksConfig loaded = PalworksConfig.current();
         try {
             WorkLevelSync.syncParty(owner);
             Optional<WorkerMoodPacket.Shown> sent = WorkLevelSync.lastSentMood(player, pokemon);
@@ -259,7 +267,14 @@ public class MoodGameTests {
             sent = WorkLevelSync.lastSentMood(player, pokemon);
             helper.assertTrue(
                     sent.equals(Optional.of(new WorkerMoodPacket.Shown(32, true, false))), "then sent " + sent);
+
+            // Mood turned off (as /palworks config can): the player is told to drop what it was sent
+            PalworksConfig.setCurrent(PalworksConfig.DEFAULTS.withMood(
+                    new PalworksConfig.MoodConfig(false, 2, 50, 25, 100, 50, 0.75, 30)));
+            WorkLevelSync.syncParty(owner);
+            helper.assertTrue(WorkLevelSync.lastSentMood(player, pokemon).isEmpty(), "dropped: mood is off");
         } finally {
+            PalworksConfig.setCurrent(loaded);
             WorkLevelSync.forget(player);
         }
         helper.succeed();

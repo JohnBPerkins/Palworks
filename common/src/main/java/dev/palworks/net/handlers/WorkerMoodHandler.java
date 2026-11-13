@@ -11,6 +11,10 @@ public class WorkerMoodHandler implements ClientNetworkPacketHandler<WorkerMoodP
 
     @Override
     public void handle(@NotNull WorkerMoodPacket packet, @NotNull Minecraft client) {
-        ClientWorkerData.putMoods(packet.getMoods(), packet.getStrikeUntil());
+        if (packet.isEnabled()) {
+            ClientWorkerData.putMoods(packet.getMoods(), packet.getStrikeUntil());
+        } else {
+            ClientWorkerData.clearMoods(); // mood was turned off: show none
+        }
     }
 }

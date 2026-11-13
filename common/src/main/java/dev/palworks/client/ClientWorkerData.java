@@ -106,6 +106,11 @@ public final class ClientWorkerData {
         ClientWorkerData.strikeUntil = strikeUntil;
     }
 
+    /** Forget every mood (mood was turned off on the server). */
+    public static void clearMoods() {
+        MOODS.clear();
+    }
+
     /** A Pokémon's mood, or null if the server hasn't said (or mood is off). */
     @Nullable
     public static WorkerMoodPacket.Shown mood(UUID pokemonUUID) {
