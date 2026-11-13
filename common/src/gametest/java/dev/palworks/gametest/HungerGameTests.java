@@ -647,7 +647,8 @@ public class HungerGameTests {
 
     @GameTest(template = Templates.EMPTY, batch = "hunger_pace_moving", timeoutTicks = 200)
     public void anEmptyWorkerMovesAtThreeQuartersSpeedWhoeverMovesIt(GameTestHelper helper) {
-        // On its movement speed itself, which Cobblemon's wandering and following go by as well
+        // On its movement speed itself, which Cobblemon's wandering and following go by as well (the root
+        // of its pace on foot, which covers ground at its pace: see Pace.attributeShare)
         Workers.isolate(helper);
         PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
         Pokemon pokemon = worker.getPokemon();
@@ -655,8 +656,8 @@ public class HungerGameTests {
         helper.startSequence()
                 .thenExecute(() -> pokemon.setCurrentFullness(0))
                 .thenWaitUntil(() -> helper.assertTrue(
-                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * 0.75) < 1e-6,
-                        "empty: three quarters of " + full + ", not "
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * Math.sqrt(0.75)) < 1e-6,
+                        "empty: the root of three quarters (on foot) of " + full + ", not "
                                 + worker.getAttributeValue(Attributes.MOVEMENT_SPEED)))
                 .thenExecute(() -> pokemon.setCurrentFullness(pokemon.getMaxFullness()))
                 .thenWaitUntil(() -> helper.assertTrue(

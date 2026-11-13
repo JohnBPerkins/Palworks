@@ -1,5 +1,7 @@
 package dev.palworks.worker;
 
+import com.cobblemon.mod.common.entity.pokemon.PokemonBehaviourFlag;
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.job.JobType;
@@ -18,7 +20,8 @@ import org.jetbrains.annotations.Nullable;
  * A slowed worker's pace (see {@link WorkSpeed}) on the Pokémon itself: its movement speed, and
  * flying speed, are that much slower, whatever's moving it. Palworks walking it to a job, or
  * Cobblemon walking it round its pasture or after its owner, all go by those attributes. A
- * transient modifier, so it's never saved; taken off again at full pace.
+ * transient modifier, so it's never saved; taken off again at full pace. On foot it's the square
+ * root of the pace (see {@link #attributeShare}), so it covers ground at its pace.
  *
  * <p>Clients are told it as an aspect ({@link #aspect}, {@code palworks-pace-25} for a quarter),
  * which Cobblemon syncs to every player nearby, and slow its animations to match (see
@@ -87,23 +90,39 @@ public final class Pace {
     /** Slow this worker's movement to its pace ({@code pace} rounded), or undo it at full pace. */
     public static void applyTo(Mob entity, double pace) {
         double rounded = rounded(pace);
-        apply(entity, Attributes.MOVEMENT_SPEED, rounded);
+        // Cobblemon's flying flag (not isPokemonFlying, which is any movement at all: it goes by the
+        // distance moved, which grows walking too)
+        boolean flying =
+                entity instanceof PokemonEntity pokemon && pokemon.getBehaviourFlag(PokemonBehaviourFlag.FLYING);
+        boolean onFoot = !flying && !entity.isInWater();
+        apply(entity, Attributes.MOVEMENT_SPEED, attributeShare(rounded, onFoot));
         apply(entity, Attributes.FLYING_SPEED, rounded);
     }
 
-    private static void apply(Mob entity, Holder<Attribute> attribute, double pace) {
+    /**
+     * The share of its movement speed that moves it at {@code pace} of its usual speed. On foot a
+     * mob covers ground as the square of its movement speed (Minecraft's Mob.setSpeed is both how
+     * hard it pushes forward and how much each push carries it), so there it's the square root: a
+     * pace of a half is about 0.71 of its movement speed. Flying or swimming, Cobblemon moves it by
+     * its movement speed as it is, so there it's the pace itself.
+     */
+    public static double attributeShare(double pace, boolean onFoot) {
+        return onFoot ? Math.sqrt(pace) : pace;
+    }
+
+    private static void apply(Mob entity, Holder<Attribute> attribute, double share) {
         AttributeInstance instance = entity.getAttribute(attribute);
         if (instance == null) {
             return; // it doesn't fly
         }
         AttributeModifier current = instance.getModifier(MODIFIER);
-        if (pace >= FULL) {
+        if (share >= FULL) {
             if (current != null) {
                 instance.removeModifier(MODIFIER);
             }
             return;
         }
-        double amount = pace - 1; // the total, times (1 + amount): times pace
+        double amount = share - 1; // the total, times (1 + amount): times share
         if (current == null || Math.abs(current.amount() - amount) > 1e-6) {
             instance.addOrUpdateTransientModifier(
                     new AttributeModifier(MODIFIER, amount, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));

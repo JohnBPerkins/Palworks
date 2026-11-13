@@ -34,4 +34,16 @@ class PaceTest {
         assertEquals(Pace.FULL, Pace.fromAspects(Set.of("shiny")), DELTA);
         assertEquals(Pace.FULL, Pace.fromAspects(Set.of("palworks-pace-lots")), DELTA, "not a pace: full");
     }
+
+    @Test
+    void onFootTheSpeedIsTheRootOfThePaceSoItCoversGroundAtThePace() {
+        assertEquals(0.5, Pace.attributeShare(0.25, true), DELTA); // squared, a quarter of the ground
+        assertEquals(Math.sqrt(0.5), Pace.attributeShare(0.5, true), DELTA);
+        assertEquals(Pace.FULL, Pace.attributeShare(Pace.FULL, true), DELTA);
+    }
+
+    @Test
+    void flyingOrSwimmingTheSpeedIsThePace() {
+        assertEquals(0.5, Pace.attributeShare(0.5, false), DELTA);
+    }
 }
