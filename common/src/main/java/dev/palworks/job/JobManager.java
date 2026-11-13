@@ -195,6 +195,17 @@ public class JobManager {
                     info.currentReservation.getStationPos());
         }
 
+        // A job it has that the registry doesn't (saved with it, before a restart or its chunk
+        // unloading) is still its own: claim it in the pool, or the scan offers it again and
+        // another worker is given it too. If another worker has it already, that one keeps it.
+        if (stateReservation != null
+                && !stateReservation.equals(info.currentReservation)
+                && !pool.adopt(stateReservation, uuid, level.getGameTime())) {
+            state.clearReservation();
+            WorkerStateManager.save(pokemon, state);
+            stateReservation = null;
+        }
+
         BlockPos entityPos = entity.blockPosition();
         info.position = entityPos;
         // A party Pokémon works near its owner; one from a pasture works round its pasture

@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
@@ -97,6 +98,29 @@ final class JobPool {
     /** Record that a worker has the job. */
     void reserve(JobRecord job) {
         reserved.put(JobKey.of(job), job);
+    }
+
+    /**
+     * A job a worker already has that the pool doesn't know of: it was saved with the worker, and
+     * this pool is new since (a restart), or the worker has just come back into a loaded chunk.
+     * Record it as that worker's, out of the available jobs, so no other worker is given it too.
+     * False if another worker has it already: then that one keeps it.
+     */
+    boolean adopt(ReservationId reservation, UUID worker, long gameTime) {
+        JobKey key = JobKey.of(reservation);
+        JobRecord held = reserved.get(key);
+        if (held != null) {
+            return held.isReservedBy(worker);
+        }
+        JobRecord job = available.get(key);
+        if (job != null) {
+            removeAvailable(key);
+        } else {
+            job = JobRecord.of(reservation.getJobType(), reservation.getStationPos(), gameTime);
+        }
+        job.reserveFor(worker);
+        reserved.put(key, job);
+        return true;
     }
 
     /**

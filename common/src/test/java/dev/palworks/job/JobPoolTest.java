@@ -1,14 +1,17 @@
 package dev.palworks.job;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.palworks.job.JobPool.JobKey;
+import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.Test;
 
@@ -113,5 +116,40 @@ class JobPoolTest {
         assertEquals(1, offeredTo(pool, FARMER).size());
         assertTrue(offeredTo(pool, NETHER_LUMBERJACK).isEmpty());
         assertGroupsMatch(pool);
+    }
+
+    @Test
+    void aSavedReservationIsClaimedForItsWorkerAndTakenOutOfTheAvailableJobs() {
+        JobPool pool = farmAndForest(); // after a restart, the scan has found the crop again
+        UUID worker = UUID.randomUUID();
+        ReservationId saved = new ReservationId(CROP, JobType.HARVEST_CROPS, 0L);
+
+        assertTrue(pool.adopt(saved, worker, 10L));
+        assertTrue(pool.isReserved(JobKey.of(saved)));
+        assertFalse(
+                offeredTo(pool, FARMER).stream().anyMatch(job -> job.position().equals(CROP)), "not offered");
+        assertGroupsMatch(pool);
+        assertTrue(pool.adopt(saved, worker, 20L), "already its own");
+    }
+
+    @Test
+    void aSavedReservationNotInThePoolYetIsClaimedToo() {
+        JobPool pool = new JobPool(); // its worker reports in before the scan finds the job
+        UUID worker = UUID.randomUUID();
+        ReservationId saved = new ReservationId(TREE, JobType.CHOP_TREE, 0L);
+
+        assertTrue(pool.adopt(saved, worker, 10L));
+        assertTrue(pool.isReserved(JobKey.of(saved)));
+    }
+
+    @Test
+    void anotherWorkersJobIsntClaimed() {
+        JobPool pool = new JobPool();
+        ReservationId saved = new ReservationId(CROP, JobType.HARVEST_CROPS, 0L);
+        UUID first = UUID.randomUUID();
+        assertTrue(pool.adopt(saved, first, 10L));
+
+        assertFalse(pool.adopt(saved, UUID.randomUUID(), 10L), "the first keeps it");
+        assertTrue(pool.reserved().iterator().next().isReservedBy(first));
     }
 }
