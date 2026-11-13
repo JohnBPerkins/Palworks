@@ -45,6 +45,11 @@ public final class WorkerTicking {
         if (pokemon == null || pokemon.getOwnerUUID() == null || pokemon.getEntity() == null) {
             return; // Only owned Pokémon that are out in the world
         }
+        // No work it can do, and never a worker: not one. (One that was, and lost its last work
+        // skill, carries on as one whose work is off: it lets its job go and wakes up.)
+        if (!WorkerEligibility.canWork(pokemon) && !WorkerStateManager.hasWorkerState(pokemon)) {
+            return;
+        }
         JobManager.getInstance(level).registerWorker(pokemon, entity, level);
         WorkerAI.tick(pokemon, entity, level);
     }

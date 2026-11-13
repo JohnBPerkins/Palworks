@@ -121,9 +121,10 @@ public class WorkerAI {
                 eating.isEmpty() ? WorkerInventoryManager.getOrCreate(pokemon).getFirstItem() : eating);
 
         // New workers start enabled (see WorkerState), so a disabled state means it was turned off
-        // on purpose (/palworks worker disable). Respect that instead of re-enabling it. Its
-        // hunger is Cobblemon's again: no rest after its last job carries over.
-        if (!state.isEnabled()) {
+        // on purpose (/palworks worker disable). Respect that instead of re-enabling it. One with
+        // no work it can do (it lost its last work skill) is no worker either. Its hunger is
+        // Cobblemon's again: no rest after its last job carries over.
+        if (!dev.palworks.worker.WorkerEligibility.works(pokemon, state)) {
             state.setRestUntil(0);
             if (state.isAsleep() && entity instanceof PokemonEntity pokemonEntity) {
                 wake(pokemon, pokemonEntity, state); // and its sleep is Cobblemon's again

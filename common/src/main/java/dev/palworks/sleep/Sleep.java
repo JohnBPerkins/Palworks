@@ -36,15 +36,15 @@ public final class Sleep {
 
     /**
      * Whether Palworks' sleep applies to this Pokémon: sleep is on, it's owned, out in the world,
-     * pastured (not from a party) and its work is on. {@code state} is its worker state, or null if
-     * it has none yet.
+     * pastured (not from a party), and it works ({@link WorkerEligibility#works}: its work is on and
+     * it has work it can do). {@code state} is its worker state, or null if it has none yet.
      */
     public static boolean appliesTo(Pokemon pokemon, @Nullable WorkerState state) {
         return config().enabled()
                 && pokemon.getOwnerUUID() != null
                 && pokemon.getEntity() != null
                 && !WorkerEligibility.isFromParty(pokemon)
-                && (state == null || state.isEnabled());
+                && WorkerEligibility.works(pokemon, state);
     }
 
     /** Its species' (and form's) sleep behaviour. */

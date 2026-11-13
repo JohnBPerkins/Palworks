@@ -7,17 +7,21 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.animation.WorkAnimator;
+import dev.palworks.hunger.Hunger;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityData;
 import dev.palworks.suitability.SuitabilityDetector;
+import dev.palworks.suitability.SuitabilityOverrides;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
@@ -26,8 +30,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -783,5 +789,53 @@ public class WorkerGameTests {
                 EnchantmentHelper.getItemEnchantmentLevel(sharpness, loaded) == 3,
                 "still Sharpness 3: " + loaded.getEnchantments());
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, timeoutTicks = 200)
+    public void aPokemonWithNoWorkSkillsIsntAWorker(GameTestHelper helper) {
+        Workers.isolate(helper);
+        PokemonEntity ekans = Workers.sendOutPastured(helper, "ekans level=20", new BlockPos(2, 1, 2)); // Poison
+        helper.runAfterDelay(40, () -> {
+            Pokemon pokemon = ekans.getPokemon();
+            helper.assertTrue(SuitabilityDetector.getSuitabilities(pokemon).isEmpty(), "no work it can do");
+            helper.assertFalse(WorkerStateManager.hasWorkerState(pokemon), "never made a worker");
+            helper.assertFalse(Hunger.pausesCobblemonDrain(pokemon), "Cobblemon drains its fullness as usual");
+            helper.assertFalse(Sleep.appliesTo(pokemon, null), "it sleeps as Cobblemon has it");
+            helper.succeed();
+        });
+    }
+
+    @AfterBatch(batch = "lost_last_skill")
+    public void afterLostLastSkill(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "lost_last_skill", timeoutTicks = 400)
+    public void aWorkerThatLosesItsLastWorkSkillLetsItsJobGo(GameTestHelper helper) {
+        // Changes every Bulbasaur's skills, so it's in a batch of its own, undone after it
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos crop = new BlockPos(6, 1, 5);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+        PokemonEntity bulbasaur = Workers.sendOut(helper, "bulbasaur level=20", new BlockPos(1, 1, 1));
+        WorkerState state = WorkerStateManager.getOrCreate(bulbasaur.getPokemon());
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(state.getCurrentReservation() != null, "it takes the harvest"))
+                .thenExecute(() -> {
+                    try { // Grass: Planting and Gathering, both taken away (as an admin's change does)
+                        SuitabilityOverrides.set("cobblemon:bulbasaur", Suitability.PLANTING, 0);
+                        SuitabilityOverrides.set("cobblemon:bulbasaur", Suitability.GATHERING, 0);
+                    } catch (IOException e) {
+                        helper.fail("couldn't change its skills: " + e);
+                    }
+                })
+                .thenWaitUntil(() -> helper.assertTrue(state.getCurrentReservation() == null, "it lets the job go"))
+                .thenIdle(60)
+                .thenExecute(() -> helper.assertTrue(
+                        helper.getBlockState(crop).equals(((CropBlock) Blocks.WHEAT).getStateForAge(7)),
+                        "and doesn't harvest it"))
+                .thenSucceed();
     }
 }

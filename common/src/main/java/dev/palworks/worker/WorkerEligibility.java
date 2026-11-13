@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.job.WorkRange;
+import dev.palworks.suitability.SuitabilityDetector;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -29,6 +30,24 @@ public class WorkerEligibility {
     /** Whether the Pokemon has fainted (0 HP): it can't work until it's healed. */
     public static boolean isFainted(Pokemon pokemon) {
         return pokemon.getCurrentHealth() <= 0;
+    }
+
+    /**
+     * Whether it has any work it can do (a work suitability). One without isn't a worker: Palworks
+     * leaves it entirely to Cobblemon, as it does one whose work is off. It can gain or lose its
+     * last one (an evolution, a form change, a datapack or an admin's change).
+     */
+    public static boolean canWork(Pokemon pokemon) {
+        return !SuitabilityDetector.getSuitabilities(pokemon).isEmpty();
+    }
+
+    /**
+     * Whether Palworks runs this Pokémon as a worker now: its work is on and it has work it can do.
+     * {@code state} is its worker state, or null if it has none yet (a new worker starts with its
+     * work on).
+     */
+    public static boolean works(Pokemon pokemon, @Nullable WorkerState state) {
+        return (state == null || state.isEnabled()) && canWork(pokemon);
     }
 
     /**

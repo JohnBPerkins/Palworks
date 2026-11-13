@@ -168,12 +168,17 @@ public class JobManager {
             DebugManager.broadcastActivity(serverLevel, pokemon.getSpecies().getName() + " is now a worker");
         }
 
-        // Disabled workers get no jobs. If one was registered before being disabled, drop it from
-        // the registry and free its job, or assignment would keep handing it work.
-        if (!state.isEnabled()) {
+        // Not a worker now: its work is off, or it has no work it can do (it lost its last work
+        // skill). If it was registered, drop it from the registry and free its job, or assignment
+        // would keep handing it work; and it lets its own job go.
+        if (!WorkerEligibility.works(pokemon, state)) {
             WorkerInfo removed = workers.remove(uuid);
             if (removed != null && removed.currentReservation != null) {
                 pool.release(JobKey.of(removed.currentReservation), level.getGameTime());
+            }
+            if (state.getCurrentReservation() != null) {
+                state.clearReservation();
+                WorkerStateManager.save(pokemon, state);
             }
             return;
         }
