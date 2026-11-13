@@ -83,15 +83,20 @@ public class JobManager {
     }
 
     /**
-     * Called for every block change on the server (see the ServerLevel mixins). If the block's
-     * collision changed (something became passable or blocked: a gate or door toggled, a block
+     * Called for every block change on the server (see the ServerLevel mixins). The scanner looks
+     * at the block again (see JobScanner#onBlockChanged). If the block's collision changed (something became passable or blocked: a gate or door toggled, a block
      * broken or placed), workers nearby forget which jobs they couldn't reach, so they re-check
      * on their next assignment. Must stay cheap: returns early unless some worker has failures.
      */
     @SuppressWarnings("ReferenceEquality") // identity on purpose, see below
     public static void onBlockStateChange(ServerLevel level, BlockPos pos, BlockState oldState, BlockState newState) {
         JobManager manager = byLevel.get(level);
-        if (manager == null || !manager.assigner.hasUnreachable()) {
+        if (manager == null) {
+            return;
+        }
+        // The jobs it gives, if its chunk has been scanned, are looked at again next tick
+        manager.scanner.onBlockChanged(pos);
+        if (!manager.assigner.hasUnreachable()) {
             return;
         }
         // Collision shapes are cached and shared per state (e.g. every full block, every crop), so
