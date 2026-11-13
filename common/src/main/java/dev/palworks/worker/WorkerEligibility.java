@@ -99,6 +99,14 @@ public class WorkerEligibility {
         return !isFromParty(pokemon) || WorkRange.withinOwnerLeash(partyOwnerPosition(pokemon, level), pos);
     }
 
+    /** The pasture block a pastured Pokémon is tethered to, or null if it isn't (or isn't a Pokémon). */
+    @Nullable
+    public static BlockPos pastureOf(Entity entity) {
+        return entity instanceof PokemonEntity pokemon && pokemon.getTethering() != null
+                ? pokemon.getTethering().getPasturePos()
+                : null;
+    }
+
     /**
      * Check if a Pokémon is from a pasture.
      * Pasture Pokémon have store coordinates but are not in party.

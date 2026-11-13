@@ -10,6 +10,8 @@ import dev.palworks.block.TroughFeed;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.hunger.HungerMath;
+import dev.palworks.job.JobType;
+import dev.palworks.reservation.ReservationId;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.lang.reflect.InvocationTargetException;
@@ -349,6 +351,43 @@ public class HungerGameTests {
                     helper.assertTrue(
                             feedIn(trough) == 9 - cap, "a point of feed a point: " + feedIn(trough) + " left");
                 })
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_home", timeoutTicks = 1200)
+    public void aPasturedWorkerFarFromItsTroughFindsItByItsPasture(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // A floor reaching well past the test, 36 blocks out from the trough, loaded all the way to
+        // where it looks round itself (only the chunks round the tests are, in the test world)
+        for (int x = 0; x <= 40; x++) {
+            for (int z = 0; z <= 4; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+        BlockPos trough = new BlockPos(2, 1, 2);
+        trough(helper, trough).addFood(berries(9));
+        // Out of reach of where it is (36 off, past the 32 it looks round itself), but its pasture
+        // is right by the trough
+        PokemonEntity worker = Workers.sendOutPastured(helper, WORKER, new BlockPos(38, 1, 2));
+        Workers.tetherTo(helper, worker, new BlockPos(2, 1, 4));
+        Pokemon pokemon = worker.getPokemon();
+        pokemon.setCurrentFullness(0);
+        Runnable unload = Scenes.keepLoaded(helper, new BlockPos(-40, 0, -40), new BlockPos(80, 0, 40));
+        // How far off it was when it set off to eat: from out there, not once it had wandered back
+        double[] setOffFrom = {-1};
+        BlockPos troughAbs = helper.absolutePos(trough);
+        helper.onEachTick(() -> {
+            ReservationId job = WorkerStateManager.getOrCreate(pokemon).getCurrentReservation();
+            if (setOffFrom[0] < 0 && job != null && job.getJobType() == JobType.EAT_FOOD) {
+                setOffFrom[0] = Math.max(
+                        Math.abs(worker.getX() - troughAbs.getX()), Math.abs(worker.getZ() - troughAbs.getZ()));
+            }
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(pokemon.getCurrentFullness() > 0, "it found the trough and ate"))
+                .thenExecute(() -> helper.assertTrue(
+                        setOffFrom[0] > 32, "it set off for it from out past 32 blocks: " + setOffFrom[0]))
+                .thenExecute(unload)
                 .thenSucceed();
     }
 

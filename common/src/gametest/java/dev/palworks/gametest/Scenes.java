@@ -91,4 +91,31 @@ public final class Scenes {
     static void air(GameTestHelper helper, int x, int y, int z) {
         helper.setBlock(x, y, z, Blocks.AIR);
     }
+
+    /**
+     * Keep the chunks covering this box (relative to the test) loaded and ticking, as they are round
+     * a player in game: the test world only loads the chunks round the tests themselves. Returns
+     * what lets them go again.
+     */
+    static Runnable keepLoaded(GameTestHelper helper, BlockPos fromRel, BlockPos toRel) {
+        var level = helper.getLevel();
+        BlockPos a = helper.absolutePos(fromRel);
+        BlockPos b = helper.absolutePos(toRel);
+        int minX = Math.min(a.getX(), b.getX()) >> 4;
+        int maxX = Math.max(a.getX(), b.getX()) >> 4;
+        int minZ = Math.min(a.getZ(), b.getZ()) >> 4;
+        int maxZ = Math.max(a.getZ(), b.getZ()) >> 4;
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                level.setChunkForced(x, z, true);
+            }
+        }
+        return () -> {
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    level.setChunkForced(x, z, false);
+                }
+            }
+        };
+    }
 }

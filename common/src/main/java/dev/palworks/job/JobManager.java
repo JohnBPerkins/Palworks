@@ -200,6 +200,7 @@ public class JobManager {
         // A party Pokémon works near its owner; one from a pasture works round its pasture
         info.fromParty = WorkerEligibility.isFromParty(pokemon);
         info.ownerPosition = info.fromParty ? WorkerEligibility.partyOwnerPosition(pokemon, level) : null;
+        info.home = info.fromParty ? info.ownerPosition : WorkerEligibility.pastureOf(entity);
         if (newlyActive) {
             // Just sent out (or back in range): its first job comes from a fresh look round, not
             // from chunk scans up to 2s old that may have missed what's there now
