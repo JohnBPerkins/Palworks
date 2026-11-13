@@ -68,6 +68,8 @@ final class JobAssigner {
     private final JobPool pool;
     private final JobScanner scanner;
     private final WorkerRegistry workers;
+    // Beds non-workers have, which no worker is offered (it never turns one out)
+    private final NonWorkerBeds nonWorkerBeds;
 
     // Per-worker memory of job positions the worker couldn't reach, either because the path check
     // failed at assignment or it got stuck walking there (Pokemon UUID -> job position -> game tick
@@ -82,11 +84,13 @@ final class JobAssigner {
     // workers that have waited longest (Turns.longestWaiting).
     private final Map<UUID, Long> lastConsidered = new ConcurrentHashMap<>();
 
-    JobAssigner(ServerLevel level, JobPool pool, JobScanner scanner, WorkerRegistry workers) {
+    JobAssigner(
+            ServerLevel level, JobPool pool, JobScanner scanner, WorkerRegistry workers, NonWorkerBeds nonWorkerBeds) {
         this.level = level;
         this.pool = pool;
         this.scanner = scanner;
         this.workers = workers;
+        this.nonWorkerBeds = nonWorkerBeds;
     }
 
     /**
@@ -365,6 +369,7 @@ final class JobAssigner {
             if (JobChecks.isBed(level.getBlockState(bedPos))
                     && level.getBlockState(bedPos).getBlock() instanceof WorkerBedBlock bed
                     && !pool.isReserved(new JobPool.JobKey(bedPos, JobType.SLEEP))
+                    && !nonWorkerBeds.isClaimed(bedPos)
                     && Beds.fits(level, bedPos, bed, entity)) {
                 beds.add(bedPos);
             }

@@ -7,6 +7,7 @@ import dev.palworks.ai.WorkerAI;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
+import dev.palworks.sleep.NonWorkerSleep;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
@@ -45,10 +46,14 @@ public final class WorkerTicking {
         if (pokemon == null || pokemon.getOwnerUUID() == null || pokemon.getEntity() == null) {
             return; // Only owned Pokémon that are out in the world
         }
-        // No work it can do, and never a worker: not one. (One that was, and lost its last work
-        // skill, carries on as one whose work is off: it lets its job go and wakes up.)
-        if (!WorkerEligibility.canWork(pokemon) && !WorkerStateManager.hasWorkerState(pokemon)) {
-            return;
+        // No work it can do: not a worker, but it sleeps in a free bed if it's pastured. One that
+        // never was a worker is nothing more; one that was, and lost its last work skill, carries
+        // on as one whose work is off (it lets its job go and wakes up).
+        if (!WorkerEligibility.canWork(pokemon)) {
+            NonWorkerSleep.tick(entity, level);
+            if (!WorkerStateManager.hasWorkerState(pokemon)) {
+                return;
+            }
         }
         JobManager.getInstance(level).registerWorker(pokemon, entity, level);
         WorkerAI.tick(pokemon, entity, level);

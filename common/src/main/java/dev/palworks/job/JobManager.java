@@ -62,6 +62,7 @@ public class JobManager {
     private final JobScanner scanner;
     private final JobAssigner assigner;
     private final PickupQueue pickups;
+    private final NonWorkerBeds nonWorkerBeds = new NonWorkerBeds(pool);
 
     /**
      * Private constructor for singleton pattern.
@@ -69,7 +70,7 @@ public class JobManager {
     private JobManager(ServerLevel level) {
         this.level = level;
         this.scanner = new JobScanner(pool);
-        this.assigner = new JobAssigner(level, pool, scanner, workers);
+        this.assigner = new JobAssigner(level, pool, scanner, workers, nonWorkerBeds);
         this.pickups = new PickupQueue(pool, workers, assigner);
     }
 
@@ -143,6 +144,37 @@ public class JobManager {
 
         // Phase 5: Clean up expired reservations and stale cache
         cleanupExpiredData(level);
+    }
+
+    // ============================================
+    // Non-workers' beds (see NonWorkerBeds, sleep.NonWorkerSleep)
+    // ============================================
+
+    /** A bed a non-worker has, and the game time it got it. */
+    public record NonWorkerBed(BlockPos pos, long since) {}
+
+    /** The bed this non-worker has, if any. Ask every tick it has one: one that stops asking loses it. */
+    @Nullable
+    public NonWorkerBed nonWorkerBed(UUID pokemon) {
+        NonWorkerBeds.Claim claim = nonWorkerBeds.claimOf(pokemon, level.getGameTime());
+        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since());
+    }
+
+    /** This non-worker wants a bed: it takes a free one, if there is one (see NonWorkerBeds). */
+    @Nullable
+    public NonWorkerBed claimNonWorkerBed(PokemonEntity entity) {
+        NonWorkerBeds.Claim claim = nonWorkerBeds.claim(level, entity);
+        return claim == null ? null : new NonWorkerBed(claim.bed(), claim.since());
+    }
+
+    /** This non-worker is done with its bed. */
+    public void releaseNonWorkerBed(UUID pokemon) {
+        nonWorkerBeds.release(pokemon);
+    }
+
+    /** This non-worker couldn't get to its bed: it lets it go, and doesn't ask again for a while. */
+    public void giveUpNonWorkerBed(UUID pokemon) {
+        nonWorkerBeds.giveUp(pokemon, level.getGameTime());
     }
 
     // ============================================
@@ -458,6 +490,7 @@ public class JobManager {
             Watering.forgetExpired(level);
         }
         scanner.dropStaleCaches(currentTime);
+        nonWorkerBeds.dropStale(currentTime);
         pool.expire(currentTime, JOB_POOL_EXPIRY_TICKS);
         assigner.expireUnreachable(currentTime);
 

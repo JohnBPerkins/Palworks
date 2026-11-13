@@ -3,11 +3,14 @@ package dev.palworks.gametest;
 import com.cobblemon.mod.common.CobblemonMemories;
 import com.cobblemon.mod.common.entity.PoseType;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import com.cobblemon.mod.common.entity.pokemon.ai.sensors.DrowsySensor;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.block.ModBlocks;
 import dev.palworks.block.WorkerBedBlock;
+import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.sleep.Beds;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
@@ -26,6 +29,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Worker sleep: pastured workers sleep in their species' hours, in a straw bed if there's one free,
@@ -135,6 +139,137 @@ public class SleepGameTests {
                     WorkerState saved = WorkerStateManager.get(pokemon); // read back from its data
                     helper.assertTrue(saved != null && saved.isAsleep(), "saved asleep");
                     helper.assertTrue(saved.getGroundSleepTicks() > 0, "with how long it has slept");
+                })
+                .thenSucceed();
+    }
+
+    // ---- Non-workers in beds ----
+
+    private static final String NIDORAN = "nidoranf level=20"; // Poison: no work skills, and it sleeps
+
+    /**
+     * Have Cobblemon make it drowsy now, by its own drowsiness check (a small chance each time, in
+     * its resting hours), run until it is; and again whenever it isn't, until it has a bed to go to
+     * (on the way it isn't drowsy: see NonWorkerSleep) or it's asleep.
+     */
+    private static void drowsyUntilAsleep(GameTestHelper helper, PokemonEntity pokemon) {
+        JobManager jobs = JobManager.getInstance(helper.getLevel());
+        helper.onEachTick(() -> {
+            for (int i = 0;
+                    i < 100_000
+                            && !Sleep.cobblemonHasItAsleep(pokemon)
+                            && !drowsy(pokemon)
+                            && jobs.nonWorkerBed(pokemon.getPokemon().getUuid()) == null;
+                    i++) {
+                DrowsySensor.Companion.drowsyLogic(pokemon);
+            }
+        });
+    }
+
+    private static boolean drowsy(PokemonEntity pokemon) {
+        return pokemon.getBrain().getMemory(CobblemonMemories.POKEMON_DROWSY).orElse(false);
+    }
+
+    /** Whether Cobblemon has it asleep in the middle of the straw bed at {@code bedRel}. */
+    private static boolean asleepInStrawBed(GameTestHelper helper, PokemonEntity pokemon, BlockPos bedRel) {
+        Vec3 middle = ((WorkerBedBlock) ModBlocks.STRAW_BED.get()).center(helper.absolutePos(bedRel));
+        double dx = pokemon.getX() - middle.x;
+        double dz = pokemon.getZ() - middle.z;
+        return Sleep.cobblemonHasItAsleep(pokemon) && dx * dx + dz * dz < 0.35 * 0.35;
+    }
+
+    @AfterBatch(batch = "nonworker_bed")
+    public void afterNonWorkerBed(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "nonworker_bed", timeoutTicks = 800)
+    public void aDrowsyNonWorkerSleepsInAFreeBed(GameTestHelper helper) {
+        Workers.isolate(helper);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity nidoran = Workers.sendOutPastured(helper, NIDORAN, new BlockPos(1, 1, 1));
+        setTime(helper, MIDNIGHT);
+        drowsyUntilAsleep(helper, nidoran);
+
+        helper.succeedWhen(() -> helper.assertTrue(
+                asleepInStrawBed(helper, nidoran, BED),
+                "asleep in the bed, as Cobblemon has it sleep: " + nonWorkerSleep(helper, nidoran, BED)));
+    }
+
+    /** Where a non-worker is in going to bed, for a failure message. */
+    private static String nonWorkerSleep(GameTestHelper helper, PokemonEntity pokemon, BlockPos bedRel) {
+        BlockPos bed = helper.absolutePos(bedRel);
+        BlockPos stand = Beds.standTile(bed, (WorkerBedBlock) ModBlocks.STRAW_BED.get());
+        var brain = pokemon.getBrain();
+        return "bed "
+                + JobManager.getInstance(helper.getLevel())
+                        .nonWorkerBed(pokemon.getPokemon().getUuid())
+                + ", fits " + Beds.fits(helper.getLevel(), bed, (WorkerBedBlock) ModBlocks.STRAW_BED.get(), pokemon)
+                + ", Cobblemon would let it sleep there " + pokemon.canSleepAt(stand.below())
+                + ", drowsy " + brain.getMemory(CobblemonMemories.POKEMON_DROWSY)
+                + ", asleep " + Sleep.cobblemonHasItAsleep(pokemon)
+                + ", walking to "
+                + brain.getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET)
+                        .map(t -> t.getTarget().currentBlockPosition().toShortString())
+                + ", at " + pokemon.position() + " (bed " + bed.toShortString() + ")";
+    }
+
+    @AfterBatch(batch = "nonworker_bed_kept")
+    public void afterNonWorkerBedKept(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "nonworker_bed_kept", timeoutTicks = 1200)
+    public void aWorkerIsntGivenTheBedANonWorkerSleepsIn(GameTestHelper helper) {
+        // Workers get beds first, but one a non-worker has stays its own: it isn't turned out
+        Workers.isolate(helper);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity nidoran = Workers.sendOutPastured(helper, NIDORAN, new BlockPos(1, 1, 1));
+        setTime(helper, MIDNIGHT);
+        drowsyUntilAsleep(helper, nidoran);
+        PokemonEntity[] squirtle = {null};
+
+        helper.startSequence()
+                .thenWaitUntil(
+                        () -> helper.assertTrue(asleepInStrawBed(helper, nidoran, BED), "the non-worker's in bed"))
+                .thenExecute(() -> squirtle[0] = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 6)))
+                .thenWaitUntil(() -> helper.assertTrue(stateOf(squirtle[0]).isAsleep(), "the worker's asleep"))
+                .thenExecute(() -> {
+                    helper.assertFalse(inBed(squirtle[0]), "not in the bed");
+                    helper.assertTrue(asleepInStrawBed(helper, nidoran, BED), "the non-worker still is");
+                })
+                .thenSucceed();
+    }
+
+    @AfterBatch(batch = "nonworker_bed_worker_first")
+    public void afterWorkerFirst(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "nonworker_bed_worker_first", timeoutTicks = 1000)
+    public void aNonWorkerDoesntTakeTheBedAWorkerSleepsIn(GameTestHelper helper) {
+        Workers.isolate(helper);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
+        setTime(helper, MIDNIGHT);
+        PokemonEntity[] nidoran = {null};
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "the worker's in bed"))
+                .thenExecute(() -> {
+                    nidoran[0] = Workers.sendOutPastured(helper, NIDORAN, new BlockPos(1, 1, 6));
+                    drowsyUntilAsleep(helper, nidoran[0]);
+                })
+                .thenIdle(100)
+                .thenExecute(() -> {
+                    helper.assertTrue(
+                            JobManager.getInstance(helper.getLevel())
+                                            .nonWorkerBed(
+                                                    nidoran[0].getPokemon().getUuid())
+                                    == null,
+                            "the non-worker has no bed");
+                    helper.assertFalse(asleepInStrawBed(helper, nidoran[0], BED), "and isn't in it");
+                    helper.assertTrue(inBed(squirtle), "the worker still is");
                 })
                 .thenSucceed();
     }
