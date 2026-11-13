@@ -9,6 +9,7 @@ import com.cobblemon.mod.common.api.moves.animations.TargetsProvider;
 import com.cobblemon.mod.common.api.moves.animations.UsersProvider;
 import com.cobblemon.mod.common.entity.generic.GenericBedrockEntity;
 import dev.palworks.Palworks;
+import dev.palworks.worker.Pace;
 import dev.palworks.worker.WorkerState;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -67,6 +68,11 @@ public final class WorkAnimator {
 
     private static final Map<UUID, Playing> PLAYING = new ConcurrentHashMap<>();
 
+    // How much longer each effect a slowed worker plays waits at its pauses, by the effect's runtime
+    // (see PauseKeyframeMixin). Weak, so it's gone with the effect.
+    private static final Map<MoLangRuntime, Float> STRETCHED =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
     private WorkAnimator() {}
 
     /** Play an animation on a worker, aimed at a block. Cuts short one of its own still playing. */
@@ -101,6 +107,7 @@ public final class WorkAnimator {
 
             MoLangRuntime runtime = new MoLangRuntime();
             MoLangFunctions.INSTANCE.addStandardFunctions(runtime.getEnvironment().query);
+            stretch(runtime, pace); // a slowed worker's effect waits to match its slowed animation
             List<Object> providers = List.of(new UsersProvider(worker), new TargetsProvider(marker));
             ActionEffectContext context = new ActionEffectContext(
                     timeline,
@@ -132,6 +139,23 @@ public final class WorkAnimator {
                     worker.getName().getString(),
                     e.toString());
         }
+    }
+
+    /**
+     * Have the effect run with {@code runtime} wait {@code 1 / pace} as long at each of its pauses
+     * (see PauseKeyframeMixin): a slowed worker's, whose body animation plays that much slower.
+     * Nothing at full pace.
+     */
+    public static void stretch(MoLangRuntime runtime, double pace) {
+        if (pace < Pace.FULL) {
+            STRETCHED.put(runtime, (float) (1 / pace));
+        }
+    }
+
+    /** How much longer the effect run with {@code runtime} waits at its pauses: 1 unless a slowed worker's. */
+    public static float stretchFor(MoLangRuntime runtime) {
+        Float stretched = STRETCHED.get(runtime);
+        return stretched == null ? 1f : stretched;
     }
 
     /**

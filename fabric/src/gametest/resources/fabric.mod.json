@@ -23,7 +23,8 @@
       "dev.palworks.gametest.WorkLevelSyncGameTests",
       "dev.palworks.gametest.HungerGameTests",
       "dev.palworks.gametest.SleepGameTests",
-      "dev.palworks.gametest.JobIndexGameTests"
+      "dev.palworks.gametest.JobIndexGameTests",
+      "dev.palworks.gametest.PaceGameTests"
     ]
   },
   "mixins": [
