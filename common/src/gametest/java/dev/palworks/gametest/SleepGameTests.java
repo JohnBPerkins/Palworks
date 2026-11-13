@@ -23,6 +23,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -782,6 +783,52 @@ public class SleepGameTests {
                 // memory (Cobblemon never lets it sleep), and asking used to crash the server
                 .thenIdle(60)
                 .thenExecute(() -> helper.assertFalse(Sleep.cobblemonHasItAsleep(eevee), "not napping"))
+                .thenSucceed();
+    }
+
+    @AfterBatch(batch = "sleep_still")
+    public void afterStill(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_still", timeoutTicks = 600)
+    @SuppressWarnings("removal") // makeMockServerPlayerInLevel: vanilla's only mock player in 1.21.1
+    public void aSleeperDoesntTurnToWatchAPlayerGoBy(GameTestHelper helper) {
+        // Asleep where it is (no bed); a player walks round and round it, close by. Awake, it turns to
+        // watch them (Cobblemon's look target); asleep, it lies as it lay down
+        Workers.isolate(helper);
+        BlockPos spot = new BlockPos(7, 1, 7);
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, spot);
+        setTime(helper, MIDNIGHT);
+        ServerPlayer passerBy = helper.makeMockServerPlayerInLevel();
+        Vec3 middle = helper.absoluteVec(Vec3.atBottomCenterOf(spot));
+        int[] tick = {0};
+        float[] lying = {Float.NaN, Float.NaN};
+        float[] turned = {0, 0}; // the most its body, and its head, have turned from that
+        helper.onEachTick(() -> {
+            double angle = tick[0] * 0.1;
+            tick[0]++;
+            passerBy.moveTo(middle.x + 3 * Math.cos(angle), middle.y, middle.z + 3 * Math.sin(angle));
+            if (Float.isNaN(lying[0])) {
+                return; // not lying there yet
+            }
+            turned[0] = Math.max(turned[0], Math.abs(Mth.wrapDegrees(squirtle.yBodyRot - lying[0])));
+            turned[1] = Math.max(turned[1], Math.abs(Mth.wrapDegrees(squirtle.getYHeadRot() - lying[1])));
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(stateOf(squirtle).isAsleep(), "asleep"))
+                // From its first tick lying there (the tick it drops off, it's still as it was awake)
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    lying[0] = squirtle.yBodyRot;
+                    lying[1] = squirtle.getYHeadRot();
+                })
+                .thenIdle(300)
+                .thenExecute(() -> {
+                    helper.assertTrue(stateOf(squirtle).isAsleep(), "still asleep");
+                    helper.assertTrue(turned[0] < 1, "its body didn't turn: it turned " + turned[0]);
+                    helper.assertTrue(turned[1] < 1, "nor its head: it turned " + turned[1]);
+                })
                 .thenSucceed();
     }
 
