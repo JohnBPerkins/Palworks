@@ -13,6 +13,7 @@ import dev.palworks.wiki.CobblemonSpecies.Entry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** Tests reading Cobblemon's species files and building the wiki's pages from them. */
@@ -166,6 +167,17 @@ class WikiGeneratorTest {
     void anUnknownMarkerIsAnError() {
         WikiGenerator generator = generator(List.of());
         assertThrows(IllegalArgumentException.class, () -> generator.fill("<!-- generated:typo -->", "Test.md"));
+    }
+
+    @Test
+    void linksToMissingPagesOrHeadingsAreFound() {
+        Map<String, String> pages = Map.of(
+                "Home",
+                        "See [Jobs](Jobs), [chopping](Jobs#chop-trees), [the site](https://example.com) and [up](#palworks).\n# Palworks\n",
+                "Jobs",
+                        "## Chop trees\n## `#palworks:ores`\n[Ores](#palworksores), [Pokémon](Who#work-skills-by-pokémon)\n",
+                "Who", "# Work skills by Pokémon\n[Gone](Missing), [nowhere](Jobs#mining)\n");
+        assertEquals(Set.of("Who: Missing", "Who: Jobs#mining"), Set.copyOf(WikiGenerator.brokenLinks(pages)));
     }
 
     @Test

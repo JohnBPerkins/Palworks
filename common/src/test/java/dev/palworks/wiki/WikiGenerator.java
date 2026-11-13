@@ -60,6 +60,9 @@ public final class WikiGenerator {
 
     static final String BY_POKEMON_PAGE = "Work-Skills-by-Pokemon";
 
+    private static final Pattern LINK = Pattern.compile("\\]\\(([^)\\s]+)\\)");
+    private static final Pattern HEADING = Pattern.compile("^#+ (.+)$", Pattern.MULTILINE);
+    private static final Pattern NOT_IN_ANCHOR = Pattern.compile("[^\\w\\- ]", Pattern.UNICODE_CHARACTER_CLASS);
     private static final Pattern MARKER = Pattern.compile("<!-- generated:([a-z-]+) -->");
     private static final String TYPES_KEY = "types";
     private static final String SPECIES_KEY = "species";
@@ -94,24 +97,67 @@ public final class WikiGenerator {
         Path out = Path.of(args[3]);
         WikiGenerator generator = new WikiGenerator(
                 CobblemonSpecies.entries(CobblemonSpecies.readJar(jar)), shippedFiles(), shippedLang(), args[1]);
+        Map<String, String> wiki = new LinkedHashMap<>();
+        try (Stream<Path> handWritten = Files.list(pages)) {
+            for (Path page :
+                    handWritten.filter(p -> p.toString().endsWith(".md")).toList()) {
+                String file = page.getFileName().toString();
+                String text = Files.readString(page, StandardCharsets.UTF_8);
+                wiki.put(file.substring(0, file.length() - ".md".length()), generator.fill(text, file));
+            }
+        }
+        wiki.putAll(generator.generatedPages());
+        List<String> broken = brokenLinks(wiki);
+        if (!broken.isEmpty()) {
+            throw new IllegalStateException("Broken wiki links:\n  " + String.join("\n  ", broken));
+        }
         Files.createDirectories(out);
         try (Stream<Path> old = Files.list(out)) {
             for (Path file : old.toList()) {
                 Files.delete(file);
             }
         }
-        try (Stream<Path> handWritten = Files.list(pages)) {
-            for (Path page :
-                    handWritten.filter(p -> p.toString().endsWith(".md")).toList()) {
-                String text = Files.readString(page, StandardCharsets.UTF_8);
-                Files.writeString(
-                        out.resolve(page.getFileName()),
-                        generator.fill(text, page.getFileName().toString()));
-            }
-        }
-        for (Map.Entry<String, String> page : generator.generatedPages().entrySet()) {
+        for (Map.Entry<String, String> page : wiki.entrySet()) {
             Files.writeString(out.resolve(page.getKey() + ".md"), page.getValue());
         }
+    }
+
+    /**
+     * Links between these pages (name to text) that go nowhere: to a page that isn't there, or a
+     * heading it doesn't have ({@code Jobs#chop-trees}). Links to other sites aren't checked.
+     */
+    static List<String> brokenLinks(Map<String, String> pages) {
+        List<String> broken = new ArrayList<>();
+        pages.forEach((name, text) -> {
+            Matcher link = LINK.matcher(text);
+            while (link.find()) {
+                String target = link.group(1);
+                if (target.contains("://")) {
+                    continue;
+                }
+                int hash = target.indexOf('#');
+                String page = hash < 0 ? target : target.substring(0, hash);
+                String to = page.isEmpty() ? name : page;
+                if (!pages.containsKey(to)
+                        || (hash >= 0 && !anchors(pages.get(to)).contains(target.substring(hash + 1)))) {
+                    broken.add(name + ": " + target);
+                }
+            }
+        });
+        return broken;
+    }
+
+    /** A page's heading anchors, as GitHub makes them: {@code ## Chop trees} is {@code chop-trees}. */
+    private static Set<String> anchors(String text) {
+        Set<String> anchors = new TreeSet<>();
+        Matcher heading = HEADING.matcher(text);
+        while (heading.find()) {
+            anchors.add(NOT_IN_ANCHOR
+                    .matcher(heading.group(1).toLowerCase(Locale.ROOT))
+                    .replaceAll("")
+                    .replace(' ', '-'));
+        }
+        return anchors;
     }
 
     /** The suitability files the mod ships, from the classpath. */
