@@ -85,7 +85,8 @@ public class JobManager {
     /**
      * Called for every block change on the server (see the ServerLevel mixins). A watered crop that's
      * broken or replaced by another block loses its watering cooldown (growing, a change of age,
-     * keeps it). If the block's collision changed (something became passable or blocked: a gate or door toggled, a block
+     * keeps it). The scanner looks at the block again (see JobScanner#onBlockChanged). If the
+     * block's collision changed (something became passable or blocked: a gate or door toggled, a block
      * broken or placed), workers nearby forget which jobs they couldn't reach, so they re-check
      * on their next assignment. Must stay cheap: returns early unless some worker has failures.
      */
@@ -95,7 +96,12 @@ public class JobManager {
             Watering.forget(level, pos);
         }
         JobManager manager = byLevel.get(level);
-        if (manager == null || !manager.assigner.hasUnreachable()) {
+        if (manager == null) {
+            return;
+        }
+        // The jobs it gives, if its chunk has been scanned, are looked at again next tick
+        manager.scanner.onBlockChanged(pos);
+        if (!manager.assigner.hasUnreachable()) {
             return;
         }
         // Collision shapes are cached and shared per state (e.g. every full block, every crop), so
@@ -104,6 +110,29 @@ public class JobManager {
             return;
         }
         manager.assigner.forgetUnreachableNear(pos);
+    }
+
+    /**
+     * Called whenever a block entity's contents change (see BlockEntityChangedMixin): a chest or
+     * furnace the scanner knows is looked at again (see JobScanner#onContainerChanged). Called very
+     * often, so it stays a couple of lookups.
+     */
+    public static void onContainerChanged(ServerLevel level, BlockPos pos) {
+        JobManager manager = byLevel.get(level);
+        if (manager != null) {
+            manager.scanner.onContainerChanged(pos);
+        }
+    }
+
+    /**
+     * Have the scanner look at the block at {@code pos} again at game time {@code at}, with nothing
+     * changing to say so (a watered crop, wanting water again once its cooldown's over).
+     */
+    public static void recheckAt(ServerLevel level, BlockPos pos, long at) {
+        JobManager manager = byLevel.get(level);
+        if (manager != null) {
+            manager.scanner.recheckAt(pos, at);
+        }
     }
 
     /**
@@ -204,6 +233,8 @@ public class JobManager {
         // A party Pokémon works near its owner; one from a pasture works round its pasture
         info.fromParty = WorkerEligibility.isFromParty(pokemon);
         info.ownerPosition = info.fromParty ? WorkerEligibility.partyOwnerPosition(pokemon, level) : null;
+        // A pastured one's home is its pasture block; a party one stays by its owner, so needs none
+        info.home = info.fromParty ? null : WorkerEligibility.pastureOf(entity);
         if (newlyActive) {
             // Just sent out (or back in range): its first job comes from a fresh look round, not
             // from chunk scans up to 2s old that may have missed what's there now
@@ -440,7 +471,7 @@ public class JobManager {
             pool.dropGoneFollowUps(level);
             Watering.forgetExpired(level);
         }
-        scanner.dropStaleCaches(currentTime);
+        scanner.dropUnloaded(level);
         pool.expire(currentTime, JOB_POOL_EXPIRY_TICKS);
         assigner.expireUnreachable(currentTime);
 
@@ -489,6 +520,29 @@ public class JobManager {
     /** The spots this worker currently remembers it couldn't reach (for the debug overlay). */
     public List<BlockPos> unreachableFor(UUID workerUUID, long now) {
         return assigner.unreachableFor(workerUUID, now);
+    }
+
+    /** Whether a job of this type at {@code pos} is waiting for a worker (tests, debugging). */
+    public boolean isAvailable(JobType type, BlockPos pos) {
+        return pool.isAvailable(new JobKey(pos, type));
+    }
+
+    /** Where the jobs of this type waiting for a worker are (tests, debugging). */
+    public List<BlockPos> availablePositions(JobType type) {
+        return pool.available().stream()
+                .filter(job -> job.type() == type)
+                .map(JobRecord::position)
+                .toList();
+    }
+
+    /** Whether the chunk {@code pos} is in has been scanned and is indexed (tests, debugging). */
+    public boolean isIndexed(BlockPos pos) {
+        return scanner.isIndexed(pos);
+    }
+
+    /** Whether the scanner knows the block at {@code pos} as a chest, trough, bed or furnace (tests). */
+    public boolean isKnownPlace(BlockPos pos) {
+        return scanner.isKnownPlace(pos);
     }
 
     /** The {@code /palworks jobs} report: lines of formatted text. */

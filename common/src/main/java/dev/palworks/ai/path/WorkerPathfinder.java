@@ -44,6 +44,14 @@ public final class WorkerPathfinder {
     private static final int VERTICAL_MARGIN = 6;
     /** Most positions it looks on from before calling the tile unreachable. */
     static final int MAX_EXPANDED = 1500;
+    /**
+     * The same three, for a trip to a trough or a bed: wider, as it can be from right across a
+     * pasture, round ponds, buildings and hills; and rarer than walking to work, so it can cost more.
+     */
+    private static final int FAR_MARGIN = 24;
+
+    private static final int FAR_VERTICAL_MARGIN = 16;
+    static final int FAR_MAX_EXPANDED = 6000;
     /** Extra cost of a jump up, over its distance: slower than walking, and riskier. */
     private static final double JUMP_COST = 0.5;
     /** Extra cost per block dropped. */
@@ -97,6 +105,14 @@ public final class WorkerPathfinder {
      * close below it (just sent out, falling): that says nothing about the tile.
      */
     public static Result find(Mob mob, BlockPos standPos) {
+        return find(mob, standPos, false);
+    }
+
+    /**
+     * {@link #find(Mob, BlockPos)}, searching further round if it's a {@code farTrip} (to a trough
+     * or a bed: see {@link #FAR_MARGIN}).
+     */
+    public static Result find(Mob mob, BlockPos standPos, boolean farTrip) {
         BodyClearance body = new BodyClearance(mob);
 
         // Where it's going: its body on that tile, on whatever floor is there
@@ -116,9 +132,11 @@ public final class WorkerPathfinder {
         Step start = new Step(
                 body.node(mob.getX()), BodyClearance.row(startFloor), body.node(mob.getZ()), startFloor, 0, null);
 
-        int margin = MARGIN + (int) Math.ceil(body.halfWidth * 2);
-        Bounds bounds = new Bounds(start, body.node(goalX), goalRow, body.node(goalZ), margin);
-        Step reached = search(body, mob, start, bounds, goalX, goalFloor, goalRow, goalZ);
+        int margin = (farTrip ? FAR_MARGIN : MARGIN) + (int) Math.ceil(body.halfWidth * 2);
+        int verticalMargin = farTrip ? FAR_VERTICAL_MARGIN : VERTICAL_MARGIN;
+        Bounds bounds = new Bounds(start, body.node(goalX), goalRow, body.node(goalZ), margin, verticalMargin);
+        int maxExpanded = farTrip ? FAR_MAX_EXPANDED : MAX_EXPANDED;
+        Step reached = search(body, mob, start, bounds, maxExpanded, goalX, goalFloor, goalRow, goalZ);
         if (reached == null) {
             return Result.NO;
         }
@@ -204,12 +222,12 @@ public final class WorkerPathfinder {
 
     /** The box of nodes the search stays in. */
     private record Bounds(int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
-        Bounds(Step start, int goalX, int goalY, int goalZ, int margin) {
+        Bounds(Step start, int goalX, int goalY, int goalZ, int margin, int verticalMargin) {
             this(
                     Math.min(start.x, goalX) - margin,
                     Math.max(start.x, goalX) + margin,
-                    Math.min(start.y, goalY) - VERTICAL_MARGIN,
-                    Math.max(start.y, goalY) + VERTICAL_MARGIN,
+                    Math.min(start.y, goalY) - verticalMargin,
+                    Math.max(start.y, goalY) + verticalMargin,
                     Math.min(start.z, goalZ) - margin,
                     Math.max(start.z, goalZ) + margin);
         }
@@ -225,6 +243,7 @@ public final class WorkerPathfinder {
             Mob mob,
             Step start,
             Bounds bounds,
+            int maxExpanded,
             double goalX,
             double goalFloor,
             int goalRow,
@@ -236,7 +255,7 @@ public final class WorkerPathfinder {
         open.add(start);
 
         int expanded = 0;
-        while (!open.isEmpty() && expanded < MAX_EXPANDED) {
+        while (!open.isEmpty() && expanded < maxExpanded) {
             Step step = open.poll();
             if (step.done || (step.from != null && best.get(step.key()) != step)) {
                 continue; // superseded by a cheaper way here

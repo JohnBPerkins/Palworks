@@ -126,6 +126,40 @@ public class PathingGameTests {
         });
     }
 
+    // ---- How far round it looks ----
+
+    /**
+     * A wall across the way, 3 high, reaching further to each side than an ordinary search looks
+     * round (8 blocks past the start and goal): from (2, 10) to (30, 10), the wall at x 16 runs from
+     * z -6 to 26.
+     */
+    private static void longWall(GameTestHelper helper) {
+        for (int z = -6; z <= 26; z++) {
+            for (int y = 1; y <= 3; y++) {
+                helper.setBlock(new BlockPos(16, y, z), Blocks.STONE);
+            }
+        }
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pathing_far_trip", timeoutTicks = 200)
+    public void aFarTripLooksFurtherRoundAWall(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Runnable unload = Scenes.keepLoaded(helper, new BlockPos(-40, 0, -40), new BlockPos(60, 0, 50));
+        longWall(helper);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, new BlockPos(2, 1, 10));
+        BlockPos goal = helper.absolutePos(new BlockPos(30, 1, 10));
+        helper.runAfterDelay(SETTLE_TICKS, () -> {
+            helper.assertTrue(
+                    WorkerPathfinder.find(worker, goal).reach() == Reach.NO,
+                    "an ordinary search gives up: the way round is further out than it looks");
+            helper.assertTrue(
+                    WorkerPathfinder.find(worker, goal, true).reach() == Reach.YES,
+                    "a far trip's (to a trough or bed) finds the way round");
+            unload.run();
+            helper.succeed();
+        });
+    }
+
     // ---- Each Pokémon's own size ----
 
     @GameTest(template = Templates.ARENA, batch = "pathing_own_size", timeoutTicks = 200)
