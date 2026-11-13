@@ -16,6 +16,9 @@ public class WorkerState {
     // Path failures further apart than this start the count again
     private static final long PATH_FAILURE_RESET_MS = 5000;
 
+    /** The best mood a worker can be in, which a new one starts at. */
+    public static final double MAX_MOOD = 100;
+
     private boolean enabled;
     private JobType assignedJob;
     private ReservationId currentReservation;
@@ -57,6 +60,11 @@ public class WorkerState {
     private long wokenUntil;
     // Ticks it's been idle in its bedtime without being put to bed (not saved)
     private int bedtimeIdleTicks;
+
+    // Mood (see dev.palworks.mood.Mood), 0 to MAX_MOOD, and whether it's on strike: it reached 0 and
+    // hasn't come back up enough yet. Saved, so neither is lost in the PC or a reload.
+    private double mood = MAX_MOOD;
+    private boolean striking;
 
     public WorkerState() {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
@@ -276,6 +284,24 @@ public class WorkerState {
         this.tired = tired;
     }
 
+    /** Its mood, 0 to {@link #MAX_MOOD}. */
+    public double getMood() {
+        return mood;
+    }
+
+    public void setMood(double mood) {
+        this.mood = Math.max(0, Math.min(MAX_MOOD, mood));
+    }
+
+    /** Whether it's on strike: its mood reached 0, and it won't work until it's back up a way. */
+    public boolean isStriking() {
+        return striking;
+    }
+
+    public void setStriking(boolean striking) {
+        this.striking = striking;
+    }
+
     /** Whether it's asleep in a bed (its SLEEP job). */
     public boolean isInBed() {
         return inBed;
@@ -351,6 +377,12 @@ public class WorkerState {
         if (wokenUntil > 0) {
             tag.putLong("wokenUntil", wokenUntil);
         }
+        if (mood < MAX_MOOD) {
+            tag.putDouble("mood", mood);
+        }
+        if (striking) {
+            tag.putBoolean("striking", true);
+        }
 
         // Serialize current reservation
         if (currentReservation != null) {
@@ -391,6 +423,9 @@ public class WorkerState {
         tired = tag.getBoolean("tired");
         inBed = tag.getBoolean("inBed");
         wokenUntil = Math.max(0, tag.getLong("wokenUntil"));
+        // Missing: in the best of moods (saved before mood, or nothing to save)
+        setMood(tag.contains("mood") ? tag.getDouble("mood") : MAX_MOOD);
+        striking = tag.getBoolean("striking");
 
         // Deserialize current reservation
         if (tag.contains("currentReservation")) {

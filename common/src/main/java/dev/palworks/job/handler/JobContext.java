@@ -30,10 +30,12 @@ public record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState s
     }
     /**
      * The worker has done {@code units} of work: it uses up fullness for it (see
-     * {@link dev.palworks.hunger.Hunger#didWork}). Only where the work really happened.
+     * {@link dev.palworks.hunger.Hunger#didWork}), and wears its mood down (see
+     * {@link dev.palworks.mood.Mood#didWork}). Only where the work really happened.
      */
     void didWork(int units) {
         dev.palworks.hunger.Hunger.didWork(pokemon, state, units);
+        dev.palworks.mood.Mood.didWork(pokemon, state, units);
     }
 
     /** Data steps leave for later steps (saved, and handed over with the job). */
