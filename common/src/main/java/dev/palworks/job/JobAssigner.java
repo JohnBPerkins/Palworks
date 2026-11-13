@@ -157,7 +157,8 @@ final class JobAssigner {
             }
 
             // A Tired pastured worker naps in a free bed before it works, rather than waiting for
-            // its bedtime (see Sleep.wantsNap); fed first, above. With no bed it can get to from
+            // its bedtime (see Sleep.wantsNap). Food comes first, above, but only if there's some
+            // to be had: with none, it naps hungry. With no bed it can get to from
             // here but one by its pasture, it heads home; with none at all, it works on, Tired.
             if (pokemon != null && entity != null && Sleep.wantsNap(entity, WorkerStateManager.get(pokemon))) {
                 List<JobRecord> beds = bedCandidates(level, worker, entity);
