@@ -4,7 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.ai.path.WorkerNavigator;
-import dev.palworks.animation.SlowedCues;
+import dev.palworks.animation.SlowedPause;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.WorkerBedBlock;
@@ -97,6 +97,7 @@ public class WorkerAI {
         WorkActivity activity = WorkActivitySync.update(pokemon, entity, state, level.getGameTime());
         WorkAspectSync.update(pokemon, activity, level.getGameTime());
         // What's holding it back (hungry), shown over its head
+        SlowedPause.update(state);
         WorkerStatusSync.update(pokemon, state);
         WorkAnimator.update(entity, state);
         // Its state lives in WorkerStateManager's cache, which goes when its chunk unloads or the
@@ -519,19 +520,11 @@ public class WorkerAI {
         // furnace keeps its time.
         List<Step> steps = handler.steps();
         int index = state.getJobStep();
-        if (index < steps.size() && steps.get(index).animation() != null) {
-            // A slowed worker shows what's slowing it while it waits for its move
-            SlowedCues.whileWaiting(
-                    entity,
-                    pokemon,
-                    state,
-                    state.getStepTicks(),
-                    steps.get(index).startTick(ctx));
-        }
-        if (!readyToAnimate
-                && index < steps.size()
+        boolean atItsMove = index < steps.size()
                 && steps.get(index).animation() != null
-                && state.getStepTicks() == steps.get(index).startTick(ctx)) {
+                && state.getStepTicks() == steps.get(index).startTick(ctx);
+        // A slowed worker pauses for the time it's saved up, just before a move (see SlowedPause)
+        if (atItsMove && (!readyToAnimate || SlowedPause.holds(entity, pokemon, state))) {
             return StepRunner.Outcome.WORKING;
         }
 

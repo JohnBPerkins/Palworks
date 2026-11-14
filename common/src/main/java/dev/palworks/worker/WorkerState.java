@@ -43,6 +43,12 @@ public class WorkerState {
     // points come off as they build up. Saved, so work done just before a reload still counts.
     private double fullnessOwed;
 
+    // A slowed worker's pauses (see dev.palworks.animation.SlowedPause), not saved: the time its
+    // moves have saved it, which it owes in pauses (below 0 when it's paused ahead), and how much
+    // of the pause it's in is left
+    private int slowedTicksOwed;
+    private int pauseTicksLeft;
+
     // Sleep (see dev.palworks.sleep.Sleep). Saved, so a reload in the night doesn't wake it, or lose
     // how it slept. Whether it's asleep (in a bed or not), and how long it has slept in each this time
     private boolean asleep;
@@ -225,6 +231,24 @@ public class WorkerState {
     /** Whether the job is past its first step, i.e. something has already been done. */
     public boolean hasJobProgress() {
         return jobStep > 0;
+    }
+
+    /** Time its moves saved a slowed worker, which it owes in pauses (see SlowedPause). */
+    public int getSlowedTicksOwed() {
+        return slowedTicksOwed;
+    }
+
+    public void setSlowedTicksOwed(int slowedTicksOwed) {
+        this.slowedTicksOwed = slowedTicksOwed;
+    }
+
+    /** How much of a slowed worker's pause is left, 0 if it isn't in one (see SlowedPause). */
+    public int getPauseTicksLeft() {
+        return pauseTicksLeft;
+    }
+
+    public void setPauseTicksLeft(int pauseTicksLeft) {
+        this.pauseTicksLeft = Math.max(0, pauseTicksLeft);
     }
 
     /** Fullness used up but not yet taken off its Pokémon, in points (see Hunger). */

@@ -19,6 +19,8 @@ import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -612,15 +614,24 @@ public class HungerGameTests {
         });
     }
 
+    /** How many ripe crops {@link #timeTheHarvest} has a worker harvest: as many as one pause of its pays for. */
+    private static final int CROPS = 7;
+
     /**
-     * How long a worker with this much fullness spends at the harvest of a ripe crop (its steps,
-     * from when it starts on them until the job's done), against how long they take at full speed.
+     * How long a worker with this much fullness spends at the harvest of a row of ripe crops (their
+     * steps, from when it starts on each until its job's done), against how long they take at full
+     * speed. A slowed one pauses for the time its moves save it (see SlowedPause): an empty one's
+     * first pause pays for {@link #CROPS} harvests, so they take about 4/3 as long.
      */
     private static void timeTheHarvest(GameTestHelper helper, boolean empty, double from, double to) {
         Workers.isolate(helper);
-        BlockPos crop = new BlockPos(5, 1, 5);
-        helper.setBlock(crop.below(), Blocks.FARMLAND);
-        helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+        List<BlockPos> crops = new ArrayList<>();
+        for (int x = 1; x <= CROPS; x++) {
+            BlockPos crop = new BlockPos(x, 1, 5);
+            helper.setBlock(crop.below(), Blocks.FARMLAND);
+            helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+            crops.add(crop);
+        }
         PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
         Pokemon pokemon = worker.getPokemon();
         if (empty) {
@@ -634,16 +645,18 @@ public class HungerGameTests {
                 working[0]++;
             }
         });
-        int fullSpeed = JobHandlerRegistry.jobTicks(JobType.HARVEST_CROPS, worker);
+        int fullSpeed = CROPS * JobHandlerRegistry.jobTicks(JobType.HARVEST_CROPS, worker);
         helper.succeedWhen(() -> {
-            helper.assertFalse(
-                    helper.getBlockState(crop).is(Blocks.WHEAT)
-                            && ((CropBlock) Blocks.WHEAT).isMaxAge(helper.getBlockState(crop)),
-                    "the wheat is harvested");
+            for (BlockPos crop : crops) {
+                helper.assertFalse(
+                        helper.getBlockState(crop).is(Blocks.WHEAT)
+                                && ((CropBlock) Blocks.WHEAT).isMaxAge(helper.getBlockState(crop)),
+                        "the wheat at " + crop + " is harvested");
+            }
             double times = (double) working[0] / fullSpeed;
             helper.assertTrue(
                     times >= from && times <= to,
-                    "the harvest took " + working[0] + " ticks, " + times + "x its " + fullSpeed + " at full speed");
+                    "the harvests took " + working[0] + " ticks, " + times + "x their " + fullSpeed + " at full speed");
         });
     }
 
@@ -697,15 +710,17 @@ public class HungerGameTests {
                 .thenSucceed();
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_empty", timeoutTicks = 800)
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_empty", timeoutTicks = 1600)
     public void anEmptyWorkerHarvestsAtThreeQuartersSpeed(GameTestHelper helper) {
-        // The work itself takes 4/3 as long (its animation plays at three quarters), not a rest after
-        timeTheHarvest(helper, true, 1.25, 1.55);
+        // Its harvests take a third longer than a fed one's (below), the extra in a pause at them,
+        // not a rest after
+        timeTheHarvest(helper, true, 1.3, 1.7);
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_fed", timeoutTicks = 400)
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_fed", timeoutTicks = 1200)
     public void aFedWorkerHarvestsAtFullSpeed(GameTestHelper helper) {
-        timeTheHarvest(helper, false, 0.9, 1.2);
+        // A little over: crops side by side, it waits at the next for its last move to play out
+        timeTheHarvest(helper, false, 0.95, 1.3);
     }
 
     // ---- Starting fullness ----

@@ -122,7 +122,7 @@ public final class WorkAnimator {
 
     /**
      * Play a Cobblemon action effect on a worker itself, aimed at nothing (a battle status's, such
-     * as Sleep's Z's: see SlowedCues). Not kept track of: nothing cuts it short, or waits for it.
+     * as Sleep's Z's: see SlowedPause). Not kept track of: nothing cuts it short, or waits for it.
      */
     public static void cue(Mob worker, ResourceLocation effect) {
         if (!(worker.level() instanceof ServerLevel level)) {

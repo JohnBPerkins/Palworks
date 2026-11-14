@@ -4,18 +4,17 @@ import com.cobblemon.mod.common.api.moves.animations.ActionEffects;
 import com.cobblemon.mod.common.entity.generic.GenericBedrockEntity;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import dev.palworks.animation.SlowedCues;
+import dev.palworks.animation.SlowedPause;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import java.util.List;
+import dev.palworks.worker.WorkerStatusSync;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
@@ -23,25 +22,66 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * A slowed worker's pace (see dev.palworks.worker.Pace): it walks slower, but still visibly walks,
- * and its work's moves play at their usual speed, later, so they still land as the work happens.
+ * and its work's moves play at their usual speed, after a pause, so they still land as the work happens.
  */
 public class PaceGameTests {
     private static final String WORKER = "bulbasaur level=20";
 
     @GameTest(template = Templates.EMPTY)
-    public void cobblemonHasTheEffectsASlowedWorkerShows(GameTestHelper helper) {
-        for (ResourceLocation cue : List.of(SlowedCues.HUNGRY, SlowedCues.TIRED)) {
-            helper.assertTrue(
-                    ActionEffects.INSTANCE.getActionEffects().get(cue) != null,
-                    "Cobblemon's " + cue + " effect is loaded");
-        }
+    public void cobblemonHasTheEffectATiredWorkerShows(GameTestHelper helper) {
+        helper.assertTrue(
+                ActionEffects.INSTANCE.getActionEffects().get(SlowedPause.TIRED) != null,
+                "Cobblemon's " + SlowedPause.TIRED + " effect is loaded");
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pace_pause", timeoutTicks = 600)
+    public void aSlowedWorkerPausesBeforeItsMove(GameTestHelper helper) {
+        // Its move plays at its usual speed, so the time a slowed worker loses goes in a pause first
+        // (players are told, to pulse its icons), then the move
+        Workers.isolate(helper);
+        helper.getLevel().setDayTime(MORNING);
+        BlockPos crop = new BlockPos(2, 1, 3);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+        PokemonEntity worker = Workers.sendOutPastured(helper, WORKER, new BlockPos(2, 1, 1));
+        worker.getPokemon().setCurrentFullness(0);
+        AABB around = new AABB(helper.absolutePos(crop)).inflate(1);
+        long[] pausing = {-1, -1};
+        long[] played = {-1};
+        helper.onEachTick(() -> {
+            long now = helper.getLevel().getGameTime();
+            boolean paused = worker.getAspects().contains(WorkerStatusSync.PAUSING);
+            if (paused && pausing[0] < 0) {
+                pausing[0] = now;
+            }
+            if (!paused && pausing[0] >= 0 && pausing[1] < 0) {
+                pausing[1] = now;
+            }
+            if (played[0] < 0
+                    && !helper.getLevel()
+                            .getEntitiesOfClass(GenericBedrockEntity.class, around)
+                            .isEmpty()) {
+                played[0] = now;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(played[0] >= 0 && pausing[1] >= 0, "it paused, and its move played");
+            long paused = pausing[1] - pausing[0];
+            helper.assertTrue(
+                    Math.abs(paused - SlowedPause.PAUSE_TICKS) <= 2,
+                    "it paused " + paused + " ticks, not " + SlowedPause.PAUSE_TICKS);
+            helper.assertTrue(
+                    played[0] >= pausing[1] - 1,
+                    "its move started at " + played[0] + ", after its pause (" + pausing[0] + " to " + pausing[1]
+                            + ")");
+        });
     }
 
     @GameTest(template = Templates.EMPTY, batch = "pace_move_lands", timeoutTicks = 600)
     public void aSlowedWorkersMoveStillLandsAsItsCropGoes(GameTestHelper helper) {
-        // At half pace its step takes twice as long, but its move plays at its usual speed (its leaves
-        // fly at theirs): it starts later, so they still reach the crop as it goes, not long before
+        // At half pace, but its move plays at its usual speed (its leaves fly at theirs), after its
+        // pause: they still reach the crop as it goes, not long before
         Workers.isolate(helper);
         helper.getLevel().setDayTime(MORNING);
         BlockPos crop = new BlockPos(2, 1, 3);

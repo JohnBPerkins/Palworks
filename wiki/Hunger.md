@@ -18,9 +18,10 @@ stat of its own.
   shank over its head, until it eats. It never stops working.
 - **A slowed worker** (out of food, Tired, or both: a quarter off for each, so half speed with
   both) is slow at everything. It walks slower, its legs too, whether Palworks or Cobblemon is
-  moving it, on its way to eat or sleep as well. Each job takes longer: at the job it waits before
-  its move, showing what's slowing it (the falling arrows of a stat drop out of food, Sleep's Z's
-  when Tired), then plays the move at its usual speed, landing just as the work happens.
+  moving it, on its way to eat or sleep as well. Its moves play at their usual speed, landing just
+  as the work happens; the time it loses goes into a pause of a few seconds before a move, every
+  few jobs (more often the slower it is). In the pause the icons over its head pulse, and it shows
+  what's slowing it: out of food it cries, as if calling for food; Tired, Sleep's Z's rise from it.
 - **A new Pokémon starts half full**, not empty as in Cobblemon, so it can go straight to work:
   the first time you get it (caught, a starter, hatched, traded, given by a command). Moving it
   between party and PC, or evolving it, doesn't top it up again.

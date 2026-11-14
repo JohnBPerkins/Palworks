@@ -1,5 +1,6 @@
 package dev.palworks.job.handler;
 
+import dev.palworks.animation.SlowedPause;
 import dev.palworks.animation.WorkAnimation;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.animation.WorkAnimator;
@@ -51,17 +52,20 @@ public record Step(
         return length.applyAsInt(speciesId);
     }
 
-    /** How long it takes this worker: longer if it's slowed down (see {@link JobContext#pace}). */
+    /**
+     * How long it takes this worker: longer if it's slowed down (see {@link JobContext#pace}), unless
+     * it plays a move. A move plays at its usual speed, so its step takes its usual time, and the
+     * time that saves a slowed worker it pauses for later (see SlowedPause).
+     */
     @Override
     public int ticks(JobContext ctx) {
-        return WorkAnimation.atPace(ticksFor(ctx.species()), ctx.pace());
+        int ticks = ticksFor(ctx.species());
+        return animation() == null ? WorkAnimation.atPace(ticks, ctx.pace()) : ticks;
     }
 
     @Override
     public int startTick(JobContext ctx) {
         WorkAnimation played = animationFor(ctx.species());
-        // Still timed to land as the step ends, however long a slowed worker's step takes: its move
-        // plays at its usual speed, later
         return played == null ? 0 : played.playAt(ticks(ctx));
     }
 
@@ -77,6 +81,9 @@ public record Step(
     public boolean finish(JobContext ctx) {
         // The step's work happens now, as its animation lands: let the animation play out
         WorkAnimator.release(ctx.entity());
+        if (animation() != null) {
+            SlowedPause.owe(ctx.state(), ticks(ctx), ctx.pace());
+        }
         return onFinish.run(ctx);
     }
 
