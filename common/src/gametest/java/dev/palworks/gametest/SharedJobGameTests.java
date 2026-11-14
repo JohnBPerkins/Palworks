@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -127,8 +128,13 @@ public class SharedJobGameTests {
         helper.setBlock(chestPos, Blocks.CHEST);
         ((ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos)))
                 .setItem(0, new ItemStack(Items.WHEAT_SEEDS, 16));
+        // Their owner stands in a corner: on their spot it's right in the way from the chest to the
+        // farmland, and a worker pushing up against it can't get to where it plants from
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(0, 1, 0));
         Workers.neverShareAJob(
-                helper, Workers.sendOut(helper, BULBASAUR, SAME_SPOT), Workers.sendOut(helper, BULBASAUR, SAME_SPOT));
+                helper,
+                Workers.sendOut(helper, owner, BULBASAUR, SAME_SPOT),
+                Workers.sendOut(helper, owner, BULBASAUR, SAME_SPOT));
 
         helper.succeedWhen(() -> {
             for (int x = 1; x <= 6; x++) {
