@@ -1,0 +1,107 @@
+name: Wiki
+
+# The GitHub wiki is built from this repo: the pages in wiki/, with their generated tables, plus a
+# page per work skill listing every Pokémon that can do it (`./gradlew :common:generateWiki`). On a
+# PR this builds it (failing on a broken link or marker) and uploads it to look at; on main it also
+# replaces the wiki with it. Edits made in GitHub's wiki editor are overwritten: change wiki/.
+
+on:
+  pull_request:
+    paths:
+      - "wiki/**"
+      - "common/src/main/resources/data/palworks/palworks/suitability/**"
+      - "common/src/main/resources/assets/palworks/lang/en_us.json"
+      - "common/src/main/java/dev/palworks/suitability/**"
+      - "common/src/test/java/dev/palworks/wiki/**"
+      - "common/build.gradle"
+      - "gradle.properties"
+      - ".github/workflows/wiki.yml"
+  push:
+    branches: [main]
+    paths:
+      - "wiki/**"
+      - "common/src/main/resources/data/palworks/palworks/suitability/**"
+      - "common/src/main/resources/assets/palworks/lang/en_us.json"
+      - "common/src/main/java/dev/palworks/suitability/**"
+      - "common/src/test/java/dev/palworks/wiki/**"
+      - "common/build.gradle"
+      - "gradle.properties"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+# PR runs are cancelled by a newer push; publishes run one at a time, in order.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # The build job's cache (see build.yml), restore only.
+      - name: Restore Loom project files
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            .gradle/loom-cache
+            */.gradle/loom-cache
+          key: loom-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+          restore-keys: |
+            loom-${{ runner.os }}-
+
+      - name: Build the wiki
+        run: ./gradlew :common:generateWiki
+
+      - name: Upload the wiki
+        uses: actions/upload-artifact@v7
+        with:
+          name: wiki
+          path: build/wiki/
+          retention-days: 14
+
+  # A job of its own, so only it can write, and nothing it runs comes from Gradle.
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      # Pushing to the wiki, a repo of its own (<repo>.wiki.git), takes contents: write
+      contents: write
+    steps:
+      - name: Download the wiki
+        uses: actions/download-artifact@v8
+        with:
+          name: wiki
+          path: wiki
+
+      - name: Publish to the GitHub wiki
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          site="$RUNNER_TEMP/site"
+          git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" "$site"
+          rsync -a --delete --exclude .git wiki/ "$site/"
+          cd "$site"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The wiki is already up to date."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Update from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git push
