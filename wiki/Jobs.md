@@ -115,9 +115,10 @@ carries them. That covers:
 Everything else on the ground is left alone, so transporters don't empty mob farms, water- or
 piston-harvested farms, or dispensers. A player's death drops stay where they fell.
 
-It goes right up to each item and picks it up from beside it, as a player would, then goes on to
-the next, taking everything within 3 blocks of where they landed (the `pickup_radius`
-[setting](Configuration)) in one go. It fills up before a trip: anything while it has a free slot,
+It goes round the items nearest first, picking each up from beside it as a player would (and
+anything it passes on the way), taking everything within 3 blocks of where they landed (the
+`pickup_radius` [setting](Configuration)) in one go. One that can fly [flies](Workers#flying) to
+items it can't walk to, like ones on top of a tree. It fills up before a trip: anything while it has a free slot,
 then only items matching what it carries. Items no worker can get to are tried again later, less
 often each time, until they despawn.
 
