@@ -16,6 +16,9 @@ stat of its own.
   by its pasture.
 - **With no fullness left** it works and walks at a quarter speed, with a half hunger shank over
   its head, until it eats. It never stops working.
+- **A new Pokémon starts half full**, not empty as in Cobblemon, so it can go straight to work:
+  the first time you get it (caught, a starter, hatched, traded, given by a command). Moving it
+  between party and PC, or evolving it, doesn't top it up again.
 
 A **trough** comes in every wood (oak, spruce, birch, jungle, acacia, dark oak, mangrove, cherry,
 bamboo, crimson and warped), crafted from 5 of that wood's slabs (two on the top row's ends, three
