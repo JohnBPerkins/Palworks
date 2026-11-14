@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * @param workRangeVertical how far up and down it does
  * @param ownerRange how far (straight line) from its owner a party Pokémon takes jobs. At most
  *     Cobblemon's teleport-back distance ({@link WorkRange#OWNER_LEASH}), or it would be yanked back mid-walk
- * @param pickupRadius how far round a pickup job's spot its items are looked for and picked up
+ * @param pickupRadius how far round a pickup job's spot its items are looked for (the worker goes up to each)
  * @param fertilizeChancePerLevel the chance, for each of a waterer's Watering levels, that watering
  *     a crop also fertilizes it, as bone meal would: 0.1 is 10% at level 1, 30% at level 3. At most
  *     0.2, so level 5 is at most certain

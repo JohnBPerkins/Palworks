@@ -2,11 +2,13 @@ package dev.palworks.ai;
 
 import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.crop.CropAdapter;
+import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.sleep.Beds;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
@@ -14,6 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -60,6 +63,9 @@ public final class WorkPositions {
                             && Beds.fits(level, targetPos, bed, entity)
                     ? Beds.standTile(targetPos, bed)
                     : null;
+        }
+        if (jobType == JobType.COLLECT_DROPS) {
+            return pickupStand(level, targetPos, entity);
         }
         int distance = stance.ringFor(entity);
 
@@ -255,12 +261,52 @@ public final class WorkPositions {
     }
 
     /**
+     * Where a transporter stands to pick up a pickup job's items: right by the nearest of them it
+     * fits by, on its tile if it can (a tile further up or down, on a slope), or one next to it.
+     * Recomputed as it goes, so it heads for the next once it's picked one up, and for wherever an
+     * item rolls. Null if there's nowhere to stand by any.
+     */
+    @Nullable
+    private static BlockPos pickupStand(Level level, BlockPos jobPos, Mob entity) {
+        List<ItemEntity> items = new ArrayList<>(JobChecks.itemsToPickUp(level, jobPos));
+        items.sort(Comparator.comparingDouble(entity::distanceToSqr));
+        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
+        for (ItemEntity item : items) {
+            BlockPos at = JobChecks.spotOf(item);
+            BlockPos on = firstHeight(at, SLOPE_STEPS, fitsThere);
+            if (on != null) {
+                return on;
+            }
+            BlockPos best = null;
+            double bestDistSq = Double.MAX_VALUE;
+            for (BlockPos tile : ring(at, 1)) {
+                BlockPos spot = firstHeight(tile, SLOPE_STEPS, fitsThere);
+                if (spot != null) {
+                    double distSq = entity.distanceToSqr(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+                    if (distSq < bestDistSq - 1e-6) {
+                        best = spot;
+                        bestDistSq = distSq;
+                    }
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Whether the worker is in its stance for this job, where it is: close enough to its target
      * (the edge of its body no further from it than the stance allows, see
      * {@link WorkStance#maxGap}), in front of it if it's a station, and about level with it (below
      * a hanging fruit). For a tree the target is the whole trunk.
      */
     public static boolean inStance(Level level, Mob entity, BlockPos targetPos, JobType jobType, WorkStance stance) {
+        if (jobType == JobType.COLLECT_DROPS) {
+            // Something to pick up within its reach
+            return !JobChecks.itemsInReach(level, entity).isEmpty();
+        }
         if (jobType == JobType.SLEEP) {
             // Lying in the middle of the bed, not just touching it
             Vec3 middle = standPoint(level, targetPos, jobType, targetPos);

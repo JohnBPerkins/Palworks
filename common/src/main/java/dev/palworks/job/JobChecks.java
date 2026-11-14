@@ -21,6 +21,7 @@ import dev.palworks.worker.WorkerStateManager;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -154,13 +155,41 @@ public final class JobChecks {
 
     /**
      * The items to pick up lying round a pickup job's spot: only what workers and players dropped
-     * (see TrackedDrops), never a farm's or a mob's.
+     * (see TrackedDrops), never a farm's or a mob's, and not those waiting after no worker could
+     * get to them (see PickupQueue#outOfReach).
      */
     public static List<ItemEntity> itemsToPickUp(Level level, BlockPos pos) {
         return level.getEntitiesOfClass(
+                ItemEntity.class, new AABB(pos).inflate(pickupRadius()), item -> isToPickUp(level, item));
+    }
+
+    /**
+     * The items to pick up within reach of a worker, as a player picks them up: a block either side
+     * of its body, and half a block above and below it.
+     */
+    public static List<ItemEntity> itemsInReach(Level level, Entity worker) {
+        return level.getEntitiesOfClass(
                 ItemEntity.class,
-                new AABB(pos).inflate(pickupRadius()),
-                item -> item.isAlive() && !item.getItem().isEmpty() && TrackedDrops.isTracked(item));
+                worker.getBoundingBox().inflate(REACH_ACROSS, REACH_UP, REACH_ACROSS),
+                item -> isToPickUp(level, item));
+    }
+
+    private static final double REACH_ACROSS = 1.0;
+    private static final double REACH_UP = 0.5;
+
+    private static boolean isToPickUp(Level level, ItemEntity item) {
+        return item.isAlive()
+                && !item.getItem().isEmpty()
+                && TrackedDrops.isTracked(item)
+                && !JobManager.isWaitingForPickup(level, item);
+    }
+
+    /**
+     * Where an item lies: the block it's in. Not the one under it: an item lying on farmland (or a
+     * slab, a path) is within the top of that block, which is solid, with nowhere to stand.
+     */
+    public static BlockPos spotOf(ItemEntity item) {
+        return BlockPos.containing(item.getX(), item.getY() + 0.5, item.getZ());
     }
 
     /** Whether the worker carries a seed that can be planted at {@code plantPos}. */
