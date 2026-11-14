@@ -80,14 +80,14 @@ public class StressGameTests {
             "venusaur", // 2.2
             "tropius", // 2.2, 5 tall, flies
             "torterra"); // 2.25
-    private static final List<String> CHOPPERS = List.of( // Fighting and Steel: chop
-            "aron", // 0.5
+    private static final List<String> CHOPPERS = List.of( // Lumbering, by type or species, and no other work
+            "tyrogue", // 0.3
             "riolu", // 0.6
             "machop", // 0.7
             "lucario", // 0.8
             "machamp", // 1.0
             "scyther", // 1.2, flies
-            "aggron", // 1.4, 3.1 tall
+            "bewear", // 1.2, 2.8 tall
             "conkeldurr"); // 1.5
     private static final List<String> KINDLERS = List.of( // Fire: light furnaces
             "torchic", // 0.7

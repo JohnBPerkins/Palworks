@@ -13,6 +13,7 @@ import dev.palworks.block.ModBlocks;
 import dev.palworks.block.TroughBlock;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.drops.TrackedDrops;
+import dev.palworks.hunger.StartingFullness;
 import dev.palworks.hunger.TroughFoodReloadListener;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.suitability.SuitabilityOverrides;
@@ -51,6 +52,8 @@ public final class PalworksCommon {
 
         // Shift-right-clicking a trough with food puts the whole stack in
         InteractionEvent.RIGHT_CLICK_BLOCK.register(TroughBlock::onShiftRightClick);
+        // A player's new Pokémon starts half full, not empty
+        StartingFullness.register();
 
         // Run workers: each from its own entity tick (PokemonEntityTickMixin), JobManager once a tick
         LifecycleEvent.SERVER_STARTING.register(server -> WorkerTicking.onServerStarting());

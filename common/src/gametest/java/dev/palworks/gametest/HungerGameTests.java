@@ -1,5 +1,7 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.Cobblemon;
+import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkStance;
@@ -629,5 +631,37 @@ public class HungerGameTests {
             helper.assertTrue(
                     state.getRestUntil() > now + 20, "it rests: until " + state.getRestUntil() + ", now " + now);
         });
+    }
+
+    // ---- Starting fullness ----
+
+    @GameTest(template = Templates.EMPTY)
+    public void aNewPokemonStartsAsFullAsTroughsFillIt(GameTestHelper helper) {
+        var party = Cobblemon.INSTANCE.getStorage().getParty(Workers.owner(helper, START));
+        Pokemon pokemon = PokemonProperties.Companion.parse("snorlax").create();
+        helper.assertTrue(pokemon.getCurrentFullness() == 0, "Cobblemon starts it empty");
+
+        party.add(pokemon);
+        int start = Hunger.troughCap(pokemon);
+        helper.assertTrue(start > 0 && start < pokemon.getMaxFullness(), "part full: " + start);
+        helper.assertTrue(
+                pokemon.getCurrentFullness() == start,
+                "it starts at " + pokemon.getCurrentFullness() + "/" + pokemon.getMaxFullness() + ", not " + start);
+
+        // Only the first time: put back in after emptying, it isn't topped up again
+        pokemon.setCurrentFullness(0);
+        party.remove(pokemon);
+        party.add(pokemon);
+        helper.assertTrue(pokemon.getCurrentFullness() == 0, "not topped up again: " + pokemon.getCurrentFullness());
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aNewPokemonThatsFullerKeepsItsFullness(GameTestHelper helper) {
+        Pokemon pokemon = PokemonProperties.Companion.parse("snorlax").create();
+        pokemon.setCurrentFullness(pokemon.getMaxFullness());
+        Cobblemon.INSTANCE.getStorage().getParty(Workers.owner(helper, START)).add(pokemon);
+        helper.assertTrue(pokemon.getCurrentFullness() == pokemon.getMaxFullness(), "still full");
+        helper.succeed();
     }
 }

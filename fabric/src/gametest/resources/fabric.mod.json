@@ -21,6 +21,7 @@
       "dev.palworks.gametest.SharedJobGameTests",
       "dev.palworks.gametest.WateringGameTests",
       "dev.palworks.gametest.WorkLevelSyncGameTests",
+      "dev.palworks.gametest.WorkLevelGameTests",
       "dev.palworks.gametest.HungerGameTests",
       "dev.palworks.gametest.SleepGameTests",
       "dev.palworks.gametest.MoodGameTests",
