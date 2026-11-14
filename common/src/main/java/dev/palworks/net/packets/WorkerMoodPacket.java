@@ -22,7 +22,7 @@ public class WorkerMoodPacket implements NetworkPacket<WorkerMoodPacket> {
      * One Pokémon's mood, as shown.
      *
      * @param mood     its mood, rounded, 0 to 100
-     * @param unhappy  whether it's unhappy, and works slower
+     * @param unhappy  whether it's unhappy: on its way to a strike
      * @param striking whether it's on strike, and does no work
      */
     public record Shown(int mood, boolean unhappy, boolean striking) {}

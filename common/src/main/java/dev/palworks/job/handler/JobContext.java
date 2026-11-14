@@ -5,6 +5,7 @@ import dev.palworks.animation.WorkAnimations;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
@@ -22,6 +23,14 @@ public record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState s
 
     String name() {
         return pokemon.getSpecies().getName();
+    }
+
+    /**
+     * How fast it works, as a share of its usual speed (see WorkSpeed): its steps take that much
+     * longer, and its animations play that much slower. Eating and sleeping too.
+     */
+    double pace() {
+        return WorkSpeed.of(pokemon, state);
     }
 
     /** The worker's species id, which its animations can be particular to. */

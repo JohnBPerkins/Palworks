@@ -13,17 +13,21 @@ import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.hunger.HungerMath;
 import dev.palworks.job.JobType;
+import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -610,27 +614,113 @@ public class HungerGameTests {
         });
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "hunger_rest", timeoutTicks = 800)
-    public void anEmptyWorkerRestsAfterEachJob(GameTestHelper helper) {
-        Workers.isolate(helper);
-        BlockPos crop = new BlockPos(5, 1, 5);
-        helper.setBlock(crop.below(), Blocks.FARMLAND);
-        helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
-        Pokemon pokemon = Workers.sendOut(helper, WORKER, START).getPokemon();
-        pokemon.setCurrentFullness(0);
-        WorkerState state = WorkerStateManager.getOrCreate(pokemon);
-        helper.assertTrue(Hunger.isEmpty(pokemon, state), "an empty worker");
+    /** How many ripe crops {@link #timeTheHarvest} has a worker harvest: as many as one pause of its pays for. */
+    private static final int CROPS = 7;
 
-        helper.succeedWhen(() -> {
-            helper.assertFalse(
-                    helper.getBlockState(crop).is(Blocks.WHEAT)
-                            && ((CropBlock) Blocks.WHEAT).isMaxAge(helper.getBlockState(crop)),
-                    "the wheat is harvested");
-            long now = helper.getLevel().getGameTime();
-            // Three times as long as the harvest took, at a quarter speed
-            helper.assertTrue(
-                    state.getRestUntil() > now + 20, "it rests: until " + state.getRestUntil() + ", now " + now);
+    /**
+     * How long a worker with this much fullness spends at the harvest of a row of ripe crops (their
+     * steps, from when it starts on each until its job's done), against how long they take at full
+     * speed. A slowed one pauses for the time its moves save it (see SlowedPause): an empty one's
+     * first pause pays for {@link #CROPS} harvests, so they take about 4/3 as long.
+     */
+    private static void timeTheHarvest(GameTestHelper helper, boolean empty, double from, double to) {
+        Workers.isolate(helper);
+        List<BlockPos> crops = new ArrayList<>();
+        for (int x = 1; x <= CROPS; x++) {
+            BlockPos crop = new BlockPos(x, 1, 5);
+            helper.setBlock(crop.below(), Blocks.FARMLAND);
+            helper.setBlock(crop, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+            crops.add(crop);
+        }
+        PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
+        Pokemon pokemon = worker.getPokemon();
+        if (empty) {
+            pokemon.setCurrentFullness(0);
+        }
+        WorkerState state = WorkerStateManager.getOrCreate(pokemon);
+        int[] working = {0};
+        helper.onEachTick(() -> {
+            ReservationId job = state.getCurrentReservation();
+            if (job != null && job.getJobType() == JobType.HARVEST_CROPS && state.isWorking()) {
+                working[0]++;
+            }
         });
+        int fullSpeed = CROPS * JobHandlerRegistry.jobTicks(JobType.HARVEST_CROPS, worker);
+        helper.succeedWhen(() -> {
+            for (BlockPos crop : crops) {
+                helper.assertFalse(
+                        helper.getBlockState(crop).is(Blocks.WHEAT)
+                                && ((CropBlock) Blocks.WHEAT).isMaxAge(helper.getBlockState(crop)),
+                        "the wheat at " + crop + " is harvested");
+            }
+            double times = (double) working[0] / fullSpeed;
+            helper.assertTrue(
+                    times >= from && times <= to,
+                    "the harvests took " + working[0] + " ticks, " + times + "x their " + fullSpeed + " at full speed");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_moving", timeoutTicks = 200)
+    public void anEmptyWorkerMovesAtThreeQuartersSpeedWhoeverMovesIt(GameTestHelper helper) {
+        // On its movement speed itself, which Cobblemon's wandering and following go by as well (the root
+        // of its pace on foot, which covers ground at its pace: see Pace.attributeShare)
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
+        Pokemon pokemon = worker.getPokemon();
+        double full = worker.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        helper.startSequence()
+                .thenExecute(() -> pokemon.setCurrentFullness(0))
+                .thenWaitUntil(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * Math.sqrt(0.75)) < 1e-6,
+                        "empty: the root of three quarters (on foot) of " + full + ", not "
+                                + worker.getAttributeValue(Attributes.MOVEMENT_SPEED)))
+                .thenExecute(() -> pokemon.setCurrentFullness(pokemon.getMaxFullness()))
+                .thenWaitUntil(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full) < 1e-6, "fed: full speed"))
+                // Empty again, then its work switched off: its speed is its own again
+                .thenExecute(() -> pokemon.setCurrentFullness(0))
+                .thenWaitUntil(() ->
+                        helper.assertTrue(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) < full, "slowed again"))
+                .thenExecute(() -> WorkerStateManager.setEnabled(pokemon, false))
+                .thenWaitUntil(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full) < 1e-6,
+                        "work off: full speed"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_to_eat", timeoutTicks = 400)
+    public void anEmptyWorkerIsSlowedOnItsWayToEatToo(GameTestHelper helper) {
+        Workers.isolate(helper);
+        trough(helper, TROUGH).addFood(berries(9));
+        PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
+        Pokemon pokemon = worker.getPokemon();
+        WorkerState state = WorkerStateManager.getOrCreate(pokemon);
+        double full = worker.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        helper.startSequence()
+                .thenExecute(() -> pokemon.setCurrentFullness(0))
+                .thenWaitUntil(() -> {
+                    ReservationId job = state.getCurrentReservation();
+                    helper.assertTrue(job != null && job.getJobType() == JobType.EAT_FOOD, "it sets off to eat");
+                })
+                .thenIdle(2)
+                .thenExecute(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * Math.sqrt(0.75)) < 1e-6,
+                        "on its way: the root of three quarters (on foot) of " + full + ", not "
+                                + worker.getAttributeValue(Attributes.MOVEMENT_SPEED)))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_empty", timeoutTicks = 1600)
+    public void anEmptyWorkerHarvestsAtThreeQuartersSpeed(GameTestHelper helper) {
+        // Its harvests take a third longer than a fed one's (below), the extra in a pause at them,
+        // not a rest after
+        timeTheHarvest(helper, true, 1.3, 1.7);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_fed", timeoutTicks = 1200)
+    public void aFedWorkerHarvestsAtFullSpeed(GameTestHelper helper) {
+        // A little over: crops side by side, it waits at the next for its last move to play out
+        timeTheHarvest(helper, false, 0.95, 1.3);
     }
 
     // ---- Starting fullness ----

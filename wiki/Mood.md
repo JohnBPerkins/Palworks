@@ -6,8 +6,8 @@ Each worker has a mood, from 0 to 100, separate from its friendship. It starts a
   and being Hungry or Tired.
 - **What brings it back:** while it's neither Hungry nor Tired, it cheers up whenever it isn't at
   work: idle, eating or asleep. A fed worker with a bed stays about level through a busy day and night.
-- **Unhappy (below 50):** it works and walks at three quarters of its speed, on top of any slowdown
-  for hunger or sleep, with a sad face over its head.
+- **Unhappy (below 50):** a sad face over its head, a warning that it's on its way to a strike. It
+  works no slower for it.
 - **On strike (at 0):** it finishes what it's doing, then does no work until its mood is back to
   30, with an anger mark over its head. It still eats and sleeps, which is how it gets there.
 - **Where to see it:** its mood shows in the bottom-left corner of its portrait on the PC and its

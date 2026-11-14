@@ -39,7 +39,7 @@ class ConfigKeysTest {
         assertTrue(names.contains(MOOD_ENABLED), names.toString());
         assertTrue(names.contains("mood.strike_until"), names.toString());
         assertFalse(names.contains("hunger"), "objects aren't settings themselves");
-        assertEquals(21, names.size(), names.toString());
+        assertEquals(20, names.size(), names.toString());
     }
 
     @Test
@@ -77,7 +77,7 @@ class ConfigKeysTest {
         assertRefused(WORK_RANGE, "lots");
         assertRefused(HUNGER_ENABLED, "yes");
         assertRefused("sleep.tired_work_speed", "NaN");
-        assertRefused("mood.unhappy_work_speed", "0"); // at least a tenth: a worker that never works is stuck
+        assertRefused("hunger.empty_work_speed", "0"); // at least a tenth: a worker that never works is stuck
         assertRefused("mood.strike_until", "0");
         assertRefused("hunger", "1");
         assertRefused("nope", "1");

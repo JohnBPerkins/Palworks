@@ -26,6 +26,12 @@ import org.jetbrains.annotations.Nullable;
  * <p>Calculated aspects, never saved with the Pokémon: a reload can't leave one stuck on.
  */
 public final class WorkerStatusSync {
+    /**
+     * The aspect a slowed worker has while it pauses (see dev.palworks.animation.SlowedPause), for
+     * clients to pulse the icons of what's slowing it.
+     */
+    public static final String PAUSING = "palworks-pausing";
+
     private static final AtomicBoolean REGISTERED = new AtomicBoolean();
     private static final Map<UUID, Set<String>> SHOWN = new ConcurrentHashMap<>();
 
@@ -72,6 +78,15 @@ public final class WorkerStatusSync {
         Set<String> wanted = new HashSet<>();
         for (WorkerStatus status : statusesOf(pokemon, state)) {
             wanted.add(status.aspect());
+        }
+        // And how slowed it is, for clients to slow its animations to match (see Pace); a non-worker
+        // isn't slowed
+        String pace = state == null ? null : Pace.aspect(Pace.now(pokemon, state));
+        if (pace != null) {
+            wanted.add(pace);
+        }
+        if (state != null && state.getPauseTicksLeft() > 0) {
+            wanted.add(PAUSING);
         }
         UUID id = pokemon.getUuid();
         Set<String> shown = SHOWN.getOrDefault(id, Set.of());
