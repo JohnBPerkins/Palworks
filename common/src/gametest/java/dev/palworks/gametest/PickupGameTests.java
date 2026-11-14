@@ -242,7 +242,7 @@ public class PickupGameTests {
     }
 
     /**
-     * How far each item was from the transporter (its middle, across) when it went: the most, by
+     * How far each item was from the transporter (its middle, on the furthest axis) when it went: the most, by
      * the end. Items it picks up go from within a block of its body, as a player picks them up.
      */
     private static double[] farthestPickupOnEachTick(GameTestHelper helper, PokemonEntity worker, ItemEntity... items) {
@@ -253,7 +253,8 @@ public class PickupGameTests {
                 if (!item.isAlive() && gone.add(item)) {
                     double dx = item.getX() - worker.getX();
                     double dz = item.getZ() - worker.getZ();
-                    farthest[0] = Math.max(farthest[0], Math.sqrt(dx * dx + dz * dz));
+                    // Its reach is a box round its body (as a player's), so on each axis
+                    farthest[0] = Math.max(farthest[0], Math.max(Math.abs(dx), Math.abs(dz)));
                 }
             }
         });
@@ -288,9 +289,10 @@ public class PickupGameTests {
     public void anItemOutOfReachDoesntHoldUpTheOnesBesideIt(GameTestHelper helper) {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
-        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
-        // Wheat on top of a pillar no worker can climb, the nearer of the two, and carrots on the
-        // ground beside it: the carrots are picked up, and the wheat waits
+        // Normal/Flying, so it transports, but it can't fly (one that can flies up: FlightGameTests)
+        PokemonEntity doduo = Workers.sendOut(helper, "doduo level=20", TRANSPORTER);
+        // Wheat on top of a pillar it can't climb, the nearer of the two, and carrots on the ground
+        // beside it: the carrots are picked up, and the wheat waits
         for (int y = 1; y <= 3; y++) {
             helper.setBlock(new BlockPos(3, y, 3), Blocks.STONE);
         }
@@ -298,8 +300,8 @@ public class PickupGameTests {
         Scenes.dropToPickUp(helper, new BlockPos(5, 1, 3), new ItemStack(Items.CARROT, 4));
 
         helper.succeedWhen(() -> {
-            helper.assertValueEqual(carried(pidgey, Items.CARROT), 4, "carrots carried");
-            helper.assertValueEqual(carried(pidgey, Items.WHEAT), 0, "wheat off the pillar");
+            helper.assertValueEqual(carried(doduo, Items.CARROT), 4, "carrots carried");
+            helper.assertValueEqual(carried(doduo, Items.WHEAT), 0, "wheat off the pillar");
         });
     }
 
