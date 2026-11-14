@@ -261,15 +261,18 @@ public final class WorkPositions {
     }
 
     /**
-     * Where a transporter stands to pick up a pickup job's items: right by the nearest of them it
-     * fits by, on its tile if it can (a tile further up or down, on a slope), or one next to it.
-     * Recomputed as it goes, so it heads for the next once it's picked one up, and for wherever an
-     * item rolls. Null if there's nowhere to stand by any.
+     * Where a transporter stands to pick up a pickup job's items: right by the one nearest the job's
+     * spot that it fits by, on its tile if it can (a tile further up or down, on a slope), or one
+     * next to it. Nearest the spot, not the worker, so it doesn't change as the worker walks (each
+     * change is a new walk to plan): only once it's picked that one up, when it heads for the next.
+     * Null if there's nowhere to stand by any.
      */
     @Nullable
     private static BlockPos pickupStand(Level level, BlockPos jobPos, Mob entity) {
         List<ItemEntity> items = new ArrayList<>(JobChecks.itemsToPickUp(level, jobPos));
-        items.sort(Comparator.comparingDouble(entity::distanceToSqr));
+        Vec3 jobMiddle = Vec3.atCenterOf(jobPos);
+        items.sort(Comparator.<ItemEntity>comparingDouble(item -> item.distanceToSqr(jobMiddle))
+                .thenComparingInt(ItemEntity::getId));
         Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
         for (ItemEntity item : items) {
             BlockPos at = JobChecks.spotOf(item);
