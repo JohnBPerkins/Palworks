@@ -16,7 +16,7 @@ concurrency:
 permissions:
   contents: read
 
-# Supported Cobblemon range (currently 1.7.0 to 1.8.x):
+# Supported Cobblemon range (currently 1.8.0 to 1.8.x):
 #   oldest: cobblemon_version in gradle.properties (what `build` compiles and releases against)
 #   newest: the last version in the compile/boot matrices below
 #   players: the Cobblemon range in fabric.mod.json and neoforge.mods.toml
@@ -330,7 +330,7 @@ jobs:
       fail-fast: false
       matrix:
         loader: [fabric, neoforge]
-        cobblemon: ["1.7.0", "1.8.4"]
+        cobblemon: ["1.8.0", "1.8.4"]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
