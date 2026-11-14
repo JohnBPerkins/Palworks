@@ -468,6 +468,8 @@ public class WorkerAI {
                 standPos,
                 walkSpeed(pokemon, state, reservation.getJobType()),
                 isForItsNeeds(reservation.getJobType()));
+        JobHandlerRegistry.forJob(reservation.getJobType())
+                .onTheWay(new JobContext(pokemon, entity, level, state, reservation));
         state.setWalkedToJob(true);
         state.resetStepIn();
 
