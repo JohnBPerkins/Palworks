@@ -24,8 +24,8 @@ final class ChopTreeHandler implements JobHandler {
             Step.of(
                             "clear leaves",
                             20,
-                            Step.effect(
-                                    ctx -> TrackedDrops.breaking(ctx.pokemon().getUuid(), () -> clearLeaves(ctx))))
+                            Step.effect(ctx ->
+                                    TrackedDrops.breaking(ctx.pokemon().getUuid(), ctx.pos(), () -> clearLeaves(ctx))))
                     .onlyIf(ChopTreeHandler::leavesInTheWay),
             // What the tree drops (and its leaves, as they decay) is the worker's, for
             // transporters to pick up (see TrackedDrops)
@@ -33,7 +33,7 @@ final class ChopTreeHandler implements JobHandler {
                     "chop",
                     60,
                     WorkAnimations.CHOP,
-                    ctx -> TrackedDrops.breaking(ctx.pokemon().getUuid(), () -> chop(ctx))),
+                    ctx -> TrackedDrops.breaking(ctx.pokemon().getUuid(), ctx.pos(), () -> chop(ctx))),
             // The tree's gone by now: it was just chopped
             Step.of("replant", 20, Step.effect(ChopTreeHandler::replant)).outlivesItsTarget());
 

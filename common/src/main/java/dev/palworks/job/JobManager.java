@@ -73,6 +73,7 @@ public class JobManager {
         this.seedRequests = new SeedRequests(pool, workers);
         this.assigner = new JobAssigner(level, pool, scanner, workers, nonWorkerBeds, seedRequests);
         this.pickups = new PickupQueue(pool, workers, assigner, seedRequests);
+        assigner.onUnreachablePickup(pos -> pickups.outOfReach(pos, level.getGameTime()));
     }
 
     /**
@@ -559,12 +560,17 @@ public class JobManager {
     /**
      * An item to pick up has come into the level (see TrackedDrops): spawned by a worker's work
      * or a player, or loaded back in with its chunk. It gets a pickup job once it's landed (one
-     * dropped by decaying leaves, with the rest of its batch), offered first to {@code
-     * suggestedWorker}, the worker that dropped it, if given.
+     * dropped by decaying leaves, with the rest of its batch): at {@code source}, where it was
+     * dropped (the crop, the tree), if it's landed near it, else where it is. Offered first to
+     * {@code suggestedWorker}, the worker that dropped it, if given.
      */
     public static void onTrackedItemAdded(
-            ServerLevel level, ItemEntity item, @Nullable UUID suggestedWorker, boolean decay) {
-        getInstance(level).pickups.track(item, suggestedWorker, decay, level.getGameTime());
+            ServerLevel level,
+            ItemEntity item,
+            @Nullable UUID suggestedWorker,
+            @Nullable BlockPos source,
+            boolean decay) {
+        getInstance(level).pickups.track(item, suggestedWorker, source, decay, level.getGameTime());
     }
 
     /**

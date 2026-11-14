@@ -79,6 +79,9 @@ final class JobAssigner {
 
     @Nullable
     private List<BlockPos> seedChestsThisTick;
+    // Told of each pickup found out of reach (see PickupQueue.outOfReach)
+    @Nullable
+    private java.util.function.Consumer<BlockPos> unreachablePickups;
 
     // Per-worker memory of job positions the worker couldn't reach, either because the path check
     // failed at assignment or it got stuck walking there (Pokemon UUID -> job position -> game tick
@@ -106,6 +109,11 @@ final class JobAssigner {
         this.workers = workers;
         this.nonWorkerBeds = nonWorkerBeds;
         this.seedRequests = seedRequests;
+    }
+
+    /** Who to tell of each pickup found out of reach (the items wait a while for another). */
+    void onUnreachablePickup(java.util.function.Consumer<BlockPos> listener) {
+        this.unreachablePickups = listener;
     }
 
     /**
@@ -573,6 +581,16 @@ final class JobAssigner {
             // Remember it, so next time this worker checks other candidates instead of
             // pathfinding to the same unreachable ones again.
             rememberUnreachable(worker.pokemonUUID, worker.position, job.position(), now);
+            if (job.type() == JobType.COLLECT_DROPS && job.isFollowUp()) {
+                // Items lying out of reach (on a furnace, in a tree's leaves): the pickup goes, and
+                // they wait a while for another (see PickupQueue). Left in the pool, every
+                // transporter path-checked it again whenever blocks near it changed, which on a
+                // busy farm is all the time.
+                pool.remove(JobPool.JobKey.of(job));
+                if (unreachablePickups != null) {
+                    unreachablePickups.accept(job.position());
+                }
+            }
             pathChecks++;
             if (pathChecks >= MAX_PATH_CHECKS_PER_WORKER) {
                 break;

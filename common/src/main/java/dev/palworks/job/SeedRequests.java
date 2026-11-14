@@ -187,8 +187,8 @@ final class SeedRequests {
             pool.remove(new JobPool.JobKey(handover.pos(), JobType.TAKE_SEEDS));
             for (ItemEntity item : JobChecks.seedsHandedTo(level, handover.pos(), handover.planter())) {
                 TrackedDrops.stopHandingOver(item);
+                pickups.track(item, null, null, false, now);
             }
-            pickups.add(handover.pos(), null, now);
             Palworks.LOGGER.debug(
                     "Planter {} never took the seeds left for it at {}: a pickup now",
                     handover.planter(),

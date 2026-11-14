@@ -41,7 +41,7 @@ final class TakeSeedsHandler implements JobHandler {
             // What its pouch has no room for is an ordinary pickup, for a transporter to put away
             TrackedDrops.stopHandingOver(item);
             if (ctx.level() instanceof ServerLevel serverLevel) {
-                JobManager.getInstance(serverLevel).queuePickup(ctx.pos(), null, serverLevel.getGameTime());
+                JobManager.onTrackedItemAdded(serverLevel, item, null, null, false);
             }
         }
         if (taken > 0) {
