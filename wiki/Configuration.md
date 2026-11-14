@@ -56,7 +56,8 @@ settings that aren't per-Pokémon:
   - **`idle_drain_per_day`** (0 to 1): the share of its max fullness a worker loses over a Minecraft
     day while its work is on, working or not.
   - **`trough_fill_fraction`** (0 to 1): how full troughs fill a worker, as a share of its max
-    fullness. The rest is left for hand-feeding. 0 and troughs never feed.
+    fullness, and how full a new Pokémon starts. The rest is left for hand-feeding. 0 and troughs
+    never feed, and new Pokémon start empty.
   - **`empty_work_speed`** (0.1 to 1): how fast a worker with no fullness left works and walks.
     Slowdowns add up (out of food and Tired is both taken off), down to a tenth of its speed.
 - **`sleep`**: how pastured workers sleep (see [Sleep](Sleep)).

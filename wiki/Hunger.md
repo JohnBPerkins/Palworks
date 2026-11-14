@@ -21,6 +21,9 @@ stat of its own.
   moving it, on its way to eat or sleep as well. Each job takes longer: at the job it waits before
   its move, showing what's slowing it (the falling arrows of a stat drop out of food, Sleep's Z's
   when Tired), then plays the move at its usual speed, landing just as the work happens.
+- **A new Pokémon starts half full**, not empty as in Cobblemon, so it can go straight to work:
+  the first time you get it (caught, a starter, hatched, traded, given by a command). Moving it
+  between party and PC, or evolving it, doesn't top it up again.
 
 A **trough** comes in every wood (oak, spruce, birch, jungle, acacia, dark oak, mangrove, cherry,
 bamboo, crimson and warped), crafted from 5 of that wood's slabs (two on the top row's ends, three
