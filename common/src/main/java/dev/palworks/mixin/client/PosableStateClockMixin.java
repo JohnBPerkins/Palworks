@@ -15,10 +15,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Plays a slowed worker's animations slower (see Pace): every animation of a Pokémon (its walk, its
  * idle, the move it works with) runs on one clock, {@code getAnimationSeconds()}, its age in ticks
  * over 20. For a Pokémon, this runs that clock at its pace, from its {@code palworks-pace-} aspect:
- * a quarter-pace worker's legs move a quarter as fast, as it walks a quarter as fast, and its work
- * move lands as late as the server has its work happen. The clock goes up by its pace each tick, so
- * it doesn't jump when its pace changes. The same in Cobblemon 1.7 and 1.8. Client only; listed
- * in palworks-common.mixins.json.
+ * a quarter-pace worker's legs move a quarter as fast, as it walks a quarter as fast. Except while
+ * it plays a one-off animation (the move it works with, a cry): those go with particles and sounds
+ * that play at their usual speed, so it does too, and its work move lands as the server has its
+ * work happen. The clock goes up by its pace each tick, so it doesn't jump when its pace changes.
+ * The same in Cobblemon 1.7 and 1.8. Client only; listed in palworks-common.mixins.json.
  */
 @Mixin(value = PosableState.class, remap = false)
 public abstract class PosableStateClockMixin {
@@ -41,7 +42,9 @@ public abstract class PosableStateClockMixin {
             return;
         }
         PokemonEntity entity = delegate.currentEntity; // the field: its getter throws until it's set
-        float pace = entity == null ? 1f : (float) Pace.fromAspects(entity.getAspects());
+        boolean oneOff = delegate.getPrimaryAnimation() != null
+                || !delegate.getActiveAnimations().isEmpty();
+        float pace = entity == null || oneOff ? 1f : (float) Pace.fromAspects(entity.getAspects());
         int ticks = age - palworks$clockAge;
         if (Float.isNaN(palworks$clock) || ticks < 0) {
             palworks$clock = age; // first asked, or its age went back (a new entity): from where it is

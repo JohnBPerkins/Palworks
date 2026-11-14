@@ -60,14 +60,16 @@ public record Step(
     @Override
     public int startTick(JobContext ctx) {
         WorkAnimation played = animationFor(ctx.species());
-        return played == null ? 0 : played.playAt(ticks(ctx), ctx.pace());
+        // Still timed to land as the step ends, however long a slowed worker's step takes: its move
+        // plays at its usual speed, later
+        return played == null ? 0 : played.playAt(ticks(ctx));
     }
 
     @Override
     public void start(JobContext ctx) {
         WorkAnimation played = animationFor(ctx.species());
         if (played != null) {
-            WorkAnimator.play(ctx.entity(), played, ctx.pos(), ctx.pace());
+            WorkAnimator.play(ctx.entity(), played, ctx.pos());
         }
     }
 

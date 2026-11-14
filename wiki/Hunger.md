@@ -17,9 +17,10 @@ stat of its own.
 - **With no fullness left** it works and walks at three quarters of its speed, with a half hunger
   shank over its head, until it eats. It never stops working.
 - **A slowed worker** (out of food, Tired, or both: a quarter off for each, so half speed with
-  both) is slow at everything: each job takes longer, its animations play slower to match (its
-  legs as it walks, the move it works with, landing just as the work happens), and it moves slower
-  whether Palworks or Cobblemon is moving it, on its way to eat or sleep too.
+  both) is slow at everything. It walks slower, its legs too, whether Palworks or Cobblemon is
+  moving it, on its way to eat or sleep as well. Each job takes longer: at the job it waits before
+  its move, showing what's slowing it (the falling arrows of a stat drop out of food, Sleep's Z's
+  when Tired), then plays the move at its usual speed, landing just as the work happens.
 
 A **trough** comes in every wood (oak, spruce, birch, jungle, acacia, dark oak, mangrove, cherry,
 bamboo, crimson and warped), crafted from 5 of that wood's slabs (two on the top row's ends, three

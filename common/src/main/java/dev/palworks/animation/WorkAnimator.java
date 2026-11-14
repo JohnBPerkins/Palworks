@@ -9,7 +9,6 @@ import com.cobblemon.mod.common.api.moves.animations.TargetsProvider;
 import com.cobblemon.mod.common.api.moves.animations.UsersProvider;
 import com.cobblemon.mod.common.entity.generic.GenericBedrockEntity;
 import dev.palworks.Palworks;
-import dev.palworks.worker.Pace;
 import dev.palworks.worker.WorkerState;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,6 +17,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import org.jetbrains.annotations.Nullable;
@@ -68,23 +68,13 @@ public final class WorkAnimator {
 
     private static final Map<UUID, Playing> PLAYING = new ConcurrentHashMap<>();
 
-    // How much longer each effect a slowed worker plays waits at its pauses, by the effect's runtime
-    // (see PauseKeyframeMixin). Weak, so it's gone with the effect.
-    private static final Map<MoLangRuntime, Float> STRETCHED =
-            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
-
     private WorkAnimator() {}
 
-    /** Play an animation on a worker, aimed at a block. Cuts short one of its own still playing. */
-    public static void play(Mob worker, WorkAnimation animation, BlockPos target) {
-        play(worker, animation, target, 1.0);
-    }
-
     /**
-     * {@link #play(Mob, WorkAnimation, BlockPos)}, by a worker at {@code pace} (see
-     * dev.palworks.worker.WorkSpeed): slowed, its body animation lasts longer, so it plays out longer.
+     * Play an animation on a worker, aimed at a block. Cuts short one of its own still playing. At
+     * its usual speed, a slowed worker's too: its particles and sounds can't be slowed to match.
      */
-    public static void play(Mob worker, WorkAnimation animation, BlockPos target, double pace) {
+    public static void play(Mob worker, WorkAnimation animation, BlockPos target) {
         if (!(worker.level() instanceof ServerLevel level)) {
             return;
         }
@@ -105,22 +95,11 @@ public final class WorkAnimator {
             marker.moveTo(target.getX() + 0.5, target.getY() + animation.aimY(), target.getZ() + 0.5, 0.0f, 0.0f);
             level.addFreshEntity(marker);
 
-            MoLangRuntime runtime = new MoLangRuntime();
-            MoLangFunctions.INSTANCE.addStandardFunctions(runtime.getEnvironment().query);
-            stretch(runtime, pace); // a slowed worker's effect waits to match its slowed animation
-            List<Object> providers = List.of(new UsersProvider(worker), new TargetsProvider(marker));
-            ActionEffectContext context = new ActionEffectContext(
-                    timeline,
-                    new HashSet<>(),
-                    providers,
-                    runtime,
-                    /* canBeInterrupted */ true,
-                    /* interrupted */ false,
-                    new ArrayList<>(),
-                    level);
+            ActionEffectContext context =
+                    context(timeline, List.of(new UsersProvider(worker), new TargetsProvider(marker)), level);
 
-            Playing playing = new Playing(
-                    context, marker, target.immutable(), level.getGameTime() + animation.durationTicks(pace));
+            Playing playing =
+                    new Playing(context, marker, target.immutable(), level.getGameTime() + animation.durationTicks());
             UUID id = worker.getUUID();
             PLAYING.put(id, playing);
             // Only the cleanup matters; the completion future itself isn't needed. Kept until its
@@ -142,20 +121,40 @@ public final class WorkAnimator {
     }
 
     /**
-     * Have the effect run with {@code runtime} wait {@code 1 / pace} as long at each of its pauses
-     * (see PauseKeyframeMixin): a slowed worker's, whose body animation plays that much slower.
-     * Nothing at full pace.
+     * Play a Cobblemon action effect on a worker itself, aimed at nothing (a battle status's, such
+     * as Sleep's Z's: see SlowedCues). Not kept track of: nothing cuts it short, or waits for it.
      */
-    public static void stretch(MoLangRuntime runtime, double pace) {
-        if (pace < Pace.FULL) {
-            STRETCHED.put(runtime, (float) (1 / pace));
+    public static void cue(Mob worker, ResourceLocation effect) {
+        if (!(worker.level() instanceof ServerLevel level)) {
+            return;
+        }
+        ActionEffectTimeline timeline =
+                ActionEffects.INSTANCE.getActionEffects().get(effect);
+        if (timeline == null) {
+            Palworks.LOGGER.debug("No Cobblemon action effect registered for {}", effect);
+            return;
+        }
+        try {
+            var unused = timeline.run(context(timeline, List.of(new UsersProvider(worker)), level));
+        } catch (Exception e) { // NOPMD - Cobblemon's effect code can throw anything; it's only a visual
+            Palworks.LOGGER.warn(
+                    "Failed to play {} on {}: {}", effect, worker.getName().getString(), e.toString());
         }
     }
 
-    /** How much longer the effect run with {@code runtime} waits at its pauses: 1 unless a slowed worker's. */
-    public static float stretchFor(MoLangRuntime runtime) {
-        Float stretched = STRETCHED.get(runtime);
-        return stretched == null ? 1f : stretched;
+    private static ActionEffectContext context(
+            ActionEffectTimeline timeline, List<Object> providers, ServerLevel level) {
+        MoLangRuntime runtime = new MoLangRuntime();
+        MoLangFunctions.INSTANCE.addStandardFunctions(runtime.getEnvironment().query);
+        return new ActionEffectContext(
+                timeline,
+                new HashSet<>(),
+                providers,
+                runtime,
+                /* canBeInterrupted */ true,
+                /* interrupted */ false,
+                new ArrayList<>(),
+                level);
     }
 
     /**

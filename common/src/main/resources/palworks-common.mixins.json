@@ -12,7 +12,6 @@
     "BlockEntityChangedMixin",
     "CobblemonNetworkMixin",
     "DrowsySensorMixin",
-    "PauseKeyframeMixin",
     "PokemonEntityInteractMixin",
     "PokemonEntityTickMixin",
     "PokemonMetabolismMixin",

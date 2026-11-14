@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.ai.path.WorkerNavigator;
+import dev.palworks.animation.SlowedCues;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.WorkerBedBlock;
@@ -153,8 +154,7 @@ public class WorkerAI {
         // Its mood: down while Hungry or Tired, back up while it's neither and not at work (see Mood)
         Mood.tick(pokemon, state);
 
-        // Slowed (hungry, Tired...), it moves slower whoever's moving it, Palworks or Cobblemon; but
-        // not on its way to eat or sleep
+        // Slowed (hungry, Tired...), it moves slower whoever's moving it, Palworks or Cobblemon
         Pace.applyTo(entity, Pace.now(pokemon, state));
 
         // A pastured worker sleeps in its bedtime (see Sleep): asleep where it is, it does nothing else
@@ -519,6 +519,15 @@ public class WorkerAI {
         // furnace keeps its time.
         List<Step> steps = handler.steps();
         int index = state.getJobStep();
+        if (index < steps.size() && steps.get(index).animation() != null) {
+            // A slowed worker shows what's slowing it while it waits for its move
+            SlowedCues.whileWaiting(
+                    entity,
+                    pokemon,
+                    state,
+                    state.getStepTicks(),
+                    steps.get(index).startTick(ctx));
+        }
         if (!readyToAnimate
                 && index < steps.size()
                 && steps.get(index).animation() != null
