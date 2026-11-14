@@ -5,6 +5,7 @@
   "minVersion": "0.8",
   "client": [
     "client.PCGUIAccessor",
+    "client.PosableStateClockMixin",
     "client.SummaryAccessor"
   ],
   "mixins": [

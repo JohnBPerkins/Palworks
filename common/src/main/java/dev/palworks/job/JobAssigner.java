@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.ai.WorkPositions;
+import dev.palworks.ai.path.WorkerFlight;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.ai.path.WorkerPathfinder;
 import dev.palworks.ai.path.WorkerPathfinder.Reach;
@@ -21,7 +22,6 @@ import dev.palworks.sleep.Beds;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
-import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
@@ -41,6 +41,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -79,9 +80,9 @@ final class JobAssigner {
 
     @Nullable
     private List<BlockPos> seedChestsThisTick;
-    // Told of each pickup found out of reach (see PickupQueue.outOfReach)
+    // Told of the items round each pickup found out of reach (see PickupQueue.outOfReach)
     @Nullable
-    private java.util.function.Consumer<BlockPos> unreachablePickups;
+    private java.util.function.Consumer<AABB> unreachablePickups;
 
     // Per-worker memory of job positions the worker couldn't reach, either because the path check
     // failed at assignment or it got stuck walking there (Pokemon UUID -> job position -> game tick
@@ -111,8 +112,8 @@ final class JobAssigner {
         this.seedRequests = seedRequests;
     }
 
-    /** Who to tell of each pickup found out of reach (the items wait a while for another). */
-    void onUnreachablePickup(java.util.function.Consumer<BlockPos> listener) {
+    /** Who to tell of the items found out of reach (they wait a while before another try). */
+    void onUnreachablePickup(java.util.function.Consumer<AABB> listener) {
         this.unreachablePickups = listener;
     }
 
@@ -196,13 +197,6 @@ final class JobAssigner {
             // A worker on strike (its mood ran out) does no work until it's back up a way; it still
             // eats and sleeps, above, which is how it gets there (see Mood)
             if (pokemon != null && Mood.isStriking(pokemon, WorkerStateManager.get(pokemon))) {
-                continue;
-            }
-
-            // An empty or Tired worker rests a while after each job, so it gets through work slower
-            // (see WorkerAI.restAfterJob); eating isn't held up by it
-            WorkerState state = pokemon == null ? null : WorkerStateManager.get(pokemon);
-            if (state != null && state.getRestUntil() > now && WorkSpeed.of(pokemon, state) < 1) {
                 continue;
             }
 
@@ -593,19 +587,24 @@ final class JobAssigner {
                 }
                 return job;
             }
+            if (job.type() == JobType.COLLECT_DROPS && job.isFollowUp()) {
+                // Items lying out of reach (on a furnace, in a tree's leaves): the pickup goes, and
+                // the item it went for (or, with nowhere to stand by any, all of them) waits a while
+                // for another (see PickupQueue), so the others round it get theirs. Left in the
+                // pool, every transporter path-checked it again whenever blocks near it changed,
+                // which on a busy farm is all the time.
+                pool.remove(JobPool.JobKey.of(job));
+                if (unreachablePickups != null) {
+                    unreachablePickups.accept(
+                            standPos == null
+                                    ? new AABB(job.position()).inflate(JobChecks.pickupRadius())
+                                    : new AABB(standPos).inflate(1.0));
+                }
+                continue;
+            }
             // Remember it, so next time this worker checks other candidates instead of
             // pathfinding to the same unreachable ones again.
             rememberUnreachable(worker.pokemonUUID, worker.position, job.position(), now);
-            if (job.type() == JobType.COLLECT_DROPS && job.isFollowUp()) {
-                // Items lying out of reach (on a furnace, in a tree's leaves): the pickup goes, and
-                // they wait a while for another (see PickupQueue). Left in the pool, every
-                // transporter path-checked it again whenever blocks near it changed, which on a
-                // busy farm is all the time.
-                pool.remove(JobPool.JobKey.of(job));
-                if (unreachablePickups != null) {
-                    unreachablePickups.accept(job.position());
-                }
-            }
             pathChecks++;
             if (pathChecks >= MAX_PATH_CHECKS_PER_WORKER) {
                 break;
@@ -834,7 +833,14 @@ final class JobAssigner {
             return new WorkerPathfinder.Result(Reach.UNKNOWN, null);
         }
         if (WorkerPathfinder.handles(entity)) {
-            return WorkerPathfinder.find(entity, standPos, farTrip);
+            // A far trip it can fly is flown (see WorkerFlight): nothing to plan, the sky's clear. So
+            // is a near one there's no walking.
+            boolean canFly = WorkerFlight.canFlyTo(entity, standPos);
+            if (canFly && WorkerFlight.isFar(entity, standPos)) {
+                return new WorkerPathfinder.Result(Reach.YES, null);
+            }
+            WorkerPathfinder.Result walk = WorkerPathfinder.find(entity, standPos, farTrip);
+            return walk.reach() == Reach.NO && canFly ? new WorkerPathfinder.Result(Reach.YES, null) : walk;
         }
         net.minecraft.world.level.pathfinder.Path path = entity.getNavigation().createPath(standPos, 1);
         if (path == null) {

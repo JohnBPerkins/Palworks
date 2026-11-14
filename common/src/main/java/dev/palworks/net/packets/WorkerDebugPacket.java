@@ -189,7 +189,7 @@ public class WorkerDebugPacket implements NetworkPacket<WorkerDebugPacket> {
      *
      * @param shown    whether mood applies to it (its work is on); if not, nothing's shown
      * @param mood     its mood, rounded, 0 to 100
-     * @param unhappy  whether it's unhappy (works slower)
+     * @param unhappy  whether it's unhappy (on its way to a strike)
      * @param striking whether it's on strike (does no work)
      */
     public record Mood(boolean shown, int mood, boolean unhappy, boolean striking) {

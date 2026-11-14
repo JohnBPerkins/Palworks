@@ -32,6 +32,6 @@
     "java": ">=21",
     "fabric-api": "*",
     "architectury": ">=13.0.8",
-    "cobblemon": ">=1.7.0 <1.9"
+    "cobblemon": ">=1.8.0 <1.9"
   }
 }

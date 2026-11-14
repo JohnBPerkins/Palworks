@@ -13,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
  * the block, ranged ones from a little way off). To swap one, change the move and re-tune its
  * impact ticks: when its target particles start, from its timeline in Cobblemon's
  * {@code data/cobblemon/action_effects/moves/<move>.json} (the delays and pauses before them, at
- * 20 ticks a second). The timelines read here are the same from Cobblemon 1.7.0 to 1.8.x.
+ * 20 ticks a second). The timelines read here are the same from Cobblemon 1.8.0 to 1.8.x.
  *
  * <p>These are the defaults: a datapack can change any of them for particular species, by id
  * ({@link WorkAnimationData}), and {@link #forSpecies} gives a species its own.

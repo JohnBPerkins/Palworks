@@ -14,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Sent from server to a player: the work levels of some of their Pokémon (party or PC), by Pokémon
  * UUID, for the PC and summary screens. The client can't work these out itself: they come from
- * the server's datapacks, and from forms it evolved from, which Cobblemon 1.7 doesn't sync. A
+ * the server's datapacks, and from forms it evolved from, which Cobblemon 1.8.x doesn't sync. A
  * Pokémon with an empty map can't do any work. Only for display: the server never reads it back.
  */
 public class WorkLevelsPacket implements NetworkPacket<WorkLevelsPacket> {

@@ -1,6 +1,7 @@
 package dev.palworks.job.handler;
 
 import dev.palworks.Palworks;
+import dev.palworks.ai.WorkStance;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.suitability.Suitability;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 final class DeliverItemsHandler implements JobHandler {
 
@@ -17,6 +19,12 @@ final class DeliverItemsHandler implements JobHandler {
     @Override
     public List<Step> steps() {
         return steps;
+    }
+
+    /** Right up against the chest (or trough) it fills, as a player stands to open one. */
+    @Override
+    public WorkStance stance(@Nullable String speciesId) {
+        return WorkStance.AGAINST;
     }
 
     private void work(JobContext ctx) {

@@ -3,14 +3,15 @@ package dev.palworks.ai;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.ai.path.WorkerFlight;
 import dev.palworks.ai.path.WorkerNavigator;
+import dev.palworks.animation.SlowedPause;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
-import dev.palworks.hunger.HungerMath;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
@@ -25,9 +26,9 @@ import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.sleep.SleepPose;
 import dev.palworks.sleep.SleepSchedule;
+import dev.palworks.worker.Pace;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
-import dev.palworks.worker.WorkSpeed;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import dev.palworks.worker.WorkerStatusSync;
@@ -97,6 +98,7 @@ public class WorkerAI {
         WorkActivity activity = WorkActivitySync.update(pokemon, entity, state, level.getGameTime());
         WorkAspectSync.update(pokemon, activity, level.getGameTime());
         // What's holding it back (hungry), shown over its head
+        SlowedPause.update(state);
         WorkerStatusSync.update(pokemon, state);
         WorkAnimator.update(entity, state);
         // Its state lives in WorkerStateManager's cache, which goes when its chunk unloads or the
@@ -123,10 +125,9 @@ public class WorkerAI {
 
         // New workers start enabled (see WorkerState), so a disabled state means it was turned off
         // on purpose (/palworks worker disable). Respect that instead of re-enabling it. One with
-        // no work it can do (it lost its last work skill) is no worker either. Its hunger is
-        // Cobblemon's again: no rest after its last job carries over.
+        // no work it can do (it lost its last work skill) is no worker either.
         if (!dev.palworks.worker.WorkerEligibility.works(pokemon, state)) {
-            state.setRestUntil(0);
+            Pace.applyTo(entity, 1.0); // its speed is its own again
             if (state.isAsleep() && entity instanceof PokemonEntity pokemonEntity) {
                 wake(pokemon, pokemonEntity, state); // and its sleep is Cobblemon's again
             }
@@ -154,6 +155,9 @@ public class WorkerAI {
         Hunger.tick(pokemon, state);
         // Its mood: down while Hungry or Tired, back up while it's neither and not at work (see Mood)
         Mood.tick(pokemon, state);
+
+        // Slowed (hungry, Tired...), it moves slower whoever's moving it, Palworks or Cobblemon
+        Pace.applyTo(entity, Pace.now(pokemon, state));
 
         // A pastured worker sleeps in its bedtime (see Sleep): asleep where it is, it does nothing else
         if (entity instanceof PokemonEntity pokemonEntity && tickSleep(pokemon, pokemonEntity, state)) {
@@ -234,7 +238,7 @@ public class WorkerAI {
             entity.getNavigation().stop();
             return false;
         }
-        navigateToJob(entity, leg, walkSpeed(pokemon, state, JobType.EAT_FOOD), true);
+        navigateToJob(entity, leg, walkSpeed(), true);
         return true;
     }
 
@@ -409,7 +413,6 @@ public class WorkerAI {
             // Job complete - clear reservation
             state.clearReservation();
             state.resetPathFailures();
-            restAfterJob(pokemon, entity, level, state, reservation.getJobType());
 
             // Opt-in activity message (only players who ran /palworks debug see it)
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
@@ -463,18 +466,20 @@ public class WorkerAI {
         if (state.getStepTicks() > 0) {
             state.restartStep();
         }
-        navigateToJob(
-                entity,
-                standPos,
-                walkSpeed(pokemon, state, reservation.getJobType()),
-                isForItsNeeds(reservation.getJobType()));
+        navigateToJob(entity, standPos, walkSpeed(), isForItsNeeds(reservation.getJobType()));
+        JobHandlerRegistry.forJob(reservation.getJobType())
+                .onTheWay(new JobContext(pokemon, entity, level, state, reservation));
         state.setWalkedToJob(true);
         state.resetStepIn();
 
         // Track path failures for stuck detection: its walk has ended (on the ground, so not just
         // falling or knocked about) without getting next to the stand tile, so the path can't
         // get it there. A few in a row and it gives up the job instead of standing around.
-        if (entity.getNavigation().isDone() && entity.onGround() && distanceSq > SETTLED_DISTSQ) {
+        // (Not while it flies there: it's off the ground, and its flight is timed, see WorkerFlight)
+        if (entity.getNavigation().isDone()
+                && entity.onGround()
+                && distanceSq > SETTLED_DISTSQ
+                && !WorkerFlight.isFlying(entity)) {
             state.recordPathFailure();
 
             if (state.isStuck()) {
@@ -522,10 +527,11 @@ public class WorkerAI {
         // furnace keeps its time.
         List<Step> steps = handler.steps();
         int index = state.getJobStep();
-        if (!readyToAnimate
-                && index < steps.size()
+        boolean atItsMove = index < steps.size()
                 && steps.get(index).animation() != null
-                && state.getStepTicks() == steps.get(index).startTick(ctx)) {
+                && state.getStepTicks() == steps.get(index).startTick(ctx);
+        // A slowed worker pauses for the time it's saved up, just before a move (see SlowedPause)
+        if (atItsMove && (!readyToAnimate || SlowedPause.holds(entity, pokemon, state))) {
             return StepRunner.Outcome.WORKING;
         }
 
@@ -622,37 +628,26 @@ public class WorkerAI {
         WorkerNavigator.walkTo(entity, standPos, speed, farTrip);
     }
 
-    /** Normal walking speed (0.6), slower for a worker with no fullness left; never on its way to eat. */
-    private static double walkSpeed(Pokemon pokemon, WorkerState state, JobType jobType) {
-        return isForItsNeeds(jobType) ? 0.6 : 0.6 * WorkSpeed.of(pokemon, state);
+    /**
+     * Normal walking speed (0.6). A slowed worker walks slower all the same: its pace is on its
+     * movement speed itself (see Pace), whoever's walking it.
+     */
+    private static double walkSpeed() {
+        return 0.6;
     }
 
-    /** Eating and going to bed: what makes it better, so never slowed down. */
+    /** Eating and going to bed: what makes it better, so worth a far trip (see WorkerNavigator). */
     private static boolean isForItsNeeds(JobType jobType) {
         return !jobType.isWork();
     }
 
-    /**
-     * After a job, a worker with no fullness left, or Tired, rests before taking another, for long
-     * enough that it gets through its work at its slower speed (see {@link HungerMath#restTicks}).
-     * Not after eating or sleeping, which is what makes it better.
-     */
-    private static void restAfterJob(Pokemon pokemon, Mob entity, Level level, WorkerState state, JobType jobType) {
-        double speed = WorkSpeed.of(pokemon, state);
-        if (isForItsNeeds(jobType) || speed >= 1) {
-            return;
-        }
-        long rest = HungerMath.restTicks(JobHandlerRegistry.jobTicks(jobType, entity), speed);
-        state.setRestUntil(level.getGameTime() + rest);
-    }
+    // The longest a leg home may take before it stops and looks again (see walkHome): 30s
+    private static final int HOME_LEG_TICKS = 600;
 
     /**
      * How long an idle worker waits in its bedtime for a bed before it sleeps where it is: long
      * enough for JobAssigner to offer it one (it gets a turn every few ticks).
      */
-    // The longest a leg home may take before it stops and looks again (see walkHome): 30s
-    private static final int HOME_LEG_TICKS = 600;
-
     private static final int BED_SEARCH_TICKS = 40;
 
     /**

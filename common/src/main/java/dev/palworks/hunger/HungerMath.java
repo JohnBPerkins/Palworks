@@ -49,17 +49,6 @@ public final class HungerMath {
     }
 
     /**
-     * How much longer than a job took an empty worker rests after it, so it gets through work at
-     * {@code speed} of its usual rate: {@code jobTicks} at half speed, three times that at a quarter.
-     */
-    public static long restTicks(long jobTicks, double speed) {
-        if (jobTicks <= 0 || speed >= 1) {
-            return 0;
-        }
-        return Math.round(jobTicks * (1 / Math.max(speed, 0.01) - 1));
-    }
-
-    /**
      * Fullness owed (used up, not yet taken off) after adding {@code drain} to {@code owed}: whole
      * points come off the Pokémon ({@link Drained#points}), at most what it has, and the fraction
      * left over is owed. Once it's at 0, nothing more is owed: it doesn't build up a debt to eat off.

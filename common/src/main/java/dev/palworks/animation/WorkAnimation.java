@@ -82,6 +82,15 @@ public record WorkAnimation(
     }
 
     /**
+     * {@code ticks} at a worker's {@code pace} (see dev.palworks.worker.WorkSpeed): longer for one
+     * slowed down (hungry, Tired...). Unchanged at full pace. Its animation itself plays at its
+     * usual speed, as its particles and sounds do: it pauses for the time instead (see SlowedPause).
+     */
+    public static int atPace(int ticks, double pace) {
+        return pace >= 1 ? ticks : (int) Math.ceil(ticks / Math.max(pace, 0.05));
+    }
+
+    /**
      * How long a step with this animation takes, given the least time its work takes: long enough
      * for the worker to settle and the animation to land.
      */

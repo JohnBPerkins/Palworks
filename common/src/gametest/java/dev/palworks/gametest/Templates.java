@@ -25,6 +25,7 @@ public final class Templates {
             WorkStatusGameTests.class,
             PickupGameTests.class,
             SeedDeliveryGameTests.class,
+            FlightGameTests.class,
             TestAreaGameTests.class,
             HangingFruitGameTests.class,
             CobblemonCropGameTests.class,
@@ -36,5 +37,6 @@ public final class Templates {
             HungerGameTests.class,
             SleepGameTests.class,
             MoodGameTests.class,
-            JobIndexGameTests.class);
+            JobIndexGameTests.class,
+            PaceGameTests.class);
 }

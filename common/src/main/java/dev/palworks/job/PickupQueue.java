@@ -22,7 +22,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -89,19 +88,24 @@ final class PickupQueue {
     }
 
     /**
-     * A pickup job at {@code pos} was out of reach (no worker could get to it): the items round it
-     * wait a while for another, longer each time, so they're not path-checked over and over. They
+     * The items in {@code area} were out of reach (no worker could get to them): they wait a while
+     * before they're picked up, longer each time, so they're not path-checked over and over. They
      * stay tracked: once the way's clear (or they've been moved), they're picked up.
      */
-    void outOfReach(BlockPos pos, long now) {
-        AABB area = new AABB(pos).inflate(JobChecks.pickupRadius());
-        for (Map.Entry<UUID, Tracked> entry : tracked.entrySet()) {
-            Tracked item = entry.getValue();
-            if (item.lastSpot != null && area.contains(Vec3.atCenterOf(item.lastSpot))) {
+    void outOfReach(ServerLevel level, AABB area, long now) {
+        for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, area)) {
+            Tracked item = tracked.get(entity.getUUID());
+            if (item != null) {
                 item.wait = item.wait == 0 ? OUT_OF_REACH_WAIT : Math.min(item.wait * 2, OUT_OF_REACH_MAX_WAIT);
                 item.due = now + item.wait;
             }
         }
+    }
+
+    /** Whether this item is waiting after being out of reach (see outOfReach). */
+    boolean isWaiting(UUID item, long now) {
+        Tracked tracking = tracked.get(item);
+        return tracking != null && tracking.wait > 0 && tracking.due > now;
     }
 
     /** Create the queued pickup jobs that are due, and jobs for items with none round them. */
@@ -197,7 +201,6 @@ final class PickupQueue {
                 continue;
             }
             BlockPos at = spotFor(entity, item.source, radius);
-            item.lastSpot = entity.blockPosition();
             createCollectDropsJob(level, at, item.suggestedWorker);
             jobs.add(new AABB(at).inflate(radius));
             item.suggestedWorker = null; // only its first job is offered to the worker that dropped it
@@ -214,17 +217,7 @@ final class PickupQueue {
         if (source != null && new AABB(source).inflate(radius).intersects(item.getBoundingBox())) {
             return source;
         }
-        return spotOf(item);
-    }
-
-    /**
-     * The spot a pickup job for this item goes at, where it is: the block it's lying in. Not the one under its
-     * feet: an item lying on farmland (or a slab, a path) is within the top of that block, and a
-     * job there is in a solid block, which nowhere to stand is found round, so it was never
-     * picked up.
-     */
-    static BlockPos spotOf(ItemEntity item) {
-        return BlockPos.containing(item.getX(), item.getY() + 0.5, item.getZ());
+        return JobChecks.spotOf(item);
     }
 
     private static boolean covered(ItemEntity item, List<AABB> jobs) {
@@ -273,11 +266,8 @@ final class PickupQueue {
      */
     private static final class Tracked {
         long due;
-        // How long it waited last after a pickup out of reach (0: none was); where it last was
+        // How long it waited last after being out of reach (0: it never was)
         long wait;
-
-        @Nullable
-        BlockPos lastSpot;
 
         @Nullable
         UUID suggestedWorker;

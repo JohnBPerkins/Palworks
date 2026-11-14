@@ -240,4 +240,95 @@ public class PickupGameTests {
 
         helper.succeedWhen(() -> helper.assertValueEqual(carried(pidgey, Items.WHEAT), 5, "wheat carried"));
     }
+
+    /**
+     * How far each item was from the transporter (its middle, on the furthest axis) when it went: the most, by
+     * the end. Items it picks up go from within a block of its body, as a player picks them up.
+     */
+    private static double[] farthestPickupOnEachTick(GameTestHelper helper, PokemonEntity worker, ItemEntity... items) {
+        double[] farthest = {0};
+        Set<ItemEntity> gone = new HashSet<>();
+        helper.onEachTick(() -> {
+            for (ItemEntity item : items) {
+                if (!item.isAlive() && gone.add(item)) {
+                    double dx = item.getX() - worker.getX();
+                    double dz = item.getZ() - worker.getZ();
+                    // Its reach is a box round its body (as a player's), so on each axis
+                    farthest[0] = Math.max(farthest[0], Math.max(Math.abs(dx), Math.abs(dz)));
+                }
+            }
+        });
+        return farthest;
+    }
+
+    /** From the middle of a worker, how far off an item it picks up can be, across: a block past its body. */
+    private static double reachOf(PokemonEntity worker) {
+        return worker.getBbWidth() / 2.0 + 1.0 + 0.25; // + 0.25: half an item's width
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_close", timeoutTicks = 600)
+    public void aTransporterGoesRightUpToEachItemItPicksUp(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        // Two items 3 blocks apart, the second in reach of the first's pickup spot, as a harvest's
+        // can be spread: it goes up to one, then on to the other
+        ItemEntity wheat = Scenes.dropToPickUp(helper, new BlockPos(3, 1, 6), new ItemStack(Items.WHEAT, 4));
+        ItemEntity carrots = Scenes.dropToPickUp(helper, new BlockPos(6, 1, 6), new ItemStack(Items.CARROT, 4));
+        double[] farthest = farthestPickupOnEachTick(helper, pidgey, wheat, carrots);
+
+        helper.succeedWhen(() -> {
+            helper.assertValueEqual(carried(pidgey, Items.WHEAT) + carried(pidgey, Items.CARROT), 8, "items carried");
+            helper.assertTrue(
+                    farthest[0] <= reachOf(pidgey),
+                    "picked up from " + farthest[0] + " blocks away, more than " + reachOf(pidgey));
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_out_of_reach", timeoutTicks = 600)
+    public void anItemOutOfReachDoesntHoldUpTheOnesBesideIt(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Normal/Flying, so it transports, but it can't fly (one that can flies up: FlightGameTests)
+        PokemonEntity doduo = Workers.sendOut(helper, "doduo level=20", TRANSPORTER);
+        // Wheat on top of a pillar it can't climb, the nearer of the two, and carrots on the ground
+        // beside it: the carrots are picked up, and the wheat waits
+        for (int y = 1; y <= 3; y++) {
+            helper.setBlock(new BlockPos(3, y, 3), Blocks.STONE);
+        }
+        Scenes.dropToPickUp(helper, new BlockPos(3, 4, 3), new ItemStack(Items.WHEAT, 4));
+        Scenes.dropToPickUp(helper, new BlockPos(5, 1, 3), new ItemStack(Items.CARROT, 4));
+
+        helper.succeedWhen(() -> {
+            helper.assertValueEqual(carried(doduo, Items.CARROT), 4, "carrots carried");
+            helper.assertValueEqual(carried(doduo, Items.WHEAT), 0, "wheat off the pillar");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "deliver_close", timeoutTicks = 600)
+    public void aTransporterDeliversRightUpAgainstTheChest(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos chestPos = new BlockPos(5, 1, 5);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        carrying(pidgey, new ItemStack(Items.WHEAT, 8));
+        // Where it is when the wheat goes in: on the tile in front of the chest (less than a block
+        // from it), not a tile or more further back
+        double[] gapWhenDelivered = {-1};
+        helper.onEachTick(() -> {
+            if (gapWhenDelivered[0] < 0 && inChest(helper, chestPos, Items.WHEAT) > 0) {
+                BlockPos chest = helper.absolutePos(chestPos);
+                double dx = Math.abs(pidgey.getX() - (chest.getX() + 0.5)) - 0.5 - pidgey.getBbWidth() / 2.0;
+                double dz = Math.abs(pidgey.getZ() - (chest.getZ() + 0.5)) - 0.5 - pidgey.getBbWidth() / 2.0;
+                gapWhenDelivered[0] = Math.max(0, Math.max(dx, dz));
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(gapWhenDelivered[0] >= 0, "the wheat was delivered");
+            helper.assertTrue(
+                    gapWhenDelivered[0] < 1.0, "delivered from " + gapWhenDelivered[0] + " blocks from the chest");
+        });
+    }
 }
