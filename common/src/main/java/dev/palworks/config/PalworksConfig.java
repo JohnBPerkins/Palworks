@@ -191,7 +191,8 @@ public record PalworksConfig(
      *     its work is on, working or not (0 for none)
      * @param troughFillFraction how full troughs fill a worker: it eats while below this share of its
      *     max fullness (rounded up). The rest is left for hand-feeding (Mochi, berries), which a full
-     *     Pokémon refuses. 0 and troughs never feed
+     *     Pokémon refuses. A player's new Pokémon starts this full too (see StartingFullness). 0 and
+     *     troughs never feed
      * @param emptyWorkSpeed how fast a worker with no fullness left works and walks, as a share of
      *     its normal speed
      */

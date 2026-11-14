@@ -231,6 +231,27 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
 - **Data-driven where possible.** Things like which blocks count as work are controlled by
   datapack tags — prefer editing tags over hard-coding in Java.
 
+## Wiki
+
+Player documentation lives on the [GitHub wiki](https://github.com/JohnBPerkins/Palworks/wiki),
+built from this repo; the README only gives an overview and links there. When a change alters what
+players see or can set up, update the page for it in the same PR.
+
+- **`wiki/`** holds every hand-written page, one Markdown file per page (`Jobs.md` is the `Jobs`
+  page; `_Sidebar.md` and `_Footer.md` are the sidebar and footer). Link pages by name:
+  `[Jobs](Jobs#chop-trees)`.
+- **Generated pages:** a page per work skill (`Lumbering-Workers`...) and `Work-Skills-by-Pokemon`
+  list every Pokémon in Cobblemon (`wiki_cobblemon_version` in `gradle.properties`) with its levels,
+  worked out from the suitability files as in game. Don't write them by hand: change the files.
+- **Generated tables** in hand-written pages: `<!-- generated:type-table -->` (types and the work
+  skills they give) and `<!-- generated:skill-table -->` (each work skill, its types and its page).
+- **`./gradlew :common:generateWiki`** builds the whole wiki into `build/wiki/` to look at. It fails
+  on a link to a page or heading that isn't there, or an unknown marker. The generator is
+  `common/src/test/java/dev/palworks/wiki/`.
+- **CI** (`.github/workflows/wiki.yml`) builds it on PRs that touch it (download the `wiki` artifact
+  to look at it) and, on `main`, replaces the GitHub wiki with it. Edits made in GitHub's wiki
+  editor are overwritten.
+
 ## Pull-request process
 
 1. **Open an issue first** for anything non-trivial so the approach can be discussed before you

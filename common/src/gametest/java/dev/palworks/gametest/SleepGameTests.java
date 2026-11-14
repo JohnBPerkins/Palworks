@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.entity.pokemon.ai.sensors.DrowsySensor;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.block.ModBlocks;
+import dev.palworks.block.TroughBlockEntity;
 import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
@@ -18,11 +19,14 @@ import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import dev.palworks.worker.WorkerStatus;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -785,6 +789,52 @@ public class SleepGameTests {
                 .thenSucceed();
     }
 
+    @AfterBatch(batch = "sleep_still")
+    public void afterStill(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_still", timeoutTicks = 600)
+    @SuppressWarnings("removal") // makeMockServerPlayerInLevel: vanilla's only mock player in 1.21.1
+    public void aSleeperDoesntTurnToWatchAPlayerGoBy(GameTestHelper helper) {
+        // Asleep where it is (no bed); a player walks round and round it, close by. Awake, it turns to
+        // watch them (Cobblemon's look target); asleep, it lies as it lay down
+        Workers.isolate(helper);
+        BlockPos spot = new BlockPos(7, 1, 7);
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, spot);
+        setTime(helper, MIDNIGHT);
+        ServerPlayer passerBy = helper.makeMockServerPlayerInLevel();
+        Vec3 middle = helper.absoluteVec(Vec3.atBottomCenterOf(spot));
+        int[] tick = {0};
+        float[] lying = {Float.NaN, Float.NaN};
+        float[] turned = {0, 0}; // the most its body, and its head, have turned from that
+        helper.onEachTick(() -> {
+            double angle = tick[0] * 0.1;
+            tick[0]++;
+            passerBy.moveTo(middle.x + 3 * Math.cos(angle), middle.y, middle.z + 3 * Math.sin(angle));
+            if (Float.isNaN(lying[0])) {
+                return; // not lying there yet
+            }
+            turned[0] = Math.max(turned[0], Math.abs(Mth.wrapDegrees(squirtle.yBodyRot - lying[0])));
+            turned[1] = Math.max(turned[1], Math.abs(Mth.wrapDegrees(squirtle.getYHeadRot() - lying[1])));
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(stateOf(squirtle).isAsleep(), "asleep"))
+                // From its first tick lying there (the tick it drops off, it's still as it was awake)
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    lying[0] = squirtle.yBodyRot;
+                    lying[1] = squirtle.getYHeadRot();
+                })
+                .thenIdle(300)
+                .thenExecute(() -> {
+                    helper.assertTrue(stateOf(squirtle).isAsleep(), "still asleep");
+                    helper.assertTrue(turned[0] < 1, "its body didn't turn: it turned " + turned[0]);
+                    helper.assertTrue(turned[1] < 1, "nor its head: it turned " + turned[1]);
+                })
+                .thenSucceed();
+    }
+
     // ---- Alongside Cobblemon's own sleep ----
 
     @AfterBatch(batch = "sleep_nap")
@@ -846,6 +896,112 @@ public class SleepGameTests {
                 .thenWaitUntil(() -> helper.assertTrue(stateOf(charmander).isAsleep(), "off to sleep"))
                 .thenExecute(() -> helper.assertTrue(
                         stateOf(charmander).getCurrentReservation() == null, "the furnace left till morning"))
+                .thenSucceed();
+    }
+
+    // ---- Naps: a Tired worker sleeps it off in a bed in the day ----
+
+    /** A pastured Squirtle, Tired, in the morning, with a free bed at {@link #BED}. */
+    private static PokemonEntity tiredInTheMorning(GameTestHelper helper) {
+        Workers.isolate(helper);
+        setTime(helper, MORNING);
+        helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
+        stateOf(squirtle).setTired(true);
+        return squirtle;
+    }
+
+    /** Whether it's up and out of its bed: no SLEEP job, not asleep. */
+    private static boolean upAndOut(PokemonEntity worker) {
+        ReservationId job = stateOf(worker).getCurrentReservation();
+        return !stateOf(worker).isAsleep() && (job == null || job.getJobType() != JobType.SLEEP);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_nap_rested", timeoutTicks = 2000)
+    public void aTiredWorkerNapsInABedInTheDayAndWakesRested(GameTestHelper helper) {
+        PokemonEntity squirtle = tiredInTheMorning(helper);
+        long[] asleepAt = {0};
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "it takes the bed for a nap"))
+                .thenExecute(() -> {
+                    asleepAt[0] = helper.getTick();
+                    helper.assertTrue(stateOf(squirtle).isTired(), "still Tired while it naps");
+                })
+                .thenWaitUntil(() -> helper.assertTrue(upAndOut(squirtle), "up once it's slept it off"))
+                .thenExecute(() -> {
+                    long slept = helper.getTick() - asleepAt[0];
+                    helper.assertTrue(slept >= Sleep.NAP_TICKS, "it napped " + slept + " ticks, a whole nap");
+                    helper.assertFalse(stateOf(squirtle).isTired(), "rested");
+                })
+                // Rested, it doesn't go back for another
+                .thenIdle(100)
+                .thenExecute(() -> helper.assertTrue(upAndOut(squirtle), "and stays up"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_nap_woken", timeoutTicks = 1200)
+    public void aWorkerWokenFromItsNapIsStillTired(GameTestHelper helper) {
+        PokemonEntity squirtle = tiredInTheMorning(helper);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "napping"))
+                .thenIdle(20)
+                .thenExecute(
+                        () -> squirtle.hurt(helper.getLevel().damageSources().magic(), 1))
+                .thenWaitUntil(() -> assertWokenAndUp(helper, squirtle))
+                .thenExecute(
+                        () -> helper.assertTrue(stateOf(squirtle).isTired(), "still Tired: it hadn't slept it off"))
+                .thenIdle(100)
+                .thenExecute(() -> assertWokenAndUp(helper, squirtle))
+                // 15 seconds on, still Tired: it goes back for a nap
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "back in the bed for another"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_nap_eats_first", timeoutTicks = 1200)
+    public void aHungryTiredWorkerEatsBeforeItNaps(GameTestHelper helper) {
+        PokemonEntity squirtle = tiredInTheMorning(helper);
+        BlockPos troughPos = new BlockPos(5, 1, 9);
+        helper.setBlock(troughPos, ModBlocks.trough("oak").get());
+        ((TroughBlockEntity) helper.getBlockEntity(troughPos))
+                .addFood(new ItemStack(
+                        BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("cobblemon", "oran_berry")),
+                        9));
+        squirtle.getPokemon().setCurrentFullness(0);
+        JobType[] firstJob = {null};
+        helper.onEachTick(() -> {
+            ReservationId job = stateOf(squirtle).getCurrentReservation();
+            if (firstJob[0] == null && job != null) {
+                firstJob[0] = job.getJobType();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(inBed(squirtle), "it naps in the end");
+            helper.assertTrue(firstJob[0] == JobType.EAT_FOOD, "but it ate first, not " + firstJob[0]);
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_nap_no_food", timeoutTicks = 1200)
+    public void aHungryTiredWorkerWithNoFoodToBeHadStillNaps(GameTestHelper helper) {
+        // Eating comes first only when there's food: with none, it doesn't wait for some to nap
+        PokemonEntity squirtle = tiredInTheMorning(helper);
+        squirtle.getPokemon().setCurrentFullness(0);
+        helper.succeedWhen(() -> helper.assertTrue(inBed(squirtle), "it naps, hungry"));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_nap_strike", timeoutTicks = 2400)
+    public void aFedWorkerOnStrikeNapsThenCheersUp(GameTestHelper helper) {
+        // Fed but Tired, its mood would only go down until it next went to bed at night
+        PokemonEntity squirtle = tiredInTheMorning(helper);
+        WorkerState state = stateOf(squirtle);
+        state.setMood(0);
+        state.setStriking(true);
+        double[] rested = {0};
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "on strike, it still naps"))
+                .thenWaitUntil(() -> helper.assertTrue(upAndOut(squirtle) && !state.isTired(), "up and rested"))
+                .thenExecute(() -> rested[0] = state.getMood())
+                .thenWaitUntil(() -> helper.assertTrue(
+                        state.getMood() > rested[0], "fed, rested and idle, it cheers up: " + state.getMood()))
                 .thenSucceed();
     }
 }
