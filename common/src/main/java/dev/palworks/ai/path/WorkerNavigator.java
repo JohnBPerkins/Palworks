@@ -146,7 +146,8 @@ public final class WorkerNavigator {
 
     /**
      * Whether the mob goes to {@code goal} by air (see {@link WorkerFlight}): it's on its way there
-     * already, or it can fly there and it's far, or there's no walking there (planned and found none).
+     * already, or it can fly there and it's far or high up, or there's no walking there (planned and
+     * found none).
      */
     private static boolean fliesTo(Mob mob, BlockPos goal) {
         if (WorkerFlight.isFlyingTo(mob, goal)) {
@@ -154,7 +155,7 @@ public final class WorkerNavigator {
         }
         Walk walk = WALKS.get(mob);
         boolean cantWalk = walk != null && walk.goal.equals(goal) && walk.path == null;
-        boolean flies = WorkerFlight.canFlyTo(mob, goal) && (cantWalk || WorkerFlight.isFar(mob, goal));
+        boolean flies = WorkerFlight.canFlyTo(mob, goal) && (cantWalk || WorkerFlight.isWorthFlying(mob, goal));
         if (!flies && WorkerFlight.isFlying(mob)) {
             // Its goal's changed to one it walks to (the next item, right by it): it comes down
             WorkerFlight.land(mob);
