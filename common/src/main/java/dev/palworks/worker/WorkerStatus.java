@@ -50,6 +50,11 @@ public enum WorkerStatus {
         this.sprite = sprite;
     }
 
+    /** Whether it's one that slows a worker (see WorkSpeed): its icon pulses while it pauses for it. */
+    public boolean slows() {
+        return this == HUNGRY || this == TIRED;
+    }
+
     /** What the icon is drawn over (the hunger bar's empty outline), or null for nothing. */
     @Nullable
     public ResourceLocation background() {

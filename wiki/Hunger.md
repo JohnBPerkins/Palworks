@@ -14,8 +14,15 @@ stat of its own.
 - **Which troughs:** any within 32 blocks of it, or, for a pastured worker, of its pasture block.
   So a pastured worker that has wandered off for work still goes back to the troughs
   by its pasture.
-- **With no fullness left** it works and walks at a quarter speed, with a half hunger shank over
-  its head, until it eats. It never stops working.
+- **With no fullness left** it works and walks at three quarters of its speed, with a half hunger
+  shank over its head, until it eats. It never stops working.
+- **A slowed worker** (out of food, Tired, or both: a quarter off for each, so half speed with
+  both) is slow at everything. It walks slower, its legs too, whether Palworks or Cobblemon is
+  moving it, on its way to eat or sleep as well. Its moves play at their usual speed, landing just
+  as the work happens; the time it loses goes into one pause before a move, every few jobs at
+  three quarters speed, before every move and longer the slower it is. In the pause the icons over
+  its head pulse, and it shows what's slowing it: out of food it cries once, as if calling for
+  food; Tired, Sleep's Z's rise from it the whole time.
 - **A new Pokémon starts half full**, not empty as in Cobblemon, so it can go straight to work:
   the first time you get it (caught, a starter, hatched, traded, given by a command). Moving it
   between party and PC, or evolving it, doesn't top it up again.

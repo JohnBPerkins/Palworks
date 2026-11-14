@@ -17,8 +17,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>Work wears it down ({@link #didWork}, by the same units hunger counts), and so does being
  *       Hungry or Tired ({@link #tick}). With neither, and while it isn't at work (idle, eating or
  *       asleep), it comes back up, slowly.</li>
- *   <li>Unhappy (below half) it works and walks slower ({@link #workSpeed}), along with any
- *       slowdown for hunger or sleep.</li>
+ *   <li>Unhappy (below half) it's on its way to a strike ({@link #isUnhappy}): a warning, it
+ *       works no slower for it.</li>
  *   <li>At 0 it goes on strike ({@link #isStriking}): it finishes what it's doing, then does no work
  *       (it still eats and sleeps) until its mood is back up a way.</li>
  * </ul>
@@ -50,7 +50,7 @@ public final class Mood {
                 && WorkerEligibility.works(pokemon, state);
     }
 
-    /** Whether it's unhappy: its mood is low enough that it works slower. */
+    /** Whether it's unhappy: its mood is low, on its way to a strike (it works no slower for it). */
     public static boolean isUnhappy(Pokemon pokemon, @Nullable WorkerState state) {
         return state != null && appliesTo(pokemon, state) && MoodMath.unhappy(state.getMood(), config().unhappyBelow());
     }
@@ -58,11 +58,6 @@ public final class Mood {
     /** Whether it's on strike: its mood reached 0, and it does no work until it's back up a way. */
     public static boolean isStriking(Pokemon pokemon, @Nullable WorkerState state) {
         return state != null && state.isStriking() && appliesTo(pokemon, state);
-    }
-
-    /** How fast this worker works and walks, as a share of its usual speed: slower when it's unhappy. */
-    public static double workSpeed(Pokemon pokemon, @Nullable WorkerState state) {
-        return isUnhappy(pokemon, state) ? config().unhappyWorkSpeed() : 1.0;
     }
 
     /** The worker has done {@code units} of work (see Hunger.didWork): it wears its mood down. */

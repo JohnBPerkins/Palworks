@@ -42,9 +42,13 @@ public class WorkerState {
     // Fullness used up but not yet taken off (see dev.palworks.hunger.Hunger), in points: whole
     // points come off as they build up. Saved, so work done just before a reload still counts.
     private double fullnessOwed;
-    // Game time until which an empty worker rests after a job before taking another (not saved: a
-    // reload just ends its rest), so it gets through work at its slower speed
-    private long restUntil;
+
+    // A slowed worker's pauses (see dev.palworks.animation.SlowedPause), not saved: the time its
+    // moves have saved it, which it owes in pauses (below 0 when it's paused ahead), how long its
+    // pause before its current step's move is (0 if it hasn't paused for it), and how much is left
+    private int slowedTicksOwed;
+    private int pauseTicks;
+    private int pauseTicksLeft;
 
     // Sleep (see dev.palworks.sleep.Sleep). Saved, so a reload in the night doesn't wake it, or lose
     // how it slept. Whether it's asleep (in a bed or not), and how long it has slept in each this time
@@ -230,6 +234,33 @@ public class WorkerState {
         return jobStep > 0;
     }
 
+    /** Time its moves saved a slowed worker, which it owes in pauses (see SlowedPause). */
+    public int getSlowedTicksOwed() {
+        return slowedTicksOwed;
+    }
+
+    public void setSlowedTicksOwed(int slowedTicksOwed) {
+        this.slowedTicksOwed = slowedTicksOwed;
+    }
+
+    /** How long a slowed worker's pause before its step's move is, 0 if it hasn't paused for it. */
+    public int getPauseTicks() {
+        return pauseTicks;
+    }
+
+    public void setPauseTicks(int pauseTicks) {
+        this.pauseTicks = pauseTicks;
+    }
+
+    /** How much of a slowed worker's pause is left, 0 if it isn't in one (see SlowedPause). */
+    public int getPauseTicksLeft() {
+        return pauseTicksLeft;
+    }
+
+    public void setPauseTicksLeft(int pauseTicksLeft) {
+        this.pauseTicksLeft = Math.max(0, pauseTicksLeft);
+    }
+
     /** Fullness used up but not yet taken off its Pokémon, in points (see Hunger). */
     public double getFullnessOwed() {
         return fullnessOwed;
@@ -237,15 +268,6 @@ public class WorkerState {
 
     public void setFullnessOwed(double fullnessOwed) {
         this.fullnessOwed = Math.max(0, fullnessOwed);
-    }
-
-    /** Game time an empty worker rests until before taking another job (0 for none). */
-    public long getRestUntil() {
-        return restUntil;
-    }
-
-    public void setRestUntil(long restUntil) {
-        this.restUntil = restUntil;
     }
 
     /** Whether it's asleep (in a bed, or wherever it is). */

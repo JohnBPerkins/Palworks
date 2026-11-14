@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.palworks.config.PalworksClientConfig;
 import dev.palworks.worker.WorkerStatus;
+import dev.palworks.worker.WorkerStatusSync;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,8 @@ public final class StatusIconRenderer {
     private static final float GAP_PX = 1F;
     // How far over the top of its hitbox the icons sit, in blocks
     private static final double ABOVE = 0.35;
+    // How much bigger a pausing worker's icons grow at most
+    private static final float PULSE = 0.35F;
 
     private static final MultiBufferSource.BufferSource BUFFERS =
             MultiBufferSource.immediate(new ByteBufferBuilder(1 << 10));
@@ -63,7 +66,8 @@ public final class StatusIconRenderer {
             pose.translate(feet.x - cam.x, feet.y - cam.y + entity.getBbHeight() + ABOVE, feet.z - cam.z);
             pose.mulPose(camera.rotation());
             pose.scale(SCALE, -SCALE, SCALE); // GUI pixels, y down
-            drawIcons(minecraft, pose.last().pose(), statuses);
+            boolean pausing = entity.getAspects().contains(WorkerStatusSync.PAUSING);
+            drawIcons(minecraft, pose.last().pose(), statuses, pausing ? pulse(level, partialTick) : 1F);
             pose.popPose();
             drew = true;
         }
@@ -83,26 +87,40 @@ public final class StatusIconRenderer {
         return statuses;
     }
 
-    /** Side by side, centred over its head. */
-    private static void drawIcons(Minecraft minecraft, Matrix4f matrix, List<WorkerStatus> statuses) {
+    /**
+     * How big a pausing worker's icons are drawn now (see WorkerStatusSync#PAUSING): growing and
+     * shrinking back, twice a second.
+     */
+    static float pulse(ClientLevel level, float partialTick) {
+        double seconds = (level.getGameTime() + partialTick) / 20.0;
+        return 1F + PULSE * (float) Math.abs(Math.sin(seconds * Math.PI * 2));
+    }
+
+    /**
+     * Side by side, centred over its head. The ones slowing it (hungry, Tired) at {@code pulse}
+     * times their size, from their bottom middle.
+     */
+    private static void drawIcons(Minecraft minecraft, Matrix4f matrix, List<WorkerStatus> statuses, float pulse) {
         float width = statuses.size() * ICON_PX + (statuses.size() - 1) * GAP_PX;
         float x = -width / 2F;
         for (WorkerStatus status : statuses) {
+            float size = status.slows() ? ICON_PX * pulse : ICON_PX;
+            float left = x + (ICON_PX - size) / 2F;
             // The outline, then the icon over it
             ResourceLocation background = status.background();
             if (background != null) {
-                drawSprite(minecraft, matrix, background, x);
+                drawSprite(minecraft, matrix, background, left, size);
             }
-            drawSprite(minecraft, matrix, status.sprite(), x);
+            drawSprite(minecraft, matrix, status.sprite(), left, size);
             x += ICON_PX + GAP_PX;
         }
     }
 
-    private static void drawSprite(Minecraft minecraft, Matrix4f matrix, ResourceLocation id, float x) {
+    private static void drawSprite(Minecraft minecraft, Matrix4f matrix, ResourceLocation id, float x, float size) {
         TextureAtlasSprite sprite = minecraft.getGuiSprites().getSprite(id);
         VertexConsumer quad = BUFFERS.getBuffer(RenderType.text(sprite.atlasLocation()));
-        float x1 = x + ICON_PX;
-        float y0 = -ICON_PX;
+        float x1 = x + size;
+        float y0 = -size;
         float y1 = 0F;
         int light = LightTexture.FULL_BRIGHT;
         quad.addVertex(matrix, x, y0, 0)
