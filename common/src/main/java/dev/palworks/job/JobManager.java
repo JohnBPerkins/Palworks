@@ -405,11 +405,10 @@ public class JobManager {
             DebugManager.broadcastActivity(serverLevel, "  §7→ Drops to §eCOLLECT_DROPS§7");
         }
 
-        // A pickup that left items behind (further off than it reaches, or they didn't fit): they get
-        // a job of their own again, offered first to this worker, which goes on to the next if it
-        // has room
+        // A pickup that left items behind (they didn't fit): they get a job of their own again, for
+        // any transporter with room for them
         if (completedReservation.getJobType() == JobType.COLLECT_DROPS) {
-            pickups.add(jobPos, workerUUID, level.getGameTime());
+            pickups.add(jobPos, null, level.getGameTime());
         }
 
         // IMPORTANT: Remove completed job entirely (don't put back in available pool!)
