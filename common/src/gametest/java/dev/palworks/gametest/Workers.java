@@ -104,7 +104,7 @@ public final class Workers {
         BlockPos abs = helper.absolutePos(rel);
         Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
         // Fed, so it works at its usual speed: an empty worker is slowed down until it eats (see
-        // Hunger), and a new Pokémon starts empty. Hunger's own tests empty it again.
+        // Hunger), and a new Pokémon starts only half full. Hunger's own tests empty it again.
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
         Cobblemon.INSTANCE.getStorage().getParty(owner).add(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
