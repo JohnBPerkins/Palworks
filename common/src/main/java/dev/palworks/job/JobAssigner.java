@@ -800,10 +800,10 @@ final class JobAssigner {
             return new WorkerPathfinder.Result(Reach.UNKNOWN, null);
         }
         if (WorkerPathfinder.handles(entity)) {
-            // A far trip it can fly is flown (see WorkerFlight): nothing to plan, the sky's clear. So
-            // is a near one there's no walking.
+            // A far or high-up trip it can fly is flown (see WorkerFlight): nothing to plan, the sky's
+            // clear. So is a near one there's no walking.
             boolean canFly = WorkerFlight.canFlyTo(entity, standPos);
-            if (canFly && WorkerFlight.isFar(entity, standPos)) {
+            if (canFly && WorkerFlight.isWorthFlying(entity, standPos)) {
                 return new WorkerPathfinder.Result(Reach.YES, null);
             }
             WorkerPathfinder.Result walk = WorkerPathfinder.find(entity, standPos, farTrip);

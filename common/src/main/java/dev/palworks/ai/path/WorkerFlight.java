@@ -11,8 +11,8 @@ import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * Flies workers that can fly (Cobblemon's {@link OmniPathingEntity#canFly}) to their jobs: a trip
- * further than {@link #FLY_DISTANCE}, or one there's no walking to (up onto a pillar, a tree's
- * leaves), with open sky over both ends. It takes off straight up to a height clear of everything
+ * further than {@link #FLY_DISTANCE}, one {@link #FLY_UP} or more higher up (onto a pillar, a
+ * tree's leaves), or one there's no walking to, with open sky over both ends. It takes off straight up to a height clear of everything
  * on the way, flies straight across, comes down onto its tile and lands. No path to plan: the sky
  * above the tallest block on the way is clear by definition, which also makes a flight cheaper
  * than a walk. Under a roof, or with a ceiling on the way up, it walks.
@@ -28,6 +28,8 @@ public final class WorkerFlight {
 
     /** Trips further than this (across, in blocks) are flown, not walked. */
     static final double FLY_DISTANCE = 8.0;
+    /** Jobs this much higher up than its feet (in blocks) or more are flown to, however near. */
+    private static final int FLY_UP = 2;
     /** How far above the tallest block on the way it flies. */
     private static final int CLEARANCE = 3;
     /** How near above its tile it is when it lands. */
@@ -68,11 +70,24 @@ public final class WorkerFlight {
         return mob instanceof OmniPathingEntity pather && pather.canFly() && !mob.isPassenger();
     }
 
-    /** Whether it's far enough to {@code goal} (a tile to stand on) to fly there. */
-    public static boolean isFar(Mob mob, BlockPos goal) {
+    /**
+     * Whether {@code goal} (a tile to stand on) is a trip to fly rather than walk: far across, or
+     * higher up than a step. No looking for a walk up there first: what goes up two blocks or more
+     * so near is mostly no walk at all (a tree's top, a pillar), and finding that out searches its
+     * whole budget.
+     */
+    public static boolean isWorthFlying(Mob mob, BlockPos goal) {
         double dx = goal.getX() + 0.5 - mob.getX();
         double dz = goal.getZ() + 0.5 - mob.getZ();
-        return dx * dx + dz * dz > FLY_DISTANCE * FLY_DISTANCE;
+        return dx * dx + dz * dz > FLY_DISTANCE * FLY_DISTANCE || goal.getY() - feet(mob) >= FLY_UP;
+    }
+
+    /**
+     * Where its feet are, rounded up: on farmland (or a slab) they're inside the top of the block it
+     * stands on, which is the heightmap's block, not under it.
+     */
+    private static int feet(Mob mob) {
+        return (int) Math.ceil(mob.getY() - 1.0e-3);
     }
 
     /**
@@ -84,10 +99,7 @@ public final class WorkerFlight {
             return false;
         }
         Level level = mob.level();
-        // Where its feet are, rounded up: on farmland (or a slab) they're inside the top of the block
-        // it stands on, which is the heightmap's block, not under it
-        int feet = (int) Math.ceil(mob.getY() - 1.0e-3);
-        return skyAbove(level, mob.getBlockX(), feet, mob.getBlockZ())
+        return skyAbove(level, mob.getBlockX(), feet(mob), mob.getBlockZ())
                 && skyAbove(level, goal.getX(), goal.getY(), goal.getZ());
     }
 
