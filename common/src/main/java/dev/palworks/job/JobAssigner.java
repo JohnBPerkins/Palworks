@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.ai.WorkPositions;
+import dev.palworks.ai.path.WorkerFlight;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.ai.path.WorkerPathfinder;
 import dev.palworks.ai.path.WorkerPathfinder.Reach;
@@ -807,7 +808,14 @@ final class JobAssigner {
             return new WorkerPathfinder.Result(Reach.UNKNOWN, null);
         }
         if (WorkerPathfinder.handles(entity)) {
-            return WorkerPathfinder.find(entity, standPos, farTrip);
+            // A far trip it can fly is flown (see WorkerFlight): nothing to plan, the sky's clear. So
+            // is a near one there's no walking.
+            boolean canFly = WorkerFlight.canFlyTo(entity, standPos);
+            if (canFly && WorkerFlight.isFar(entity, standPos)) {
+                return new WorkerPathfinder.Result(Reach.YES, null);
+            }
+            WorkerPathfinder.Result walk = WorkerPathfinder.find(entity, standPos, farTrip);
+            return walk.reach() == Reach.NO && canFly ? new WorkerPathfinder.Result(Reach.YES, null) : walk;
         }
         net.minecraft.world.level.pathfinder.Path path = entity.getNavigation().createPath(standPos, 1);
         if (path == null) {
