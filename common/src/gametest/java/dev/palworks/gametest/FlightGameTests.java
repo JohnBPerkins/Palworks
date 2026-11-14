@@ -10,6 +10,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Workers that can fly fly to their jobs (see WorkerFlight): a far one, or one there's no walking
@@ -69,6 +71,28 @@ public class FlightGameTests {
             helper.setBlock(new BlockPos(4, y, 4), Blocks.STONE);
         }
         Scenes.dropToPickUp(helper, new BlockPos(4, 4, 4), new ItemStack(Items.WHEAT, 4));
+
+        helper.succeedWhen(() -> helper.assertValueEqual(carried(pidgey, Items.WHEAT), 4, WHEAT_CARRIED));
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "flight_treetop", timeoutTicks = 600)
+    public void aWorkerThatFliesFliesUpOntoATreetop(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // A tree's top is higher than Cobblemon flies it over the grass with room to spare: it goes
+        // across as high as it gets, still over the leaves, and comes down onto them
+        BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        for (int y = 1; y <= 6; y++) {
+            int spread = y >= 4 ? (y == 6 ? 1 : 2) : 0;
+            for (int x = -spread; x <= spread; x++) {
+                for (int z = -spread; z <= spread; z++) {
+                    boolean trunk = x == 0 && z == 0 && y <= 5;
+                    helper.setBlock(new BlockPos(8 + x, y, 8 + z), trunk ? Blocks.OAK_LOG.defaultBlockState() : leaves);
+                }
+            }
+        }
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, new BlockPos(3, 1, 8));
+        Scenes.dropToPickUp(helper, new BlockPos(8, 7, 8), new ItemStack(Items.WHEAT, 4));
 
         helper.succeedWhen(() -> helper.assertValueEqual(carried(pidgey, Items.WHEAT), 4, WHEAT_CARRIED));
     }
