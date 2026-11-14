@@ -39,7 +39,7 @@ public class CobblemonCropGameTests {
     private static final BlockPos CROP = new BlockPos(3, 1, 3);
 
     /**
-     * Red mint, by id: Cobblemon 1.7.0 has no @JvmField on CobblemonBlocks.RED_MINT (only a Kotlin
+     * Red mint, by id: Cobblemon 1.8.0 has no @JvmField on CobblemonBlocks.RED_MINT (only a Kotlin
      * getter) and 1.8.4 does (no getter), so neither spelling compiles against both. Looked up when
      * a test runs, not when the class loads, which can be before Cobblemon registers its blocks.
      */

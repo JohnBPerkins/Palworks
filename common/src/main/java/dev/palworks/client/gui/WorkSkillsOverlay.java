@@ -45,7 +45,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>Drawn over the screen once it's drawn (Architectury's screen render event, on both loaders),
  * lifted to {@link #OVERLAY_Z}. The layouts are copied from PCGUI and Summary, the same in
- * Cobblemon 1.7 and 1.8.
+ * Cobblemon 1.8.x.
  */
 public final class WorkSkillsOverlay {
     /**
@@ -67,7 +67,7 @@ public final class WorkSkillsOverlay {
     private static final int SUMMARY_HEIGHT = 161;
     private static final float SUMMARY_PORTRAIT_X = 6;
     private static final float SUMMARY_PORTRAIT_Y = 32;
-    // Both screens' portraits are this square (PCGUI and Summary's PORTRAIT_SIZE, in 1.7 and 1.8)
+    // Both screens' portraits are this square (PCGUI and Summary's PORTRAIT_SIZE, in 1.8.x)
     private static final float PORTRAIT_SIZE = 66;
     private static final int SUMMARY_INFO_PAGE = 0;
     private static final float BOX_X = 77 + 5; // the Info page is at 77, 12; the box at 5, 123 in it
