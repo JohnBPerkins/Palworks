@@ -143,6 +143,14 @@ public record Step(
         return new Step(name, length, animation, onFinish, isNeeded, ctx -> true);
     }
 
+    /**
+     * This step, with its own idea of whether its job is still there, for a job whose target
+     * isn't a block (a planter seeds are being brought to: still where the job was set?).
+     */
+    Step thereWhile(java.util.function.Predicate<JobContext> there) {
+        return new Step(name, length, animation, onFinish, isNeeded, there);
+    }
+
     /** A step's effect. Return false to end the job here (e.g. there turned out to be nothing to do). */
     @FunctionalInterface
     public interface Finish {

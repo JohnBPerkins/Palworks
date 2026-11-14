@@ -4,10 +4,7 @@ import dev.palworks.Palworks;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.job.JobManager;
 import dev.palworks.station.ChestHelper;
-import dev.palworks.suitability.Suitability;
-import dev.palworks.suitability.SuitabilityDetector;
 import java.util.List;
-import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -39,12 +36,10 @@ final class GetSeedsHandler implements JobHandler {
             return;
         }
 
-        // What it's out of (farmland seeds for Planting, nether wart for Nether: see
-        // JobManager.seedToFetch), and only what the open spots round it can take
-        Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
+        // What it's out of, if it plants too, or what the planter it's bringing seeds to is out
+        // of; only what the open spots there can take (see JobManager.seedToFetch)
         Item seed = ctx.level() instanceof ServerLevel serverLevel
-                ? JobManager.getInstance(serverLevel)
-                        .seedToFetch(targetPos, ctx.entity().blockPosition(), suitabilities, inventory)
+                ? JobManager.getInstance(serverLevel).seedToFetch(ctx.pokemon().getUuid(), targetPos, inventory)
                 : null;
         ItemStack extracted =
                 seed == null ? ItemStack.EMPTY : ChestHelper.extractItems(ctx.level(), targetPos, seed, 64);

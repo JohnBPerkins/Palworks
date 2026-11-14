@@ -14,7 +14,6 @@ import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
-import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
@@ -24,7 +23,6 @@ import dev.palworks.worker.WorkerStatusSync;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
@@ -63,6 +61,7 @@ public class JobManager {
     private final JobScanner scanner;
     private final JobAssigner assigner;
     private final PickupQueue pickups;
+    private final SeedRequests seedRequests;
     private final NonWorkerBeds nonWorkerBeds = new NonWorkerBeds(pool);
 
     /**
@@ -71,8 +70,9 @@ public class JobManager {
     private JobManager(ServerLevel level) {
         this.level = level;
         this.scanner = new JobScanner(pool);
-        this.assigner = new JobAssigner(level, pool, scanner, workers, nonWorkerBeds);
-        this.pickups = new PickupQueue(pool, workers, assigner);
+        this.seedRequests = new SeedRequests(pool, workers);
+        this.assigner = new JobAssigner(level, pool, scanner, workers, nonWorkerBeds, seedRequests);
+        this.pickups = new PickupQueue(pool, workers, assigner, seedRequests);
         assigner.onUnreachablePickup(pos -> pickups.outOfReach(pos, level.getGameTime()));
     }
 
@@ -516,6 +516,7 @@ public class JobManager {
 
         if (currentTime % FOLLOW_UP_RECHECK_INTERVAL == 0) {
             pool.dropGoneFollowUps(level);
+            seedRequests.cleanUp(level, pickups);
             Watering.forgetExpired(level);
         }
         scanner.dropUnloaded(level);
@@ -573,13 +574,71 @@ public class JobManager {
     }
 
     /**
-     * The seed (or nether wart) a worker at {@code workerPos} with these skills, carrying {@code
-     * inventory}, should take from the chest at {@code chestPos}, or null if none (see JobAssigner).
+     * The seed (or nether wart) this transporter, carrying {@code inventory}, should take from the
+     * chest at {@code chestPos}: to plant itself, or for the planter it's bringing seeds to. Null
+     * if none (see JobAssigner).
      */
     @Nullable
-    public Item seedToFetch(
-            BlockPos chestPos, @Nullable BlockPos workerPos, Set<Suitability> skills, WorkerInventory inventory) {
-        return assigner.seedToFetch(chestPos, workerPos, skills, inventory);
+    public Item seedToFetch(UUID transporter, BlockPos chestPos, WorkerInventory inventory) {
+        return assigner.seedToFetchAs(transporter, chestPos, inventory);
+    }
+
+    // ============================================
+    // Seeds for planters (see SeedRequests)
+    // ============================================
+
+    /** The planter this transporter is bringing seeds to, if it's out in the world. */
+    @Nullable
+    public PokemonEntity seedsRecipient(UUID transporter) {
+        SeedRequests.Request request = seedRequests.takenOnBy(transporter);
+        return request == null ? null : workers.entity(request.planter);
+    }
+
+    /** Whether this transporter carries seeds for the planter it's bringing them to. */
+    public boolean hasSeedsToBring(Pokemon transporter) {
+        SeedRequests.Request request = seedRequests.takenOnBy(transporter.getUuid());
+        WorkerInfo planter = request == null ? null : workers.get(request.planter);
+        return planter != null && assigner.seedSlotFor(planter, WorkerInventoryManager.getOrCreate(transporter)) >= 0;
+    }
+
+    /**
+     * A transporter has brought seeds to the planter that asked for them: it drops them at the
+     * planter's feet, and the planter gets a job to pick them up (see SeedRequests). Only that
+     * planter takes them; nobody else's pickups do.
+     */
+    public void handOverSeeds(Pokemon transporter) {
+        SeedRequests.Request request = seedRequests.takenOnBy(transporter.getUuid());
+        WorkerInfo planter = request == null ? null : workers.get(request.planter);
+        PokemonEntity planterEntity = request == null ? null : workers.entity(request.planter);
+        if (planter == null || planterEntity == null) {
+            return;
+        }
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(transporter);
+        int slot = assigner.seedSlotFor(planter, inventory);
+        if (slot < 0) {
+            return;
+        }
+        net.minecraft.world.item.ItemStack seeds = inventory.getItem(slot);
+        inventory.setItem(slot, net.minecraft.world.item.ItemStack.EMPTY);
+        inventory.setChanged();
+        ItemEntity item =
+                new ItemEntity(level, planterEntity.getX(), planterEntity.getY(), planterEntity.getZ(), seeds, 0, 0, 0);
+        level.addFreshEntity(item);
+        // Marked once it's in: an item that comes into the world already marked (as one loaded with
+        // its chunk does) was left for a planter that's long forgotten (see TrackedDrops)
+        dev.palworks.drops.TrackedDrops.handOverTo(item, planter.pokemonUUID);
+        seedRequests.handOver(assigner, planter, item.blockPosition(), level.getGameTime());
+        Palworks.LOGGER.debug(
+                "{} left {} for {} at {}",
+                transporter.getSpecies().getName(),
+                seeds,
+                planterEntity.getPokemon().getSpecies().getName(),
+                item.blockPosition());
+    }
+
+    /** A planter has picked up the seeds left for it. */
+    public void onSeedsTaken(UUID planter) {
+        seedRequests.taken(planter);
     }
 
     /** The spots this worker currently remembers it couldn't reach (for the debug overlay). */

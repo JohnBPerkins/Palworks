@@ -1,7 +1,12 @@
 package dev.palworks.job;
 
+import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.crop.CropAdapter;
+import dev.palworks.drops.TrackedDrops;
+import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
+import dev.palworks.suitability.Suitability;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -14,6 +19,8 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -36,6 +43,8 @@ final class PickupQueue {
      * while they keep coming, see JobAssigner).
      */
     static final int DECAY_BATCH_TICKS = 600;
+    // How much further than the pickup radius a planter can be from seeds a player threw it
+    private static final double THROWN_SEEDS_EXTRA_REACH = 2.0;
     /** How often (ticks) items with no pickup job round them are given one. */
     static final int SWEEP_TICKS = 20;
     // Items out of reach wait this long (ticks) for another pickup job, twice as long each time
@@ -46,16 +55,18 @@ final class PickupQueue {
     private final JobPool pool;
     private final WorkerRegistry workers;
     private final JobAssigner assigner;
+    private final SeedRequests seedRequests;
 
     // Ordered by due time, since process() stops at the first request not yet due
     private final Queue<PickupRequest> queue = new PriorityQueue<>(Comparator.comparingLong(PickupRequest::dueTime));
     // The items to pick up in the level (by entity UUID), till they're gone
     private final Map<UUID, Tracked> tracked = new LinkedHashMap<>();
 
-    PickupQueue(JobPool pool, WorkerRegistry workers, JobAssigner assigner) {
+    PickupQueue(JobPool pool, WorkerRegistry workers, JobAssigner assigner, SeedRequests seedRequests) {
         this.pool = pool;
         this.workers = workers;
         this.assigner = assigner;
+        this.seedRequests = seedRequests;
     }
 
     /**
@@ -106,6 +117,45 @@ final class PickupQueue {
     }
 
     /**
+     * The planter seeds a player threw are for: the nearest one close by (within the pickup
+     * radius and a little) that plants them (Planting for farmland seeds, Nether for wart), with
+     * room in its pouch, that doesn't transport (one that does takes them as any pickup). Null if
+     * they aren't a player's seeds, or no planter's close by.
+     */
+    @Nullable
+    private WorkerInfo planterFor(ItemEntity item) {
+        Item seed = item.getItem().getItem();
+        if (!TrackedDrops.isThrownByPlayer(item) || !CropAdapter.isSeed(seed)) {
+            return null;
+        }
+        Suitability skill = seed.equals(Items.NETHER_WART) ? Suitability.NETHER : Suitability.PLANTING;
+        double reach = JobChecks.pickupRadius() + THROWN_SEEDS_EXTRA_REACH;
+        WorkerInfo nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (WorkerInfo worker : workers.all()) {
+            if (!worker.suitabilities.contains(skill) || worker.suitabilities.contains(Suitability.TRANSPORTING)) {
+                continue;
+            }
+            double dx = Math.abs(worker.position.getX() + 0.5 - item.getX());
+            double dz = Math.abs(worker.position.getZ() + 0.5 - item.getZ());
+            double dy = Math.abs(worker.position.getY() - item.getY());
+            if (dx > reach || dz > reach || dy > reach) {
+                continue;
+            }
+            Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
+            if (pokemon == null || WorkerInventoryManager.getOrCreate(pokemon).roomFor(item.getItem()) == 0) {
+                continue;
+            }
+            double distance = dx * dx + dz * dz + dy * dy;
+            if (distance < nearestDistance) {
+                nearest = worker;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
+    /**
      * Give every item to pick up that's landed, with no pickup job round it, one where it is (which
      * takes the others round it too). One that's gone (picked up, despawned, or its chunk unloaded:
      * it's tracked again if that loads) is let go.
@@ -131,6 +181,16 @@ final class PickupQueue {
             }
             if (!(level.getEntity(entry.getKey()) instanceof ItemEntity entity) || !entity.isAlive()) {
                 it.remove();
+                continue;
+            }
+            if (TrackedDrops.handedTo(entity) != null) {
+                continue; // left for a planter: its own to take (see SeedRequests)
+            }
+            // Seeds a player threw by a planter with room for them are its, to plant
+            WorkerInfo planter = planterFor(entity);
+            if (planter != null) {
+                TrackedDrops.handOverTo(entity, planter.pokemonUUID);
+                seedRequests.handOver(assigner, planter, entity.blockPosition(), now);
                 continue;
             }
             if (covered(entity, jobs)) {
