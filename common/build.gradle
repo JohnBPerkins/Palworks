@@ -24,7 +24,7 @@ dependencies {
     // supported Cobblemon. Non-transitive: Cobblemon's runtime libraries aren't needed to compile.
     modCompileOnly("com.cobblemon:mod:${rootProject.cobblemon_version}+${rootProject.minecraft_version}") { transitive = false }
     // Cobblemon's MoLang library. Bundled inside Cobblemon's loader jars (so it's there at runtime),
-    // but not in the common artifact. Same version in every supported Cobblemon (1.7.0 to 1.8.x).
+    // but not in the common artifact. Same version in every supported Cobblemon (1.8.0 to 1.8.x).
     compileOnly("com.bedrockk:molang:1.1.20")
 
     // Kotlin stdlib for Cobblemon API interop (provided at runtime by Cobblemon)

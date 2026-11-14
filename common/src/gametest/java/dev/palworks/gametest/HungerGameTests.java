@@ -17,8 +17,6 @@ import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -45,7 +43,6 @@ public class HungerGameTests {
     private static final BlockPos START = new BlockPos(1, 1, 1);
     private static final String WORKER = "bulbasaur level=20";
     private static final String OAK = "oak";
-    private static final String TICK_METABOLISM = "tickMetabolism";
 
     private static Item oranBerry() {
         return BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("cobblemon", "oran_berry"));
@@ -521,32 +518,12 @@ public class HungerGameTests {
     // ---- Draining ----
 
     /**
-     * Run Cobblemon's metabolism for long enough that it takes a point off. Through reflection: it's
-     * {@code tickMetabolism()} up to Cobblemon 1.7, and {@code tickMetabolism(int ticks)} from 1.8.
+     * Run Cobblemon's metabolism for long enough that it takes a point off: once a second, as the
+     * party does it, until a point's worth (its rate is in ticks, 20 a call).
      */
     private static void runCobblemonMetabolism(Pokemon pokemon) {
-        try {
-            Method tick = null;
-            for (Method method : Pokemon.class.getMethods()) {
-                if (TICK_METABOLISM.equals(method.getName())) {
-                    tick = method;
-                }
-            }
-            if (tick == null) {
-                throw new IllegalStateException("Cobblemon has no tickMetabolism");
-            }
-            // Once a second, as the party does it, until a point's worth: 1.8 counts its rate in
-            // ticks, 20 a call
-            int calls = tick.getParameterCount() == 0 ? pokemon.getMetabolismRate() : pokemon.getMetabolismRate() / 20;
-            for (int i = 0; i <= calls; i++) {
-                if (tick.getParameterCount() == 0) {
-                    tick.invoke(pokemon);
-                } else {
-                    tick.invoke(pokemon, 20);
-                }
-            }
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new IllegalStateException(e);
+        for (int i = 0; i <= pokemon.getMetabolismRate() / 20; i++) {
+            pokemon.tickMetabolism(20);
         }
     }
 

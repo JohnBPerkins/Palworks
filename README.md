@@ -32,7 +32,7 @@ commands, and customizing Palworks with datapacks and resource packs.
 ## Requirements
 
 - Minecraft **1.21.1**
-- [Cobblemon](https://cobblemon.com) **1.7.1**
+- [Cobblemon](https://cobblemon.com) **1.8** (1.8.0 or later)
 - **Fabric Loader + Fabric API**, _or_ **NeoForge**
 - [Architectury API](https://modrinth.com/mod/architectury-api) **13.0.8** or later (the shared
   library Palworks uses to run on both loaders)

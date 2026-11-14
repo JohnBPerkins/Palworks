@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  *   <li>a red cross when its work is switched off,</li>
  *   <li>nothing while it has no job.</li>
  * </ul>
- * That corner is the only free spot on the card (Cobblemon 1.7 and 1.8 draw nothing there); the rest
+ * That corner is the only free spot on the card (Cobblemon 1.8.x draws nothing there); the rest
  * is taken (state icon, level, held item, HP/EXP/status bars, ball, name) or would cover the
  * Pokémon's portrait.
  *

@@ -102,7 +102,7 @@ public final class Workers {
      */
     public static PokemonEntity sendOut(GameTestHelper helper, ServerPlayer owner, String properties, BlockPos rel) {
         BlockPos abs = helper.absolutePos(rel);
-        Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
+        Pokemon pokemon = create(properties);
         // Fed, so it works at its usual speed: an empty worker is slowed down until it eats (see
         // Hunger), and a new Pokémon starts only half full. Hunger's own tests empty it again.
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
@@ -115,6 +115,20 @@ public final class Workers {
     }
 
     /**
+     * A Pokémon with these properties, at its species' usual size unless they give one
+     * ({@code scale_modifier=}). Cobblemon 1.8 gives each new Pokémon a random size (a few percent
+     * either way), and its walking speed and the room it needs go with it, so tests that time or
+     * race workers would vary from run to run.
+     */
+    private static Pokemon create(String properties) {
+        PokemonProperties parsed = PokemonProperties.Companion.parse(properties);
+        if (parsed.getScaleModifier() == null) {
+            parsed.setScaleModifier(1.0f);
+        }
+        return parsed.create();
+    }
+
+    /**
      * Send out a pastured Pokémon at a spot in the test: one kept in its owner's PC rather than a
      * party, as a pasture's Pokémon are, which is all Palworks tells them apart by (see
      * WorkerEligibility.isFromParty). It's sent out fed.
@@ -122,7 +136,7 @@ public final class Workers {
     public static PokemonEntity sendOutPastured(GameTestHelper helper, String properties, BlockPos rel) {
         ServerPlayer owner = owner(helper, rel);
         BlockPos abs = helper.absolutePos(rel);
-        Pokemon pokemon = PokemonProperties.Companion.parse(properties).create();
+        Pokemon pokemon = create(properties);
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
         Cobblemon.INSTANCE.getStorage().getPC(owner).add(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);

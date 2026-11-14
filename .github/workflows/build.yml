@@ -16,9 +16,9 @@ concurrency:
 permissions:
   contents: read
 
-# Supported Cobblemon range (currently 1.7.0 to 1.8.x):
+# Supported Cobblemon range (currently 1.8.0 to 1.8.x):
 #   oldest: cobblemon_version in gradle.properties (what `build` compiles and releases against)
-#   newest: the last version in the compile/boot matrices below
+#   newest: the last version in the gametest/boot matrices below
 #   players: the Cobblemon range in fabric.mod.json and neoforge.mods.toml
 #   wiki: wiki_cobblemon_version in gradle.properties (whose Pokémon the wiki lists; see wiki.yml)
 # To support a newer Cobblemon, update the matrices and widen both metadata ranges.
@@ -136,15 +136,18 @@ jobs:
 
   # In-game tests: boots a headless dev server with Palworks, Cobblemon and the GameTests
   # (common/src/gametest), and runs them: real worlds, real blocks, real Pokémon doing jobs. The
-  # same tests on both loaders, so loader-specific behaviour (networking, events, mixins) is covered.
+  # same tests on both loaders, so loader-specific behaviour (networking, events, mixins) is covered,
+  # and at both ends of the supported Cobblemon range, compiled and run against each, so Cobblemon
+  # changes within it are too (it's also what catches API removed or changed after the oldest).
   gametest:
-    name: gametest (${{ matrix.loader }})
+    name: gametest (${{ matrix.loader }}, Cobblemon ${{ matrix.cobblemon }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         loader: [fabric, neoforge]
+        cobblemon: ["1.8.0", "1.8.4"]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -170,27 +173,29 @@ jobs:
             */.gradle/loom-cache
             !.gradle/loom-cache/remapped_mods
             !*/.gradle/loom-cache/remapped_mods
-          key: loom-gametest-${{ matrix.loader }}-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
+          key: loom-gametest-${{ matrix.loader }}-${{ matrix.cobblemon }}-${{ runner.os }}-${{ hashFiles('**/*.gradle', '**/gradle.properties', 'gradle/wrapper/gradle-wrapper.properties', '**/*.accesswidener', '**/accesstransformer.cfg') }}
           restore-keys: |
-            loom-gametest-${{ matrix.loader }}-${{ runner.os }}-
+            loom-gametest-${{ matrix.loader }}-${{ matrix.cobblemon }}-${{ runner.os }}-
 
       - name: Run GameTests
         id: gametest
         env:
           LOADER: ${{ matrix.loader }}
-        run: ./gradlew ":$LOADER:runGameTest"
+          COBBLEMON: ${{ matrix.cobblemon }}
+        run: ./gradlew ":$LOADER:runGameTest" -Pcobblemon_version="$COBBLEMON"
 
       - name: GameTest results
         if: ${{ !cancelled() && steps.gametest.conclusion != 'skipped' }}
         env:
           LOADER: ${{ matrix.loader }}
-        run: python3 -I .github/scripts/test_summary.py --title "In-game tests ($LOADER)" "$LOADER/build/test-results/gametest"
+          COBBLEMON: ${{ matrix.cobblemon }}
+        run: python3 -I .github/scripts/test_summary.py --title "In-game tests ($LOADER, Cobblemon $COBBLEMON)" "$LOADER/build/test-results/gametest"
 
       - name: Upload GameTest logs
         if: ${{ failure() && steps.gametest.conclusion == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
-          name: gametest-logs-${{ matrix.loader }}
+          name: gametest-logs-${{ matrix.loader }}-${{ matrix.cobblemon }}
           path: |
             ${{ matrix.loader }}/build/run/gameTest/logs/
             ${{ matrix.loader }}/build/test-results/gametest/
@@ -290,33 +295,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Compiles against the newest supported Cobblemon, catching API that was removed or changed after
-  # the oldest supported version (which `build` compiles against).
-  compile-newest:
-    name: compile (Cobblemon ${{ matrix.cobblemon }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        cobblemon: ["1.8.4"]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Compile
-        env:
-          COBBLEMON: ${{ matrix.cobblemon }}
-        run: ./gradlew assemble -Pcobblemon_version="$COBBLEMON"
-
   # Starts a real dedicated server with the jars `build` produced plus real Cobblemon releases from
   # Modrinth, on both loaders and at both ends of the supported Cobblemon range. Catches what
   # compiling can't: mixins that no longer match Cobblemon, broken access wideners/transformers,
@@ -330,7 +308,7 @@ jobs:
       fail-fast: false
       matrix:
         loader: [fabric, neoforge]
-        cobblemon: ["1.7.0", "1.8.4"]
+        cobblemon: ["1.8.0", "1.8.4"]
     steps:
       - name: Checkout
         uses: actions/checkout@v7

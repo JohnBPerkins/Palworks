@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * it plays a one-off animation (the move it works with, a cry): those go with particles and sounds
  * that play at their usual speed, so it does too, and its work move lands as the server has its
  * work happen. The clock goes up by its pace each tick, so it doesn't jump when its pace changes.
- * The same in Cobblemon 1.7 and 1.8. Client only; listed in palworks-common.mixins.json.
+ * The same throughout Cobblemon 1.8.x. Client only; listed in palworks-common.mixins.json.
  */
 @Mixin(value = PosableState.class, remap = false)
 public abstract class PosableStateClockMixin {
