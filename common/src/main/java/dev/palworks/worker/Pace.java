@@ -4,8 +4,6 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonBehaviourFlag;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
-import dev.palworks.job.JobType;
-import dev.palworks.reservation.ReservationId;
 import java.util.Collection;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
@@ -40,17 +38,10 @@ public final class Pace {
     private Pace() {}
 
     /**
-     * The pace a worker goes at right now: its work speed (see {@link WorkSpeed}), rounded, except on
-     * its way to eat or sleep, or heading home for that, which is never slowed: what makes it better
-     * isn't held up by what's wrong with it.
+     * The pace a worker goes at right now: its work speed (see {@link WorkSpeed}), rounded. The same
+     * whatever it's doing, on its way to eat or sleep too.
      */
     public static double now(Pokemon pokemon, WorkerState state) {
-        ReservationId job = state.getCurrentReservation();
-        boolean forItsNeeds =
-                job != null && (job.getJobType() == JobType.EAT_FOOD || job.getJobType() == JobType.SLEEP);
-        if (forItsNeeds || state.getHomeward() != null) {
-            return FULL;
-        }
         return rounded(WorkSpeed.of(pokemon, state));
     }
 

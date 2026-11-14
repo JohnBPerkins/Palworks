@@ -19,8 +19,7 @@ stat of its own.
 - **A slowed worker** (out of food, Tired, or both: a quarter off for each, so half speed at the
   slowest) is slow at everything: each job takes longer, its animations play slower to match (its
   legs as it walks, the move it works with, landing just as the work happens), and it moves slower
-  whether Palworks or Cobblemon is moving it. Except on its way to eat or sleep, which is never held
-  up.
+  whether Palworks or Cobblemon is moving it, on its way to eat or sleep too.
 
 A **trough** comes in every wood (oak, spruce, birch, jungle, acacia, dark oak, mangrove, cherry,
 bamboo, crimson and warped), crafted from 5 of that wood's slabs (two on the top row's ends, three

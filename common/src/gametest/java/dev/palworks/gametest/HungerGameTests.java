@@ -673,6 +673,28 @@ public class HungerGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "hunger_pace_to_eat", timeoutTicks = 400)
+    public void anEmptyWorkerIsSlowedOnItsWayToEatToo(GameTestHelper helper) {
+        Workers.isolate(helper);
+        trough(helper, TROUGH).addFood(berries(9));
+        PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
+        Pokemon pokemon = worker.getPokemon();
+        WorkerState state = WorkerStateManager.getOrCreate(pokemon);
+        double full = worker.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        helper.startSequence()
+                .thenExecute(() -> pokemon.setCurrentFullness(0))
+                .thenWaitUntil(() -> {
+                    ReservationId job = state.getCurrentReservation();
+                    helper.assertTrue(job != null && job.getJobType() == JobType.EAT_FOOD, "it sets off to eat");
+                })
+                .thenIdle(2)
+                .thenExecute(() -> helper.assertTrue(
+                        Math.abs(worker.getAttributeValue(Attributes.MOVEMENT_SPEED) - full * Math.sqrt(0.75)) < 1e-6,
+                        "on its way: the root of three quarters (on foot) of " + full + ", not "
+                                + worker.getAttributeValue(Attributes.MOVEMENT_SPEED)))
+                .thenSucceed();
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "hunger_pace_empty", timeoutTicks = 800)
     public void anEmptyWorkerHarvestsAtThreeQuartersSpeed(GameTestHelper helper) {
         // The work itself takes 4/3 as long (its animation plays at three quarters), not a rest after

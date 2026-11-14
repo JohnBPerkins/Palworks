@@ -627,7 +627,7 @@ public class WorkerAI {
         return 0.6;
     }
 
-    /** Eating and going to bed: what makes it better, so never slowed down. */
+    /** Eating and going to bed: what makes it better, so worth a far trip (see WorkerNavigator). */
     private static boolean isForItsNeeds(JobType jobType) {
         return !jobType.isWork();
     }
