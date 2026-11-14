@@ -44,9 +44,10 @@ public class WorkerState {
     private double fullnessOwed;
 
     // A slowed worker's pauses (see dev.palworks.animation.SlowedPause), not saved: the time its
-    // moves have saved it, which it owes in pauses (below 0 when it's paused ahead), and how much
-    // of the pause it's in is left
+    // moves have saved it, which it owes in pauses (below 0 when it's paused ahead), how long its
+    // pause before its current step's move is (0 if it hasn't paused for it), and how much is left
     private int slowedTicksOwed;
+    private int pauseTicks;
     private int pauseTicksLeft;
 
     // Sleep (see dev.palworks.sleep.Sleep). Saved, so a reload in the night doesn't wake it, or lose
@@ -240,6 +241,15 @@ public class WorkerState {
 
     public void setSlowedTicksOwed(int slowedTicksOwed) {
         this.slowedTicksOwed = slowedTicksOwed;
+    }
+
+    /** How long a slowed worker's pause before its step's move is, 0 if it hasn't paused for it. */
+    public int getPauseTicks() {
+        return pauseTicks;
+    }
+
+    public void setPauseTicks(int pauseTicks) {
+        this.pauseTicks = pauseTicks;
     }
 
     /** How much of a slowed worker's pause is left, 0 if it isn't in one (see SlowedPause). */

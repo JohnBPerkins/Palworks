@@ -69,8 +69,8 @@ public class PaceGameTests {
             helper.assertTrue(played[0] >= 0 && pausing[1] >= 0, "it paused, and its move played");
             long paused = pausing[1] - pausing[0];
             helper.assertTrue(
-                    Math.abs(paused - SlowedPause.PAUSE_TICKS) <= 2,
-                    "it paused " + paused + " ticks, not " + SlowedPause.PAUSE_TICKS);
+                    Math.abs(paused - SlowedPause.SHORTEST_PAUSE_TICKS) <= 2,
+                    "it paused " + paused + " ticks, not " + SlowedPause.SHORTEST_PAUSE_TICKS);
             helper.assertTrue(
                     played[0] >= pausing[1] - 1,
                     "its move started at " + played[0] + ", after its pause (" + pausing[0] + " to " + pausing[1]
