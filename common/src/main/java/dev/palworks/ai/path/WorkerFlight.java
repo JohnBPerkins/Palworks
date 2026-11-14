@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 
@@ -38,7 +39,7 @@ public final class WorkerFlight {
     /** The slowest a flight is expected to go (blocks a tick), for how long it's given. */
     private static final double BLOCKS_PER_TICK = 0.1;
 
-    /** How many ticks climbing without getting higher end the climb (it's as high as it flies here). */
+    /** How many ticks climbing without getting higher end the climb (something's holding it back). */
     private static final int CLIMB_STALL_TICKS = 10;
 
     /** A flight under way: where to, how high, when it's given up on, and how its climb is going. */
@@ -46,8 +47,10 @@ public final class WorkerFlight {
         final BlockPos goal;
         double cruiseY;
         final long giveUpAt;
-        double lastY = Double.NEGATIVE_INFINITY;
+        double highestY = Double.NEGATIVE_INFINITY;
         int stalled;
+        // It's as high as it flies here: it goes across at the highest it got, and doesn't climb again
+        boolean topped;
 
         Flight(BlockPos goal, double cruiseY, long giveUpAt) {
             this.goal = goal;
@@ -125,6 +128,12 @@ public final class WorkerFlight {
             land(mob);
             return false;
         }
+        // Nothing else steers it meanwhile: Cobblemon's own AI gives it somewhere to walk now and then
+        // (as WorkerNavigator sees off for a walk), and its navigation, following that, pulls it down
+        if (mob.getNavigation().isInProgress()) {
+            mob.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+            mob.getNavigation().stop();
+        }
         if (!pather.isFlying()) {
             pather.setFlying(true);
         }
@@ -140,13 +149,15 @@ public final class WorkerFlight {
                 return false;
             }
             mob.getMoveControl().setWantedPosition(goalX, goal.getY(), goalZ, speed);
-        } else if (mob.getY() < flight.cruiseY - 1) {
-            // Straight up first, clear of everything on the way. Cobblemon only flies so high above the
-            // ground, so one that stops getting higher goes across from as high as it got
-            flight.stalled = mob.getY() > flight.lastY + 0.05 ? 0 : flight.stalled + 1;
-            flight.lastY = Math.max(flight.lastY, mob.getY());
+        } else if (!flight.topped && mob.getY() < flight.cruiseY - 1) {
+            // Straight up first, clear of everything on the way. One that stops getting higher (held
+            // back by something the heightmap doesn't show) goes across at the highest it got: not
+            // where it's sunk to since, which lower each time would end up below what it's flying over
+            flight.stalled = mob.getY() > flight.highestY + 0.05 ? 0 : flight.stalled + 1;
+            flight.highestY = Math.max(flight.highestY, mob.getY());
             if (flight.stalled >= CLIMB_STALL_TICKS) {
-                flight.cruiseY = mob.getY();
+                flight.cruiseY = flight.highestY;
+                flight.topped = true;
             }
             mob.getMoveControl().setWantedPosition(mob.getX(), flight.cruiseY, mob.getZ(), speed);
         } else {
