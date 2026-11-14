@@ -177,7 +177,8 @@ public final class JobChecks {
     private static final double REACH_ACROSS = 1.0;
     private static final double REACH_UP = 0.5;
 
-    private static boolean isToPickUp(Level level, ItemEntity item) {
+    /** Whether this is an item to pick up (see {@link #itemsToPickUp}). */
+    public static boolean isToPickUp(Level level, ItemEntity item) {
         return item.isAlive()
                 && !item.getItem().isEmpty()
                 && TrackedDrops.isTracked(item)

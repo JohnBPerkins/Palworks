@@ -8,7 +8,6 @@ import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.sleep.Beds;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
@@ -261,20 +260,15 @@ public final class WorkPositions {
     }
 
     /**
-     * Where a transporter stands to pick up a pickup job's items: right by the one nearest the job's
-     * spot that it fits by, on its tile if it can (a tile further up or down, on a slope), or one
-     * next to it. Nearest the spot, not the worker, so it doesn't change as the worker walks (each
-     * change is a new walk to plan): only once it's picked that one up, when it heads for the next.
-     * Null if there's nowhere to stand by any.
+     * Where a transporter stands to pick up a pickup job's items: right by the next of them on its
+     * round (see PickupRoute) that it fits by, on its tile if it can (a tile further up or down, on a
+     * slope), or one next to it. It only changes once it's picked that one up (each change is a new
+     * walk to plan). Null if there's nowhere to stand by any.
      */
     @Nullable
     private static BlockPos pickupStand(Level level, BlockPos jobPos, Mob entity) {
-        List<ItemEntity> items = new ArrayList<>(JobChecks.itemsToPickUp(level, jobPos));
-        Vec3 jobMiddle = Vec3.atCenterOf(jobPos);
-        items.sort(Comparator.<ItemEntity>comparingDouble(item -> item.distanceToSqr(jobMiddle))
-                .thenComparingInt(ItemEntity::getId));
         Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
-        for (ItemEntity item : items) {
+        for (ItemEntity item : PickupRoute.itemsInOrder(level, jobPos, entity)) {
             BlockPos at = JobChecks.spotOf(item);
             BlockPos on = firstHeight(at, SLOPE_STEPS, fitsThere);
             if (on != null) {
@@ -307,8 +301,8 @@ public final class WorkPositions {
      */
     public static boolean inStance(Level level, Mob entity, BlockPos targetPos, JobType jobType, WorkStance stance) {
         if (jobType == JobType.COLLECT_DROPS) {
-            // Something to pick up within its reach
-            return !JobChecks.itemsInReach(level, entity).isEmpty();
+            // Something within its reach that it has room for
+            return PickupRoute.anyToPickUpHere(level, entity);
         }
         if (jobType == JobType.SLEEP) {
             // Lying in the middle of the bed, not just touching it
