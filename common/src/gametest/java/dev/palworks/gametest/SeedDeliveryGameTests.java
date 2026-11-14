@@ -72,6 +72,17 @@ public class SeedDeliveryGameTests {
         return total;
     }
 
+    /** Whether seeds have been left on the ground for a planter (see TrackedDrops.handOverTo). */
+    private static boolean seedsLeftForAPlanter(GameTestHelper helper) {
+        for (ItemEntity item : helper.getLevel()
+                .getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4))) {
+            if (TrackedDrops.handedTo(item) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "seeds_planter_alone", timeoutTicks = 400)
     public void aPlanterDoesntTakeSeedsOutOfAChestItself(GameTestHelper helper) {
         ChestBlockEntity chest = farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
@@ -98,7 +109,7 @@ public class SeedDeliveryGameTests {
 
     @GameTest(template = Templates.EMPTY, batch = "seeds_keep_working", timeoutTicks = 2000)
     public void aPlanterKeepsWorkingWhileItsSeedsAreBrought(GameTestHelper helper) {
-        ChestBlockEntity chest = farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
+        farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
         // Ripe wheat along z=2 for it to harvest (walking up and down the row) while it waits
         for (int x = 1; x <= 5; x++) {
             helper.setBlock(x, 0, 2, Blocks.FARMLAND);
@@ -106,6 +117,12 @@ public class SeedDeliveryGameTests {
         }
         Workers.sendOut(helper, BULBASAUR, PLANTER);
         Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        boolean[] handedOver = {false};
+        helper.onEachTick(() -> {
+            if (!handedOver[0] && seedsLeftForAPlanter(helper)) {
+                handedOver[0] = true;
+            }
+        });
 
         helper.succeedWhen(() -> {
             for (int x = 1; x <= 5; x++) {
@@ -114,7 +131,8 @@ public class SeedDeliveryGameTests {
                         "wheat at x=" + x + " should be harvested");
             }
             assertPlanted(helper);
-            helper.assertTrue(inChest(chest, Items.WHEAT_SEEDS) < 8, "seeds came out of the chest");
+            // (Not "fewer seeds in the chest": the harvest's seeds are put in it too)
+            helper.assertTrue(handedOver[0], "seeds were brought to the planter");
         });
     }
 
