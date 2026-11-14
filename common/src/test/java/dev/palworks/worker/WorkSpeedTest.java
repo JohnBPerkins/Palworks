@@ -24,8 +24,17 @@ class WorkSpeedTest {
     }
 
     @Test
-    void neverSlowerThanHalf() {
+    void oneSlowdownCanGoAsLowAsItsSet() {
+        // No floor above the config's own: a worker set to a tenth's speed out of food goes at a tenth
+        assertEquals(0.1, WorkSpeed.combined(0.1, 1), 1e-9);
+        assertEquals(0.3, WorkSpeed.combined(0.3, 1), 1e-9);
+        assertEquals(0.3, WorkSpeed.combined(0.65, 0.65), 1e-9);
+    }
+
+    @Test
+    void togetherTheyNeverGoBelowTheSlowestEitherCanBe() {
         assertEquals(WorkSpeed.SLOWEST, WorkSpeed.combined(0.3, 0.3));
-        assertEquals(WorkSpeed.SLOWEST, WorkSpeed.combined(0.1));
+        assertEquals(WorkSpeed.SLOWEST, WorkSpeed.combined(0.1, 0.75));
+        assertEquals(0.1, WorkSpeed.SLOWEST);
     }
 }

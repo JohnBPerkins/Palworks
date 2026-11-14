@@ -58,7 +58,7 @@ settings that aren't per-Pokémon:
   - **`trough_fill_fraction`** (0 to 1): how full troughs fill a worker, as a share of its max
     fullness. The rest is left for hand-feeding. 0 and troughs never feed.
   - **`empty_work_speed`** (0.1 to 1): how fast a worker with no fullness left works and walks.
-    Slowdowns add up (out of food and Tired is both taken off), but never below half speed.
+    Slowdowns add up (out of food and Tired is both taken off), down to a tenth of its speed.
 - **`sleep`**: how pastured workers sleep (see [Sleep](Sleep)).
   - **`enabled`**: `false` turns it off: pastured workers' sleep is then Cobblemon's alone.
   - **`tired_work_speed`** (0.1 to 1): how fast a Tired worker works and walks.

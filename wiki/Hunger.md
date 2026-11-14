@@ -16,8 +16,8 @@ stat of its own.
   by its pasture.
 - **With no fullness left** it works and walks at three quarters of its speed, with a half hunger
   shank over its head, until it eats. It never stops working.
-- **A slowed worker** (out of food, Tired, or both: a quarter off for each, so half speed at the
-  slowest) is slow at everything: each job takes longer, its animations play slower to match (its
+- **A slowed worker** (out of food, Tired, or both: a quarter off for each, so half speed with
+  both) is slow at everything: each job takes longer, its animations play slower to match (its
   legs as it walks, the move it works with, landing just as the work happens), and it moves slower
   whether Palworks or Cobblemon is moving it, on its way to eat or sleep too.
 
