@@ -68,8 +68,8 @@ or **trapped chest** has seeds it can plant, it asks for some, and carries on wi
 meanwhile:
 
 1. A Transporting worker takes a stack of the seeds from the chest.
-2. It brings them to wherever the planter is and drops them at its feet.
-3. The planter picks them up and plants them.
+2. It brings them to wherever the planter is and throws them to its feet.
+3. The planter picks them up a moment later, as a player would, and plants them.
 
 You can also throw seeds (with Q) next to a planter that has room for them, and it picks them up.
 A worker that both plants and transports, such as a Grass/Flying type, takes its own seeds from
