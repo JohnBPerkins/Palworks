@@ -487,7 +487,7 @@ final class JobScanner {
         }
 
         // Grown crystals (amethyst, tumblestone, type gems): Mining
-        if (CrystalAdapter.isRipe(state)) {
+        if (CrystalAdapter.isRipe(level, pos, state)) {
             return JobRecord.of(JobType.MINE_CRYSTAL, pos, now);
         }
 

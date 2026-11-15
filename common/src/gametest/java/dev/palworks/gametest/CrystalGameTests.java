@@ -31,6 +31,7 @@ public class CrystalGameTests {
     private static final String IT_MINES = "it mines";
     private static final String TUMBLESTONE = "tumblestone";
     private static final String CRYSTAL_CORE = "deepslate_crystal_core";
+    private static final String FIRE = "fire";
     private static final String FIRE_GEM_BLOCK = "fire_gem_block";
     private static final String TUMBLESTONE_CLUSTER = "tumblestone_cluster";
 
@@ -134,7 +135,7 @@ public class CrystalGameTests {
         helper.setBlock(CRYSTAL.below(2), block(CRYSTAL_CORE));
         helper.setBlock(CRYSTAL.below(), block(FIRE_GEM_BLOCK));
         IntegerProperty stage = TypeGemClusterBlock.Companion.getSTAGE();
-        helper.setBlock(CRYSTAL, gemCluster("fire", Collections.max(stage.getPossibleValues())));
+        helper.setBlock(CRYSTAL, gemCluster(FIRE, Collections.max(stage.getPossibleValues())));
 
         helper.assertTrue(mine(helper, CRYSTAL), IT_MINES);
         helper.assertBlockPresent(Blocks.AIR, CRYSTAL);
@@ -149,16 +150,23 @@ public class CrystalGameTests {
     @GameTest(template = Templates.EMPTY)
     public void crystalsStillGrowingAreLeftAlone(GameTestHelper helper) {
         var level = helper.getLevel();
+        BlockPos at = helper.absolutePos(CRYSTAL);
+        // Each on what grows it, where a grown one would be mined
+        List<Block> supports = List.of(Blocks.BUDDING_AMETHYST, Blocks.STONE, block(FIRE_GEM_BLOCK));
         List<BlockState> growing = List.of(
                 facing(Blocks.LARGE_AMETHYST_BUD, Direction.UP),
                 facing(block("large_budding_tumblestone"), Direction.UP),
-                gemCluster("fire", 2));
-        for (BlockState state : growing) {
-            helper.assertFalse(CrystalAdapter.isRipe(state), state + " isn't grown");
+                gemCluster(FIRE, 2));
+        for (int i = 0; i < growing.size(); i++) {
+            helper.setBlock(CRYSTAL.below(), supports.get(i));
+            helper.setBlock(CRYSTAL, growing.get(i));
+            helper.assertFalse(CrystalAdapter.isRipe(level, at, growing.get(i)), growing.get(i) + " isn't grown");
         }
         // Nor what they grow from
         for (Block block : List.of(Blocks.BUDDING_AMETHYST, block(FIRE_GEM_BLOCK), block(CRYSTAL_CORE))) {
-            helper.assertFalse(CrystalAdapter.isRipe(block.defaultBlockState()), block + " isn't a crystal to mine");
+            helper.setBlock(CRYSTAL, block);
+            helper.assertFalse(
+                    CrystalAdapter.isRipe(level, at, block.defaultBlockState()), block + " isn't a crystal to mine");
         }
         helper.setBlock(CRYSTAL.below(), Blocks.STONE);
         helper.setBlock(CRYSTAL, growing.get(1));
@@ -166,6 +174,28 @@ public class CrystalGameTests {
                 JobChecks.isJobStillThere(level, JobType.MINE_CRYSTAL, helper.absolutePos(CRYSTAL)), "no job");
         helper.assertFalse(mine(helper, CRYSTAL), "nothing to mine");
         helper.assertBlockPresent(block("large_budding_tumblestone"), CRYSTAL);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void crystalsThatWouldntGrowBackAreLeftAlone(GameTestHelper helper) {
+        // Put there to look at (a cluster on stone, a gem cluster on a wall): nothing grows another
+        // in their place, so mining them only takes a build apart
+        var level = helper.getLevel();
+        helper.setBlock(CRYSTAL.below(), Blocks.STONE);
+        for (BlockState placed : List.of(facing(Blocks.AMETHYST_CLUSTER, Direction.UP), gemCluster(FIRE, 3))) {
+            helper.setBlock(CRYSTAL, placed);
+            helper.assertFalse(
+                    JobChecks.isJobStillThere(level, JobType.MINE_CRYSTAL, helper.absolutePos(CRYSTAL)),
+                    "no job for " + placed);
+            helper.assertFalse(mine(helper, CRYSTAL), "nothing to mine: " + placed);
+            helper.assertBlockPresent(placed.getBlock(), CRYSTAL);
+        }
+        // A tumblestone cluster is put back from its own drops wherever it is, so it is one to mine
+        helper.setBlock(CRYSTAL, facing(block(TUMBLESTONE_CLUSTER), Direction.UP));
+        helper.assertTrue(
+                JobChecks.isJobStillThere(level, JobType.MINE_CRYSTAL, helper.absolutePos(CRYSTAL)),
+                "a job for a tumblestone cluster on stone");
         helper.succeed();
     }
 
@@ -204,7 +234,7 @@ public class CrystalGameTests {
         List<BlockPos> crystals = new java.util.ArrayList<>();
         for (Direction face : List.of(Direction.UP, Direction.NORTH, Direction.EAST, Direction.WEST)) {
             helper.setBlock(
-                    gemBlock.relative(face), gemCluster("fire", grown).setValue(BlockStateProperties.FACING, face));
+                    gemBlock.relative(face), gemCluster(FIRE, grown).setValue(BlockStateProperties.FACING, face));
             crystals.add(gemBlock.relative(face));
         }
         BlockPos hanging = new BlockPos(6, 3, 5);
