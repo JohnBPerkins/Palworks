@@ -3,6 +3,7 @@ package dev.palworks.ai;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.ai.path.WorkerFlight;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.SlowedPause;
 import dev.palworks.animation.WorkAnimator;
@@ -466,13 +467,19 @@ public class WorkerAI {
             state.restartStep();
         }
         navigateToJob(entity, standPos, walkSpeed(), isForItsNeeds(reservation.getJobType()));
+        JobHandlerRegistry.forJob(reservation.getJobType())
+                .onTheWay(new JobContext(pokemon, entity, level, state, reservation));
         state.setWalkedToJob(true);
         state.resetStepIn();
 
         // Track path failures for stuck detection: its walk has ended (on the ground, so not just
         // falling or knocked about) without getting next to the stand tile, so the path can't
         // get it there. A few in a row and it gives up the job instead of standing around.
-        if (entity.getNavigation().isDone() && entity.onGround() && distanceSq > SETTLED_DISTSQ) {
+        // (Not while it flies there: it's off the ground, and its flight is timed, see WorkerFlight)
+        if (entity.getNavigation().isDone()
+                && entity.onGround()
+                && distanceSq > SETTLED_DISTSQ
+                && !WorkerFlight.isFlying(entity)) {
             state.recordPathFailure();
 
             if (state.isStuck()) {

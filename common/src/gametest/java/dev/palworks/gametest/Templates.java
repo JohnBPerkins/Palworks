@@ -24,6 +24,7 @@ public final class Templates {
             RealTreeGameTests.class,
             WorkStatusGameTests.class,
             PickupGameTests.class,
+            FlightGameTests.class,
             TestAreaGameTests.class,
             HangingFruitGameTests.class,
             CobblemonCropGameTests.class,

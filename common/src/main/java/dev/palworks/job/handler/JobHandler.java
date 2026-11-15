@@ -18,6 +18,9 @@ public interface JobHandler {
     default boolean repeatAfterComplete(JobContext ctx) {
         return false;
     }
+    /** Each tick the worker's on its way to the job (nothing, for most jobs). */
+    default void onTheWay(JobContext ctx) {}
+
     /**
      * Where a worker of this species stands for the whole job: the stance its animation is
      * played from (the first, if it has more than one), or {@link WorkStance#NEAR} if it has

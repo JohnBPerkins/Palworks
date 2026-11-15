@@ -37,6 +37,14 @@ Admins can also use `/palworks worker enable` and `disable` (see [Commands](Comm
 - After a harvest or a chop, the worker that did it is offered the pickup first, if it can
   transport.
 
+## Flying
+
+Workers that can fly in Cobblemon (Pidgey, Charizard, Hoppip and the like) fly to a job more than
+8 blocks away, one 2 or more blocks above them, such as items on top of a tree, or one they can't
+walk to. They take off straight up, fly across above everything on the way, and land at the job.
+They walk to jobs close by, and anywhere with a roof over them or over the job. Flying-type Pokémon
+that can't fly in Cobblemon, such as Doduo, always walk.
+
 ## Inventory
 
 What a worker carries depends on its work skills:

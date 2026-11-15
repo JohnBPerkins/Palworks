@@ -41,8 +41,8 @@ settings that aren't per-Pokémon:
 - **`work_range_vertical`** (4 to 64): how many blocks up and down it does.
 - **`owner_range`** (4 to 32): how far from its owner a Pokémon from a party takes jobs. Cobblemon
   teleports a party Pokémon back to its owner past 32 blocks, so it can't be more.
-- **`pickup_radius`** (1 to 8): how far round a harvest, chop or pickup spot dropped items are
-  collected from.
+- **`pickup_radius`** (1 to 8): how far round where dropped items landed a transporter collects
+  them in one go, going up to each in turn.
 - **`fertilize_chance_per_level`** (0 to 0.2): the chance that watering a crop also fertilizes it,
   for each of the waterer's [Watering levels](Suitabilities#work-levels): at 0.1, a level 1 Squirtle fertilizes
   10% of the crops it waters, a level 3 Blastoise 30%.

@@ -1,12 +1,14 @@
 package dev.palworks.job.handler;
 
 import dev.palworks.Palworks;
+import dev.palworks.ai.WorkStance;
 import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.station.ChestHelper;
 import java.util.List;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A transporter fetches food from a chest for a trough that's running low (see JobAssigner): a
@@ -23,6 +25,12 @@ final class FetchFoodHandler implements JobHandler {
     @Override
     public List<Step> steps() {
         return steps;
+    }
+
+    /** Right up against the chest it takes from, as a player stands to open one. */
+    @Override
+    public WorkStance stance(@Nullable String speciesId) {
+        return WorkStance.AGAINST;
     }
 
     private static void fetch(JobContext ctx) {

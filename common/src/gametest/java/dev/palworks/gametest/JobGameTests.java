@@ -168,11 +168,13 @@ public class JobGameTests {
         helper.setBlock(pos.below(), Blocks.STONE);
         helper.assertFalse(there(helper, JobType.COLLECT_DROPS, pos), "nothing on the ground");
 
-        var abs = helper.absolutePos(pos);
-        ItemEntity item = new ItemEntity(
-                helper.getLevel(), abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, new ItemStack(Items.WHEAT, 3));
-        helper.getLevel().addFreshEntity(item);
-        helper.assertTrue(there(helper, JobType.COLLECT_DROPS, pos), "wheat on the ground");
+        // A farm's or a mob's drops aren't for picking up: only what workers and players drop
+        ItemEntity farmed = Scenes.dropNotToPickUp(helper, pos, new ItemStack(Items.WHEAT, 3));
+        helper.assertFalse(there(helper, JobType.COLLECT_DROPS, pos), "a farm's wheat on the ground");
+        farmed.discard();
+
+        ItemEntity item = Scenes.dropToPickUp(helper, pos, new ItemStack(Items.WHEAT, 3));
+        helper.assertTrue(there(helper, JobType.COLLECT_DROPS, pos), "a worker's wheat on the ground");
 
         item.discard();
         helper.assertFalse(there(helper, JobType.COLLECT_DROPS, pos), "someone picked it up");

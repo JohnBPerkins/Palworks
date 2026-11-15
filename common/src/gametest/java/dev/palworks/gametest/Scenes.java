@@ -1,9 +1,11 @@
 package dev.palworks.gametest;
 
+import dev.palworks.drops.TrackedDrops;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -81,6 +83,32 @@ public final class Scenes {
             }
         }
         return total;
+    }
+
+    /**
+     * Put an item on the ground at a spot (not moving), as a worker or player would drop it: one
+     * for transporters to pick up (see TrackedDrops). It gets its pickup job once it's landed.
+     */
+    static ItemEntity dropToPickUp(GameTestHelper helper, BlockPos rel, ItemStack stack) {
+        ItemEntity entity = lying(helper, rel, stack);
+        entity.addTag(TrackedDrops.TAG);
+        helper.getLevel().addFreshEntity(entity);
+        return entity;
+    }
+
+    /**
+     * Put an item on the ground at a spot (not moving) as a farm or a mob would: nothing for
+     * transporters to pick up.
+     */
+    static ItemEntity dropNotToPickUp(GameTestHelper helper, BlockPos rel, ItemStack stack) {
+        ItemEntity entity = lying(helper, rel, stack);
+        helper.getLevel().addFreshEntity(entity);
+        return entity;
+    }
+
+    private static ItemEntity lying(GameTestHelper helper, BlockPos rel, ItemStack stack) {
+        BlockPos abs = helper.absolutePos(rel);
+        return new ItemEntity(helper.getLevel(), abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5, stack, 0, 0, 0);
     }
 
     /** Remove every item lying on the ground in the test area. */

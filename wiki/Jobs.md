@@ -104,9 +104,25 @@ log, and mangrove roots too, so trees from other mods work. See
 
 **Who:** Transporting (Flying types)
 
-After a harvest or a tree is chopped, a Transporting worker picks up the items lying within 3 blocks
-of the spot (the `pickup_radius` [setting](Configuration)) and carries them. It fills up before a
-trip: anything while it has a free slot, then only items matching what it carries.
+A Transporting worker picks up items that workers or players dropped, wherever they land, and
+carries them. That covers:
+
+- a harvest's drops, and everything a chopped tree drops, including the saplings, sticks and
+  apples its leaves drop as they decay over the next few minutes;
+- items a player throws (with Q, or out of their inventory);
+- what drops from blocks a player mines.
+
+Everything else on the ground is left alone, so transporters don't empty mob farms, water- or
+piston-harvested farms, or dispensers. A player's death drops stay where they fell.
+
+It goes round the items nearest first, picking each up from beside it as a player would (and
+anything it passes on the way), taking everything within 3 blocks of where they landed (the
+`pickup_radius` [setting](Configuration)) in one go. One that can fly [flies](Workers#flying) to
+items it can't walk to, like ones on top of a tree. It fills up before a trip: anything while it has a free slot,
+then only items matching what it carries. Items no worker can get to are tried again later, less
+often each time, until they despawn.
+
+It stands right in front of a chest to put items in or take them out.
 
 ## Deliver items
 
