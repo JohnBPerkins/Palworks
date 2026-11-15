@@ -42,7 +42,7 @@ public enum JobType {
     // Take seeds from a chest: for a planter that asked for them (only transporters take things
     // out of chests), or to plant itself, for a transporter that plants too (see JobAssigner)
     GET_SEEDS(Suitability.TRANSPORTING, 6),
-    // Bring seeds taken from a chest to the planter that asked for them, and drop them at its feet
+    // Bring seeds taken from a chest to the planter that asked for them, and throw them to its feet
     BRING_SEEDS(Suitability.TRANSPORTING, 10),
 
     // Not work: a hungry worker eats from a trough (see dev.palworks.hunger.Hunger). Any worker

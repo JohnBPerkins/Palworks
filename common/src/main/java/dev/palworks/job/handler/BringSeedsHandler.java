@@ -6,8 +6,8 @@ import java.util.List;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * A transporter brings seeds it took from a chest to the planter that asked for them, and drops
- * them at its feet (see JobManager.handOverSeeds). The planter carries on working meanwhile: once
+ * A transporter brings seeds it took from a chest to the planter that asked for them, and throws
+ * them to its feet (see JobManager.handOverSeeds). The planter carries on working meanwhile: once
  * it's moved off from where the job was set, the job's gone, and the transporter is sent again
  * to where it is now.
  */

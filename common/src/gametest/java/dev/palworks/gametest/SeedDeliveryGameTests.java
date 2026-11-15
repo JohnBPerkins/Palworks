@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 /**
  * Seeds for planters (see SeedRequests): a planter can't take seeds out of a chest, so one that's
- * run out asks, and a transporter brings it some and drops them at its feet; seeds a player throws
+ * run out asks, and a transporter brings it some and throws them to its feet; seeds a player throws
  * by a planter are its too. A worker that transports and plants still fetches its own.
  */
 public class SeedDeliveryGameTests {
@@ -28,6 +28,16 @@ public class SeedDeliveryGameTests {
     private static final BlockPos PLANTER = new BlockPos(3, 1, 1);
     private static final BlockPos TRANSPORTER = new BlockPos(1, 1, 1);
     private static final BlockPos CHEST = new BlockPos(6, 1, 2);
+
+    // Where the workers' owner stands: off the field, out of every way they walk. A mock player
+    // never moves, so one in a worker's way (as one stood where each worker was sent out) holds it
+    // there for good, pushing it back as it walks into it.
+    private static final BlockPos OWNER = new BlockPos(-2, 1, -2);
+
+    /** Send out a worker here, owned by a player standing at {@link #OWNER}. */
+    private static PokemonEntity sendOut(GameTestHelper helper, String properties, BlockPos rel) {
+        return Workers.sendOut(helper, Workers.owner(helper, OWNER), properties, rel);
+    }
 
     /** Empty farmland along z=5, and a chest holding these. */
     private static ChestBlockEntity farmlandAndChest(GameTestHelper helper, ItemStack... contents) {
@@ -86,7 +96,7 @@ public class SeedDeliveryGameTests {
     @GameTest(template = Templates.EMPTY, batch = "seeds_planter_alone", timeoutTicks = 400)
     public void aPlanterDoesntTakeSeedsOutOfAChestItself(GameTestHelper helper) {
         ChestBlockEntity chest = farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
-        PokemonEntity planter = Workers.sendOut(helper, BULBASAUR, PLANTER);
+        PokemonEntity planter = sendOut(helper, BULBASAUR, PLANTER);
 
         helper.runAfterDelay(300, () -> {
             helper.assertValueEqual(inChest(chest, Items.WHEAT_SEEDS), 8, "seeds left in the chest");
@@ -102,7 +112,7 @@ public class SeedDeliveryGameTests {
     @GameTest(template = Templates.EMPTY, batch = "seeds_own", timeoutTicks = 1000)
     public void aTransporterThatPlantsFetchesItsOwnSeeds(GameTestHelper helper) {
         farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
-        Workers.sendOut(helper, "hoppip level=20", PLANTER); // Grass/Flying: Planting and Transporting
+        sendOut(helper, "hoppip level=20", PLANTER); // Grass/Flying: Planting and Transporting
 
         helper.succeedWhen(() -> assertPlanted(helper));
     }
@@ -115,8 +125,8 @@ public class SeedDeliveryGameTests {
             helper.setBlock(x, 0, 2, Blocks.FARMLAND);
             helper.setBlock(x, 1, 2, WHEAT.getStateForAge(7));
         }
-        Workers.sendOut(helper, BULBASAUR, PLANTER);
-        Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        sendOut(helper, BULBASAUR, PLANTER);
+        sendOut(helper, PIDGEY, TRANSPORTER);
         boolean[] handedOver = {false};
         helper.onEachTick(() -> {
             if (!handedOver[0] && seedsLeftForAPlanter(helper)) {
@@ -136,11 +146,48 @@ public class SeedDeliveryGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "seeds_thrown_over", timeoutTicks = 1200)
+    public void broughtSeedsLieOnTheGroundAMomentBeforeThePlanterTakesThem(GameTestHelper helper) {
+        farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
+        sendOut(helper, BULBASAUR, PLANTER);
+        sendOut(helper, PIDGEY, TRANSPORTER);
+        // When the seeds were thrown, when they landed, and when they were taken
+        long[] thrown = {-1};
+        long[] landed = {-1};
+        long[] taken = {-1};
+        helper.onEachTick(() -> {
+            ItemEntity seeds = null;
+            for (ItemEntity item : helper.getLevel()
+                    .getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4))) {
+                if (TrackedDrops.handedTo(item) != null) {
+                    seeds = item;
+                }
+            }
+            long now = helper.getTick();
+            if (seeds != null && thrown[0] < 0) {
+                thrown[0] = now;
+            }
+            if (seeds != null && seeds.onGround() && landed[0] < 0) {
+                landed[0] = now;
+            }
+            if (seeds == null && thrown[0] >= 0 && taken[0] < 0) {
+                taken[0] = now;
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            assertPlanted(helper);
+            helper.assertTrue(landed[0] > thrown[0], "the seeds were thrown, and landed after");
+            // A player's throw can be picked up after 2 seconds
+            helper.assertTrue(taken[0] - thrown[0] >= 40, "the seeds lay there a moment before they were taken");
+        });
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "seeds_recalled", timeoutTicks = 2600)
     public void seedsLeftForAPlanterThatsPutAwayGoBackInAChest(GameTestHelper helper) {
         ChestBlockEntity chest = farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
-        PokemonEntity planter = Workers.sendOut(helper, BULBASAUR, PLANTER);
-        Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        PokemonEntity planter = sendOut(helper, BULBASAUR, PLANTER);
+        sendOut(helper, PIDGEY, TRANSPORTER);
 
         // Put away the moment the seeds are left for it, before it can pick them up
         boolean[] recalled = {false};
@@ -169,8 +216,8 @@ public class SeedDeliveryGameTests {
     @GameTest(template = Templates.EMPTY, batch = "seeds_thrown", timeoutTicks = 800)
     public void seedsAPlayerThrowsByAPlanterAreItsToPlant(GameTestHelper helper) {
         farmlandAndChest(helper);
-        Workers.sendOut(helper, BULBASAUR, new BlockPos(3, 1, 3));
-        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, new BlockPos(6, 1, 6));
+        sendOut(helper, BULBASAUR, new BlockPos(3, 1, 3));
+        PokemonEntity pidgey = sendOut(helper, PIDGEY, new BlockPos(6, 1, 6));
         // Thrown as Q does, ahead of the player (south, the way a new player faces), by the planter
         ServerPlayer player = Workers.owner(helper, new BlockPos(3, 1, 1));
         player.drop(new ItemStack(Items.WHEAT_SEEDS, 6), false, true);
@@ -192,7 +239,7 @@ public class SeedDeliveryGameTests {
     public void seedsAPlayerThrowsWithNoPlanterByThemArePickedUp(GameTestHelper helper) {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
-        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        PokemonEntity pidgey = sendOut(helper, PIDGEY, TRANSPORTER);
         ServerPlayer player = Workers.owner(helper, new BlockPos(4, 1, 2));
         player.drop(new ItemStack(Items.WHEAT_SEEDS, 6), false, true);
 
