@@ -29,6 +29,10 @@ public class WorkerInventoryManager {
         WorkerInventory cached = inventoryCache.get(uuid);
         if (cached != null) {
             cached.setMode(carryModeFor(pokemon)); // suitabilities can change (e.g. evolution)
+            // Saved into the Pokémon it's asked for with now: Cobblemon makes a new Pokemon object
+            // for the same Pokémon when its owner logs back in, and one still out (in a pasture,
+            // its chunk kept loaded) keeps this inventory, which went on saving into the old one
+            cached.setOnChanged(() -> save(pokemon, cached));
             return cached;
         }
 

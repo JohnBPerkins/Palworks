@@ -13,6 +13,7 @@ import dev.palworks.animation.WorkAnimator;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.inventory.CarryMode;
+import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
@@ -866,6 +867,27 @@ public class WorkerGameTests {
 
         WorkerInventoryManager.unload(pidgey.getUuid());
         WorkerStateManager.unload(pidgey.getUuid());
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aCachedInventoryIsSavedIntoThePokemonItsAskedForWith(GameTestHelper helper) {
+        Pokemon pidgey = PokemonProperties.Companion.parse(PIDGEY).create(); // Flying: Transporting
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pidgey);
+        // The same Pokémon as a new object, as Cobblemon makes when its owner logs back in. One
+        // still out then (pastured, its chunk kept loaded) keeps its cached inventory.
+        Pokemon reloaded = pidgey.clone(false, helper.getLevel().registryAccess());
+        helper.assertTrue(
+                inventory.equals(WorkerInventoryManager.getOrCreate(reloaded)),
+                "the inventory it had is still its own");
+        inventory.setItem(0, new ItemStack(Items.WHEAT, 5));
+
+        WorkerInventoryManager.unload(reloaded.getUuid()); // read back from the new object's data
+        ItemStack loaded = WorkerInventoryManager.getOrCreate(reloaded).getItem(0);
+        WorkerInventoryManager.unload(reloaded.getUuid());
+        helper.assertTrue(
+                loaded.is(Items.WHEAT) && loaded.getCount() == 5,
+                "what it was given since is in the new object's data, not the old one's: " + loaded);
         helper.succeed();
     }
 
