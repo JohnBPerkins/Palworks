@@ -12,7 +12,8 @@ Check these in order:
 3. **Is the job close enough?** Workers look 32 blocks out by default, and a party Pokémon only
    works within 24 blocks of you. See [Configuration](Configuration).
 4. **Is the job actually available?** For example, a furnace needs smeltable items in it, farmland
-   needs the space above it empty, and a Planting worker needs seeds in a chest.
+   needs the space above it empty, and a Planting worker needs seeds in a chest and a Transporting
+   worker to bring them.
 5. **Can it reach the spot?** If there's no path, the worker skips that spot for up to 30 seconds.
 6. **Is it hungry, Tired, unhappy or on strike?** Look over its head. See [Hunger](Hunger),
    [Sleep](Sleep) and [Mood](Mood).

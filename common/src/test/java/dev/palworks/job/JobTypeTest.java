@@ -12,13 +12,10 @@ import org.junit.jupiter.api.Test;
 class JobTypeTest {
 
     @Test
-    void everyJobButEatingSleepingAndFetchingSeedsMapsToASuitability() {
+    void everyJobButEatingAndSleepingMapsToASuitability() {
         for (JobType type : JobType.values()) {
             if (type == JobType.EAT_FOOD || type == JobType.SLEEP) {
                 continue; // what any worker does, whatever its skills
-            }
-            if (type == JobType.GET_SEEDS) {
-                continue; // Planting or Nether: which seed it takes depends on its skills
             }
             assertNotNull(type.getRequiredSuitability(), type + " must declare a required suitability");
             assertEquals(java.util.EnumSet.of(type.getRequiredSuitability()), type.requiredSuitabilities());

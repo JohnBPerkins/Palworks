@@ -27,7 +27,7 @@ for its species.
 |---|---|---|
 | Kindling | Light furnaces, blast furnaces and smokers | Working |
 | Watering | Water growing crops, sometimes fertilizing them | Working |
-| Planting | Take seeds from chests and plant farmland | Working |
+| Planting | Plant farmland, with seeds a Transporting worker brings | Working |
 | Gathering | Harvest ripe crops and berries | Working |
 | Lumbering | Chop trees and replant saplings | Working |
 | Transporting | Pick up drops, deliver them to chests and troughs, restock troughs | Working |

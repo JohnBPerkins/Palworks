@@ -23,6 +23,8 @@ import org.jetbrains.annotations.Nullable;
 public final class TrackedDrops {
     /** The entity tag on items to pick up. */
     public static final String TAG = "palworks_drop";
+    // The entity tag on seeds handed to a planter, followed by its UUID
+    private static final String HANDED_TO = "palworks_seeds_for:";
 
     // Set while a worker or player breaks blocks (or tracked leaves decay), on the server thread:
     // items spawned meanwhile are theirs. A depth, so nested breaks (a player breaking a block
@@ -43,6 +45,44 @@ public final class TrackedDrops {
     /** Whether this item is one to pick up. */
     public static boolean isTracked(ItemEntity item) {
         return item.getTags().contains(TAG);
+    }
+
+    /**
+     * Mark seeds on the ground as handed to a planter (by a transporter, or thrown it by a
+     * player): only it picks them up, and transporters leave them be (see JobChecks), until
+     * {@link #stopHandingOver}.
+     */
+    public static void handOverTo(ItemEntity item, UUID planter) {
+        item.addTag(HANDED_TO + planter);
+    }
+
+    /** The planter seeds on the ground were handed to, or null if they weren't. */
+    @Nullable
+    public static UUID handedTo(ItemEntity item) {
+        for (String tag : item.getTags()) {
+            if (tag.startsWith(HANDED_TO)) {
+                try {
+                    return UUID.fromString(tag.substring(HANDED_TO.length()));
+                } catch (IllegalArgumentException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Seeds handed to a planter that it never took (it was put away, say): they're an ordinary
+     * item to pick up again, for a transporter to put away.
+     */
+    public static void stopHandingOver(ItemEntity item) {
+        item.getTags().removeIf(tag -> tag.startsWith(HANDED_TO));
+        item.addTag(TAG);
+    }
+
+    /** Whether a player threw this item (see {@link #thrownByPlayer}). */
+    public static boolean isThrownByPlayer(ItemEntity item) {
+        return thrownByPlayer(item);
     }
 
     /**
@@ -114,6 +154,11 @@ public final class TrackedDrops {
     public static EventResult onEntityAdded(Entity entity, Level level) {
         if (!(entity instanceof ItemEntity item) || !(level instanceof ServerLevel serverLevel)) {
             return EventResult.pass();
+        }
+        // Seeds left for a planter, back from disk (their chunk unloaded, or the server stopped):
+        // who they were for is forgotten by now (see SeedRequests), so they're an ordinary pickup
+        if (handedTo(item) != null) {
+            stopHandingOver(item);
         }
         if (!isTracked(item) && (depth > 0 || thrownByPlayer(item))) {
             item.addTag(TAG);

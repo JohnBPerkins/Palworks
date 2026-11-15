@@ -50,15 +50,15 @@ For a farm that plants, waters, harvests and replants itself:
 2. Send out a **Grass-type** Pokémon. Grass types plant and harvest.
 3. Send out a **Water-type** Pokémon to water the crops, which keeps the farmland wet and sometimes
    fertilizes them.
-4. Send out a **Flying-type** Pokémon to pick up the harvest, and put a **chest** with free space
-   nearby for it to go into.
+4. Send out a **Flying-type** Pokémon to bring the Grass type seeds and pick up the harvest, and
+   put a **chest** with free space nearby for it to go into.
 
-The Grass type takes seeds from the chest and plants the empty farmland. When crops are fully
-grown, it harvests them and replants them in place. The Flying type picks up what was harvested
-and puts it in a chest.
+The Flying type takes seeds from the chest and brings them to the Grass type, which plants the
+empty farmland. When crops are fully grown, the Grass type harvests them and replants them in
+place. The Flying type picks up what was harvested and puts it in a chest.
 
-Without step 4 the farm still plants and harvests, but nobody picks up the harvest, so it stays
-on the ground.
+Without step 4, nobody brings the Grass type seeds from the chest, and nobody picks up the
+harvest, so it stays on the ground. You can still give it seeds by throwing them next to it.
 
 For a farm that runs while you're away, put the workers in a Cobblemon **pasture**, with a
 [trough](Hunger) of berries to eat from and [beds](Sleep) to sleep in.

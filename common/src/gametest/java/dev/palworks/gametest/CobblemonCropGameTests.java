@@ -316,7 +316,7 @@ public class CobblemonCropGameTests {
         });
     }
 
-    @GameTest(template = Templates.EMPTY, batch = "worker_plant_chest_cobblemon", timeoutTicks = 1000)
+    @GameTest(template = Templates.EMPTY, batch = "worker_plant_chest_cobblemon", timeoutTicks = 1600)
     public void planterTakesTheSeedsItCanPlantFromAChest(GameTestHelper helper) {
         // The chest's first stack is leeks, which grow in water. Carried, they'd count as the seeds
         // it has, so it would never go back for the vivichoke seeds the farmland can take.
@@ -331,6 +331,8 @@ public class CobblemonCropGameTests {
         chest.setItem(0, new ItemStack(CobblemonItems.MEDICINAL_LEEK, 8));
         chest.setItem(1, new ItemStack(CobblemonItems.VIVICHOKE_SEEDS, 8));
         Workers.sendOut(helper, "bulbasaur level=20", START);
+        // Planters can't take seeds out of chests: a Flying type (Transporting) brings them
+        Workers.sendOut(helper, "pidgey level=20", new BlockPos(1, 1, 1));
 
         helper.succeedWhen(() -> {
             for (int x = 2; x <= 4; x++) {

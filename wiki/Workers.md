@@ -51,7 +51,8 @@ What a worker carries depends on its work skills:
 
 - **Transporting** workers have a **3-slot inventory** for the items they pick up and deliver.
 - **Planting** and **Nether** workers have a **1-slot seed pouch** that only holds seeds (or nether
-  wart). They take up to a stack from a chest and keep it until it's planted.
+  wart). A Transporting worker brings them a stack from a chest, and they keep it until it's
+  planted.
 - Other workers carry nothing.
 
 **To open it:** use Cobblemon's interaction wheel on your Pokémon and choose **Inventory**. The
@@ -62,7 +63,7 @@ item. Its real held item (Leftovers, a Choice item...) is never touched.
 
 ## Chests
 
-Workers use regular **chests** and **trapped chests**, both to take seeds and to drop off items.
+Workers use regular **chests** and **trapped chests**, both to take seeds from and to drop off items in.
 Barrels, shulker boxes and storage from other mods aren't supported yet. Transporters take
 [trough food](Hunger) to troughs before chests.
 

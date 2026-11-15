@@ -62,9 +62,18 @@ Nether wart is Nether work: see [below](#nether-wart).
 
 **Who:** Planting (Grass types)
 
-A Planting worker plants on **farmland** with an empty space above it. It takes seeds from a nearby
-**chest** or **trapped chest**, up to a stack in its seed pouch, and keeps them until it has planted
-them all.
+A Planting worker plants on **farmland** with an empty space above it, from the stack of seeds in
+its seed pouch. It can't take seeds out of a chest itself. When it runs out and a nearby **chest**
+or **trapped chest** has seeds it can plant, it asks for some, and carries on with its other work
+meanwhile:
+
+1. A Transporting worker takes a stack of the seeds from the chest.
+2. It brings them to wherever the planter is and drops them at its feet.
+3. The planter picks them up and plants them.
+
+You can also throw seeds (with Q) next to a planter that has room for them, and it picks them up.
+A worker that both plants and transports, such as a Grass/Flying type, takes its own seeds from
+chests.
 
 Any item that plants a crop or stem counts as seeds, so modded and Cobblemon seeds work too.
 Pitcher pods can't be planted.
@@ -74,7 +83,7 @@ Pitcher pods can't be planted.
 **Who:** Nether Work (Ghost types)
 
 Works like [planting](#plant-crops) and [harvesting](#harvest-crops), but on **soul sand** with
-**nether wart** from a chest. Regular Planting and Gathering workers leave nether wart alone.
+**nether wart**, brought from a chest by a Transporting worker. Regular Planting and Gathering workers leave nether wart alone.
 
 A worker with both Nether Work and Lumbering also chops **crimson and warped trees** (see
 [Chop trees](#chop-trees)).
@@ -153,11 +162,11 @@ that will count as ore come from the `#palworks:ores` tag. See
 When several jobs are available, a worker weighs how close each one is against how important it
 is. From most to least important:
 
-1. Deliver items
+1. Deliver items, bring seeds to a planter, pick up seeds brought to it
 2. Pick up drops, restock troughs
 3. Harvest crops
 4. Light furnaces
-5. Take seeds from a chest
+5. Fetch seeds from a chest
 6. Plant crops
 7. Chop trees
 8. Water crops

@@ -62,7 +62,13 @@ public final class JobRecord {
      * never removes them.
      */
     public static JobRecord followUp(JobType type, BlockPos position, long gameTime, @Nullable UUID suggestedWorker) {
-        JobRecord job = new JobRecord(type, position, gameTime, type.requiredSuitabilities(), true);
+        return followUp(type, position, gameTime, suggestedWorker, type.requiredSuitabilities());
+    }
+
+    /** {@link #followUp(JobType, BlockPos, long, UUID)}, needing other suitabilities than its type's. */
+    public static JobRecord followUp(
+            JobType type, BlockPos position, long gameTime, @Nullable UUID suggestedWorker, Set<Suitability> required) {
+        JobRecord job = new JobRecord(type, position, gameTime, required, true);
         job.reservedBy = suggestedWorker;
         return job;
     }
