@@ -2,7 +2,7 @@
 
 While a Pokémon works, it plays a placeholder Cobblemon move as its work animation: Ember to light
 a furnace, Razor Leaf to harvest, Leech Seed to plant, Water Gun to water, Scratch to chop and
-Rock Throw to mine. Each
+Pound to mine. Each
 animation has a **stance**, which sets where the worker stands. A contact move like Scratch is played right up
 against the block; ranged moves are played from a little way back. Bigger Pokémon stand further
 back, measured from the edge of their hitbox.
