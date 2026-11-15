@@ -30,6 +30,8 @@ public class CrystalGameTests {
     private static final BlockPos START = new BlockPos(1, 1, 1);
     private static final String IT_MINES = "it mines";
     private static final String TUMBLESTONE = "tumblestone";
+    private static final String CRYSTAL_CORE = "deepslate_crystal_core";
+    private static final String FIRE_GEM_BLOCK = "fire_gem_block";
     private static final String TUMBLESTONE_CLUSTER = "tumblestone_cluster";
 
     // Cobblemon's blocks and items by id: some of their fields are Kotlin getters in 1.8.0 and
@@ -129,15 +131,15 @@ public class CrystalGameTests {
 
     @GameTest(template = Templates.EMPTY)
     public void aGrownGemClusterGivesItsGemsAndItsGemBlockStays(GameTestHelper helper) {
-        helper.setBlock(CRYSTAL.below(2), block("deepslate_crystal_core"));
-        helper.setBlock(CRYSTAL.below(), block("fire_gem_block"));
+        helper.setBlock(CRYSTAL.below(2), block(CRYSTAL_CORE));
+        helper.setBlock(CRYSTAL.below(), block(FIRE_GEM_BLOCK));
         IntegerProperty stage = TypeGemClusterBlock.Companion.getSTAGE();
         helper.setBlock(CRYSTAL, gemCluster("fire", Collections.max(stage.getPossibleValues())));
 
         helper.assertTrue(mine(helper, CRYSTAL), IT_MINES);
         helper.assertBlockPresent(Blocks.AIR, CRYSTAL);
-        helper.assertBlockPresent(block("fire_gem_block"), CRYSTAL.below());
-        helper.assertBlockPresent(block("deepslate_crystal_core"), CRYSTAL.below(2));
+        helper.assertBlockPresent(block(FIRE_GEM_BLOCK), CRYSTAL.below());
+        helper.assertBlockPresent(block(CRYSTAL_CORE), CRYSTAL.below(2));
         // Its loot: 2-4 gems, by hand
         int gems = Scenes.itemsOnGround(helper, item("fire_gem"));
         helper.assertTrue(gems >= 2 && gems <= 4, "2-4 fire gems, got " + gems);
@@ -155,7 +157,7 @@ public class CrystalGameTests {
             helper.assertFalse(CrystalAdapter.isRipe(state), state + " isn't grown");
         }
         // Nor what they grow from
-        for (Block block : List.of(Blocks.BUDDING_AMETHYST, block("fire_gem_block"), block("deepslate_crystal_core"))) {
+        for (Block block : List.of(Blocks.BUDDING_AMETHYST, block(FIRE_GEM_BLOCK), block(CRYSTAL_CORE))) {
             helper.assertFalse(CrystalAdapter.isRipe(block.defaultBlockState()), block + " isn't a crystal to mine");
         }
         helper.setBlock(CRYSTAL.below(), Blocks.STONE);
@@ -185,6 +187,36 @@ public class CrystalGameTests {
             helper.assertBlockPresent(block("small_budding_tumblestone"), tumblestone);
             helper.assertBlockPresent(Blocks.LARGE_AMETHYST_BUD, bud);
             helper.assertTrue(Scenes.itemsOnGround(helper, Items.AMETHYST_SHARD) > 0, "its shards");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "crystal_reach", timeoutTicks = 1200)
+    public void aMiningWorkerReachesCrystalsTwoBlocksUp(GameTestHelper helper) {
+        // Up to two blocks above where it can stand is within reach: the top of a gem formation
+        // (gem clusters all round a gem block on a crystal core), and amethyst hanging from a ceiling
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.STONE);
+        BlockPos gemBlock = new BlockPos(2, 2, 5);
+        helper.setBlock(gemBlock.below(), block(CRYSTAL_CORE));
+        helper.setBlock(gemBlock, block(FIRE_GEM_BLOCK));
+        IntegerProperty stage = TypeGemClusterBlock.Companion.getSTAGE();
+        int grown = Collections.max(stage.getPossibleValues());
+        List<BlockPos> crystals = new java.util.ArrayList<>();
+        for (Direction face : List.of(Direction.UP, Direction.NORTH, Direction.EAST, Direction.WEST)) {
+            helper.setBlock(
+                    gemBlock.relative(face), gemCluster("fire", grown).setValue(BlockStateProperties.FACING, face));
+            crystals.add(gemBlock.relative(face));
+        }
+        BlockPos hanging = new BlockPos(6, 3, 5);
+        helper.setBlock(hanging.above(), Blocks.BUDDING_AMETHYST);
+        helper.setBlock(hanging, facing(Blocks.AMETHYST_CLUSTER, Direction.DOWN));
+        crystals.add(hanging);
+        Workers.sendOut(helper, "geodude level=20", START);
+
+        helper.succeedWhen(() -> {
+            for (BlockPos crystal : crystals) {
+                helper.assertBlockPresent(Blocks.AIR, crystal);
+            }
         });
     }
 }
