@@ -32,7 +32,7 @@ for its species.
 | Lumbering | Chop trees and replant saplings | Working |
 | Transporting | Pick up drops, deliver them to chests and troughs, restock troughs | Working |
 | Nether Work | Plant and harvest nether wart; chop crimson and warped trees (with Lumbering) | Working |
-| Mining | Mine ores | Not yet |
+| Mining | Mine amethyst, tumblestone and type gems; mine ores (not yet) | Working |
 | Handiwork | Crafting | Not yet |
 | Medicine Production | Brewing | Not yet |
 | Generating Electricity | Powering devices | Not yet |

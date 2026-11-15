@@ -38,7 +38,8 @@ class WorkSkillsTest {
     void workThereIsNothingToDoOnYetIsntShown() {
         assertEquals(
                 List.of(new Shown(Suitability.TRANSPORTING, 2)),
-                WorkSkills.shown(Map.of(Suitability.COOLING, 4, Suitability.MINING, 3, Suitability.TRANSPORTING, 2)));
+                WorkSkills.shown(
+                        Map.of(Suitability.COOLING, 4, Suitability.HANDIWORK, 3, Suitability.TRANSPORTING, 2)));
         assertEquals(List.of(), WorkSkills.shown(Map.of()));
     }
 

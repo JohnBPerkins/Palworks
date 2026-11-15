@@ -32,6 +32,7 @@ public final class WorkSkills {
         ICONS.put(Suitability.PLANTING, hudIcon("plant_seeds"));
         ICONS.put(Suitability.GATHERING, hudIcon("harvest_crops"));
         ICONS.put(Suitability.LUMBERING, hudIcon("chop_tree"));
+        ICONS.put(Suitability.MINING, hudIcon("mine_crystal"));
         ICONS.put(Suitability.TRANSPORTING, hudIcon("deliver_items"));
         ICONS.put(Suitability.NETHER, Palworks.id("textures/gui/work_skill/nether.png"));
     }

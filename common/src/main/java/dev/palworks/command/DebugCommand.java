@@ -44,7 +44,7 @@ public class DebugCommand {
             return;
         }
         player.sendSystemMessage(Component.literal("Building the Palworks test area..."));
-        TestArea.Result result = TestArea.build(level, player.blockPosition());
+        TestArea.Result result = TestArea.build(level, player.blockPosition(), player);
         player.sendSystemMessage(Component.literal(String.format(
                 "Built the test area from %s to %s (%d plots). You're at its north-west corner.",
                 result.min().toShortString(), result.max().toShortString(), result.plots())));

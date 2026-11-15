@@ -3,7 +3,12 @@ package dev.palworks.gametest;
 import com.cobblemon.mod.common.block.BerryBlock;
 import com.cobblemon.mod.common.block.NutBushBlock;
 import com.cobblemon.mod.common.block.RootBlock;
+import com.cobblemon.mod.common.block.TypeGemClusterBlock;
 import com.cobblemon.mod.common.block.entity.BerryBlockEntity;
+import dev.palworks.block.TroughBlock;
+import dev.palworks.block.TroughBlockEntity;
+import dev.palworks.block.WorkerBedBlock;
+import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.debug.TestArea;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -160,11 +165,52 @@ public class TestAreaGameTests {
         return floating;
     }
 
+    /**
+     * The ranch's blocks (whole: the pasture and PC with their tops) and the grown crystals: amethyst,
+     * each colour of tumblestone, and type gems.
+     */
+    private static void assertRanchAndCrystals(GameTestHelper helper, TestArea.Result area) {
+        var level = helper.getLevel();
+        Map<String, Integer> found = new HashMap<>();
+        for (BlockPos pos :
+                BlockPos.betweenClosed(area.min(), area.max().atY(area.min().getY() + 3))) {
+            BlockState state = level.getBlockState(pos);
+            String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+            if (CrystalAdapter.isRipe(state)) {
+                found.merge(state.getBlock() instanceof TypeGemClusterBlock ? "gem cluster" : id, 1, Integer::sum);
+            } else if (state.getBlock() instanceof WorkerBedBlock) {
+                found.merge("bed", 1, Integer::sum);
+            } else if (state.getBlock() instanceof TroughBlock
+                    && level.getBlockEntity(pos) instanceof TroughBlockEntity trough
+                    && trough.hasFeed()) {
+                found.merge("trough with feed", 1, Integer::sum);
+            } else if (List.of("healing_machine", "pasture", "pc").contains(id)) {
+                found.merge(id, 1, Integer::sum);
+            }
+            if (!state.getFluidState().isEmpty()
+                    && List.of("healing_machine", "pasture", "pc").contains(id)) {
+                found.merge("waterlogged " + id, 1, Integer::sum);
+            }
+        }
+        Map<String, Integer> expected = Map.of(
+                "healing_machine", 1,
+                "pasture", 2, // its two halves
+                "pc", 2,
+                "bed", 1,
+                "trough with feed", 1,
+                "amethyst_cluster", 4,
+                "tumblestone_cluster", 1,
+                "sky_tumblestone_cluster", 1,
+                "black_tumblestone_cluster", 1,
+                "gem cluster", 4);
+        helper.assertValueEqual(found, expected, "the ranch and crystals");
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "test_area", timeoutTicks = 200)
     public void theTestAreaHasEverythingFullyGrown(GameTestHelper helper) {
         // Well away from the other tests' areas
         BlockPos origin = helper.absolutePos(new BlockPos(0, 1, 0)).offset(600, 0, 0);
-        TestArea.Result area = TestArea.build(helper.getLevel(), origin);
+        TestArea.Result area = TestArea.build(helper.getLevel(), origin, null);
         helper.assertTrue(area.problems().isEmpty(), "problems: " + area.problems());
         List<String> floating = floatingLeaves(helper, area);
         helper.assertTrue(
@@ -196,6 +242,7 @@ public class TestAreaGameTests {
             }
         }
         check(helper, area, expected, "when built");
+        assertRanchAndCrystals(helper, area);
         // Nothing pops off, dries out or washes away a moment later
         helper.runAfterDelay(40, () -> {
             check(helper, area, expected, "40 ticks later");

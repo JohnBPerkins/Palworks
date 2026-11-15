@@ -306,7 +306,8 @@ class SuitabilityDataTest {
         assertEquals(Map.of(PLANTING, 1, GATHERING, 1), levels(data, List.of("grass"), "x:y"));
         assertEquals(Map.of(GENERATING_ELECTRICITY, 1), levels(data, List.of("electric"), "x:y"));
         assertEquals(Map.of(COOLING, 1), levels(data, List.of("ice"), "x:y"));
-        assertEquals(Map.of(LUMBERING, 1), levels(data, List.of("fighting"), "x:y"));
+        // Fighting mines too since crystal mining (Rock Smash is a Fighting move)
+        assertEquals(Map.of(LUMBERING, 1, MINING, 1), levels(data, List.of("fighting"), "x:y"));
         assertEquals(Map.of(MINING, 1), levels(data, List.of("rock"), "x:y"));
         assertEquals(Map.of(MINING, 1), levels(data, List.of("ground"), "x:y"));
         assertEquals(Map.of(TRANSPORTING, 1), levels(data, List.of("flying"), "x:y"));
@@ -331,10 +332,16 @@ class SuitabilityDataTest {
     void shippedSpeciesFollowTheirStats() throws IOException {
         SuitabilityData data = shipped();
         assertEquals(80, data.speciesCount());
-        // Fighting gives Lumbering; Machamp's species entry adds Handiwork. Both from its stats.
-        assertEquals(Map.of(LUMBERING, 3, HANDIWORK, 3), levels(data, List.of("fighting"), "cobblemon:machamp", 505));
-        assertEquals(Map.of(LUMBERING, 2, HANDIWORK, 2), levels(data, List.of("fighting"), "cobblemon:machoke", 405));
-        assertEquals(Map.of(LUMBERING, 1, HANDIWORK, 1), levels(data, List.of("fighting"), "cobblemon:machop", 305));
+        // Fighting gives Lumbering and Mining; Machamp's species entry adds Handiwork. All from its stats.
+        assertEquals(
+                Map.of(LUMBERING, 3, MINING, 3, HANDIWORK, 3),
+                levels(data, List.of("fighting"), "cobblemon:machamp", 505));
+        assertEquals(
+                Map.of(LUMBERING, 2, MINING, 2, HANDIWORK, 2),
+                levels(data, List.of("fighting"), "cobblemon:machoke", 405));
+        assertEquals(
+                Map.of(LUMBERING, 1, MINING, 1, HANDIWORK, 1),
+                levels(data, List.of("fighting"), "cobblemon:machop", 305));
         assertEquals(Map.of(LUMBERING, 3), levels(data, List.of("bug", "steel"), "cobblemon:scizor", 500));
         assertEquals(
                 Map.of(LUMBERING, 3, TRANSPORTING, 3),

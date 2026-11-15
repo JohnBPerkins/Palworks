@@ -3,6 +3,7 @@ package dev.palworks.job;
 import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.crop.Watering;
+import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.station.ChestHelper;
@@ -483,6 +484,11 @@ final class JobScanner {
                     ? JobRecord.of(
                             JobType.CHOP_TREE, chopPos, now, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER))
                     : JobRecord.of(JobType.CHOP_TREE, chopPos, now);
+        }
+
+        // Grown crystals (amethyst, tumblestone, type gems): Mining
+        if (CrystalAdapter.isRipe(state)) {
+            return JobRecord.of(JobType.MINE_CRYSTAL, pos, now);
         }
 
         // Check for mining jobs (ores). Off until mining is implemented (MINE_RESOURCE's handler

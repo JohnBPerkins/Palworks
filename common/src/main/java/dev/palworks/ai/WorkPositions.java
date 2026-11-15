@@ -96,10 +96,12 @@ public final class WorkPositions {
         // Non-directional (crops, ore, brewing stand, ...; trees are handled above): the nearest
         // ring, from `distance` out, that has a tile the worker fits on; in that ring, the tile
         // nearest the worker. Rings are square (cardinal and diagonal tiles), and each tile is also
-        // tried one block up and down so slopes work. A worker eating from a trough stands square to
-        // one of its sides if it can, so its head is over the food, not at a corner.
+        // tried one block up and down so slopes work (and, for a crystal, two down: see
+        // CRYSTAL_STEPS). A worker eating from a trough stands square to one of its sides if it can,
+        // so its head is over the food, not at a corner.
         Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
         boolean squareOn = jobType == JobType.EAT_FOOD;
+        int[] heights = jobType == JobType.MINE_CRYSTAL ? CRYSTAL_STEPS : SLOPE_STEPS;
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
@@ -107,7 +109,7 @@ public final class WorkPositions {
             double bestSquareDistSq = Double.MAX_VALUE;
             for (BlockPos candidate : ring(targetPos, d)) {
                 // One height per tile: the first that works, level ground first
-                BlockPos spot = firstHeight(candidate, SLOPE_STEPS, fitsThere);
+                BlockPos spot = firstHeight(candidate, heights, fitsThere);
                 if (spot == null) {
                     continue;
                 }
@@ -533,6 +535,13 @@ public final class WorkPositions {
     private static final int EXTRA_RINGS = 3;
     /** Heights tried for each tile: level first, then one up and one down (slopes). */
     private static final int[] SLOPE_STEPS = {0, 1, -1};
+    /**
+     * Heights tried for each tile round a crystal: as {@link #SLOPE_STEPS}, then two down, as far
+     * below its work as a worker reaches ({@link #WORK_HEIGHT_REACH}). Crystals grow on top of
+     * other crystals' blocks (a gem formation) and hang from ceilings, out of reach of the ground
+     * tiles one down.
+     */
+    private static final int[] CRYSTAL_STEPS = {0, 1, -1, -2};
 
     /** The first of {@code tile}'s heights, in {@code dys} order, where {@code fits}; null if none. */
     @Nullable

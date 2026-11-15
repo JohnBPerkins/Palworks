@@ -4,7 +4,10 @@ import com.cobblemon.mod.common.block.ApricornBlock;
 import com.cobblemon.mod.common.block.BerryBlock;
 import com.cobblemon.mod.common.block.NutBushBlock;
 import com.cobblemon.mod.common.block.RootBlock;
+import com.cobblemon.mod.common.block.TypeGemClusterBlock;
 import com.cobblemon.mod.common.block.entity.BerryBlockEntity;
+import dev.palworks.block.ModBlocks;
+import dev.palworks.block.TroughBlockEntity;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,6 +23,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -50,7 +54,11 @@ import org.jetbrains.annotations.Nullable;
  * (its north-west corner, at the height plants stand) east and south:
  * <ol>
  *   <li>Smelting: a furnace, a blast furnace and a smoker, each with something to smelt but no
- *       fuel, and a chest for the output.</li>
+ *       fuel, and a chest for the output. Beside it, a ranch: a healing machine, a pasture and a
+ *       PC (owned by whoever built the area), a straw bed, and a trough with berries in it.</li>
+ *   <li>Crystals, fully grown, each on what grows it back: amethyst clusters on budding amethyst,
+ *       a tumblestone cluster of each colour on a magma block (the heat it needs), and fire gem
+ *       clusters on a fire gem block on a deepslate crystal core.</li>
  *   <li>Crops: one of each, fully grown, with a sign naming it: every vanilla crop (pumpkins and
  *       melons with their fruit, cocoa on a log, glow berries hanging from a post), every Cobblemon
  *       crop block and root (big and energy root, hanging under a block), and every berry bush with
@@ -89,6 +97,8 @@ public final class TestArea {
     private static final Grid SMALL_TREES = new Grid(9, 9, 6);
     private static final Grid BIG_TREES = new Grid(12, 12, 4);
     private static final int SMELTING_DEPTH = 2;
+    // Crystals: a row of north-facing clusters, their bases, and their signs
+    private static final int CRYSTALS_DEPTH = 3;
     private static final int FARM_CLEAR_HEIGHT = 10;
     private static final int SMALL_TREE_CLEAR_HEIGHT = 24;
     private static final int TREE_CLEAR_HEIGHT = 40;
@@ -124,16 +134,22 @@ public final class TestArea {
 
     private final ServerLevel level;
     private final BlockPos origin;
+    // Who the pasture and PC are placed by (null in tests)
+    @Nullable
+    private final ServerPlayer owner;
+
     private final List<String> problems = new ArrayList<>();
     private int plots;
 
-    private TestArea(ServerLevel level, BlockPos origin) {
+    private TestArea(ServerLevel level, BlockPos origin, @Nullable ServerPlayer owner) {
         this.level = level;
         this.origin = origin;
+        this.owner = owner;
     }
 
-    public static Result build(ServerLevel level, BlockPos origin) {
-        return new TestArea(level, origin).build();
+    /** Build the area from {@code origin}, its pasture and PC placed by {@code owner} (if any). */
+    public static Result build(ServerLevel level, BlockPos origin, @Nullable ServerPlayer owner) {
+        return new TestArea(level, origin, owner).build();
     }
 
     private Result build() {
@@ -146,7 +162,8 @@ public final class TestArea {
 
         int width = WALK + CONTENT_WIDTH + WALK;
         int smeltingZ = WALK + 1;
-        int cropsZ = smeltingZ + SMELTING_DEPTH + WALK;
+        int crystalsZ = smeltingZ + SMELTING_DEPTH + WALK;
+        int cropsZ = crystalsZ + CRYSTALS_DEPTH + WALK;
         int smallTreesZ = cropsZ + cropRows * CROP_ROW_DEPTH + WALK;
         int bigTreesZ = smallTreesZ + SMALL_TREES.depth(smallTrees.size()) + WALK;
         int depth = bigTreesZ + BIG_TREES.depth(bigTrees.size()) + 1 + WALK;
@@ -155,9 +172,11 @@ public final class TestArea {
         clearAndFloor(0, width, 0, smallTreesZ, FARM_CLEAR_HEIGHT);
         clearAndFloor(0, width, smallTreesZ, bigTreesZ, SMALL_TREE_CLEAR_HEIGHT);
         clearAndFloor(0, width, bigTreesZ, depth, TREE_CLEAR_HEIGHT);
-        walkways(width, depth, List.of(cropsZ - WALK, smallTreesZ - WALK, bigTreesZ - WALK));
+        walkways(width, depth, List.of(crystalsZ - WALK, cropsZ - WALK, smallTreesZ - WALK, bigTreesZ - WALK));
 
         smelting(smeltingZ);
+        ranch(smeltingZ);
+        crystals(crystalsZ);
         crops(cropsZ, crops);
         section("Trees", smallTreesZ, smallTrees, SMALL_TREES);
         section("Big trees", bigTreesZ, bigTrees, BIG_TREES);
@@ -312,6 +331,125 @@ public final class TestArea {
             problems.add(label + ": no block entity at " + pos.toShortString());
         }
         sign(pos.south(), label, "(no fuel)");
+        plots++;
+    }
+
+    // ---- Ranch ----
+
+    /** A healing machine, a pasture, a PC, a straw bed and a trough of berries, east of the smelting. */
+    private void ranch(int z) {
+        sign(at(WALK + 11, 0, z - 1), "== Ranch ==");
+        facingNorth(at(WALK + 12, 0, z), cobblemonBlock("healing_machine"), "Healer");
+        facingNorth(at(WALK + 15, 0, z), cobblemonBlock("pasture"), "Pasture");
+        facingNorth(at(WALK + 18, 0, z), cobblemonBlock("pc"), "PC");
+
+        BlockPos bed = at(WALK + 21, 0, z);
+        set(bed, ModBlocks.STRAW_BED.get().defaultBlockState());
+        sign(bed.south(), "Bed");
+        plots++;
+
+        BlockPos trough = at(WALK + 24, 0, z);
+        set(trough, ModBlocks.trough("oak").get().defaultBlockState());
+        if (level.getBlockEntity(trough) instanceof TroughBlockEntity feed) {
+            feed.addFood(new ItemStack(BuiltInRegistries.ITEM.get(cobblemonId("oran_berry")), 16));
+        } else {
+            problems.add("Trough: no block entity at " + trough.toShortString());
+        }
+        sign(trough.south(), "Trough");
+        plots++;
+    }
+
+    /**
+     * One of Cobblemon's blocks, facing north (towards whoever looks at it from its sign), placed as
+     * by a player: a pasture or PC puts its top half on, and the pasture takes its owner.
+     */
+    private void facingNorth(BlockPos pos, Block block, String label) {
+        if (block.defaultBlockState().isAir()) {
+            problems.add(label + ": no such block");
+            return;
+        }
+        BlockState state = block.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
+        // Placed in air, as a player would: the pasture's default state is waterlogged (Cobblemon
+        // never sets it), and placing that left water in it
+        if (state.hasProperty(BlockStateProperties.WATERLOGGED)) {
+            state = state.setValue(BlockStateProperties.WATERLOGGED, false);
+        }
+        set(pos, state);
+        block.setPlacedBy(level, pos, state, owner, new ItemStack(block));
+        sign(pos.south(), label);
+        plots++;
+    }
+
+    private static Block cobblemonBlock(String path) {
+        return BuiltInRegistries.BLOCK.get(cobblemonId(path));
+    }
+
+    private static ResourceLocation cobblemonId(String path) {
+        return ResourceLocation.fromNamespaceAndPath(COBBLEMON, path);
+    }
+
+    // ---- Crystals ----
+
+    /**
+     * Grown crystals, for Mining workers, each on what grows it again (see CrystalAdapter). Bases
+     * are a block in from the walkway, so the clusters on their north faces stay off it.
+     */
+    private void crystals(int z) {
+        sign(at(1, 0, z - 1), "== Crystals ==");
+        BlockPos amethyst = at(WALK + 2, 0, z + 1);
+        set(amethyst, Blocks.BUDDING_AMETHYST.defaultBlockState());
+        clusters(amethyst, Blocks.AMETHYST_CLUSTER.defaultBlockState());
+        sign(amethyst.south(), "Amethyst");
+        plots++;
+
+        int x = WALK + 6;
+        for (String colour : List.of("", "sky", "black")) {
+            String name = colour.isEmpty() ? "tumblestone" : colour + "_tumblestone";
+            tumblestone(
+                    at(x, 0, z + 1), cobblemonBlock(name + "_cluster"), signLines(capitalise(name.replace('_', ' '))));
+            x += 3;
+        }
+        gems(at(x + 1, 0, z + 1));
+    }
+
+    /** Clusters on the top and every side but the south (where its sign goes) of a block. */
+    private void clusters(BlockPos base, BlockState cluster) {
+        for (Direction face : List.of(Direction.UP, Direction.NORTH, Direction.EAST, Direction.WEST)) {
+            set(base.relative(face), cluster.setValue(BlockStateProperties.FACING, face));
+        }
+    }
+
+    /** A grown tumblestone on a magma block, the heat a new one needs to grow (Cobblemon's #tumblestone_heat_source). */
+    private void tumblestone(BlockPos pos, Block cluster, String... label) {
+        if (cluster.defaultBlockState().isAir()) {
+            problems.add(String.join(" ", label) + ": no such block");
+            return;
+        }
+        set(pos.below(), Blocks.MAGMA_BLOCK.defaultBlockState());
+        set(pos, cluster.defaultBlockState().setValue(BlockStateProperties.FACING, Direction.UP));
+        sign(pos.south(), label);
+        plots++;
+    }
+
+    /**
+     * A fire gem block on a deepslate crystal core, grown gem clusters on it. The core is what grows
+     * the gem blocks joined to it new clusters, so they grow back.
+     */
+    private void gems(BlockPos core) {
+        Block coreBlock = cobblemonBlock("deepslate_crystal_core");
+        Block gemBlock = cobblemonBlock("fire_gem_block");
+        Block cluster = cobblemonBlock("fire_gem_cluster");
+        if (coreBlock.defaultBlockState().isAir()
+                || gemBlock.defaultBlockState().isAir()
+                || !(cluster instanceof TypeGemClusterBlock)) {
+            problems.add("Type gems: no such blocks");
+            return;
+        }
+        IntegerProperty stage = TypeGemClusterBlock.Companion.getSTAGE();
+        set(core, coreBlock.defaultBlockState());
+        set(core.above(), gemBlock.defaultBlockState());
+        clusters(core.above(), cluster.defaultBlockState().setValue(stage, Collections.max(stage.getPossibleValues())));
+        sign(core.south(), "Fire gems");
         plots++;
     }
 

@@ -35,6 +35,7 @@ public final class JobHandlerRegistry {
             case HARVEST_CROPS -> new HarvestCropsHandler();
             case WATER_CROPS -> new WaterCropsHandler();
             case CHOP_TREE -> new ChopTreeHandler();
+            case MINE_CRYSTAL -> new MineCrystalHandler();
             case EAT_FOOD -> new EatFoodHandler();
             case FETCH_FOOD -> new FetchFoodHandler();
             case BRING_SEEDS -> new BringSeedsHandler();

@@ -7,6 +7,7 @@ import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.crop.Watering;
+import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.hunger.TroughFood;
@@ -103,6 +104,7 @@ public final class JobChecks {
             case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
             case WATER_CROPS -> Watering.needsWater(level, pos);
             case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
+            case MINE_CRYSTAL -> CrystalAdapter.isRipe(level.getBlockState(pos));
             case GET_SEEDS ->
                 isChest(level.getBlockState(pos))
                         && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));

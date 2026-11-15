@@ -38,5 +38,6 @@ public final class Templates {
             SleepGameTests.class,
             MoodGameTests.class,
             JobIndexGameTests.class,
-            PaceGameTests.class);
+            PaceGameTests.class,
+            CrystalGameTests.class);
 }
