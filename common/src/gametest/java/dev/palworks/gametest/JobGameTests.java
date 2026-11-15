@@ -7,13 +7,16 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobBlockTags;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
+import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -149,6 +152,30 @@ public class JobGameTests {
         chest.setItem(5, ItemStack.EMPTY);
         chest.setItem(0, new ItemStack(Items.NETHER_WART, 3));
         helper.assertTrue(there(helper, JobType.GET_SEEDS, pos), "nether wart counts too");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void takingAnItemFromAChestKeepsDifferentStacksOfItApart(GameTestHelper helper) {
+        BlockPos pos = new BlockPos(3, 1, 3);
+        helper.setBlock(pos, Blocks.CHEST);
+        var chest = (ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(pos));
+        // The same item, but not the same thing: as an Aprijuice with a ride boost and a plain one
+        ItemStack named = new ItemStack(Items.WHEAT_SEEDS, 2);
+        named.set(DataComponents.CUSTOM_NAME, Component.literal("Special"));
+        chest.setItem(0, named.copy());
+        chest.setItem(1, new ItemStack(Items.WHEAT_SEEDS, 10));
+        chest.setItem(2, named.copyWithCount(3));
+
+        ItemStack taken = ChestHelper.extractItems(helper.getLevel(), helper.absolutePos(pos), Items.WHEAT_SEEDS, 64);
+        helper.assertTrue(
+                taken.getCount() == 5 && ItemStack.isSameItemSameComponents(taken, named),
+                "the first kind found, and only what there was of it (5 named): " + taken);
+        ItemStack left = chest.getItem(1);
+        helper.assertTrue(
+                left.getCount() == 10 && !left.has(DataComponents.CUSTOM_NAME),
+                "the plain ones are still in the chest, not turned into named ones: " + left);
+        helper.assertTrue(chest.getItem(0).isEmpty() && chest.getItem(2).isEmpty(), "the named ones are all taken");
         helper.succeed();
     }
 

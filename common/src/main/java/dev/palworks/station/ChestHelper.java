@@ -71,7 +71,12 @@ public class ChestHelper {
 
         for (int i = 0; i < container.getContainerSize() && remaining > 0; i++) {
             ItemStack stack = container.getItem(i);
-            if (!stack.isEmpty() && stack.is(item)) {
+            // One kind only: a stack of the item that isn't the same all through as the first found
+            // (an Aprijuice with other effects, a renamed one) stays. Added to the first's count,
+            // it came out as more of the first.
+            if (!stack.isEmpty()
+                    && stack.is(item)
+                    && (result.isEmpty() || ItemStack.isSameItemSameComponents(result, stack))) {
                 int toExtract = Math.min(remaining, stack.getCount());
 
                 if (result.isEmpty()) {
