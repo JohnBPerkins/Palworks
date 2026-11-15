@@ -369,6 +369,11 @@ public final class TestArea {
             return;
         }
         BlockState state = block.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
+        // Placed in air, as a player would: the pasture's default state is waterlogged (Cobblemon
+        // never sets it), and placing that left water in it
+        if (state.hasProperty(BlockStateProperties.WATERLOGGED)) {
+            state = state.setValue(BlockStateProperties.WATERLOGGED, false);
+        }
         set(pos, state);
         block.setPlacedBy(level, pos, state, owner, new ItemStack(block));
         sign(pos.south(), label);

@@ -187,6 +187,10 @@ public class TestAreaGameTests {
             } else if (List.of("healing_machine", "pasture", "pc").contains(id)) {
                 found.merge(id, 1, Integer::sum);
             }
+            if (!state.getFluidState().isEmpty()
+                    && List.of("healing_machine", "pasture", "pc").contains(id)) {
+                found.merge("waterlogged " + id, 1, Integer::sum);
+            }
         }
         Map<String, Integer> expected = Map.of(
                 "healing_machine", 1,
