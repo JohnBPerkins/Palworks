@@ -17,7 +17,8 @@ A Pokémon with no work skills doesn't work even with its work on. See [Workers]
 
 ## Work skills
 
-Change a species' work skills without touching the datapacks. Changes apply straight away (players'
+Change a species' [work skills](Suitabilities) without touching the datapacks (the command is
+named for what the datapack files call them, suitabilities). Changes apply straight away (players'
 PC and summary screens show them a moment later), go over every datapack's levels, and are kept
 after `/reload` and restarts. They're saved with the world, in
 `<world>/palworks/suitability_overrides.json`. If you edit that file by hand and part of it can't
@@ -27,13 +28,14 @@ be read, the server logs a warning, uses the rest, and keeps a copy of your file
 | Command | What it does |
 |---|---|
 | `/palworks suitability get <species>` | Its levels (its standard form's), and which were changed in game. |
-| `/palworks suitability set <species> <job> <level>` | Sets its level for that job outright, whatever its stats give. `0` takes the job away. E.g. `/palworks suitability set bulbasaur watering 3`. |
-| `/palworks suitability reset <species> [<job>]` | Back to the datapacks' levels, for one job or all. |
+| `/palworks suitability set <species> <skill> <level>` | Sets its level for that work skill outright, whatever its stats give. `0` takes the skill away. E.g. `/palworks suitability set bulbasaur watering 3`. |
+| `/palworks suitability reset <species> [<skill>]` | Back to the datapacks' levels, for one work skill or all. |
 | `/palworks suitability reset all` | Undoes every change. |
 | `/palworks suitability list` | Every species changed, and how. |
 
-The jobs are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`, `gathering`,
-`lumbering`, `mining`, `medicine_production`, `cooling`, `transporting`, `nether` and `farming`.
+The work skills are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
+`gathering`, `lumbering`, `mining`, `medicine_production`, `cooling`, `transporting`, `nether` and
+`farming`.
 
 ## Settings
 

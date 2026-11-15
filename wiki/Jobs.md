@@ -95,8 +95,8 @@ A worker with both Nether Work and Lumbering also chops **crimson and warped tre
 [who can](Lumbering-Workers))
 
 A Lumbering worker chops down a **whole tree** at once, then replants it itself: a sapling at the
-base, four for a 2×2 trunk, and a propagule under a mangrove. Afterwards a Transporting worker picks
-up the logs.
+base, four for a 2×2 trunk, and a propagule under a mangrove. Trees grown into each other come
+down together, and each gets its sapling back. Afterwards a Transporting worker picks up the logs.
 
 To protect your builds, a group of logs only counts as a tree if:
 
@@ -154,15 +154,19 @@ from a chest that has some and takes it to the trough.
 **Who:** Mining (Ground, Rock and Fighting types)
 
 Mining workers mine crystals once they're fully grown, getting exactly what you'd get breaking them
-by hand. They leave what the crystals grow from alone, so the crystals grow back:
+by hand. They leave what the crystals grow from alone, so the crystals grow back. And they only
+mine a crystal where another will grow: one you've put somewhere else, as decoration or a light,
+is left alone.
 
-- **Amethyst clusters** (2 shards). Buds aren't mined, and budding amethyst grows new ones.
+- **Amethyst clusters** on budding amethyst (2 shards). Buds aren't mined, and the budding
+  amethyst grows new ones.
 - **Tumblestone clusters** of every colour (4 tumblestone). The worker puts a new tumblestone back
   where the cluster was, using one of the four. It grows again if there's lava or a magma block
   next to it. A cluster under water isn't put back, because tumblestone can't be placed in water.
-- **Type gem clusters** at their last stage (2-4 gems). Gem blocks and the deepslate crystal core
-  are never mined. Gem blocks joined to a core grow new clusters. Left alone, a fully grown
-  cluster turns into a gem block, so a formation a worker keeps mined stays the same size.
+- **Type gem clusters** at their last stage, on a gem block or a crystal core (2-4 gems). Gem
+  blocks and the deepslate crystal core are never mined. Gem blocks joined to a core grow new
+  clusters. Left alone, a fully grown cluster turns into a gem block, so a formation a worker
+  keeps mined stays the same size.
 
 A Transporting worker then picks up the drops.
 

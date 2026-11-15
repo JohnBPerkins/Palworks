@@ -1,8 +1,10 @@
 # Suitabilities
 
-A **suitability** (or work skill) is a kind of work a Pokémon can do, at a **level** from 1 to 5. A
-Pokémon gets suitabilities from its **types**, and some species get extra ones. A Pokémon can only
-take a [job](Jobs) if it has that job's suitability.
+A **work skill** is a kind of work a Pokémon can do, at a **level** from 1 to 5. (The datapack
+files and the `/palworks suitability` command call it a suitability: it's the same thing.) A
+Pokémon gets work skills from its **types**, and some species get extra ones. A Pokémon can only
+take a [job](Jobs), a single piece of work such as lighting one furnace, if it has that job's work
+skill.
 
 To look up a particular Pokémon, see [Work skills by Pokémon](Work-Skills-by-Pokemon), or its PC
 and summary screens in game.
@@ -11,7 +13,7 @@ and summary screens in game.
 
 <!-- generated:type-table -->
 
-Dual-type Pokémon get the suitabilities of both types: Gyarados (Water/Flying) waters crops and
+Dual-type Pokémon get the work skills of both types: Gyarados (Water/Flying) waters crops and
 transports.
 
 ## Every work skill
@@ -56,7 +58,7 @@ A Pokémon's level for a job (1 to 5) comes from how strong it is: its **base st
 - **From a type:** one level less for each earlier form in the Pokémon's evolution line that
   didn't have that type. Hisuian Typhlosion does Kindling at 3, but Nether work at only 1, as
   Cyndaquil and Quilava were Fire but not Ghost. Vaporeon waters at 2, as Eevee was Normal. With two
-  types that give the job, the better level counts.
+  types that give the skill, the better level counts.
 - **From a species entry:** the level its stats give, whatever its earlier forms were. Kingambit
   chops at 4. A datapack can give a species a level or more above that (see
   [Datapacks and Tags](Datapacks-and-Tags#work-skills)).

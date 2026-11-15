@@ -16,7 +16,7 @@ How well it does it depends on how strong it is.
 - **[Getting Started](Getting-Started)**: install the mod and set up your first worker.
 - **[Workers](Workers)**: which Pokémon work, how far they range, switching work on and off, their
   inventory, and what the icons mean.
-- **[Suitabilities](Suitabilities)**: which types and species can do which work, and how well.
+- **[Suitabilities](Suitabilities)**: the work skills, and which types and species have which, and how well.
 - **[Work skills by Pokémon](Work-Skills-by-Pokemon)**: look up any Pokémon.
 - **[Jobs](Jobs)**: every job, how to set it up, and what's still in progress.
 

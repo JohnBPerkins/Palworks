@@ -51,10 +51,11 @@ settings that aren't per-Pokémon:
 - **`hunger`**: how workers get hungry and eat (see [Hunger](Hunger)).
   - **`enabled`**: `false` turns hunger off: Palworks leaves fullness entirely to Cobblemon.
   - **`work_per_fullness`** (1 to 500): how many units of work use up one point of fullness. A
-    unit is a crop harvested, a seed planted, a crop watered, a furnace lit, a trip to pick up or
-    deliver, or every 8 logs of a tree (at most 5 a tree).
+    unit is a crop harvested, a seed planted, a crop watered, a furnace lit, a crystal mined, a
+    trip to pick up or deliver, or every 8 logs of a tree (at most 5 a tree).
   - **`idle_drain_per_day`** (0 to 1): the share of its max fullness a worker loses over a Minecraft
-    day while its work is on, working or not.
+    day while its work is on. Despite the name, that's whether it's idle or busy: work uses up
+    fullness on top of it.
   - **`trough_fill_fraction`** (0 to 1): how full troughs fill a worker, as a share of its max
     fullness, and how full a new Pokémon starts. The rest is left for hand-feeding. 0 and troughs
     never feed, and new Pokémon start empty.
@@ -74,10 +75,12 @@ settings that aren't per-Pokémon:
     it's on its way to a strike.
   - **`strike_until`** (1 to 100): the mood a worker on strike has to be back to before it works.
 
-Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
-the server logs a warning and uses the defaults for every setting. Your file is left as it is for
-you to fix, and a copy is kept beside it as `palworks.json.invalid`, because changing a setting in
-game (below) writes the file again. Changes to the file apply the next time the server starts.
+Any setting left out keeps its default. If a value is out of range, a fraction is given where a
+whole number goes, or the file isn't valid JSON, the server logs a warning and uses the defaults
+for every setting. Your file is left as it is for you to fix, and a copy is kept beside it as
+`palworks.json.invalid`, because changing a setting in game (below) writes the file again. A name
+that isn't a setting (a misspelt one, say) does nothing: the server logs a warning naming it, and
+uses the rest of the file. Changes to the file apply the next time the server starts.
 
 Admins (OP level 2, or the server console) can also change them in game, straight away. Each
 setting is named by its place in the file, and the change is written to the file:

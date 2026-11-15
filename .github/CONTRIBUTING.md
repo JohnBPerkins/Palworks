@@ -11,8 +11,8 @@ Clone and build as described in the [README](../README.md#building-from-source) 
 Gradle wrapper provides the right Gradle version). The commands you'll use day to day:
 
 ```bash
-./gradlew build                  # builds both loaders -> fabric/build/libs/, neoforge/build/libs/,
-                                 # and runs the unit tests and the Fabric in-game tests
+./gradlew assemble               # builds both loaders -> fabric/build/libs/, neoforge/build/libs/
+./gradlew build                  # the same, and runs lint, the unit tests and the Fabric in-game tests
 ./gradlew :common:test           # runs the unit tests (seconds)
 ./gradlew :fabric:runGameTest    # runs the in-game tests on a headless Fabric server (about 30 seconds)
 ./gradlew :neoforge:runGameTest  # the same in-game tests on a headless NeoForge server
@@ -119,6 +119,12 @@ scene, in an empty 8x8x8 area (`Templates.EMPTY`) or a 16x24x16 one for full-siz
 - `WorkerGameTests`: real Pokémon (`Workers.sendOut`) finding and doing jobs end to end.
 - `RealTreeGameTests`: trees grown by Minecraft's own worldgen (branches, low leaves, bent trunks),
   chopped by real lumberjacks of different sizes.
+
+**Client code** (the screens, the HUD, and the three client mixins in
+`palworks-common.mixins.json`) is run by no test: every test runs on a server. The compiler
+does check each mixin against Cobblemon (a field or method one names that isn't there fails the
+build, and CI compiles against each supported Cobblemon), but that client code still works needs
+a look in `runClient`.
 
 Start every test that sends out Pokémon with `Workers.isolate(helper)`, and give it its own
 `batch` (batches run one after another). Workers look for jobs 32 blocks around them, and earlier
@@ -325,6 +331,12 @@ merged since the previous release, grouped by type (see [PR titles](#pr-titles))
 full changelog for everything else. The
 "Full changelog" link in a dry run's preview points at a tag that doesn't exist yet, so it shows
 nothing until the release is made.
+
+Each upload to a mod site is a `publish` job of its own, after the tag is made. **If one fails**
+(a bad token, the site down), open that run and choose **Re-run failed jobs**: it uploads the same
+jars under the same version, and leaves alone what already went up. Don't run the workflow again:
+it refuses on a commit that's already released, as that would release the same code as the next
+version.
 
 ### Publishing setup
 

@@ -5,8 +5,9 @@ servers can change them without code. `/reload` applies changes.
 
 ## Work skills
 
-Which work a Pokémon can do (its [suitabilities](Suitabilities)) comes from datapack files, one per
-job: `data/<namespace>/palworks/suitability/<job>.json`. For example, part of the default
+Which work a Pokémon can do (its [work skills](Suitabilities), which the files call suitabilities)
+comes from datapack files, one per work skill:
+`data/<namespace>/palworks/suitability/<skill>.json`. For example, part of the default
 `data/palworks/palworks/suitability/lumbering.json`:
 
 ```json
@@ -16,25 +17,25 @@ job: `data/<namespace>/palworks/suitability/<job>.json`. For example, part of th
 }
 ```
 
-- **`types`**: every Pokémon of that type can do the job. Types are named as in Cobblemon (`fire`,
+- **`types`**: every Pokémon of that type has the skill. Types are named as in Cobblemon (`fire`,
   `fighting`, …). The number (1 to 5) is added to the Pokémon's
   [work level](Suitabilities#work-levels): `1` is the usual, `2` gives one more.
-- **`species`**: extra species that can do it. The number (1 to 5) works as a type's does: `1` is
+- **`species`**: extra species that have it. The number (1 to 5) works as a type's does: `1` is
   the level its stats give, `2` one more. It's used instead of what the species' types give for that
-  job. A species without a namespace is Cobblemon's (`scizor` = `cobblemon:scizor`). `0` takes the
-  job away from that species, even if one of its types gives it.
+  skill. A species without a namespace is Cobblemon's (`scizor` = `cobblemon:scizor`). `0` takes the
+  skill away from that species, even if one of its types gives it.
 
-Files for the same job from different namespaces **merge**, like vanilla tags: an addon can add
+Files for the same skill from different namespaces **merge**, like vanilla tags: an addon can add
 `data/myaddon/palworks/suitability/kindling.json` with just its own entries. Where two files give
 the same type or species a level, the higher one wins, and a species' `0` wins over any level. Add
-`"replace": true` to a file to use only it for that job, ignoring the other namespaces' files. To
+`"replace": true` to a file to use only it for that skill, ignoring the other namespaces' files. To
 change a default, put a file at the same path as ours in your datapack.
 
-The jobs are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
+The work skills are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
 `gathering`, `lumbering`, `mining`, `medicine_production`, `cooling`, `transporting`, `nether` and
 `farming`. The defaults are in
 [`common/src/main/resources/data/palworks/palworks/suitability`](https://github.com/JohnBPerkins/Palworks/tree/main/common/src/main/resources/data/palworks/palworks/suitability),
-and the [work skill pages](Suitabilities#every-work-skill) list who they give each job to.
+and the [work skill pages](Suitabilities#every-work-skill) list who they give each skill to.
 
 To change a species on one server or world instead, use `/palworks suitability` (see
 [Commands](Commands#work-skills)).
@@ -63,7 +64,8 @@ smoker. A modded block needs a furnace block entity to work.
 
 ## `#palworks:ores`
 
-The blocks [Mining](Jobs#mine-ores) workers will go to, once mining works. By default it holds
+The blocks [Mining](Jobs#mine-ores) workers will go to once they mine ores (for now they only
+[mine crystals](Jobs#mine-crystals), which need no tag). By default it holds
 every vanilla ore: coal, iron, copper, gold, diamond, emerald, lapis and redstone (stone and
 deepslate versions), plus nether gold ore and nether quartz ore.
 
