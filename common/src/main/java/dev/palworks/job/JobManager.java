@@ -385,8 +385,7 @@ public class JobManager {
     // ============================================
 
     /**
-     * Called when a worker completes a job.
-     * Creates consecutive jobs for harvest chains.
+     * Called when a worker completes a job. A pickup that left items behind gets a job again.
      */
     public void onJobCompleted(Pokemon pokemon, ReservationId completedReservation, Level level) {
         if (!(level instanceof ServerLevel serverLevel)) return;
@@ -449,10 +448,9 @@ public class JobManager {
 
     /**
      * Called when a worker finds its reserved job no longer exists — the station block was broken,
-     * replaced, or emptied while it was walking there. Removes the job from both pools (like a
-     * completion) so it isn't re-offered, and marks the worker idle. Clearing the worker's
-     * {@code currentReservation} here prevents {@link #registerWorker} from re-releasing the job
-     * back into {@code availableJobs} on the next tick. Unlike {@link #onJobAbandoned} it does NOT
+     * replaced, or emptied while it was walking there. Removes the job from the pool (like a
+     * completion) so it isn't re-offered, and marks the worker idle, so {@link #registerWorker}
+     * doesn't give the job back to the pool on the next tick. Unlike {@link #onJobAbandoned} it does NOT
      * blacklist the position: nothing is wrong with the spot, so if real work reappears there (e.g.
      * the replacement furnace gets a smeltable input) it should be assignable again immediately.
      */

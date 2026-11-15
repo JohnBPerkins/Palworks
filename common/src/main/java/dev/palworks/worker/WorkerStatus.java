@@ -23,7 +23,7 @@ public enum WorkerStatus {
      */
     TIRED(null, "palworks:status/tired"),
 
-    /** Its mood is low: it works slower until it cheers up (see dev.palworks.mood.Mood). A sad face. */
+    /** Its mood is low: a warning that it's on its way to a strike (see dev.palworks.mood.Mood). A sad face. */
     UNHAPPY(null, "palworks:status/unhappy"),
 
     /**

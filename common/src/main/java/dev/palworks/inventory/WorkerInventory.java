@@ -247,7 +247,7 @@ public class WorkerInventory implements Container {
     }
 
     /**
-     * Get the first item stack in the inventory (for compatibility with old single-slot system).
+     * Get the first item stack in the inventory: what a worker is shown holding.
      */
     public ItemStack getFirstItem() {
         for (ItemStack stack : items) {

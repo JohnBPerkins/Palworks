@@ -487,7 +487,7 @@ public class CropAdapter {
             }
         }
 
-        // Default: break the block completely (for crops like wheat, carrots, etc.)
+        // Default: break the block completely (a crop with no age to set back)
         level.destroyBlock(pos, true);
         return true;
     }

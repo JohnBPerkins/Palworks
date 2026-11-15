@@ -10,8 +10,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Tells JobManager about block changes, so workers re-check jobs they couldn't reach as soon as
- * the terrain changes (see {@link JobManager#onBlockStateChange}). Listed in
+ * Tells JobManager about block changes: the jobs a changed block gives are looked for again, a
+ * crop that's broken loses its watering cooldown, and workers re-check jobs they couldn't reach as
+ * soon as the terrain changes (see {@link JobManager#onBlockStateChange}). Listed in
  * palworks-common.mixins.json, which both loaders load.
  */
 @Mixin(ServerLevel.class)

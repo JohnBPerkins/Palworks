@@ -18,8 +18,9 @@ public class PalworksNeoForgeClient {
     public PalworksNeoForgeClient() {
         PalworksClient.init();
 
-        // Work icons on the party HUD's cards. Cobblemon draws the HUD from the same event at normal
-        // priority; lowest runs after it, so the icons go on top.
+        // Work icons on the party HUD's cards. Cobblemon draws the party HUD earlier in the frame
+        // (before the chat layer), so anything drawn from this event goes on top. Lowest priority
+        // puts them after what else is drawn from it too, Cobblemon's Pokédex scanner among it.
         NeoForge.EVENT_BUS.addListener(
                 EventPriority.LOWEST,
                 false,

@@ -21,8 +21,10 @@ public class PalworksFabricClient implements ClientModInitializer {
     public void onInitializeClient() {
         PalworksClient.init();
 
-        // Work icons on the party HUD's cards. Cobblemon draws the HUD from the same event, in the
-        // default phase; this phase runs after it, so the icons go on top.
+        // Work icons on the party HUD's cards. Cobblemon draws the party HUD earlier in the frame
+        // (its mixin at the head of Gui.renderCameraOverlays), so anything drawn from this event
+        // goes on top. The phase puts them after what's drawn in the default one too, Cobblemon's
+        // Pokédex scanner among it.
         ResourceLocation afterCobblemon = Palworks.id("after_cobblemon_hud");
         HudRenderCallback.EVENT.addPhaseOrdering(Event.DEFAULT_PHASE, afterCobblemon);
         HudRenderCallback.EVENT.register(afterCobblemon, (graphics, deltaTracker) -> WorkStatusHud.render(graphics));
