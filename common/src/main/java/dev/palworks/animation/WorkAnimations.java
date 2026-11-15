@@ -56,8 +56,14 @@ public final class WorkAnimations {
      */
     public static final WorkAnimation WATER = WorkAnimation.move("water", "watergun", 31, 0.25, WorkStance.NEAR);
 
+    /**
+     * Mining a crystal: Rock Throw, a ranged move. Its rocks are thrown at 1.25s and hit the target
+     * half a second later; aimed low, as crystals are small and mostly on the ground.
+     */
+    public static final WorkAnimation MINE = WorkAnimation.move("mine", "rockthrow", 35, 0.25, WorkStance.NEAR);
+
     /** All of them. */
-    public static final List<WorkAnimation> ALL = List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP, WATER);
+    public static final List<WorkAnimation> ALL = List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP, WATER, MINE);
 
     /**
      * The animation a species plays in place of {@code animation}: the default, with whatever the

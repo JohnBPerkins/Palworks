@@ -31,7 +31,9 @@ public enum JobType {
     // Lumbering
     CHOP_TREE(Suitability.LUMBERING, 4),
 
-    // Mining (not scanned for yet: see JobManager's MINING_JOBS_ENABLED)
+    // Mining: crystals that grow back (see dev.palworks.crystal.CrystalAdapter)
+    MINE_CRYSTAL(Suitability.MINING, 7),
+    // Mining ores (not scanned for yet: see JobScanner's MINING_JOBS_ENABLED)
     MINE_RESOURCE(Suitability.MINING, 7),
 
     // Transporting
