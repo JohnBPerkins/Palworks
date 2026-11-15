@@ -56,6 +56,31 @@ class SuitabilityOverridesTest {
     }
 
     @Test
+    void aFileWithEntriesThatWereIgnoredIsKeptWhenAChangeIsSavedOverIt(@TempDir Path world) throws IOException {
+        // One level out of range: that entry is ignored, and the next change saved leaves it out
+        String written = "{\"species\": {\"bulbasaur\": {\"watering\": 3}, \"squirtle\": {\"watering\": 99}}}";
+        Path file = world.resolve(SuitabilityOverrides.FILE_NAME);
+        Files.writeString(file, written);
+        SuitabilityOverrides.load(world);
+        assertEquals(Map.of(BULBASAUR, Map.of(WATERING, 3)), SuitabilityOverrides.all(), "the rest is used");
+
+        SuitabilityOverrides.set(BULBASAUR, PLANTING, 2);
+        assertFalse(Files.readString(file).contains("squirtle"), "saved without what was ignored");
+        assertEquals(
+                written,
+                Files.readString(world.resolve(SuitabilityOverrides.FILE_NAME + ".invalid")),
+                "but a copy of the file as it was is kept");
+    }
+
+    @Test
+    void aFileReadInFullLeavesNoCopy(@TempDir Path world) throws IOException {
+        Files.writeString(
+                world.resolve(SuitabilityOverrides.FILE_NAME), "{\"species\": {\"bulbasaur\": {\"watering\": 3}}}");
+        SuitabilityOverrides.load(world);
+        assertFalse(Files.exists(world.resolve(SuitabilityOverrides.FILE_NAME + ".invalid")));
+    }
+
+    @Test
     void changesAreLoadedWithTheWorldAndPutBackAfterAReload(@TempDir Path world) throws IOException {
         SuitabilityOverrides.load(world);
         SuitabilityOverrides.set(BULBASAUR, PLANTING, 0);
