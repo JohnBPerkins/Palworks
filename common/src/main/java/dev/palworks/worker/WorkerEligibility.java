@@ -51,26 +51,6 @@ public class WorkerEligibility {
     }
 
     /**
-     * Check if a Pokémon is eligible to work.
-     * Must be:
-     * 1. Owned by a player
-     * 2. Currently in the world (sent out from party or pasture)
-     *
-     * @param pokemon The Pokémon to check
-     * @return true if eligible to work
-     */
-    public static boolean isEligible(Pokemon pokemon) {
-        // Must be owned
-        if (!isOwned(pokemon)) {
-            return false;
-        }
-
-        // Must be in the world (sent out)
-        // This is checked by whether the Pokemon has an entity
-        return pokemon.getEntity() != null;
-    }
-
-    /**
      * Check if a Pokémon is owned by a player.
      */
     public static boolean isOwned(Pokemon pokemon) {
@@ -124,38 +104,5 @@ public class WorkerEligibility {
         return entity instanceof PokemonEntity pokemon && pokemon.getTethering() != null
                 ? pokemon.getTethering().getPasturePos()
                 : null;
-    }
-
-    /**
-     * Check if a Pokémon is from a pasture.
-     * Pasture Pokémon have store coordinates but are not in party.
-     */
-    public static boolean isFromPasture(Pokemon pokemon) {
-        if (!isOwned(pokemon)) {
-            return false;
-        }
-
-        // Has store coordinates but not from party
-        var storeCoords = pokemon.getStoreCoordinates().get();
-        return storeCoords != null && !isFromParty(pokemon);
-    }
-
-    /**
-     * Get a description of where this Pokemon is from.
-     */
-    public static String getSourceDescription(Pokemon pokemon) {
-        if (!isOwned(pokemon)) {
-            return "Wild";
-        }
-
-        if (isFromParty(pokemon)) {
-            return "Party";
-        }
-
-        if (isFromPasture(pokemon)) {
-            return "Pasture";
-        }
-
-        return "Unknown";
     }
 }

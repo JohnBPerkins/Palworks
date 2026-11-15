@@ -79,19 +79,4 @@ public class SuitabilityDetector {
 
         return maxLevel;
     }
-
-    /**
-     * Clear all providers (useful for testing or reloading).
-     */
-    public static void clearProviders() {
-        providers.clear();
-    }
-
-    /**
-     * Reset to default providers.
-     */
-    public static void resetToDefaults() {
-        providers.clear();
-        providers.add(new DatapackSuitabilityProvider());
-    }
 }

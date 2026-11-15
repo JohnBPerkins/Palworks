@@ -550,15 +550,6 @@ public class JobManager {
     }
 
     /**
-     * Queue a job to pick up the items lying round {@code pos} (within
-     * {@link JobChecks#pickupRadius}), created at {@code gameTime} if there are any then.
-     * {@code suggestedWorker}, if given, is offered it first.
-     */
-    public void queuePickup(BlockPos pos, @Nullable UUID suggestedWorker, long gameTime) {
-        pickups.add(pos, suggestedWorker, gameTime);
-    }
-
-    /**
      * An item to pick up has come into the level (see TrackedDrops): spawned by a worker's work
      * or a player, or loaded back in with its chunk. It gets a pickup job once it's landed (one
      * dropped by decaying leaves, with the rest of its batch): at {@code source}, where it was

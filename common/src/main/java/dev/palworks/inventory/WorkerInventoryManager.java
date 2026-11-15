@@ -89,14 +89,6 @@ public class WorkerInventoryManager {
     }
 
     /**
-     * Check if a Pokemon has any items in their worker inventory.
-     */
-    public static boolean hasItems(Pokemon pokemon) {
-        WorkerInventory inventory = getOrCreate(pokemon);
-        return !inventory.isEmpty();
-    }
-
-    /**
      * Get the total item count in a Pokemon's worker inventory.
      */
     public static int getTotalItemCount(Pokemon pokemon) {
