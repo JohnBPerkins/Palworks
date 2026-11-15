@@ -6,13 +6,16 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import dev.palworks.Palworks;
+import dev.palworks.config.InvalidFiles;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
@@ -57,11 +60,17 @@ public final class SuitabilityOverrides {
         file = dir.resolve(FILE_NAME);
         overrides = Map.of();
         if (Files.exists(file)) {
-            Consumer<String> warn = message -> Palworks.LOGGER.warn("[suitability] Ignoring {}: {}", file, message);
+            List<String> problems = new ArrayList<>();
             try {
-                overrides = parse(Files.readString(file, StandardCharsets.UTF_8), warn);
+                overrides = parse(Files.readString(file, StandardCharsets.UTF_8), problems::add);
             } catch (IOException e) {
-                warn.accept("couldn't read it (" + e.getMessage() + ")");
+                problems.add("couldn't read it (" + e.getMessage() + ")");
+            }
+            for (String problem : problems) {
+                Palworks.LOGGER.warn("[suitability] Ignoring {}: {}", file, problem);
+            }
+            if (!problems.isEmpty()) {
+                InvalidFiles.keep(file); // the next change saved leaves out what was ignored
             }
             Palworks.LOGGER.info("Loaded in-game work suitability changes for {} species", overrides.size());
         }

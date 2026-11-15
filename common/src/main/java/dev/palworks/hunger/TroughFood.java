@@ -148,7 +148,14 @@ public final class TroughFood {
                     warn.accept(where + ": needs one of \"item\" or \"tag\"");
                     continue;
                 }
-                String idText = (entry.has(ITEM) ? entry.get(ITEM) : entry.get(TAG_FIELD)).getAsString();
+                JsonElement named = entry.has(ITEM) ? entry.get(ITEM) : entry.get(TAG_FIELD);
+                if (!named.isJsonPrimitive() || !named.getAsJsonPrimitive().isString()) {
+                    // Read as text regardless, an object here (a tag file's {"id": ..., "required":
+                    // false}) threw, and that failed the whole datapack reload
+                    warn.accept(where + ": its item or tag should be an id in quotes");
+                    continue;
+                }
+                String idText = named.getAsString();
                 ResourceLocation id = ResourceLocation.tryParse(idText.startsWith("#") ? idText.substring(1) : idText);
                 if (id == null) {
                     warn.accept(where + ": \"" + idText + "\" isn't a valid id");

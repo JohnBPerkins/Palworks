@@ -20,7 +20,9 @@ A Pokémon with no work skills doesn't work even with its work on. See [Workers]
 Change a species' work skills without touching the datapacks. Changes apply straight away (players'
 PC and summary screens show them a moment later), go over every datapack's levels, and are kept
 after `/reload` and restarts. They're saved with the world, in
-`<world>/palworks/suitability_overrides.json`.
+`<world>/palworks/suitability_overrides.json`. If you edit that file by hand and part of it can't
+be read, the server logs a warning, uses the rest, and keeps a copy of your file beside it as
+`suitability_overrides.json.invalid`, because the next change made in game writes the file again.
 
 | Command | What it does |
 |---|---|

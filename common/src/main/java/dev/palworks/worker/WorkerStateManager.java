@@ -80,7 +80,7 @@ public class WorkerStateManager {
      */
     public static void save(Pokemon pokemon, WorkerState state) {
         CACHE.put(pokemon.getUuid(), state);
-        pokemon.getPersistentData().put(WORKER_STATE_KEY, state.serializeNBT());
+        PersistentData.put(pokemon, WORKER_STATE_KEY, state.serializeNBT());
     }
 
     /**

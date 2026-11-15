@@ -1,7 +1,9 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
+import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
@@ -11,7 +13,10 @@ import dev.palworks.animation.WorkAnimator;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.inventory.CarryMode;
+import dev.palworks.inventory.ModMenuTypes;
+import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.inventory.WorkerInventoryMenu;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
@@ -28,6 +33,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -840,6 +846,77 @@ public class WorkerGameTests {
                 EnchantmentHelper.getItemEnchantmentLevel(sharpness, loaded) == 3,
                 "still Sharpness 3: " + loaded.getEnchantments());
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void savingAWorkersStateOrInventoryTellsCobblemonItChanged(GameTestHelper helper) {
+        // In its owner's PC, as a pastured worker is: Cobblemon writes a PC out only once it's been
+        // told one of its Pokémon changed, so a save that doesn't say so can be gone after a restart
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        Pokemon pidgey = PokemonProperties.Companion.parse(PIDGEY).create(); // Flying: Transporting
+        PCStore pc = Cobblemon.INSTANCE.getStorage().getPC(owner);
+        pc.add(pidgey);
+        WorkerState state = WorkerStateManager.getOrCreate(pidgey);
+        AtomicInteger changes = new AtomicInteger();
+        pc.getAnyChangeObservable().subscribe(unit -> changes.incrementAndGet());
+
+        WorkerStateManager.setEnabled(pidgey, false);
+        helper.assertTrue(changes.get() == 1, "switching its work off is a change to save: " + changes.get());
+        WorkerStateManager.save(pidgey, state);
+        helper.assertTrue(changes.get() == 1, "saving it again, unchanged, isn't: " + changes.get());
+        WorkerInventoryManager.getOrCreate(pidgey).setItem(0, new ItemStack(Items.WHEAT, 5));
+        helper.assertTrue(changes.get() == 2, "an item put in its inventory is: " + changes.get());
+
+        WorkerInventoryManager.unload(pidgey.getUuid());
+        WorkerStateManager.unload(pidgey.getUuid());
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aCachedInventoryIsSavedIntoThePokemonItsAskedForWith(GameTestHelper helper) {
+        Pokemon pidgey = PokemonProperties.Companion.parse(PIDGEY).create(); // Flying: Transporting
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pidgey);
+        // The same Pokémon as a new object, as Cobblemon makes when its owner logs back in. One
+        // still out then (pastured, its chunk kept loaded) keeps its cached inventory.
+        Pokemon reloaded = pidgey.clone(false, helper.getLevel().registryAccess());
+        helper.assertTrue(
+                inventory.equals(WorkerInventoryManager.getOrCreate(reloaded)),
+                "the inventory it had is still its own");
+        inventory.setItem(0, new ItemStack(Items.WHEAT, 5));
+
+        WorkerInventoryManager.unload(reloaded.getUuid()); // read back from the new object's data
+        ItemStack loaded = WorkerInventoryManager.getOrCreate(reloaded).getItem(0);
+        WorkerInventoryManager.unload(reloaded.getUuid());
+        helper.assertTrue(
+                loaded.is(Items.WHEAT) && loaded.getCount() == 5,
+                "what it was given since is in the new object's data, not the old one's: " + loaded);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "inventory_screen")
+    public void anInventoryScreenClosesOnceTheWorkerNoLongerCarriesThatInventory(GameTestHelper helper) {
+        Workers.isolate(helper);
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        PokemonEntity pidgey = Workers.sendOut(helper, owner, PIDGEY, new BlockPos(4, 1, 4));
+        Pokemon pokemon = pidgey.getPokemon();
+        // A couple of ticks on, not as it's sent out: a test that fails the tick its Pokémon joins
+        // the world took the whole test server down with it
+        helper.runAfterDelay(2, () -> {
+            WorkerInventoryMenu screen = ModMenuTypes.menuFor(1, owner.getInventory(), pokemon);
+            helper.assertTrue(screen.stillValid(owner), "open while it's out with that inventory");
+
+            // As when it stops ticking for a moment, or faints: dropped from the cache, and read
+            // again from its data. The open screen is on the old copy, with the same items in it.
+            WorkerInventoryManager.unload(pokemon.getUuid());
+            WorkerInventoryManager.getOrCreate(pokemon);
+            helper.assertFalse(screen.stillValid(owner), "closed: the worker carries another copy now");
+
+            WorkerInventoryMenu reopened = ModMenuTypes.menuFor(2, owner.getInventory(), pokemon);
+            helper.assertTrue(reopened.stillValid(owner), "opened again, it's on the copy the worker has");
+            pokemon.recall();
+            helper.assertFalse(reopened.stillValid(owner), "closed once it's recalled");
+            helper.succeed();
+        });
     }
 
     @GameTest(template = Templates.EMPTY, timeoutTicks = 200)

@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
@@ -258,7 +260,8 @@ public record PalworksConfig(
 
     /**
      * Read {@code palworks.json} from the loader's config folder, writing it with the defaults if
-     * it isn't there, so there's a file to edit. Problems are logged, and the defaults used.
+     * it isn't there, so there's a file to edit. Problems are logged, and the defaults used; a file
+     * that isn't valid is left as it is, and a copy kept (see {@link InvalidFiles#keep}).
      */
     public static void load(Path configDir) {
         Path file = configDir.resolve(FILE_NAME);
@@ -270,9 +273,14 @@ public record PalworksConfig(
                 current = DEFAULTS;
                 return;
             }
-            current = parse(
-                    Files.readString(file, StandardCharsets.UTF_8),
-                    message -> Palworks.LOGGER.warn("Ignoring config/{}: {}. Using the defaults.", FILE_NAME, message));
+            List<String> problems = new ArrayList<>();
+            current = parse(Files.readString(file, StandardCharsets.UTF_8), problems::add);
+            for (String problem : problems) {
+                Palworks.LOGGER.warn("Ignoring config/{}: {}. Using the defaults.", FILE_NAME, problem);
+            }
+            if (!problems.isEmpty()) {
+                InvalidFiles.keep(file); // /palworks config writes over it, with the defaults
+            }
         } catch (IOException e) {
             Palworks.LOGGER.warn("Couldn't read or write config/{}; using the defaults", FILE_NAME, e);
             current = DEFAULTS;

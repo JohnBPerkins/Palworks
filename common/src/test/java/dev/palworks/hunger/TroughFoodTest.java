@@ -73,6 +73,25 @@ class TroughFoodTest {
     }
 
     @Test
+    void anItemOrTagThatIsntAnIdInQuotesIsSkippedWithAWarning() {
+        // As a tag file writes an optional entry, or by mistake: reading these as text threw,
+        // which failed the whole datapack reload
+        List<String> warnings = new ArrayList<>();
+        TroughFood food = load(
+                Map.of(
+                        "pack:food",
+                        "{\"values\": [{\"item\": {\"id\": \"x:optional\", \"required\": false}, \"fullness\": 2},"
+                                + " {\"tag\": [\"x:one\", \"x:two\"], \"fullness\": 2},"
+                                + " {\"item\": null, \"fullness\": 2}, {\"item\": 7, \"fullness\": 2},"
+                                + " {\"item\": \"x:good\", \"fullness\": 1}]}"),
+                warnings);
+        assertEquals(4, warnings.size(), warnings.toString());
+        assertEquals(1, food.valueForItem(ResourceLocation.parse("x:good")));
+        assertEquals(1, food.itemCount());
+        assertEquals(List.of(), food.tagOrder());
+    }
+
+    @Test
     void theShippedFileLoadsCleanly() throws IOException {
         Path file = DATA.resolve("palworks/palworks/trough_food/cobblemon.json");
         List<String> warnings = new ArrayList<>();

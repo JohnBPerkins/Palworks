@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class PalworksConfigTest {
+    private static final String FILE = "palworks.json";
 
     @AfterEach
     void restoreDefaults() {
@@ -173,7 +174,7 @@ class PalworksConfigTest {
     @Test
     void loadingWritesTheDefaultsWhenThereIsNoFile(@TempDir Path configDir) throws IOException {
         PalworksConfig.load(configDir);
-        Path file = configDir.resolve("palworks.json");
+        Path file = configDir.resolve(FILE);
         assertTrue(Files.exists(file));
         assertEquals(PalworksConfig.DEFAULTS, PalworksConfig.current());
         assertTrue(Files.readString(file).contains("\"work_range_horizontal\": 32"), Files.readString(file));
@@ -181,9 +182,34 @@ class PalworksConfigTest {
 
     @Test
     void loadingReadsTheFile(@TempDir Path configDir) throws IOException {
-        Files.writeString(configDir.resolve("palworks.json"), "{\"owner_range\": 16}");
+        Files.writeString(configDir.resolve(FILE), "{\"owner_range\": 16}");
         PalworksConfig.load(configDir);
         assertEquals(16, PalworksConfig.current().ownerRange());
+    }
+
+    @Test
+    void aFileThatIsntValidIsKeptWhenAChangeIsSavedOverIt(@TempDir Path configDir) throws IOException {
+        // One value out of range: the whole file is ignored, and a change made in game then
+        // writes the defaults over everything else its author had set
+        String written = "{\"work_range_horizontal\": 48, \"owner_range\": 400}";
+        Path file = configDir.resolve(FILE);
+        Files.writeString(file, written);
+        PalworksConfig.load(configDir);
+        assertEquals(PalworksConfig.DEFAULTS, PalworksConfig.current());
+        assertEquals(written, Files.readString(file), "left as it was, for its author to put right");
+
+        PalworksConfig changed =
+                PalworksConfig.DEFAULTS.withHunger(new PalworksConfig.HungerConfig(false, 20, 0.25, 0.5, 0.25));
+        PalworksConfig.save(changed);
+        assertEquals(changed, parse(Files.readString(file), new ArrayList<>()), "saved over it, with the defaults");
+        assertEquals(written, Files.readString(configDir.resolve(FILE + InvalidFiles.SUFFIX)), "but a copy is kept");
+    }
+
+    @Test
+    void aValidFileLeavesNoCopy(@TempDir Path configDir) throws IOException {
+        Files.writeString(configDir.resolve(FILE), "{\"owner_range\": 16}");
+        PalworksConfig.load(configDir);
+        assertFalse(Files.exists(configDir.resolve(FILE + InvalidFiles.SUFFIX)));
     }
 
     @Test

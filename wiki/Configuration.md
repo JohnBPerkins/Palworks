@@ -75,8 +75,9 @@ settings that aren't per-Pokémon:
   - **`strike_until`** (1 to 100): the mood a worker on strike has to be back to before it works.
 
 Any setting left out keeps its default. If a value is out of range or the file isn't valid JSON,
-the server logs a warning and uses the defaults. Changes to the file apply the next time the server
-starts.
+the server logs a warning and uses the defaults for every setting. Your file is left as it is for
+you to fix, and a copy is kept beside it as `palworks.json.invalid`, because changing a setting in
+game (below) writes the file again. Changes to the file apply the next time the server starts.
 
 Admins (OP level 2, or the server console) can also change them in game, straight away. Each
 setting is named by its place in the file, and the change is written to the file:
