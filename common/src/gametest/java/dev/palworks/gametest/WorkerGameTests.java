@@ -1,7 +1,9 @@
 package dev.palworks.gametest;
 
+import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
+import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
@@ -28,6 +30,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -839,6 +842,30 @@ public class WorkerGameTests {
         helper.assertTrue(
                 EnchantmentHelper.getItemEnchantmentLevel(sharpness, loaded) == 3,
                 "still Sharpness 3: " + loaded.getEnchantments());
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void savingAWorkersStateOrInventoryTellsCobblemonItChanged(GameTestHelper helper) {
+        // In its owner's PC, as a pastured worker is: Cobblemon writes a PC out only once it's been
+        // told one of its Pokémon changed, so a save that doesn't say so can be gone after a restart
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        Pokemon pidgey = PokemonProperties.Companion.parse(PIDGEY).create(); // Flying: Transporting
+        PCStore pc = Cobblemon.INSTANCE.getStorage().getPC(owner);
+        pc.add(pidgey);
+        WorkerState state = WorkerStateManager.getOrCreate(pidgey);
+        AtomicInteger changes = new AtomicInteger();
+        pc.getAnyChangeObservable().subscribe(unit -> changes.incrementAndGet());
+
+        WorkerStateManager.setEnabled(pidgey, false);
+        helper.assertTrue(changes.get() == 1, "switching its work off is a change to save: " + changes.get());
+        WorkerStateManager.save(pidgey, state);
+        helper.assertTrue(changes.get() == 1, "saving it again, unchanged, isn't: " + changes.get());
+        WorkerInventoryManager.getOrCreate(pidgey).setItem(0, new ItemStack(Items.WHEAT, 5));
+        helper.assertTrue(changes.get() == 2, "an item put in its inventory is: " + changes.get());
+
+        WorkerInventoryManager.unload(pidgey.getUuid());
+        WorkerStateManager.unload(pidgey.getUuid());
         helper.succeed();
     }
 

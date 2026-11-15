@@ -2,6 +2,7 @@ package dev.palworks.inventory;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.architectury.utils.GameInstance;
+import dev.palworks.worker.PersistentData;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,8 +63,7 @@ public class WorkerInventoryManager {
      * Save a worker inventory to the Pokemon's persistent data.
      */
     public static void save(Pokemon pokemon, WorkerInventory inventory) {
-        CompoundTag persistentData = pokemon.getPersistentData();
-        persistentData.put(NBT_KEY, inventory.serializeNBT(registries()));
+        PersistentData.put(pokemon, NBT_KEY, inventory.serializeNBT(registries()));
     }
 
     /**
