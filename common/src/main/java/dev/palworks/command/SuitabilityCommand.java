@@ -41,10 +41,10 @@ import org.jetbrains.annotations.Nullable;
  */
 final class SuitabilityCommand {
     private static final String SPECIES = "species";
-    private static final String JOB = "job";
+    private static final String SKILL = "skill"; // what players call a suitability: a work skill
     private static final String LEVEL = "level";
-    private static final DynamicCommandExceptionType UNKNOWN_JOB = new DynamicCommandExceptionType(
-            id -> Component.literal("Unknown job \"" + id + "\": expected one of " + String.join(", ", jobIds())));
+    private static final DynamicCommandExceptionType UNKNOWN_JOB = new DynamicCommandExceptionType(id ->
+            Component.literal("Unknown work skill \"" + id + "\": expected one of " + String.join(", ", jobIds())));
 
     private SuitabilityCommand() {}
 
@@ -178,12 +178,12 @@ final class SuitabilityCommand {
     }
 
     private static RequiredArgumentBuilder<CommandSourceStack, String> job() {
-        return Commands.argument(JOB, StringArgumentType.word())
+        return Commands.argument(SKILL, StringArgumentType.word())
                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(jobIds(), builder));
     }
 
     private static Suitability job(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        String id = StringArgumentType.getString(ctx, JOB);
+        String id = StringArgumentType.getString(ctx, SKILL);
         Suitability job = Suitability.fromId(id.toLowerCase(Locale.ROOT));
         if (job == null) {
             throw UNKNOWN_JOB.create(id);
