@@ -13,8 +13,10 @@ import dev.palworks.animation.WorkAnimator;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.inventory.CarryMode;
+import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.inventory.WorkerInventoryMenu;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
@@ -889,6 +891,32 @@ public class WorkerGameTests {
                 loaded.is(Items.WHEAT) && loaded.getCount() == 5,
                 "what it was given since is in the new object's data, not the old one's: " + loaded);
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "inventory_screen")
+    public void anInventoryScreenClosesOnceTheWorkerNoLongerCarriesThatInventory(GameTestHelper helper) {
+        Workers.isolate(helper);
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        PokemonEntity pidgey = Workers.sendOut(helper, owner, PIDGEY, new BlockPos(4, 1, 4));
+        Pokemon pokemon = pidgey.getPokemon();
+        // A couple of ticks on, not as it's sent out: a test that fails the tick its Pokémon joins
+        // the world took the whole test server down with it
+        helper.runAfterDelay(2, () -> {
+            WorkerInventoryMenu screen = ModMenuTypes.menuFor(1, owner.getInventory(), pokemon);
+            helper.assertTrue(screen.stillValid(owner), "open while it's out with that inventory");
+
+            // As when it stops ticking for a moment, or faints: dropped from the cache, and read
+            // again from its data. The open screen is on the old copy, with the same items in it.
+            WorkerInventoryManager.unload(pokemon.getUuid());
+            WorkerInventoryManager.getOrCreate(pokemon);
+            helper.assertFalse(screen.stillValid(owner), "closed: the worker carries another copy now");
+
+            WorkerInventoryMenu reopened = ModMenuTypes.menuFor(2, owner.getInventory(), pokemon);
+            helper.assertTrue(reopened.stillValid(owner), "opened again, it's on the copy the worker has");
+            pokemon.recall();
+            helper.assertFalse(reopened.stillValid(owner), "closed once it's recalled");
+            helper.succeed();
+        });
     }
 
     @GameTest(template = Templates.EMPTY, timeoutTicks = 200)

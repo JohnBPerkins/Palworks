@@ -1,6 +1,7 @@
 package dev.palworks.inventory;
 
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -16,8 +17,9 @@ import net.minecraft.world.item.ItemStack;
  * Handles server-side slot management and item transfer.
  */
 public final class WorkerInventoryMenu extends AbstractContainerMenu {
-    private final Container workerInventory;
     private final UUID pokemonUUID;
+    // Whether the worker still carries this inventory (server side; always true on the client)
+    private final BooleanSupplier stillCarried;
     // The worker's CarryMode (ordinal), synced to the client so it shows only the slots the worker
     // can use (all 3, or the single seed-pouch slot). Starts as NONE on the client until synced.
     private final DataSlot carryMode = DataSlot.standalone();
@@ -31,7 +33,7 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
     private static final int PLAYER_HOTBAR_END = PLAYER_HOTBAR_START + 9;
 
     /**
-     * Server-side constructor.
+     * Server-side constructor. The screen closes once {@code stillCarried} is false.
      */
     @SuppressWarnings("EnumOrdinal") // the data slot syncs CarryMode by ordinal; see CarryMode.fromOrdinal
     public WorkerInventoryMenu(
@@ -39,10 +41,11 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
             int containerId,
             Inventory playerInventory,
             Container workerInventory,
-            UUID pokemonUUID) {
+            UUID pokemonUUID,
+            BooleanSupplier stillCarried) {
         super(menuType, containerId);
-        this.workerInventory = workerInventory;
         this.pokemonUUID = pokemonUUID;
+        this.stillCarried = stillCarried;
 
         checkContainerSize(workerInventory, WorkerInventory.INVENTORY_SIZE);
 
@@ -75,7 +78,13 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
      * Client-side constructor (creates empty container that will be synced).
      */
     public WorkerInventoryMenu(MenuType<?> menuType, int containerId, Inventory playerInventory, UUID pokemonUUID) {
-        this(menuType, containerId, playerInventory, new SimpleContainer(WorkerInventory.INVENTORY_SIZE), pokemonUUID);
+        this(
+                menuType,
+                containerId,
+                playerInventory,
+                new SimpleContainer(WorkerInventory.INVENTORY_SIZE),
+                pokemonUUID,
+                () -> true);
     }
 
     public UUID getPokemonUUID() {
@@ -105,7 +114,7 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return workerInventory.stillValid(player);
+        return stillCarried.getAsBoolean();
     }
 
     @Override

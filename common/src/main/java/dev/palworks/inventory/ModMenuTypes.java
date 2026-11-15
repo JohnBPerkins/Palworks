@@ -36,10 +36,24 @@ public final class ModMenuTypes {
         MENUS.register();
     }
 
+    /**
+     * The server's side of a worker's inventory screen: on the inventory the worker itself uses,
+     * and open only while it stays that (see {@link WorkerInventoryManager#isCarriedBy}).
+     */
+    public static WorkerInventoryMenu menuFor(int containerId, Inventory playerInventory, Pokemon pokemon) {
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+        return new WorkerInventoryMenu(
+                WORKER_INVENTORY.get(),
+                containerId,
+                playerInventory,
+                inventory,
+                pokemon.getUuid(),
+                () -> WorkerInventoryManager.isCarriedBy(pokemon, inventory));
+    }
+
     /** Open a worker's inventory for a player. */
     public static void openWorkerInventory(ServerPlayer player, Pokemon pokemon) {
         UUID pokemonUUID = pokemon.getUuid();
-        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         String pokemonName = pokemon.getSpecies().getName();
         MenuProvider provider = new MenuProvider() {
             @Override
@@ -49,8 +63,7 @@ public final class ModMenuTypes {
 
             @Override
             public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player p) {
-                return new WorkerInventoryMenu(
-                        WORKER_INVENTORY.get(), containerId, playerInventory, inventory, pokemonUUID);
+                return menuFor(containerId, playerInventory, pokemon);
             }
         };
         MenuRegistry.openExtendedMenu(player, provider, buf -> buf.writeUUID(pokemonUUID));

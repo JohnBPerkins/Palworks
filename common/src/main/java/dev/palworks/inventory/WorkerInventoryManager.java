@@ -1,5 +1,6 @@
 package dev.palworks.inventory;
 
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.architectury.utils.GameInstance;
 import dev.palworks.worker.PersistentData;
@@ -76,6 +77,18 @@ public class WorkerInventoryManager {
      */
     private static HolderLookup.Provider registries() {
         return GameInstance.getServer().registryAccess();
+    }
+
+    /**
+     * Whether {@code inventory} is still what this Pokémon carries, out in the world: what an open
+     * inventory screen asks each tick. Once it's recalled, faints or stops ticking, its inventory
+     * leaves the cache, and it's read from its data again (a new object) when it's back. A screen
+     * left open on the old one would hand out items the worker still has too.
+     */
+    public static boolean isCarriedBy(Pokemon pokemon, WorkerInventory inventory) {
+        PokemonEntity entity = pokemon.getEntity();
+        // That very object: an inventory equals only itself
+        return entity != null && entity.isAlive() && inventory.equals(inventoryCache.get(pokemon.getUuid()));
     }
 
     /**
