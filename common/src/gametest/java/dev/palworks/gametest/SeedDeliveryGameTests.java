@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
 
 /**
  * Seeds for planters (see SeedRequests): a planter can't take seeds out of a chest, so one that's
- * run out asks, and a transporter brings it some and drops them at its feet; seeds a player throws
+ * run out asks, and a transporter brings it some and throws them to its feet; seeds a player throws
  * by a planter are its too. A worker that transports and plants still fetches its own.
  */
 public class SeedDeliveryGameTests {
@@ -133,6 +133,43 @@ public class SeedDeliveryGameTests {
             assertPlanted(helper);
             // (Not "fewer seeds in the chest": the harvest's seeds are put in it too)
             helper.assertTrue(handedOver[0], "seeds were brought to the planter");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "seeds_thrown_over", timeoutTicks = 1200)
+    public void broughtSeedsLieOnTheGroundAMomentBeforeThePlanterTakesThem(GameTestHelper helper) {
+        farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
+        Workers.sendOut(helper, BULBASAUR, PLANTER);
+        Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        // When the seeds were thrown, when they landed, and when they were taken
+        long[] thrown = {-1};
+        long[] landed = {-1};
+        long[] taken = {-1};
+        helper.onEachTick(() -> {
+            ItemEntity seeds = null;
+            for (ItemEntity item : helper.getLevel()
+                    .getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4))) {
+                if (TrackedDrops.handedTo(item) != null) {
+                    seeds = item;
+                }
+            }
+            long now = helper.getTick();
+            if (seeds != null && thrown[0] < 0) {
+                thrown[0] = now;
+            }
+            if (seeds != null && seeds.onGround() && landed[0] < 0) {
+                landed[0] = now;
+            }
+            if (seeds == null && thrown[0] >= 0 && taken[0] < 0) {
+                taken[0] = now;
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            assertPlanted(helper);
+            helper.assertTrue(landed[0] > thrown[0], "the seeds were thrown, and landed after");
+            // A player's throw can be picked up after 2 seconds
+            helper.assertTrue(taken[0] - thrown[0] >= 40, "the seeds lay there a moment before they were taken");
         });
     }
 
