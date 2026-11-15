@@ -2,6 +2,8 @@ package dev.palworks.config;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
@@ -24,6 +26,35 @@ public final class ConfigKeys {
         List<String> names = new ArrayList<>();
         addNames("", json(PalworksConfig.DEFAULTS), names);
         return names;
+    }
+
+    /**
+     * The keys in {@code json} (the file's text) that aren't settings, named as settings are: a
+     * misspelt one, or one from another version. They're read as if they weren't there, so without
+     * this a mistyped setting just quietly kept its default. None if it isn't JSON.
+     */
+    public static List<String> unknown(String json) {
+        List<String> unknown = new ArrayList<>();
+        try {
+            addUnknown("", JsonParser.parseString(json), json(PalworksConfig.DEFAULTS), unknown);
+        } catch (JsonParseException e) {
+            return List.of();
+        }
+        return unknown;
+    }
+
+    private static void addUnknown(String prefix, JsonElement given, JsonElement known, List<String> unknown) {
+        if (!(given instanceof JsonObject givenObject) || !(known instanceof JsonObject knownObject)) {
+            return;
+        }
+        for (Map.Entry<String, JsonElement> entry : givenObject.entrySet()) {
+            JsonElement match = knownObject.get(entry.getKey());
+            if (match == null) {
+                unknown.add(prefix + entry.getKey());
+            } else {
+                addUnknown(prefix + entry.getKey() + ".", entry.getValue(), match, unknown);
+            }
+        }
     }
 
     /** This setting's value in {@code config}, as the file writes it; null if there's no such setting. */

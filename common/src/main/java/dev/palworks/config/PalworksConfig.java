@@ -6,8 +6,10 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
+import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.PrimitiveCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.palworks.Palworks;
 import dev.palworks.job.WorkRange;
@@ -142,7 +144,7 @@ public record PalworksConfig(
 
         public static final Codec<MoodConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                         field(Codec.BOOL, "enabled", DEFAULTS.enabled()).forGetter(MoodConfig::enabled),
-                        field(Codec.intRange(1, 500), "work_per_point", DEFAULTS.workPerPoint())
+                        field(wholeRange(1, 500), "work_per_point", DEFAULTS.workPerPoint())
                                 .forGetter(MoodConfig::workPerPoint),
                         field(Codec.doubleRange(0.0, 1000.0), "hungry_drain_per_day", DEFAULTS.hungryDrainPerDay())
                                 .forGetter(MoodConfig::hungryDrainPerDay),
@@ -150,9 +152,9 @@ public record PalworksConfig(
                                 .forGetter(MoodConfig::tiredDrainPerDay),
                         field(Codec.doubleRange(0.0, 1000.0), "recovery_per_day", DEFAULTS.recoveryPerDay())
                                 .forGetter(MoodConfig::recoveryPerDay),
-                        field(Codec.intRange(0, 100), "unhappy_below", DEFAULTS.unhappyBelow())
+                        field(wholeRange(0, 100), "unhappy_below", DEFAULTS.unhappyBelow())
                                 .forGetter(MoodConfig::unhappyBelow),
-                        field(Codec.intRange(1, 100), "strike_until", DEFAULTS.strikeUntil())
+                        field(wholeRange(1, 100), "strike_until", DEFAULTS.strikeUntil())
                                 .forGetter(MoodConfig::strikeUntil))
                 .apply(instance, MoodConfig::new));
     }
@@ -204,7 +206,7 @@ public record PalworksConfig(
 
         public static final Codec<HungerConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                         field(Codec.BOOL, "enabled", DEFAULTS.enabled()).forGetter(HungerConfig::enabled),
-                        field(Codec.intRange(1, 500), "work_per_fullness", DEFAULTS.workPerFullness())
+                        field(wholeRange(1, 500), "work_per_fullness", DEFAULTS.workPerFullness())
                                 .forGetter(HungerConfig::workPerFullness),
                         field(Codec.doubleRange(0.0, 1.0), "idle_drain_per_day", DEFAULTS.idleDrainPerDay())
                                 .forGetter(HungerConfig::idleDrainPerDay),
@@ -216,17 +218,17 @@ public record PalworksConfig(
     }
 
     public static final Codec<PalworksConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-                    field(Codec.intRange(8, 64), "work_range_horizontal", DEFAULTS.workRangeHorizontal())
+                    field(wholeRange(8, 64), "work_range_horizontal", DEFAULTS.workRangeHorizontal())
                             .forGetter(PalworksConfig::workRangeHorizontal),
-                    field(Codec.intRange(4, 64), "work_range_vertical", DEFAULTS.workRangeVertical())
+                    field(wholeRange(4, 64), "work_range_vertical", DEFAULTS.workRangeVertical())
                             .forGetter(PalworksConfig::workRangeVertical),
-                    field(Codec.intRange(4, WorkRange.OWNER_LEASH), "owner_range", DEFAULTS.ownerRange())
+                    field(wholeRange(4, WorkRange.OWNER_LEASH), "owner_range", DEFAULTS.ownerRange())
                             .forGetter(PalworksConfig::ownerRange),
                     field(Codec.doubleRange(1.0, 8.0), "pickup_radius", DEFAULTS.pickupRadius())
                             .forGetter(PalworksConfig::pickupRadius),
                     field(Codec.doubleRange(0.0, 0.2), "fertilize_chance_per_level", DEFAULTS.fertilizeChancePerLevel())
                             .forGetter(PalworksConfig::fertilizeChancePerLevel),
-                    field(Codec.intRange(5, 600), "watering_cooldown_seconds", DEFAULTS.wateringCooldownSeconds())
+                    field(wholeRange(5, 600), "watering_cooldown_seconds", DEFAULTS.wateringCooldownSeconds())
                             .forGetter(PalworksConfig::wateringCooldownSeconds),
                     field(HungerConfig.CODEC, "hunger", DEFAULTS.hunger()).forGetter(PalworksConfig::hunger),
                     field(SleepConfig.CODEC, "sleep", DEFAULTS.sleep()).forGetter(PalworksConfig::sleep),
@@ -234,6 +236,37 @@ public record PalworksConfig(
             .apply(instance, PalworksConfig::new));
 
     private static final String FILE_NAME = "palworks.json";
+
+    /**
+     * A whole number, as JSON has it. Codec.INT cuts a fraction down to one (8.7 to 8). In a class
+     * of its own so it's there whichever of the codecs above is built first.
+     */
+    private static final class Whole {
+        static final Codec<Integer> CODEC = new PrimitiveCodec<>() {
+            @Override
+            public <T> DataResult<Integer> read(DynamicOps<T> ops, T input) {
+                return ops.getNumberValue(input)
+                        .flatMap(number -> number.doubleValue() == Math.rint(number.doubleValue())
+                                ? DataResult.success(number.intValue())
+                                : DataResult.error(() -> number + " isn't a whole number"));
+            }
+
+            @Override
+            public <T> T write(DynamicOps<T> ops, Integer value) {
+                return ops.createInt(value);
+            }
+        };
+    }
+
+    /**
+     * A whole number from {@code min} to {@code max}. As {@code Codec.intRange}, but a fraction is
+     * refused, as {@code /palworks config set} refuses it, rather than quietly rounded down.
+     */
+    private static Codec<Integer> wholeRange(int min, int max) {
+        return Whole.CODEC.validate(value -> value >= min && value <= max
+                ? DataResult.success(value)
+                : DataResult.error(() -> "Value " + value + " outside of range [" + min + ":" + max + "]"));
+    }
 
     /**
      * An optional field: left out, it's {@code fallback}. Unlike {@code optionalFieldOf(name,
@@ -261,7 +294,8 @@ public record PalworksConfig(
     /**
      * Read {@code palworks.json} from the loader's config folder, writing it with the defaults if
      * it isn't there, so there's a file to edit. Problems are logged, and the defaults used; a file
-     * that isn't valid is left as it is, and a copy kept (see {@link InvalidFiles#keep}).
+     * that isn't valid is left as it is, and a copy kept (see {@link InvalidFiles#keep}). A key
+     * that isn't a setting (misspelt, or from another version) is logged too, and the rest used.
      */
     public static void load(Path configDir) {
         Path file = configDir.resolve(FILE_NAME);
@@ -274,12 +308,21 @@ public record PalworksConfig(
                 return;
             }
             List<String> problems = new ArrayList<>();
-            current = parse(Files.readString(file, StandardCharsets.UTF_8), problems::add);
+            String json = Files.readString(file, StandardCharsets.UTF_8);
+            current = parse(json, problems::add);
             for (String problem : problems) {
                 Palworks.LOGGER.warn("Ignoring config/{}: {}. Using the defaults.", FILE_NAME, problem);
             }
             if (!problems.isEmpty()) {
                 InvalidFiles.keep(file); // /palworks config writes over it, with the defaults
+                return;
+            }
+            for (String name : ConfigKeys.unknown(json)) {
+                Palworks.LOGGER.warn(
+                        "config/{}: there's no setting \"{}\", so it does nothing. Check its spelling"
+                                + " (/palworks config get lists them all).",
+                        FILE_NAME,
+                        name);
             }
         } catch (IOException e) {
             Palworks.LOGGER.warn("Couldn't read or write config/{}; using the defaults", FILE_NAME, e);

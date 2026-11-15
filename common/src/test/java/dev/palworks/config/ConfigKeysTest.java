@@ -84,6 +84,19 @@ class ConfigKeysTest {
     }
 
     @Test
+    void findsTheKeysInAFileThatArentSettings() {
+        assertEquals(List.of(), ConfigKeys.unknown(PalworksConfig.toJson(DEFAULTS)));
+        // Misspelt at the top and inside an object, and one a version ago had
+        assertEquals(
+                List.of("work_range", "hunger.enable", "mood.unhappy_work_speed"),
+                ConfigKeys.unknown("{\"work_range\": 40, \"hunger\": {\"enable\": false, \"enabled\": true},"
+                        + " \"mood\": {\"unhappy_work_speed\": 0.5}}"));
+        // What isn't JSON, or isn't an object where one goes, is the parser's to report
+        assertEquals(List.of(), ConfigKeys.unknown("{\"hunger\": "));
+        assertEquals(List.of(), ConfigKeys.unknown("{\"hunger\": 3}"));
+    }
+
+    @Test
     void resetsASettingToItsDefault() {
         PalworksConfig changed = set(set(DEFAULTS, "owner_range", "12"), "hunger.work_per_fullness", "40");
         PalworksConfig reset = ConfigKeys.reset(changed, "owner_range").getOrThrow();
