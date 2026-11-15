@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
  * (JobScanner, or JobAssigner for jobs made per worker, like deliveries).
  */
 public enum JobType {
-    // Priorities: 0-10, higher is taken first (see JobManager's job scoring)
+    // Priorities: 0-10, higher is taken first (see JobAssigner's job scoring)
 
     // Kindling
     FUEL_FURNACE(Suitability.KINDLING, 7),
@@ -70,10 +70,7 @@ public enum JobType {
         return priority;
     }
 
-    /**
-     * Whether it's work, not something a worker does for itself: eating and sleeping aren't. Not
-     * "has a work skill": fetching seeds is work, though it takes no one skill (Planting or Nether).
-     */
+    /** Whether it's work, not something a worker does for itself: eating and sleeping aren't. */
     public boolean isWork() {
         return this != EAT_FOOD && this != SLEEP;
     }

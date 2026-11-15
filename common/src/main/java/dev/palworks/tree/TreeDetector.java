@@ -307,13 +307,6 @@ public class TreeDetector {
     }
 
     /**
-     * Simple check if a position is part of a valid tree (for job scanning).
-     */
-    public static boolean isValidTree(Level level, BlockPos pos) {
-        return validateTree(level, pos).isValid();
-    }
-
-    /**
      * Check if a block state is a log (uses #minecraft:logs tag).
      * Excludes Cobblemon apricorn logs.
      */
@@ -555,15 +548,6 @@ public class TreeDetector {
         Block saplingBlock = getSaplingBlock(sapling);
         // Saplings check the block below them, so ask as if it were planted on top of the soil
         return saplingBlock != null && saplingBlock.defaultBlockState().canSurvive(level, soilPos.above());
-    }
-
-    /**
-     * Get all log positions in a valid tree (for chopping).
-     * Returns empty set if tree is invalid.
-     */
-    public static Set<BlockPos> getTreeLogs(Level level, BlockPos startPos) {
-        TreeValidationResult result = validateTree(level, startPos);
-        return result.isValid() ? result.getLogPositions() : Collections.emptySet();
     }
 
     /**

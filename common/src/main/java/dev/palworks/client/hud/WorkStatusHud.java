@@ -32,9 +32,9 @@ import org.jetbrains.annotations.Nullable;
  * is taken (state icon, level, held item, HP/EXP/status bars, ball, name) or would cover the
  * Pokémon's portrait.
  *
- * <p>Called by each loader's HUD event (Fabric HudRenderCallback, NeoForge RenderGuiEvent.Post), the
- * same events Cobblemon draws the HUD from, registered to run after Cobblemon's so the icon is drawn
- * over the card. Its layout is copied from {@link PartyOverlay}.
+ * <p>Called by each loader's HUD event (Fabric HudRenderCallback, NeoForge RenderGuiEvent.Post), which
+ * comes after the whole HUD is drawn. Cobblemon draws its party HUD earlier in the frame, so the icon
+ * is drawn over the card. Its layout is copied from {@link PartyOverlay}.
  */
 public final class WorkStatusHud {
     // PartyOverlay's layout (private constants there)

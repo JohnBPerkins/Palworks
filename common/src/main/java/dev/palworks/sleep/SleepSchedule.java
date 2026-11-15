@@ -1,5 +1,6 @@
 package dev.palworks.sleep;
 
+import dev.palworks.hunger.HungerMath;
 import java.util.function.IntPredicate;
 
 /**
@@ -7,9 +8,6 @@ import java.util.function.IntPredicate;
  * Cobblemon types, so it's unit-tested. See {@link Sleep}.
  */
 public final class SleepSchedule {
-    /** Ticks in a Minecraft day. */
-    public static final int DAY_TICKS = 24_000;
-
     /** How often through the day hours are sampled to tell whether they cover all of it. */
     private static final int SAMPLE_TICKS = 1_000;
 
@@ -21,13 +19,13 @@ public final class SleepSchedule {
      * has to work some time.
      */
     public static boolean isBedtime(long dayTime, IntPredicate hours, IntPredicate night) {
-        int time = (int) Math.floorMod(dayTime, (long) DAY_TICKS);
+        int time = (int) Math.floorMod(dayTime, (long) HungerMath.TICKS_PER_DAY);
         return (coversWholeDay(hours) ? night : hours).test(time);
     }
 
     /** Whether these hours take up the whole day (Cobblemon's "any"), as far as samples through it tell. */
     public static boolean coversWholeDay(IntPredicate hours) {
-        for (int time = 0; time < DAY_TICKS; time += SAMPLE_TICKS) {
+        for (int time = 0; time < HungerMath.TICKS_PER_DAY; time += SAMPLE_TICKS) {
             if (!hours.test(time)) {
                 return false;
             }

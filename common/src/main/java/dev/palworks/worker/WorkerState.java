@@ -20,7 +20,6 @@ public class WorkerState {
     public static final double MAX_MOOD = 100;
 
     private boolean enabled;
-    private JobType assignedJob;
     private ReservationId currentReservation;
 
     // Path failure tracking for stuck detection
@@ -79,7 +78,6 @@ public class WorkerState {
 
     public WorkerState() {
         this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
-        this.assignedJob = null;
         this.currentReservation = null;
         this.pathFailCount = 0;
         this.lastPathFailTime = 0;
@@ -95,20 +93,6 @@ public class WorkerState {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
-    }
-
-    // Job assignment
-    @Nullable
-    public JobType getAssignedJob() {
-        return assignedJob;
-    }
-
-    public void setAssignedJob(@Nullable JobType job) {
-        this.assignedJob = job;
-    }
-
-    public boolean hasJob() {
-        return assignedJob != null;
     }
 
     // Reservation
@@ -394,9 +378,6 @@ public class WorkerState {
         CompoundTag tag = new CompoundTag();
 
         tag.putBoolean("enabled", enabled);
-        if (assignedJob != null) {
-            tag.putString("assignedJob", assignedJob.getId());
-        }
         tag.putInt("jobStep", jobStep);
         tag.put("jobData", jobData.copy());
 
@@ -449,15 +430,6 @@ public class WorkerState {
         // Missing key: never toggled, so enabled (the default).
         enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
 
-        if (tag.contains("assignedJob")) {
-            String jobId = tag.getString("assignedJob");
-            try {
-                assignedJob = JobType.valueOf(jobId.toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException e) {
-                assignedJob = null;
-            }
-        }
-
         pathFailCount = tag.getInt("pathFailCount");
         lastPathFailTime = tag.getLong("lastPathFailTime");
         // Missing: none owed (saved before hunger, or nothing was)
@@ -503,22 +475,5 @@ public class WorkerState {
         WorkerState state = new WorkerState();
         state.deserializeNBT(tag);
         return state;
-    }
-
-    /**
-     * Get a debug status string for rendering above the Pokemon.
-     */
-    public String getDebugStatusString() {
-        if (!enabled) {
-            return "§7DISABLED";
-        }
-
-        if (currentReservation != null) {
-            BlockPos pos = currentReservation.getStationPos();
-            return String.format(
-                    "§e%s §7[%d, %d, %d]", currentReservation.getJobType().name(), pos.getX(), pos.getY(), pos.getZ());
-        }
-
-        return "§aIDLE";
     }
 }

@@ -12,8 +12,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Sent from server to a player: the mood of some of their Pokémon (party or PC), by Pokémon UUID,
  * for the PC and summary screens (see dev.palworks.mood.Mood). Only for display: the server never
- * reads it back. While mood is off in the server's config, only {@link #off()} is sent, once (mood can
- * be turned off in game: see /palworks config), so the client stops showing the moods it has.
+ * reads it back. While mood is off in the server's config, only {@link #off()} is sent (mood can be
+ * turned off in game: see /palworks config), so the client stops showing the moods it has: once to
+ * a player who was sent moods, and again whenever they open their PC.
  */
 public class WorkerMoodPacket implements NetworkPacket<WorkerMoodPacket> {
     public static final ResourceLocation ID = Palworks.id("worker_mood");

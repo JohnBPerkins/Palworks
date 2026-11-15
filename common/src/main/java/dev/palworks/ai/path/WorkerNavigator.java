@@ -22,6 +22,9 @@ import org.jetbrains.annotations.Nullable;
  * <p>Server thread only, like the rest of the worker AI.
  */
 public final class WorkerNavigator {
+    /** The speed a Pokémon is walked at: to its work, or to a bed. */
+    public static final double WALK_SPEED = 0.6;
+
     private WorkerNavigator() {}
 
     /** How long a path planned when the job was handed out stays good to start walking. */

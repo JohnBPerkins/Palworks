@@ -2,22 +2,23 @@ package dev.palworks.suitability;
 
 /**
  * Represents what a Pokémon CAN do.
- * Stored as tags in data to allow additions without breaking saves.
+ * Its levels come from the datapacks' suitability files (see SuitabilityData), named there, in
+ * commands and in the overrides file by {@link #getId}. Some have no jobs yet.
  */
 public enum Suitability {
-    KINDLING("kindling"), // Power furnaces
-    WATERING("watering"), // Water crops, power water wheels
+    KINDLING("kindling"), // Light furnaces
+    WATERING("watering"), // Water crops
     PLANTING("planting"), // Plant seeds in farms
-    GENERATING_ELECTRICITY("generating_electricity"), // Power electric devices
-    HANDIWORK("handiwork"), // Manage crafting benches
+    GENERATING_ELECTRICITY("generating_electricity"), // Power electric devices (no jobs yet)
+    HANDIWORK("handiwork"), // Crafting (no jobs yet)
     GATHERING("gathering"), // Harvest crops
     LUMBERING("lumbering"), // Cut down trees
-    MINING("mining"), // Mine rocks
-    MEDICINE_PRODUCTION("medicine_production"), // Create medicine at workbenches
-    COOLING("cooling"), // Cool down containers
+    MINING("mining"), // Mine crystals (ores: not yet)
+    MEDICINE_PRODUCTION("medicine_production"), // Brewing (no jobs yet)
+    COOLING("cooling"), // Cool down containers (no jobs yet)
     TRANSPORTING("transporting"), // Move items into storage
-    NETHER("nether"), // Work with nether-related tasks (ghost types)
-    FARMING("farming"); // Drop items when in ranch
+    NETHER("nether"), // Nether wart, and crimson and warped trees
+    FARMING("farming"); // Drop items when in ranch (no jobs yet)
 
     private final String id;
 

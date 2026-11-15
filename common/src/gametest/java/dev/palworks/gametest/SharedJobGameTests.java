@@ -246,7 +246,6 @@ public class SharedJobGameTests {
                 helper.absolutePos(crop),
                 JobType.HARVEST_CROPS,
                 helper.getLevel().getGameTime()));
-        state.setAssignedJob(JobType.HARVEST_CROPS);
         state.startJob(0, null);
         WorkerStateManager.save(saved.getPokemon(), state);
         Workers.neverShareAJob(helper, saved, beside);
