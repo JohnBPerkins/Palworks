@@ -30,7 +30,6 @@ public class DebugInfo {
     public static class WorkerDebugInfo {
         public final String speciesName;
         public final boolean enabled;
-        public final String assignedJob;
         public final String currentReservation;
         public final List<String> suitabilities;
         public final int pathFailCount;
@@ -42,9 +41,6 @@ public class DebugInfo {
         public WorkerDebugInfo(Pokemon pokemon, WorkerState state, @Nullable Mob entity) {
             this.speciesName = pokemon.getSpecies().getName();
             this.enabled = state.isEnabled();
-            this.assignedJob =
-                    state.getAssignedJob() != null ? state.getAssignedJob().name() : "None";
-
             ReservationId reservation = state.getCurrentReservation();
             if (reservation != null) {
                 BlockPos pos = reservation.getStationPos();
@@ -73,7 +69,6 @@ public class DebugInfo {
             List<String> lines = new ArrayList<>();
             lines.add("=== Worker: " + speciesName + " ===");
             lines.add("Enabled: " + (enabled ? "Yes" : "No"));
-            lines.add("Job: " + assignedJob);
             lines.add("Reservation: " + currentReservation);
 
             if (entityPosition != null) {

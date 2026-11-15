@@ -775,7 +775,6 @@ final class JobAssigner {
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
         state.setCurrentReservation(reservation);
         state.setHomeward(null, level.getGameTime()); // it's got where it can get one
-        state.setAssignedJob(job.type());
         // Start from the job's first step, or from where the previous worker left it (handed over)
         state.startJob(job.resumeStep(), job.resumeData());
         WorkerStateManager.save(pokemon, state);
