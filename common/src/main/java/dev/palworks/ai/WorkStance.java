@@ -36,7 +36,7 @@ public record WorkStance(double gap, int minRing, int maxRing, double slack) {
      * Right up against the work, as close as the body fits, for a contact move: a lumberjack at the
      * trunk. Only just off the middle of its tile counts (crossing into the next tile out doesn't).
      */
-    public static final WorkStance AGAINST = new WorkStance(0.0, 1, Integer.MAX_VALUE, 0.35);
+    public static final WorkStance AGAINST = new WorkStance(0.0, 1, Integer.MAX_VALUE, WorkPositions.ON_TILE_DIST);
 
     public WorkStance {
         if (gap < 0 || slack < 0) {

@@ -346,8 +346,14 @@ public final class WorkPositions {
         return Vec3.atBottomCenterOf(standPos);
     }
 
+    /**
+     * How near the middle of a tile counts as on it, in blocks (crossing its edge doesn't): a worker
+     * on its stand tile, one right up against its work, a Pokémon in its bed.
+     */
+    public static final double ON_TILE_DIST = 0.35;
+
     /** How far from a bed's middle a worker lying in it may be (squared, in blocks). */
-    private static final double BED_SETTLE_DIST_SQ = 0.35 * 0.35;
+    private static final double BED_SETTLE_DIST_SQ = ON_TILE_DIST * ON_TILE_DIST;
 
     /** How many blocks above or below a tree's base a lumberjack can chop it from (a slope). */
     private static final int TREE_HEIGHT_REACH = 1;
