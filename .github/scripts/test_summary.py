@@ -8,7 +8,9 @@ Usage: python3 test_summary.py [--title TITLE] <results dir glob>...
        test_summary.py --title "In-game tests" 'fabric/build/test-results/gametest'
 Counts the <testcase> elements themselves rather than trusting suite totals, so it reads both
 Gradle's reports and Fabric's GameTest report (which nests suites and omits their totals).
-Exits 0 even when tests failed: the Gradle step already fails the job; this only reports.
+Exits 0 even when tests failed: the Gradle step already fails the job; this only reports. But it
+exits 1 if no tests ran at all (no reports, or reports with no test in them): Gradle is content
+with that, and a suite that silently stopped running would otherwise show as passing.
 """
 
 import glob
@@ -62,15 +64,17 @@ def main() -> None:
     broken = totals["failures"] + totals["errors"]
     passed = totals["tests"] - broken - totals["skipped"]
 
-    if not files:
-        status = "⚠️ no results"
+    if not totals["tests"]:
+        status = "❌ no tests ran"
     elif broken:
         status = f"❌ {broken} failed"
     else:
         status = "✅ all passed"
     lines = [f"## {title}: {status}", ""]
-    if not files:
-        lines.append("_No test results found. Did the tests run?_")
+    if not totals["tests"]:
+        found = f"{len(files)} report(s) with no tests in them" if files else "No test results"
+        lines.append(f"_{found} found. Did the tests run?_")
+        print(f"::error title={title}::No tests ran ({found.lower()} found)")
     else:
         lines += [
             "| Passed | Failed | Skipped | Total |",
@@ -103,6 +107,8 @@ def main() -> None:
             out.write(text)
     else:
         print(text)
+    if not totals["tests"]:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
