@@ -10,7 +10,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Helper for interacting with chests and other containers.
@@ -59,7 +58,6 @@ public class ChestHelper {
      * @param maxCount Maximum number of items to extract
      * @return ItemStack containing the extracted items, or EMPTY if none found
      */
-    @Nullable
     public static ItemStack extractItems(Level level, BlockPos pos, Item item, int maxCount) {
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (!(blockEntity instanceof Container container)) {

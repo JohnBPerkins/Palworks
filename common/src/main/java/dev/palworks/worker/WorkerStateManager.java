@@ -5,7 +5,6 @@ import dev.palworks.Palworks;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
 
@@ -107,14 +106,6 @@ public class WorkerStateManager {
     }
 
     /**
-     * Remove WorkerState from a Pokemon (cache + persistent data).
-     */
-    public static void remove(Pokemon pokemon) {
-        CACHE.remove(pokemon.getUuid());
-        pokemon.getPersistentData().remove(WORKER_STATE_KEY);
-    }
-
-    /**
      * Evict a single worker's cached state. Call when the entity unloads/despawns; the last
      * flushed NBT remains and is reloaded on demand.
      */
@@ -127,15 +118,5 @@ public class WorkerStateManager {
      */
     public static void clearCache() {
         CACHE.clear();
-    }
-
-    /**
-     * Update the WorkerState for a Pokemon using a callback.
-     * Handles loading, modification, and saving automatically.
-     */
-    public static void update(Pokemon pokemon, Consumer<WorkerState> updater) {
-        WorkerState state = getOrCreate(pokemon);
-        updater.accept(state);
-        save(pokemon, state);
     }
 }

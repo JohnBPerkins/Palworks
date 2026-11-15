@@ -5,6 +5,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.entity.pokemon.ai.sensors.DrowsySensor;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.ai.WorkPositions;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.config.PalworksConfig;
@@ -38,10 +39,8 @@ import net.minecraft.world.phys.Vec3;
  * Cobblemon (it never makes one sent out from the party drowsy).
  */
 public final class NonWorkerSleep {
-    // How near the bed's middle counts as there (as for a worker: WorkPositions' ON_TILE_DIST)
-    private static final double ARRIVED = 0.35;
-    // Its walk speed to bed (a worker's)
-    private static final double WALK_SPEED = 0.6;
+    // How near the bed's middle counts as there (as for a worker)
+    private static final double ARRIVED = WorkPositions.ON_TILE_DIST;
     // The longest it may take to get to its bed before it gives up (30s)
     private static final long WALK_TICKS = 600;
     // How many times /palworks sleep runs Cobblemon's drowsiness check (a chance of 1 in 300 or so
@@ -135,7 +134,7 @@ public final class NonWorkerSleep {
             jobs.giveUpNonWorkerBed(pokemon.getUuid());
             return;
         }
-        WorkerNavigator.walkTo(entity, Beds.standTile(bed.pos(), bedBlock), WALK_SPEED);
+        WorkerNavigator.walkTo(entity, Beds.standTile(bed.pos(), bedBlock), WorkerNavigator.WALK_SPEED);
     }
 
     /** Whether it's a non-worker lying in its bed, asleep (Palworks holding it so). */

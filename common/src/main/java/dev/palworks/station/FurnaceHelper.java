@@ -155,64 +155,6 @@ public class FurnaceHelper {
     }
 
     /**
-     * Check if a furnace is currently lit and burning.
-     */
-    public static boolean isLit(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        if (state.hasProperty(BlockStateProperties.LIT)) {
-            return state.getValue(BlockStateProperties.LIT);
-        }
-
-        return false;
-    }
-
-    /**
-     * Get the remaining burn time for a furnace.
-     * Reads the access-widened litTime field directly.
-     */
-    public static int getRemainingBurnTime(Level level, BlockPos pos) {
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity instanceof AbstractFurnaceBlockEntity furnace) {
-            return furnace.litTime;
-        }
-        return 0;
-    }
-
-    /**
-     * Check if a furnace has finished smelting (output slot is ready).
-     */
-    public static boolean hasOutput(Level level, BlockPos pos) {
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity instanceof AbstractFurnaceBlockEntity furnace) {
-            return !furnace.getItem(2).isEmpty(); // Slot 2 is output
-        }
-        return false;
-    }
-
-    /**
-     * Check if a furnace can accept more work.
-     * Returns true if input has items and output isn't full.
-     */
-    public static boolean canWork(Level level, BlockPos pos) {
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)) {
-            return false;
-        }
-
-        // Has input
-        if (furnace.getItem(0).isEmpty()) {
-            return false;
-        }
-
-        // Output not full (vanilla logic allows 64 max)
-        if (!furnace.getItem(2).isEmpty() && furnace.getItem(2).getCount() >= 64) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * Check if a furnace has MORE items to smelt after the current one.
      * Returns true if input slot has 2+ items (meaning there's a queue).
      */

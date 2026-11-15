@@ -43,7 +43,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Main AI controller for Pokémon workers.
- * Handles job scanning, navigation, and work execution.
+ * Handles navigation to the job a worker was given, work execution, and its sleep. Jobs are found
+ * and given out by JobManager.
  */
 public class WorkerAI {
 
@@ -62,8 +63,6 @@ public class WorkerAI {
     // Most ticks a worker spends stepping from where its walk ended onto its stand tile before it
     // settles for working from where it is (something's in the way: another mob, say).
     public static final int STEP_IN_TICKS = 40;
-    // How near the middle of its stand tile counts as on it (crossing its edge doesn't)
-    private static final double ON_TILE_DIST = 0.35;
 
     // How often (ticks) to flush in-progress worker state to NBT. Between flushes the state
     // lives in the WorkerStateManager cache; staggered per-entity to avoid a save spike.
@@ -111,8 +110,8 @@ public class WorkerAI {
     }
 
     private static boolean tickWork(Pokemon pokemon, Mob entity, Level level) {
-        // Skip eligibility check - if the entity exists and we're calling this, it's eligible enough
-        // The commands already filter for owned Pokemon
+        // Only called for an owned Pokémon out in the world that is, or was, a worker (see
+        // WorkerTicking.onPokemonTick)
 
         WorkerState state = WorkerStateManager.getOrCreate(pokemon);
 
@@ -343,7 +342,8 @@ public class WorkerAI {
         Vec3 spot = WorkPositions.standPoint(level, targetPos, jobType, standPos);
         double offX = entity.getX() - spot.x;
         double offZ = entity.getZ() - spot.z;
-        boolean onStand = distanceSq == 0 && offX * offX + offZ * offZ <= ON_TILE_DIST * ON_TILE_DIST;
+        boolean onStand =
+                distanceSq == 0 && offX * offX + offZ * offZ <= WorkPositions.ON_TILE_DIST * WorkPositions.ON_TILE_DIST;
         boolean inStance = WorkPositions.inStance(level, entity, targetPos, jobType, stance);
         boolean nextToStand = distanceSq <= SETTLED_DISTSQ;
         if (walkEnded && nextToStand && !onStand && !inStance && state.getStepInTicks() < STEP_IN_TICKS) {
@@ -351,7 +351,7 @@ public class WorkerAI {
                 return true;
             }
             state.addStepInTick();
-            entity.getMoveControl().setWantedPosition(spot.x, standPos.getY(), spot.z, 0.6);
+            entity.getMoveControl().setWantedPosition(spot.x, standPos.getY(), spot.z, walkSpeed());
             return true;
         }
         boolean arrived =
@@ -629,11 +629,11 @@ public class WorkerAI {
     }
 
     /**
-     * Normal walking speed (0.6). A slowed worker walks slower all the same: its pace is on its
+     * Normal walking speed. A slowed worker walks slower all the same: its pace is on its
      * movement speed itself (see Pace), whoever's walking it.
      */
     private static double walkSpeed() {
-        return 0.6;
+        return WorkerNavigator.WALK_SPEED;
     }
 
     /** Eating and going to bed: what makes it better, so worth a far trip (see WorkerNavigator). */

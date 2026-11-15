@@ -113,7 +113,7 @@ public final class WorkerDebugText {
 
         String mood = moodLine(d.mood());
         if (mood != null) {
-            // Unhappy or on strike is a warning: it works slower, or not at all
+            // Unhappy or on strike is a warning: it's on its way to a strike, or does no work
             lines.add(new Line(mood, d.mood().unhappy() || d.mood().striking()));
         }
 

@@ -237,24 +237,6 @@ public class CropAdapter {
     }
 
     /**
-     * Check if a block is a crop (not necessarily fully grown).
-     */
-    public static boolean isCrop(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
-        Block block = state.getBlock();
-
-        return block instanceof CropBlock
-                || block instanceof StemBlock
-                || block instanceof NetherWartBlock
-                || block instanceof CocoaBlock
-                || isApricorn(state)
-                || block instanceof SweetBerryBushBlock
-                || state.is(Blocks.CAVE_VINES)
-                || state.is(Blocks.CAVE_VINES_PLANT)
-                || state.is(COBBLEMON_BERRIES);
-    }
-
-    /**
      * Whether the block at {@code pos} is a crop still growing, which watering helps along (see
      * Watering): a field crop, a stem, a berry bush, a pitcher plant, by its own rule for whether bone
      * meal would grow it any more. A two-block crop is watered from its lower half. Not nether wart
@@ -505,7 +487,7 @@ public class CropAdapter {
             }
         }
 
-        // Default: break the block completely (for crops like wheat, carrots, etc.)
+        // Default: break the block completely (a crop with no age to set back)
         level.destroyBlock(pos, true);
         return true;
     }
@@ -583,13 +565,5 @@ public class CropAdapter {
         // default state is what planting it by hand gives: age 0, not wild, not mutated.
         level.setBlock(plantPos, fieldCropOf(seed).defaultBlockState(), 3);
         return true;
-    }
-
-    /**
-     * Check if light level is sufficient for crop growth.
-     * Most crops need light level >= 9.
-     */
-    public static boolean hasValidLightLevel(Level level, BlockPos pos) {
-        return level.getRawBrightness(pos, 0) >= 9;
     }
 }
