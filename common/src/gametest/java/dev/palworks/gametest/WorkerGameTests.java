@@ -609,7 +609,7 @@ public class WorkerGameTests {
     public void lumberjacksWithoutNetherLeaveNetherTreesAlone(GameTestHelper helper) {
         Workers.isolate(helper);
         crimsonFungus(helper);
-        Workers.sendOut(helper, MACHOP, START); // Fighting: Lumbering only
+        Workers.sendOut(helper, MACHOP, START); // Fighting: Lumbering, no Nether
 
         helper.runAfterDelay(250, () -> {
             helper.assertBlockPresent(Blocks.CRIMSON_STEM, new BlockPos(3, 1, 5));

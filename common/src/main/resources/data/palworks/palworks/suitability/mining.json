@@ -1,7 +1,8 @@
 {
   "types": {
     "ground": 1,
-    "rock": 1
+    "rock": 1,
+    "fighting": 1
   },
   "species": {}
 }

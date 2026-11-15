@@ -151,7 +151,7 @@ from a chest that has some and takes it to the trough.
 
 ## Mine crystals
 
-**Who:** Mining (Rock and Ground types)
+**Who:** Mining (Ground, Rock and Fighting types)
 
 Mining workers mine crystals once they're fully grown, getting exactly what you'd get breaking them
 by hand. They leave what the crystals grow from alone, so the crystals grow back:
@@ -168,7 +168,7 @@ A Transporting worker then picks up the drops.
 
 ## Mine ores
 
-**Who:** Mining (Rock and Ground types)
+**Who:** Mining (Ground, Rock and Fighting types)
 **Status:** not yet
 
 Mining is switched off until workers can break ore: they don't look for ores at all yet. The blocks
