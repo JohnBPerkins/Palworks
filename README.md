@@ -15,7 +15,7 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
 - **Autonomous workers**: a sent-out or pastured Pokémon finds work nearby and does it on its own.
   See [Workers](https://github.com/JohnBPerkins/Palworks/wiki/Workers).
 - **Jobs**: lighting furnaces, planting, watering and harvesting crops, nether wart, chopping trees,
-  and hauling to chests and troughs. Mining is in progress. See [Jobs](https://github.com/JohnBPerkins/Palworks/wiki/Jobs).
+  mining crystals, and hauling to chests and troughs. Mining ores is in progress. See [Jobs](https://github.com/JohnBPerkins/Palworks/wiki/Jobs).
 - **Suitabilities**: a Pokémon's types and species decide which work it can do, and its base stats
   how well. See [Suitabilities](https://github.com/JohnBPerkins/Palworks/wiki/Suitabilities), or look any Pokémon up in
   [Work skills by Pokémon](https://github.com/JohnBPerkins/Palworks/wiki/Work-Skills-by-Pokemon).

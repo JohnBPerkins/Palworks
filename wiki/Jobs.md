@@ -14,6 +14,7 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | [Pick up drops](#pick-up-drops) | Transporting | Working |
 | [Deliver items](#deliver-items) | Transporting | Working |
 | [Restock troughs](#restock-troughs) | Transporting | Working |
+| [Mine crystals](#mine-crystals) | Mining | Working |
 | [Mine ores](#mine-ores) | Mining | Not yet |
 
 Crafting (Handiwork), brewing (Medicine Production), and work for Generating Electricity, Cooling
@@ -148,6 +149,23 @@ jobs.
 When a [trough](Hunger) in reach has less than 16 feed left, a transporter fetches a stack of food
 from a chest that has some and takes it to the trough.
 
+## Mine crystals
+
+**Who:** Mining (Rock and Ground types)
+
+Mining workers mine crystals once they're fully grown, getting exactly what you'd get breaking them
+by hand. They leave what the crystals grow from alone, so the crystals grow back:
+
+- **Amethyst clusters** (2 shards). Buds aren't mined, and budding amethyst grows new ones.
+- **Tumblestone clusters** of every colour (4 tumblestone). The worker puts a new tumblestone back
+  where the cluster was, using one of the four. It grows again if there's lava or a magma block
+  next to it. A cluster under water isn't put back, because tumblestone can't be placed in water.
+- **Type gem clusters** at their last stage (2-4 gems). Gem blocks and the deepslate crystal core
+  are never mined. Gem blocks joined to a core grow new clusters. Left alone, a fully grown
+  cluster turns into a gem block, so a formation a worker keeps mined stays the same size.
+
+A Transporting worker then picks up the drops.
+
 ## Mine ores
 
 **Who:** Mining (Rock and Ground types)
@@ -165,7 +183,7 @@ is. From most to least important:
 1. Deliver items, bring seeds to a planter, pick up seeds brought to it
 2. Pick up drops, restock troughs
 3. Harvest crops
-4. Light furnaces
+4. Light furnaces, mine crystals
 5. Fetch seeds from a chest
 6. Plant crops
 7. Chop trees

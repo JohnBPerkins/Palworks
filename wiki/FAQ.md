@@ -17,7 +17,7 @@ Check these in order:
 5. **Can it reach the spot?** If there's no path, the worker skips that spot for up to 30 seconds.
 6. **Is it hungry, Tired, unhappy or on strike?** Look over its head. See [Hunger](Hunger),
    [Sleep](Sleep) and [Mood](Mood).
-7. **Is the job working yet?** Mining isn't, and nothing uses Handiwork, Medicine Production,
+7. **Is the job working yet?** Mining ores isn't (crystals are), and nothing uses Handiwork, Medicine Production,
    Generating Electricity, Cooling or Farming yet. See [Jobs](Jobs).
 
 ## The harvest is left on the ground
