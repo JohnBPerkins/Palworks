@@ -27,7 +27,7 @@ final class TakeSeedsHandler implements JobHandler {
         WorkerInventory pouch = ctx.inventory();
         int taken = 0;
         for (ItemEntity item :
-                JobChecks.seedsHandedTo(ctx.level(), ctx.pos(), ctx.pokemon().getUuid())) {
+                JobChecks.seedsToTake(ctx.level(), ctx.pos(), ctx.pokemon().getUuid())) {
             ItemStack stack = item.getItem();
             int leftover = pouch.addItem(stack);
             taken += stack.getCount() - leftover;

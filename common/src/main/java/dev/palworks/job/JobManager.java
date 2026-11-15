@@ -616,10 +616,20 @@ public class JobManager {
         return planter != null && assigner.seedSlotFor(planter, WorkerInventoryManager.getOrCreate(transporter)) >= 0;
     }
 
+    // A seed handover is thrown as a player throws an item (Player.drop): from this far below its
+    // eyes, with this lift, at most this fast, waiting as long before it can be picked up
+    private static final double THROW_BELOW_EYES = 0.3;
+    private static final double THROW_LIFT = 0.1;
+    private static final double THROW_MAX_SPEED = 0.3;
+    private static final int THROW_PICKUP_DELAY = 40;
+    // How fast (blocks a tick) to throw it for each block it's to go: about what lands it there
+    private static final double THROW_SPEED_PER_BLOCK = 0.1;
+
     /**
-     * A transporter has brought seeds to the planter that asked for them: it drops them at the
-     * planter's feet, and the planter gets a job to pick them up (see SeedRequests). Only that
-     * planter takes them; nobody else's pickups do.
+     * A transporter has brought seeds to the planter that asked for them: it throws them to the
+     * planter's feet, as a player gives another an item, and the planter gets a job to pick them up
+     * once they've landed and a player could (see SeedRequests). Only that planter takes them;
+     * nobody else's pickups do.
      */
     public void handOverSeeds(Pokemon transporter) {
         SeedRequests.Request request = seedRequests.takenOnBy(transporter.getUuid());
@@ -636,13 +646,24 @@ public class JobManager {
         net.minecraft.world.item.ItemStack seeds = inventory.getItem(slot);
         inventory.setItem(slot, net.minecraft.world.item.ItemStack.EMPTY);
         inventory.setChanged();
-        ItemEntity item =
-                new ItemEntity(level, planterEntity.getX(), planterEntity.getY(), planterEntity.getZ(), seeds, 0, 0, 0);
+        PokemonEntity from = transporter.getEntity();
+        double startX = from == null ? planterEntity.getX() : from.getX();
+        double startY = from == null ? planterEntity.getY() : from.getEyeY() - THROW_BELOW_EYES;
+        double startZ = from == null ? planterEntity.getZ() : from.getZ();
+        double dx = planterEntity.getX() - startX;
+        double dz = planterEntity.getZ() - startZ;
+        double across = Math.sqrt(dx * dx + dz * dz);
+        double speed = Math.min(across * THROW_SPEED_PER_BLOCK, THROW_MAX_SPEED);
+        double velocityX = across > 0 ? dx / across * speed : 0;
+        double velocityZ = across > 0 ? dz / across * speed : 0;
+        ItemEntity item = new ItemEntity(level, startX, startY, startZ, seeds, velocityX, THROW_LIFT, velocityZ);
+        item.setPickUpDelay(THROW_PICKUP_DELAY);
         level.addFreshEntity(item);
         // Marked once it's in: an item that comes into the world already marked (as one loaded with
         // its chunk does) was left for a planter that's long forgotten (see TrackedDrops)
         dev.palworks.drops.TrackedDrops.handOverTo(item, planter.pokemonUUID);
-        seedRequests.handOver(assigner, planter, item.blockPosition(), level.getGameTime());
+        // Where it's thrown to: it lands about there, within the job's pickup radius
+        seedRequests.handOver(assigner, planter, planterEntity.blockPosition(), level.getGameTime());
         Palworks.LOGGER.debug(
                 "{} left {} for {} at {}",
                 transporter.getSpecies().getName(),

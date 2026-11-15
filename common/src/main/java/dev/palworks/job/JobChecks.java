@@ -18,6 +18,7 @@ import dev.palworks.station.FurnaceHelper;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.worker.WorkerStateManager;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -141,8 +142,8 @@ public final class JobChecks {
             case BRING_SEEDS ->
                 level instanceof ServerLevel serverLevel
                         && JobManager.getInstance(serverLevel).hasSeedsToBring(pokemon);
-            // Room for seeds left there for it
-            case TAKE_SEEDS -> hasRoomForAny(inventory, seedsHandedTo(level, pos, pokemon.getUuid()));
+            // Room for seeds left there for it, once they can be picked up
+            case TAKE_SEEDS -> hasRoomForAny(inventory, seedsToTake(level, pos, pokemon.getUuid()));
             // Something to deliver
             case DELIVER_ITEMS -> inventory.hasCargo(SuitabilityDetector.getSuitabilities(pokemon));
             // Hungry, with its work on: eating isn't work, but only a worker eats from troughs
@@ -219,6 +220,16 @@ public final class JobChecks {
             UUID handedTo = TrackedDrops.handedTo(item);
             return handedTo != null && (planter == null || planter.equals(handedTo));
         });
+    }
+
+    /**
+     * The seeds left round {@code pos} for {@code planter} that it can take now: landed, and past
+     * their pickup delay, as a player picks up what another threw it.
+     */
+    public static List<ItemEntity> seedsToTake(Level level, BlockPos pos, UUID planter) {
+        List<ItemEntity> seeds = new ArrayList<>(seedsHandedTo(level, pos, planter));
+        seeds.removeIf(item -> !item.onGround() || item.hasPickUpDelay());
+        return seeds;
     }
 
     /** Whether the worker carries a seed that can be planted at {@code plantPos}. */

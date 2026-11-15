@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
  * Seeds on their way to planters. A planter can't take seeds out of a chest (only a worker that
  * transports can), so one that's run out of seeds for the open farmland (or soul sand) round it
  * asks for some: a transporter takes them from a chest, brings them to wherever the planter is
- * now and drops them at its feet, and the planter picks them up (TAKE_SEEDS). Seeds a player throws
+ * now and throws them to its feet, and the planter picks them up (TAKE_SEEDS). Seeds a player throws
  * by a planter with room for them are handed to it the same way (see PickupQueue). In memory
  * only: after a restart a transporter still carrying seeds puts them away as any cargo, and the
  * planter asks again.
