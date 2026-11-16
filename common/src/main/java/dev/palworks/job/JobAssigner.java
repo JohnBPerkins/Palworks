@@ -140,6 +140,10 @@ final class JobAssigner {
         int assignedCount = 0;
         for (WorkerInfo worker : idleWorkers) {
             lastConsidered.put(worker.pokemonUUID, now);
+            // Before its jobs are listed: what it remembers as unreachable is left out of the list,
+            // so with nothing else to do the list was empty, and it never got as far as the look
+            // assignFirstReachable has at whether it's moved since
+            refreshUnreachableMemory(worker);
             Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
 
             // Sleep (pastured workers only): one Cobblemon has napping is left to nap; in its bedtime,

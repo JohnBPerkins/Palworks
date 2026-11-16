@@ -18,6 +18,7 @@ import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.inventory.WorkerInventoryMenu;
 import dev.palworks.job.JobChecks;
+import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobHandlerRegistry;
@@ -33,6 +34,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -1024,5 +1026,42 @@ public class WorkerGameTests {
             helper.assertTrue(WorkerInventory.accepts(CarryMode.SEED_POUCH, stack), item + " goes in a seed pouch");
         }
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_unreachable_moved", timeoutTicks = 450)
+    public void aWorkerThatsMovedLooksAgainAtWhatItCouldntReach(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Ripe wheat in a walled pen (too high to jump), the only job there is, and a worker
+        // outside it, 12 blocks off
+        BlockPos crop = new BlockPos(4, 1, 4);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        for (int i = 1; i <= 7; i++) {
+            for (int y = 1; y <= 2; y++) {
+                helper.setBlock(i, y, 1, Blocks.STONE);
+                helper.setBlock(i, y, 7, Blocks.STONE);
+                helper.setBlock(1, y, i, Blocks.STONE);
+                helper.setBlock(7, y, i, Blocks.STONE);
+            }
+        }
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, new BlockPos(-8, 1, 4));
+        JobManager jobs = JobManager.getInstance(helper.getLevel());
+        UUID uuid = worker.getPokemon().getUuid();
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertFalse(
+                        jobs.unreachableFor(uuid, helper.getLevel().getGameTime())
+                                .isEmpty(),
+                        "it can't get to the wheat"))
+                // Put down inside the pen: from here it can, long before it would give the spot
+                // another try anyway (30 seconds)
+                .thenExecute(() -> {
+                    BlockPos inside = helper.absolutePos(new BlockPos(3, 1, 3));
+                    worker.moveTo(inside.getX() + 0.5, inside.getY(), inside.getZ() + 0.5);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(
+                        helper.getBlockState(crop).equals(WHEAT.getStateForAge(0)), "harvested, once it looked again"))
+                .thenSucceed();
     }
 }
