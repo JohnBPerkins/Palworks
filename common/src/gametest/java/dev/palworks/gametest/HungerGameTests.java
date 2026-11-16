@@ -2,6 +2,7 @@ package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
+import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkStance;
@@ -12,6 +13,7 @@ import dev.palworks.block.TroughFeed;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.hunger.HungerMath;
+import dev.palworks.hunger.StartingFullness;
 import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.reservation.ReservationId;
@@ -19,6 +21,7 @@ import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -729,6 +732,26 @@ public class HungerGameTests {
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
         Cobblemon.INSTANCE.getStorage().getParty(Workers.owner(helper, START)).add(pokemon);
         helper.assertTrue(pokemon.getCurrentFullness() == pokemon.getMaxFullness(), "still full");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aFullPokemonsStartIsStillAChangeToSave(GameTestHelper helper) {
+        // Full already, so getting its start changes nothing but the marker that it's had it.
+        // Cobblemon only writes out a PC it's told changed: unsaved, the marker is gone after
+        // a restart, and the Pokémon is topped up again when it next changes hands.
+        Pokemon pokemon = PokemonProperties.Companion.parse("snorlax").create();
+        pokemon.setCurrentFullness(pokemon.getMaxFullness());
+        PCStore pc = Cobblemon.INSTANCE.getStorage().getPC(Workers.owner(helper, START));
+        pc.add(pokemon);
+        pokemon.getPersistentData().remove(StartingFullness.MARKER); // as before it was got
+        AtomicInteger changes = new AtomicInteger();
+        pc.getAnyChangeObservable().subscribe(unit -> changes.incrementAndGet());
+
+        StartingFullness.onGained(pokemon);
+        helper.assertTrue(changes.get() == 1, "marking that it's had its start is a change: " + changes.get());
+        StartingFullness.onGained(pokemon);
+        helper.assertTrue(changes.get() == 1, "got again, already marked, isn't: " + changes.get());
         helper.succeed();
     }
 }

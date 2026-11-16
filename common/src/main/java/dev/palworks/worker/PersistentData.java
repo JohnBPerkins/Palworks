@@ -2,6 +2,7 @@ package dev.palworks.worker;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 
 /** What Palworks keeps in a Pokémon's own data (Cobblemon's persistent data), which goes where it goes. */
 public final class PersistentData {
@@ -16,7 +17,7 @@ public final class PersistentData {
      * there already, so saving an unchanged worker over and over doesn't have its PC written out
      * each time.
      */
-    public static void put(Pokemon pokemon, String key, CompoundTag tag) {
+    public static void put(Pokemon pokemon, String key, Tag tag) {
         CompoundTag data = pokemon.getPersistentData();
         if (tag.equals(data.get(key))) {
             return;
