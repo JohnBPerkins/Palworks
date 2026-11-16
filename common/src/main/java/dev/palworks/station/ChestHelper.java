@@ -9,12 +9,37 @@ import net.minecraft.world.Container;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.ChestType;
 
 /**
  * Helper for interacting with chests and other containers.
  */
 public class ChestHelper {
+
+    /**
+     * A worker has the chest at {@code pos} open for the next {@code ticks}: it opens as it does for
+     * a player (its lid, its sound, a trapped chest's signal), and closes by itself afterwards, even
+     * if the worker has gone meanwhile. Both halves of a double chest, as a player opens both.
+     * Anything but a chest (a trough) is left alone.
+     */
+    public static void holdOpen(Level level, BlockPos pos, int ticks) {
+        holdLidOpen(level, pos, ticks);
+        BlockState state = level.getBlockState(pos);
+        if (state.hasProperty(ChestBlock.TYPE) && state.getValue(ChestBlock.TYPE) != ChestType.SINGLE) {
+            holdLidOpen(level, pos.relative(ChestBlock.getConnectedDirection(state)), ticks);
+        }
+    }
+
+    private static void holdLidOpen(Level level, BlockPos pos, int ticks) {
+        if (level.getBlockEntity(pos) instanceof ChestBlockEntity chest) {
+            ((WorkerHeldLid) chest.openersCounter).palworks$holdOpenUntil(level.getGameTime() + ticks);
+            chest.recheckOpen(); // counts the worker in, which opens it (see ContainerOpenersCounterMixin)
+        }
+    }
 
     /**
      * Check if a container has a specific item.

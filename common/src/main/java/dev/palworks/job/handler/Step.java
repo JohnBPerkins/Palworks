@@ -6,6 +6,7 @@ import dev.palworks.animation.WorkAnimations;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.StepRunner;
+import dev.palworks.station.ChestHelper;
 import java.util.function.ToIntFunction;
 import org.jetbrains.annotations.Nullable;
 
@@ -75,6 +76,8 @@ public record Step(
         if (played != null) {
             WorkAnimator.play(ctx.entity(), played, ctx.pos());
         }
+        // A job at a chest (taking seeds or food out of it, putting items in) has it open meanwhile
+        ChestHelper.holdOpen(ctx.level(), ctx.pos(), ticks(ctx));
     }
 
     @Override
