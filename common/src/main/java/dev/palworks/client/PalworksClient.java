@@ -5,6 +5,7 @@ import dev.architectury.platform.Platform;
 import dev.architectury.registry.menu.MenuRegistry;
 import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.gui.WorkSkillsOverlay;
+import dev.palworks.client.gui.WorkedByTooltip;
 import dev.palworks.config.PalworksClientConfig;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventoryScreen;
@@ -33,6 +34,9 @@ public final class PalworksClient {
 
         // Work skills on Cobblemon's PC and summary screens
         WorkSkillsOverlay.init();
+
+        // "Worked by" on the items of blocks Pokémon work on, while Shift is held
+        WorkedByTooltip.init();
 
         // Another world or server: what this one said about its workers was about its own
         ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> ClientWorkerData.clear());
