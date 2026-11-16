@@ -4,15 +4,23 @@ import it.unimi.dsi.fastutil.longs.Long2DoubleMap;
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2FloatMap;
 import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Where a worker's body fits and how it can move, tested with its real hitbox against the blocks'
@@ -44,6 +52,13 @@ final class BodyClearance {
 
     final double maxJump;
     final int maxDrop;
+
+    /** See {@link #flatTop}. Weak, for shapes made afresh each time (a shulker box opening). */
+    private static final Map<VoxelShape, Double> FLAT_TOPS = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /** What blocks' shapes are for this mob (see {@link #shapeAt}); made when first needed. */
+    @Nullable
+    private CollisionContext context;
 
     /** Floors worked out so far, by node: NaN where there's none in that node's row. */
     private final Long2DoubleMap floors = new Long2DoubleOpenHashMap();
@@ -101,10 +116,104 @@ final class BodyClearance {
      * tile's, on whatever floor is in the tile's row, among the blocks there.
      */
     boolean fitsOnTile(BlockPos tile) {
+        PlainFit plain = fitsOnPlainTile(tile);
+        if (plain != PlainFit.NOT_PLAIN) {
+            return plain == PlainFit.FITS;
+        }
         double cx = tile.getX() + 0.5;
         double cz = tile.getZ() + 0.5;
         double floor = floorAt(cx, tile.getY(), cz);
         return !Double.isNaN(floor) && level.noBlockCollision(mob, box(cx, floor, cz));
+    }
+
+    /** What {@link #fitsOnPlainTile} makes of a tile. */
+    private enum PlainFit {
+        FITS,
+        DOESNT,
+        NOT_PLAIN
+    }
+
+    /**
+     * {@link #fitsOnTile} for a tile with nothing but plain blocks about it, worked out from the
+     * blocks themselves: under the body only blocks that are one box over their whole block (a
+     * cube, farmland, a slab), and nothing at all where the body goes. That's nearly every tile,
+     * and it gives the same answer as asking the level for the collision shapes there, at a
+     * fraction of the cost: stand tiles are tested for every tile round a job, every tick, by
+     * every worker, and the collision queries alone nearly doubled a tick with 200 workers.
+     * Anything else about (a carpet, a fence, stairs, leaves overhead) is {@code NOT_PLAIN}: the
+     * level is asked.
+     */
+    private PlainFit fitsOnPlainTile(BlockPos tile) {
+        double cx = tile.getX() + 0.5;
+        double cz = tile.getZ() + 0.5;
+        int y = tile.getY();
+        int minX = Mth.floor(cx - halfWidth + EPS);
+        int maxX = Mth.floor(cx + halfWidth - EPS);
+        int minZ = Mth.floor(cz - halfWidth + EPS);
+        int maxZ = Mth.floor(cz + halfWidth - EPS);
+        int topRow = Mth.floor(y + height - EPS); // its floor is no higher than the tile's own
+        if (context == null) {
+            context = CollisionContext.of(mob);
+        }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        double floor = Double.NaN;
+        for (int bx = minX; bx <= maxX; bx++) {
+            for (int bz = minZ; bz <= maxZ; bz++) {
+                // (Not loaded: no collision there, as the level's own queries have it)
+                BlockGetter chunk = level.getChunkForCollisions(bx >> 4, bz >> 4);
+                if (chunk == null) {
+                    continue;
+                }
+                // A block two down that's over a block tall (a fence, a wall) reaches the floor's row
+                VoxelShape twoDown = shapeAt(chunk, pos.set(bx, y - 2, bz));
+                if (!twoDown.isEmpty() && twoDown.max(Direction.Axis.Y) > 1.0) {
+                    return PlainFit.NOT_PLAIN;
+                }
+                VoxelShape under = shapeAt(chunk, pos.set(bx, y - 1, bz));
+                if (!under.isEmpty()) {
+                    double top = flatTop(under);
+                    if (Double.isNaN(top) || top > 1.0) {
+                        return PlainFit.NOT_PLAIN;
+                    }
+                    // In the tile's row (see floorAt), and the highest there
+                    top += y - 1;
+                    if (top >= y - 0.5 - EPS && (Double.isNaN(floor) || top > floor)) {
+                        floor = top;
+                    }
+                }
+                for (int by = y; by <= topRow; by++) {
+                    if (!shapeAt(chunk, pos.set(bx, by, bz)).isEmpty()) {
+                        return PlainFit.NOT_PLAIN;
+                    }
+                }
+            }
+        }
+        return Double.isNaN(floor) ? PlainFit.DOESNT : PlainFit.FITS;
+    }
+
+    /** A block's collision shape for the mob, as the level's collision queries see it. */
+    private VoxelShape shapeAt(BlockGetter chunk, BlockPos pos) {
+        return chunk.getBlockState(pos).getCollisionShape(level, pos, context);
+    }
+
+    /**
+     * The top (0 to 1, within its block) of a shape (not an empty one) that's a single box over its whole block, so
+     * the same height wherever on it something stands; NaN for any other shape. Kept by shape:
+     * blocks share a few shapes between them, and working one out takes its boxes apart.
+     */
+    private static double flatTop(VoxelShape shape) {
+        return FLAT_TOPS.computeIfAbsent(shape, BodyClearance::computeFlatTop);
+    }
+
+    private static Double computeFlatTop(VoxelShape shape) {
+        List<AABB> boxes = shape.toAabbs();
+        AABB box = boxes.get(0); // (it isn't empty)
+        boolean wholeBlock = boxes.size() == 1
+                && box.minX <= EPS
+                && box.maxX >= 1.0 - EPS
+                && box.minZ <= EPS
+                && box.maxZ >= 1.0 - EPS;
+        return wholeBlock ? box.maxY : Double.NaN;
     }
 
     /**
