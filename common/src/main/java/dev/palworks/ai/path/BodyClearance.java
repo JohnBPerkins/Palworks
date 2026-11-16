@@ -6,6 +6,8 @@ import it.unimi.dsi.fastutil.longs.Long2DoubleMap;
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2FloatMap;
 import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -205,6 +207,30 @@ final class BodyClearance {
         return hurtsHere;
     }
 
+    /**
+     * {@link #hurtsAt} for a block whose state is in hand, without asking the level anything: the
+     * test of a tile to stand on is made too often for that ({@link #scanPlain}). What a state is
+     * to Minecraft's pathfinding is the state's alone to say, so it's worked out once for each.
+     */
+    private boolean hurts(BlockState state, BlockGetter chunk, BlockPos pos) {
+        PathType type = STATE_TYPES.get(state);
+        if (type == null) {
+            type = StateTypes.of(chunk, pos);
+            STATE_TYPES.put(state, type);
+        }
+        return HurtingBlocks.hurts(type, mob);
+    }
+
+    /** What each block state met by {@link #hurts(BlockState, BlockGetter, BlockPos)} is to walk through. Server thread only. */
+    private static final Reference2ObjectMap<BlockState, PathType> STATE_TYPES = new Reference2ObjectOpenHashMap<>();
+
+    /** Minecraft's own reading of a block for pathfinding, which it keeps to its node evaluators. */
+    private static final class StateTypes extends WalkNodeEvaluator {
+        static PathType of(BlockGetter level, BlockPos pos) {
+            return getPathTypeFromState(level, pos);
+        }
+    }
+
     /** What the block here is to walk through, on its own (whatever is under or next to it). */
     private PathType pathTypeAt(int x, int y, int z) {
         if (pathTypes == null) {
@@ -253,7 +279,7 @@ final class BodyClearance {
      * fraction of the cost: stand tiles are tested for every tile round a job (and the rows above
      * and below it), every tick, by every worker, and the collision queries alone nearly doubled a
      * tick with 200 workers. A shape of several boxes about (stairs, a fence joined to another, a
-     * cauldron) is {@code NOT_PLAIN}: the level is asked. A block that hurts ({@link #hurtsAt})
+     * cauldron) is {@code NOT_PLAIN}: the level is asked. A block that hurts ({@link #hurts})
      * in a row the body is in is {@code DOESNT}, wherever in its block the body would be.
      *
      * <p>Each box under or in the body is one of three things, by its top: below the tile's row,
@@ -321,7 +347,7 @@ final class BodyClearance {
                     }
                     boolean cube = state.isCollisionShapeFullBlock(level, pos);
                     // (A whole block is never one the body is in)
-                    if (!cube && row >= y - 1 && hurtsAt(bx, row, bz)) {
+                    if (!cube && row >= y - 1 && hurts(state, chunk, pos)) {
                         if (row >= y) {
                             return PlainFit.DOESNT;
                         }
