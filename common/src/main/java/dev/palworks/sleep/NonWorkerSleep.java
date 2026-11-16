@@ -77,7 +77,7 @@ public final class NonWorkerSleep {
         JobManager jobs = JobManager.getInstance(level);
         NonWorkerBed bed = jobs.nonWorkerBed(pokemon.getUuid());
         if (bed == null) {
-            bed = claim(jobs, entity);
+            bed = jobs.claimNonWorkerBed(entity);
         }
         if (bed != null && !bed.inBed()) {
             entity.getBrain().eraseMemory(CobblemonMemories.POKEMON_DROWSY); // until it's in its bed
@@ -92,7 +92,7 @@ public final class NonWorkerSleep {
         if (bed == null) {
             // One Cobblemon never makes drowsy goes to bed at its bedtime
             if (!Sleep.hasSleepPose(entity) && appliesTo(pokemon) && Sleep.isBedtime(entity)) {
-                claim(jobs, entity);
+                jobs.claimNonWorkerBed(entity);
             }
             return;
         }
@@ -145,16 +145,6 @@ public final class NonWorkerSleep {
         NonWorkerBed bed =
                 JobManager.getInstance(level).nonWorkerBed(entity.getPokemon().getUuid());
         return bed != null && bed.inBed();
-    }
-
-    /** It takes a free bed, if there is one (null if not), and says so in the debug log. */
-    private static NonWorkerBed claim(JobManager jobs, PokemonEntity entity) {
-        NonWorkerBed bed = jobs.claimNonWorkerBed(entity);
-        Palworks.LOGGER.debug(
-                "{} is sleepy: {}",
-                entity.getPokemon().getSpecies().getName(),
-                bed == null ? "no bed free" : "off to the bed at " + bed.pos().toShortString());
-        return bed;
     }
 
     /**

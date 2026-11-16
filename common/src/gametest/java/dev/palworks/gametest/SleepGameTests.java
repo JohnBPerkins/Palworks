@@ -283,6 +283,35 @@ public class SleepGameTests {
                 .thenSucceed();
     }
 
+    @AfterBatch(batch = "nonworker_bed_none_free")
+    public void afterNoBedFree(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "nonworker_bed_none_free", timeoutTicks = 800)
+    public void oneWithNoBedFreeLooksAgainInAWhileNotEveryTick(GameTestHelper helper) {
+        // Looking for a bed reads every block round its pasture: with none free, a species that
+        // goes to bed by the clock asked every tick, all night
+        Workers.isolate(helper);
+        PokemonEntity trubbish = Workers.sendOutPastured(helper, "trubbish level=20", new BlockPos(1, 1, 1));
+        setTime(helper, MIDNIGHT);
+        JobManager jobs = JobManager.getInstance(helper.getLevel());
+
+        helper.startSequence()
+                .thenIdle(5) // it's looked, and found none
+                .thenExecute(() -> {
+                    helper.setBlock(BED, ModBlocks.STRAW_BED.get());
+                    helper.assertTrue(
+                            jobs.claimNonWorkerBed(trubbish) == null,
+                            "it looked for a bed again straight after finding none");
+                })
+                // It still finds one put down later, when it next looks
+                .thenWaitUntil(() -> helper.assertTrue(
+                        asleepInStrawBed(helper, trubbish, BED),
+                        "lying in the bed: " + nonWorkerSleep(helper, trubbish, BED)))
+                .thenSucceed();
+    }
+
     @AfterBatch(batch = "sleep_command")
     public void afterSleepCommand(ServerLevel level) {
         morningAfter(level);
