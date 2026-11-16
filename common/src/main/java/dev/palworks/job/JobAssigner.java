@@ -1073,13 +1073,13 @@ final class JobAssigner {
 
     /**
      * The request for seeds (see SeedRequests) this transporter could take on with seeds from the
-     * chest at {@code chestPos}: a waiting one, from a planter it may go to (within its work range,
+     * chest at {@code chestPos}: a waiting one it hasn't just given up, from a planter it may go to (within its work range,
      * and its owner's, as {@link #bringSeeds} asks), that the chest has a seed for (one the open
      * spots round the planter can take). Null if none.
      */
     @Nullable
     private SeedRequests.Request requestToTakeOn(WorkerInfo transporter, BlockPos chestPos) {
-        for (SeedRequests.Request request : seedRequests.waiting()) {
+        for (SeedRequests.Request request : seedRequests.waitingFor(transporter.pokemonUUID, level.getGameTime())) {
             WorkerInfo planter = workers.get(request.planter);
             if (planter != null && inWorkRange(transporter, planter.position) && seedFor(planter, chestPos) != null) {
                 return request;
@@ -1158,7 +1158,7 @@ final class JobAssigner {
                 || seedSlotFor(planter, WorkerInventoryManager.getOrCreate(pokemon)) < 0
                 || !inWorkRange(transporter, planterEntity.blockPosition())
                 || isRecentlyUnreachable(transporter, planterEntity.blockPosition())) {
-            seedRequests.giveUp(transporter.pokemonUUID);
+            seedRequests.giveUp(transporter.pokemonUUID, now);
             return SeedTrip.NONE;
         }
         JobRecord trip = JobRecord.of(JobType.BRING_SEEDS, planterEntity.blockPosition(), now);

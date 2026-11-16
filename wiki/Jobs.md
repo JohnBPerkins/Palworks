@@ -73,6 +73,9 @@ meanwhile:
 2. It brings them to wherever the planter is and throws them to its feet.
 3. The planter picks them up a moment later, as a player would, and plants them.
 
+A transporter that can't get the seeds to the planter puts them back in a chest, and leaves that
+planter's seeds to other transporters for 30 seconds before it tries again.
+
 You can also throw seeds (with Q) next to a planter that has room for them, and it picks them up.
 A worker that both plants and transports, such as a Grass/Flying type, takes its own seeds from
 chests.
