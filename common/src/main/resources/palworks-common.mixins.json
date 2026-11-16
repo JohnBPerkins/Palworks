@@ -11,6 +11,7 @@
   "mixins": [
     "BlockEntityChangedMixin",
     "CobblemonNetworkMixin",
+    "ContainerOpenersCounterMixin",
     "DrowsySensorMixin",
     "LeavesBlockMixin",
     "PokemonEntityInteractMixin",
