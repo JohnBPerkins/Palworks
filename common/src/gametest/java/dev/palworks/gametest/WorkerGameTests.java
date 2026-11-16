@@ -9,6 +9,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
 import com.mojang.brigadier.tree.CommandNode;
 import dev.palworks.ai.WorkStance;
+import dev.palworks.ai.WorkerAI;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.hunger.Hunger;
@@ -46,9 +47,12 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -1178,5 +1182,49 @@ public class WorkerGameTests {
                         WorkerStateManager.getOrCreate(pokemon).hasWalkedToJob(),
                         "its state was still in memory after it was recalled"))
                 .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_slow_walk", timeoutTicks = 4000)
+    public void aSlowWorkerOnALongWalkKeepsItsJob(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos crop = new BlockPos(3, 1, 21); // 20 blocks off
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+        // Slowed so the walk takes longer than the 30 seconds a worker may hold a job without
+        // starting on it (as a long way round does)
+        worker.getAttribute(Attributes.MOVEMENT_SPEED)
+                .addTransientModifier(new AttributeModifier(
+                        ResourceLocation.fromNamespaceAndPath("palworks_gametest", "slow"),
+                        -0.72,
+                        AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+        WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
+        long[] since = {-1};
+        long[] walked = {-1};
+        boolean[] dropped = {false};
+        helper.onEachTick(() -> {
+            if (walked[0] >= 0) {
+                return;
+            }
+            boolean hasJob = state.getCurrentReservation() != null;
+            if (hasJob && since[0] < 0) {
+                since[0] = helper.getTick();
+            }
+            if (hasJob && state.isWorking()) {
+                walked[0] = helper.getTick() - since[0]; // there, and at work
+            }
+            if (!hasJob && since[0] >= 0) {
+                dropped[0] = true;
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(helper.getBlockState(crop).equals(WHEAT.getStateForAge(0)), "harvested");
+            if (walked[0] <= WorkerAI.RESERVATION_TIMEOUT_TICKS) {
+                helper.fail("the walk took " + walked[0] + " ticks: not the 30 seconds this is about");
+            }
+            helper.assertFalse(dropped[0], "it gave its job up on the way");
+        });
     }
 }

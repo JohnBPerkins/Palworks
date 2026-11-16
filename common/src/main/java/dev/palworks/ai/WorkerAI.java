@@ -484,6 +484,12 @@ public class WorkerAI {
                 .onTheWay(new JobContext(pokemon, entity, level, state, reservation));
         state.setWalkedToJob(true);
         state.resetStepIn();
+        // The 30 seconds it may hold a job without starting on it (see RESERVATION_TIMEOUT_TICKS)
+        // count from when it last got nearer, not from when it was given the job: a walk that takes
+        // longer (a slowed worker, a long way round) was given up part way, and started again
+        if (state.gotNearer(Math.sqrt(distanceSq))) {
+            state.setCurrentReservation(new ReservationId(targetPos, reservation.getJobType(), level.getGameTime()));
+        }
 
         // Track path failures for stuck detection: its walk has ended (on the ground, so not just
         // falling or knocked about) without getting next to the stand tile, so the path can't
