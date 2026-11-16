@@ -1,9 +1,13 @@
 package dev.palworks.ai.path;
 
+import it.unimi.dsi.fastutil.longs.Long2BooleanMap;
+import it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2DoubleMap;
 import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2FloatMap;
 import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +20,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.pathfinder.PathfindingContext;
 import net.minecraft.world.level.pathfinder.WalkNodeEvaluator;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -24,8 +29,9 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Where a worker's body fits and how it can move, tested with its real hitbox against the blocks'
- * real collision shapes: the geometry {@link WorkerPathfinder} plans with. One per search, as it
- * caches what it has worked out about the world.
+ * real collision shapes, and kept out of the blocks that hurt it ({@link #hurtsIn}): the geometry
+ * {@link WorkerPathfinder} plans with. One per search, as it caches what it has worked out about
+ * the world.
  *
  * <p>Positions are path nodes in the convention Minecraft's path follower steers by (see
  * {@code Path.getEntityPosAtNode}): a node's x and z are where the hitbox's corner block is, and the
@@ -53,6 +59,15 @@ final class BodyClearance {
     final double maxJump;
     final int maxDrop;
 
+    /**
+     * How many nodes back a mob following a path may leave its line for the next node. It counts a
+     * node as reached once it's within some way of it ({@link #reachedWithin}): half its width, or
+     * for one under 0.75 wide, 0.75 less half its width. That's under a block for a body up to two
+     * wide, so it turns before the node it's coming to; a wider one can turn before the node before
+     * that.
+     */
+    final int turnsEarlyBy;
+
     /** See {@link #boxOf}. Weak, for shapes made afresh each time (a shulker box opening). */
     private static final Map<VoxelShape, OneBox> ONE_BOXES = Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -71,6 +86,19 @@ final class BodyClearance {
     @Nullable
     private CollisionContext context;
 
+    /** Whether {@link #scanPlain} found a block that hurts in the row under the tile it's on. */
+    private boolean plainHurtsBelow;
+
+    /** What blocks are to walk through, as Minecraft's own pathfinding has them; made when first needed. */
+    @Nullable
+    private PathfindingContext pathTypes;
+
+    /** Whether each block asked about so far hurts the mob ({@link #hurtsAt}), by block. */
+    private final Long2BooleanMap hurts = new Long2BooleanOpenHashMap();
+
+    /** {@link #nearHurt} so far, by node. */
+    private final Long2BooleanMap nearHurt = new Long2BooleanOpenHashMap();
+
     /** Floors worked out so far, by node: NaN where there's none in that node's row. */
     private final Long2DoubleMap floors = new Long2DoubleOpenHashMap();
     /** How bad standing at a node is (its worst path-type malus), by node: negative for "never". */
@@ -84,6 +112,15 @@ final class BodyClearance {
         this.centreOffset = ((int) (mob.getBbWidth() + 1.0F)) * 0.5;
         this.maxJump = Math.max(MIN_JUMP, mob.maxUpStep());
         this.maxDrop = Math.max(1, mob.getMaxFallDistance());
+        this.turnsEarlyBy = Math.max(1, (int) Math.ceil(reachedWithin(mob)));
+    }
+
+    /**
+     * How near a node a mob following a path has to get, across, for the node to count as reached:
+     * Minecraft's path follower's rule, and Cobblemon's.
+     */
+    static double reachedWithin(Mob mob) {
+        return mob.getBbWidth() > 0.75F ? mob.getBbWidth() / 2.0 : 0.75 - mob.getBbWidth() / 2.0;
     }
 
     /** Where the mob's middle is steered to for a node's x (or z). */
@@ -112,9 +149,94 @@ final class BodyClearance {
                 cz + halfWidth - EPS);
     }
 
-    /** Whether nothing solid is in this space (blocks, the world border, boats and the like). */
+    /**
+     * Whether the body can be in this space: nothing solid in it (blocks, the world border, boats
+     * and the like), and no block that would hurt it ({@link #hurtsIn}).
+     */
     boolean clear(AABB space) {
-        return level.noCollision(mob, space);
+        return !hurtsIn(space) && level.noCollision(mob, space);
+    }
+
+    /**
+     * Whether a body in this space would be in a block that hurts it by touch: a cactus, a sweet
+     * berry bush, fire, a lit campfire. The whole of the block's space counts, whatever its shape,
+     * as it does to the game: a body brushing the corner of a bush's block is in the bush, and one
+     * pressed against a cactus is in the cactus. Blocks the mob is in already don't count: it has
+     * to be let out of them.
+     */
+    boolean hurtsIn(AABB space) {
+        AABB here = mob.getBoundingBox();
+        for (int x = Mth.floor(space.minX); x <= Mth.floor(space.maxX); x++) {
+            for (int y = Mth.floor(space.minY); y <= Mth.floor(space.maxY); y++) {
+                for (int z = Mth.floor(space.minZ); z <= Mth.floor(space.maxZ); z++) {
+                    if (hurtsAt(x, y, z) && !here.intersects(x, y, z, x + 1.0, y + 1.0, z + 1.0)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a block that hurts is near enough a body standing at this node to be brushed as it
+     * turns there: within the nodes round it (or the two round it, for a body that
+     * {@link #turnsEarlyBy} two). Cached.
+     */
+    boolean nearHurt(int x, int y, int z, double floorY) {
+        long key = BlockPos.asLong(x, y, z);
+        if (nearHurt.containsKey(key)) {
+            return nearHurt.get(key);
+        }
+        boolean near = hurtsIn(box(centre(x), floorY, centre(z)).inflate(turnsEarlyBy, 0.0, turnsEarlyBy));
+        nearHurt.put(key, near);
+        return near;
+    }
+
+    /**
+     * Whether the block here hurts the mob when it's in it ({@link HurtingBlocks#hurts}). Cached.
+     * (Not loaded: no, like its collision.)
+     */
+    private boolean hurtsAt(int x, int y, int z) {
+        long key = BlockPos.asLong(x, y, z);
+        if (hurts.containsKey(key)) {
+            return hurts.get(key);
+        }
+        boolean hurtsHere = level.hasChunk(x >> 4, z >> 4) && HurtingBlocks.hurts(pathTypeAt(x, y, z), mob);
+        hurts.put(key, hurtsHere);
+        return hurtsHere;
+    }
+
+    /**
+     * {@link #hurtsAt} for a block whose state is in hand, without asking the level anything: the
+     * test of a tile to stand on is made too often for that ({@link #scanPlain}). What a state is
+     * to Minecraft's pathfinding is the state's alone to say, so it's worked out once for each.
+     */
+    private boolean hurts(BlockState state, BlockGetter chunk, BlockPos pos) {
+        PathType type = STATE_TYPES.get(state);
+        if (type == null) {
+            type = StateTypes.of(chunk, pos);
+            STATE_TYPES.put(state, type);
+        }
+        return HurtingBlocks.hurts(type, mob);
+    }
+
+    /** What each block state met by {@link #hurts(BlockState, BlockGetter, BlockPos)} is to walk through. Server thread only. */
+    private static final Reference2ObjectMap<BlockState, PathType> STATE_TYPES = new Reference2ObjectOpenHashMap<>();
+
+    /** Minecraft's own reading of a block for pathfinding, which it keeps to its node evaluators. */
+    private static final class StateTypes extends WalkNodeEvaluator {
+        static PathType of(BlockGetter level, BlockPos pos) {
+            return getPathTypeFromState(level, pos);
+        }
+    }
+
+    /** What the block here is to walk through, on its own (whatever is under or next to it). */
+    private PathType pathTypeAt(int x, int y, int z) {
+        if (pathTypes == null) {
+            pathTypes = new PathfindingContext(level, mob);
+        }
+        return pathTypes.getPathTypeFromState(x, y, z);
     }
 
     /** Whether the body fits standing on {@code floorY} with its middle at (cx, cz). */
@@ -124,7 +246,8 @@ final class BodyClearance {
 
     /**
      * Whether the body fits standing in this tile (the block its feet go in), its middle at the
-     * tile's, on whatever floor is in the tile's row, among the blocks there.
+     * tile's, on whatever floor is in the tile's row, among the blocks there, and in none that
+     * hurts it.
      */
     boolean fitsOnTile(BlockPos tile) {
         PlainFit plain = fitsOnPlainTile(tile);
@@ -134,7 +257,11 @@ final class BodyClearance {
         double cx = tile.getX() + 0.5;
         double cz = tile.getZ() + 0.5;
         double floor = floorAt(cx, tile.getY(), cz);
-        return !Double.isNaN(floor) && level.noBlockCollision(mob, box(cx, floor, cz));
+        if (Double.isNaN(floor)) {
+            return false;
+        }
+        AABB body = box(cx, floor, cz);
+        return level.noBlockCollision(mob, body) && !hurtsIn(body);
     }
 
     /** What {@link #fitsOnPlainTile} makes of a tile. */
@@ -152,7 +279,8 @@ final class BodyClearance {
      * fraction of the cost: stand tiles are tested for every tile round a job (and the rows above
      * and below it), every tick, by every worker, and the collision queries alone nearly doubled a
      * tick with 200 workers. A shape of several boxes about (stairs, a fence joined to another, a
-     * cauldron) is {@code NOT_PLAIN}: the level is asked.
+     * cauldron) is {@code NOT_PLAIN}: the level is asked. A block that hurts ({@link #hurts})
+     * in a row the body is in is {@code DOESNT}, wherever in its block the body would be.
      *
      * <p>Each box under or in the body is one of three things, by its top: below the tile's row,
      * and nothing to it; in the row, and somewhere to stand (the highest is its floor: see
@@ -168,6 +296,7 @@ final class BodyClearance {
         }
         plainFloor = Double.NaN;
         plainCeiling = Double.POSITIVE_INFINITY;
+        plainHurtsBelow = false;
         // Two rows down: a block over a block tall (a fence post) reaches up into the tile's row
         int topRow = Mth.floor(y + height - EPS);
         PlainFit scanned = scanPlain(cx, cz, y, y - 2, topRow);
@@ -184,6 +313,10 @@ final class BodyClearance {
             if (scanned != PlainFit.FITS) {
                 return scanned;
             }
+        }
+        // On a floor in the lower half of the row (a slab, farmland), its feet are in the row below
+        if (plainHurtsBelow && plainFloor + EPS < y) {
+            return PlainFit.DOESNT;
         }
         return plainFloor + height - EPS <= plainCeiling ? PlainFit.FITS : PlainFit.DOESNT;
     }
@@ -213,6 +346,13 @@ final class BodyClearance {
                         continue;
                     }
                     boolean cube = state.isCollisionShapeFullBlock(level, pos);
+                    // (A whole block is never one the body is in)
+                    if (!cube && row >= y - 1 && hurts(state, chunk, pos)) {
+                        if (row >= y) {
+                            return PlainFit.DOESNT;
+                        }
+                        plainHurtsBelow = true;
+                    }
                     double bottom = row;
                     double top = row + 1.0;
                     if (!cube) {

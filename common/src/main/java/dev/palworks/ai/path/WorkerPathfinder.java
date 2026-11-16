@@ -14,12 +14,14 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Plans a worker's walk to the tile it works from, checking its whole body all the way: the real
  * size of its hitbox against the blocks' real collision shapes, how high it can jump and how far it
- * can drop, room over its head when it jumps, and no cutting corners (see {@link BodyClearance}).
+ * can drop, room over its head when it jumps, no cutting corners, and no part of it in a block that
+ * hurts it, a cactus or a berry bush (see {@link BodyClearance}).
  * Cobblemon's own pathfinder checks bodies by whole blocks from the corner of their hitbox, skips
  * the headroom for jumps by anything a block wide or more, and doesn't walk-check Pokémon about
  * 1.6 blocks big at all, so workers were sent along routes they didn't fit.
@@ -141,8 +143,7 @@ public final class WorkerPathfinder {
         if (Double.isNaN(startFloor)) {
             return Result.UNKNOWN;
         }
-        Step start = new Step(
-                body.node(mob.getX()), BodyClearance.row(startFloor), body.node(mob.getZ()), startFloor, 0, null);
+        Step start = new Step(body.node(mob.getX()), BodyClearance.row(startFloor), body.node(mob.getZ()), startFloor);
 
         int margin = (farTrip ? FAR_MARGIN : MARGIN) + (int) Math.ceil(body.halfWidth * 2);
         int verticalMargin = farTrip ? FAR_VERTICAL_MARGIN : VERTICAL_MARGIN;
@@ -206,6 +207,8 @@ public final class WorkerPathfinder {
         final double floor;
         final double cost;
         final float malus;
+        /** Whether a block that hurts is close enough to matter to how it turns here: see {@link #turnIsClear}. */
+        final boolean nearHurt;
 
         @Nullable
         final Step from;
@@ -213,22 +216,67 @@ public final class WorkerPathfinder {
         double estimate;
         boolean done;
 
-        Step(int x, int y, int z, double floor, float malus, @Nullable Step from) {
-            this(x, y, z, floor, malus, from, 0);
+        /** The start. */
+        Step(int x, int y, int z, double floor) {
+            this(x, y, z, floor, 0, false, null, 0);
         }
 
-        Step(int x, int y, int z, double floor, float malus, @Nullable Step from, double cost) {
+        Step(int x, int y, int z, double floor, float malus, boolean nearHurt, @Nullable Step from, double cost) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.floor = floor;
             this.malus = malus;
+            this.nearHurt = nearHurt;
             this.from = from;
             this.cost = cost;
         }
 
         long key() {
             return BlockPos.asLong(x, y, z);
+        }
+
+        /** Which of the 8 ways it came here by, as a number from 0 to 8 (4: none, from the start's own node). */
+        int heading() {
+            return from == null ? 4 : heading(x - from.x, z - from.z);
+        }
+
+        static int heading(int dx, int dz) {
+            return (Integer.signum(dx) + 1) * 3 + Integer.signum(dz) + 1;
+        }
+    }
+
+    /**
+     * The cheapest way found so far to each place the search has reached. A place is a node, but
+     * for a node next to a block that hurts it's a node and the way it was come to: which ways it
+     * can go on from there depends on that ({@link #turnIsClear}), so the cheapest way to the node
+     * may be one that can't go on where a dearer one can.
+     */
+    private static final class Reached {
+        private final Long2ObjectMap<Step> byNode = new Long2ObjectOpenHashMap<>();
+        private final Long2ObjectMap<Step[]> byNodeAndHeading = new Long2ObjectOpenHashMap<>();
+
+        @Nullable
+        Step get(Step step) {
+            return get(step.key(), step.nearHurt, step.heading());
+        }
+
+        /** The cheapest way so far to this node, come to by this {@link Step#heading} if it's near a block that hurts. */
+        @Nullable
+        Step get(long node, boolean nearHurt, int heading) {
+            if (!nearHurt) {
+                return byNode.get(node);
+            }
+            Step[] ways = byNodeAndHeading.get(node);
+            return ways == null ? null : ways[heading];
+        }
+
+        void put(Step step) {
+            if (step.nearHurt) {
+                byNodeAndHeading.computeIfAbsent(step.key(), key -> new Step[9])[step.heading()] = step;
+            } else {
+                byNode.put(step.key(), step);
+            }
         }
     }
 
@@ -260,7 +308,7 @@ public final class WorkerPathfinder {
             double goalFloor,
             int goalRow,
             double goalZ) {
-        Long2ObjectMap<Step> best = new Long2ObjectOpenHashMap<>();
+        Reached best = new Reached();
         Queue<Step> open = new PriorityQueue<>((a, b) -> Double.compare(a.estimate, b.estimate));
         // The start is where the mob is, not a node, so it isn't one of the nodes it can go to
         start.estimate = heuristic(body, start, goalX, goalZ);
@@ -269,7 +317,7 @@ public final class WorkerPathfinder {
         int expanded = 0;
         while (!open.isEmpty() && expanded < maxExpanded) {
             Step step = open.poll();
-            if (step.done || (step.from != null && best.get(step.key()) != step)) {
+            if (step.done || (step.from != null && best.get(step) != step)) {
                 continue; // superseded by a cheaper way here
             }
             step.done = true;
@@ -278,17 +326,17 @@ public final class WorkerPathfinder {
             // Where it is (for the start, the mob's real position, not its node's middle)
             double atX = step.from == null ? mob.getX() : body.centre(step.x);
             double atZ = step.from == null ? mob.getZ() : body.centre(step.z);
-            if (isGoal(body, step, atX, atZ, goalX, goalFloor, goalRow, goalZ)) {
+            if (isGoal(body, mob, step, atX, atZ, goalX, goalFloor, goalRow, goalZ)) {
                 return step;
             }
 
             for (int[] d : step.from == null ? FROM_START : DIRECTIONS) {
-                Step next = move(body, step, atX, atZ, d[0], d[1], bounds, best);
+                Step next = move(body, mob, step, atX, atZ, d[0], d[1], bounds, best);
                 if (next == null) {
                     continue;
                 }
                 next.estimate = next.cost + heuristic(body, next, goalX, goalZ);
-                best.put(next.key(), next);
+                best.put(next);
                 open.add(next);
             }
         }
@@ -302,6 +350,7 @@ public final class WorkerPathfinder {
      */
     private static boolean isGoal(
             BodyClearance body,
+            Mob mob,
             Step step,
             double atX,
             double atZ,
@@ -317,7 +366,33 @@ public final class WorkerPathfinder {
         if (offX > GOAL_SLACK || offZ > GOAL_SLACK) {
             return false;
         }
-        return (offX < 1.0e-6 && offZ < 1.0e-6) || body.canMove(atX, step.floor, atZ, goalX, goalFloor, goalZ);
+        return (offX < 1.0e-6 && offZ < 1.0e-6)
+                || (body.canMove(atX, step.floor, atZ, goalX, goalFloor, goalZ)
+                        && turnIsClear(body, mob, step, false, goalX, goalFloor, goalZ));
+    }
+
+    /**
+     * Whether the body can turn at {@code step} for a place next to it without brushing a block
+     * that hurts. A mob following a path doesn't walk right up to each node: it makes for the next
+     * one as soon as it's within some way of this one ({@link BodyClearance#turnsEarlyBy}), so on a
+     * turn it leaves the planned line early and cuts across the inside of the corner. Going
+     * straight on it leaves nothing. So the space from the place (or places) it came through to
+     * the one it's going to has to be free of them too, which makes a walk into a gap between two
+     * berry bushes line up with the gap first, and walk straight in.
+     */
+    private static boolean turnIsClear(
+            BodyClearance body, Mob mob, Step step, boolean straightOn, double toX, double toFloor, double toZ) {
+        if (!step.nearHurt || step.from == null || straightOn) {
+            return true;
+        }
+        AABB swept = body.box(toX, toFloor, toZ);
+        Step back = step.from;
+        for (int i = 0; i < body.turnsEarlyBy && back != null; i++, back = back.from) {
+            double backX = back.from == null ? mob.getX() : body.centre(back.x);
+            double backZ = back.from == null ? mob.getZ() : body.centre(back.z);
+            swept = swept.minmax(body.box(backX, back.floor, backZ));
+        }
+        return !body.hurtsIn(swept);
     }
 
     /**
@@ -329,13 +404,14 @@ public final class WorkerPathfinder {
     @Nullable
     private static Step move(
             BodyClearance body,
+            Mob mob,
             Step step,
             double atX,
             double atZ,
             int dx,
             int dz,
             Bounds bounds,
-            Long2ObjectMap<Step> best) {
+            Reached best) {
         int x = step.x + dx;
         int z = step.z + dz;
         if (x < bounds.minX() || x > bounds.maxX() || z < bounds.minZ() || z > bounds.maxZ()) {
@@ -348,17 +424,17 @@ public final class WorkerPathfinder {
         int up = step.y + 1;
         double floorUp = body.floorAtNode(x, up, z);
         if (!Double.isNaN(floorUp)) {
-            return arrive(body, step, atX, atZ, x, up, z, floorUp, bounds, best);
+            return arrive(body, mob, step, atX, atZ, x, up, z, floorUp, bounds, best);
         }
         double floorLevel = body.floorAtNode(x, step.y, z);
         if (!Double.isNaN(floorLevel)) {
-            return arrive(body, step, atX, atZ, x, step.y, z, floorLevel, bounds, best);
+            return arrive(body, mob, step, atX, atZ, x, step.y, z, floorLevel, bounds, best);
         }
         // Nothing to stand on at this height: down to the first floor below, if it's not too far
         for (int y = step.y - 1; y >= step.y - body.maxDrop - 1; y--) {
             double floor = body.floorAtNode(x, y, z);
             if (!Double.isNaN(floor)) {
-                return arrive(body, step, atX, atZ, x, y, z, floor, bounds, best);
+                return arrive(body, mob, step, atX, atZ, x, y, z, floor, bounds, best);
             }
             if (!body.clear(body.box(toX, y, toZ))) {
                 return null; // no floor yet, but something in the way of dropping
@@ -370,6 +446,7 @@ public final class WorkerPathfinder {
     @Nullable
     private static Step arrive(
             BodyClearance body,
+            Mob mob,
             Step step,
             double atX,
             double atZ,
@@ -378,14 +455,15 @@ public final class WorkerPathfinder {
             int z,
             double floor,
             Bounds bounds,
-            Long2ObjectMap<Step> best) {
+            Reached best) {
         if (!bounds.contains(x, y, z)) {
             return null;
         }
         // Most of the ways to a node are to one already gone on from, or reached as cheaply (seven
         // of the eight ways onto any node in the open): those are turned down here, before the
         // body is tried against the blocks there and on the way, which is what a search costs
-        Step known = best.get(BlockPos.asLong(x, y, z));
+        boolean nearHurt = body.nearHurt(x, y, z, floor);
+        Step known = best.get(BlockPos.asLong(x, y, z), nearHurt, Step.heading(x - step.x, z - step.z));
         if (known != null && known.done) {
             return null;
         }
@@ -407,7 +485,16 @@ public final class WorkerPathfinder {
         if (!body.canMove(atX, step.floor, atZ, toX, floor, toZ)) {
             return null;
         }
-        return new Step(x, y, z, floor, malus, step, cost);
+        // Straight on: the way it came to `step`, again (never so from the start, which is no node)
+        Step before = step.from;
+        boolean straightOn = before != null
+                && before.from != null
+                && x - step.x == step.x - before.x
+                && z - step.z == step.z - before.z;
+        if (!turnIsClear(body, mob, step, straightOn, toX, floor, toZ)) {
+            return null;
+        }
+        return new Step(x, y, z, floor, malus, nearHurt, step, cost);
     }
 
     /** Octile distance across to the tile: never more than the cheapest walk there. */
