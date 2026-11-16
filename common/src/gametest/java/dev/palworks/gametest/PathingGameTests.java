@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
+import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.pathfinder.Node;
@@ -39,6 +40,17 @@ public class PathingGameTests {
     private static final int SETTLE_TICKS = 10;
 
     private static final CropBlock WHEAT = (CropBlock) Blocks.WHEAT;
+
+    // A sweet berry bush hurts whatever moves through its block once it's past a seedling (age 1
+    // on); it's ripe to pick, and so a job, at age 3. It has no collision at any age.
+    private static final BlockState YOUNG_BUSH =
+            Blocks.SWEET_BERRY_BUSH.defaultBlockState().setValue(SweetBerryBushBlock.AGE, 1);
+    private static final BlockState RIPE_BUSH =
+            Blocks.SWEET_BERRY_BUSH.defaultBlockState().setValue(SweetBerryBushBlock.AGE, 3);
+    /** Where the {@link #hedge} of bushes runs across the arena, and the middle of the gap in it. */
+    private static final int HEDGE_X = 8;
+
+    private static final int GAP_Z = 8;
 
     // ---- Scenes ----
 
@@ -410,6 +422,177 @@ public class PathingGameTests {
             assertFits(helper, wide, new BlockPos(11, 6, 10), true, "a wide one beside a post its body misses");
             assertFits(helper, wide, new BlockPos(3, 6, 14), false, "a wide one beside a block its body would be in");
             helper.succeed();
+        });
+    }
+
+    // ---- Blocks that hurt ----
+
+    /** A cactus, 2 high, on the sand it needs under it. */
+    private static void cactus(GameTestHelper helper, int x, int z) {
+        helper.setBlock(x, 0, z, Blocks.SAND);
+        helper.setBlock(x, 1, z, Blocks.CACTUS);
+        helper.setBlock(x, 2, z, Blocks.CACTUS);
+    }
+
+    /**
+     * A hedge of young berry bushes across the arena at {@link #HEDGE_X}, running well past it to both
+     * sides (further than a search looks round), with the tiles from {@code gapFrom} to
+     * {@code gapTo} left open.
+     */
+    private static void hedge(GameTestHelper helper, int gapFrom, int gapTo) {
+        for (int z = -8; z <= 24; z++) {
+            if (z < gapFrom || z > gapTo) {
+                helper.setBlock(HEDGE_X, 1, z, YOUNG_BUSH);
+            }
+        }
+    }
+
+    /** Fail the test the moment a Pokémon loses health, from a couple of ticks after it's sent out. */
+    private static void neverHurt(GameTestHelper helper, PokemonEntity... mobs) {
+        float[] health = new float[mobs.length];
+        long from = helper.getTick() + 2;
+        helper.onEachTick(() -> {
+            for (int i = 0; i < mobs.length; i++) {
+                if (helper.getTick() > from && mobs[i].getHealth() < health[i]) {
+                    var source = mobs[i].getLastDamageSource();
+                    helper.fail(mobs[i].getPokemon().getSpecies().getName() + " was hurt by "
+                            + (source == null ? "something" : source.getMsgId()) + " at "
+                            + mobs[i].position());
+                }
+                health[i] = mobs[i].getHealth();
+            }
+        });
+    }
+
+    /** Where a path's node {@code i} is, in the test's own coordinates. */
+    private static BlockPos nodeRel(GameTestHelper helper, Path path, int i) {
+        return path.getNode(i).asBlockPos().subtract(helper.absolutePos(BlockPos.ZERO));
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "pathing_hurting_corners", timeoutTicks = 200)
+    public void aWalkDoesntSlipBetweenBerryBushesThatTouchAtTheCorners(GameTestHelper helper) {
+        // Bushes corner to corner across the arena. Nothing there stops a body, and no tile
+        // between two of them has a bush in it, but a body going from one side to the other
+        // passes through the corners of both
+        Workers.isolate(helper);
+        RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
+        for (int i = -8; i <= 24; i++) {
+            helper.setBlock(i, 1, i, YOUNG_BUSH);
+        }
+        helper.setBlock(7, 1, 7, Blocks.AIR);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, new BlockPos(4, 1, 10));
+        BlockPos goal = new BlockPos(10, 1, 4);
+
+        helper.runAfterDelay(SETTLE_TICKS, () -> {
+            assertReach(helper, worker, goal, Reach.YES, "through the tile with no bush in it");
+            helper.setBlock(7, 1, 7, YOUNG_BUSH);
+            assertReach(helper, worker, goal, Reach.NO, "between bushes that touch at their corners");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "pathing_hurting_gap", timeoutTicks = 200)
+    public void aWalkLinesUpWithAGapBetweenBerryBushesBeforeGoingIn(GameTestHelper helper) {
+        // A hedge of bushes with a gap a block wide, come to from off to one side. A mob following
+        // a path turns for the next node before it's at this one, so a turn right at the gap's
+        // mouth would brush the bush on the inside of it: the walk turns a tile back, and goes
+        // through, and a tile on, in a straight line
+        Workers.isolate(helper);
+        RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
+        hedge(helper, GAP_Z, GAP_Z);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, new BlockPos(3, 1, 4));
+        BlockPos goal = new BlockPos(13, 1, 4);
+
+        helper.runAfterDelay(SETTLE_TICKS, () -> {
+            WorkerPathfinder.Result result = WorkerPathfinder.find(worker, helper.absolutePos(goal));
+            helper.assertTrue(result.reach() == Reach.YES, "it gets through the gap: " + result.reach());
+            Path path = result.path();
+            int inGap = -1;
+            for (int i = 0; i < path.getNodeCount(); i++) {
+                BlockPos node = nodeRel(helper, path, i);
+                if (node.getX() == HEDGE_X) {
+                    helper.assertTrue(
+                            node.getZ() == GAP_Z, "it crosses the hedge at the gap, not through a bush at " + node);
+                    inGap = i;
+                }
+            }
+            helper.assertTrue(inGap >= 2 && inGap + 2 < path.getNodeCount(), "the path goes through the gap");
+            for (int i = inGap - 2; i <= inGap + 2; i++) {
+                BlockPos node = nodeRel(helper, path, i);
+                helper.assertTrue(
+                        node.getZ() == GAP_Z && node.getX() == HEDGE_X + i - inGap,
+                        "it's in line with the gap from 2 tiles before it to 2 after, but goes by " + node);
+            }
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "pathing_hurting_tiles", timeoutTicks = 200)
+    public void aTileInABlockThatHurtsIsNowhereToStand(GameTestHelper helper) {
+        Workers.isolate(helper);
+        RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
+        PokemonEntity small = Workers.sendOut(helper, BULBASAUR, new BlockPos(2, 1, 2));
+        PokemonEntity wide = Workers.sendOut(helper, MACHAMP, new BlockPos(2, 1, 13));
+        helper.setBlock(8, 1, 8, YOUNG_BUSH);
+        cactus(helper, 8, 12);
+        // The same, half a block up: the body on a slab next to the bush is in the bush's block,
+        // on a whole block next to it it's over the bush
+        column(helper, 4, 4, Blocks.STONE.defaultBlockState(), bottomSlab());
+        column(helper, 5, 4, Blocks.DIRT.defaultBlockState(), YOUNG_BUSH);
+        column(helper, 4, 8, Blocks.STONE.defaultBlockState(), Blocks.STONE.defaultBlockState());
+        column(helper, 5, 8, Blocks.DIRT.defaultBlockState(), YOUNG_BUSH);
+        // And on a floor that isn't a plain one: a carpet
+        helper.setBlock(12, 1, 3, YOUNG_BUSH);
+        helper.setBlock(13, 1, 3, Blocks.WHITE_CARPET);
+        helper.setBlock(13, 1, 5, Blocks.WHITE_CARPET);
+
+        helper.runAfterDelay(2, () -> {
+            assertFits(helper, small, new BlockPos(8, 1, 8), false, "in a berry bush");
+            assertFits(
+                    helper, small, new BlockPos(9, 1, 8), true, "next to the bush, for a body that stays in its tile");
+            assertFits(
+                    helper,
+                    wide,
+                    new BlockPos(9, 1, 8),
+                    false,
+                    "next to the bush, for a 1.2-wide body that reaches into it");
+            assertFits(helper, wide, new BlockPos(10, 1, 8), true, "a tile further from the bush");
+            assertFits(
+                    helper, small, new BlockPos(9, 1, 12), true, "next to a cactus, for a body that stays in its tile");
+            assertFits(helper, wide, new BlockPos(9, 1, 12), false, "next to a cactus, for a body that reaches it");
+            assertFits(helper, wide, new BlockPos(13, 1, 3), false, "on a carpet next to a bush, reaching into it");
+            assertFits(helper, wide, new BlockPos(13, 1, 5), true, "on a carpet a tile further from the bush");
+            assertFits(
+                    helper,
+                    wide,
+                    new BlockPos(4, 6, 4),
+                    false,
+                    "on a slab beside a bush, its feet in the bush's block");
+            assertFits(helper, wide, new BlockPos(4, 6, 8), true, "on a whole block beside a bush, over it");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "pathing_hurting_patch", timeoutTicks = 3000)
+    public void aWorkerPicksAWholeBerryPatchUnhurt(GameTestHelper helper) {
+        // 5x5 ripe bushes. It picks from 2 to 4 tiles off, so the ones in the middle are in reach
+        // from outside the patch: it never stands in a bush (a tile in one used to be the nearest
+        // "free" tile, which it then couldn't path to, and the middle of a patch was never picked)
+        Workers.isolate(helper);
+        RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
+        fill(helper, 6, 1, 6, 10, 1, 10, RIPE_BUSH);
+        PokemonEntity worker =
+                Workers.sendOut(helper, Workers.owner(helper, new BlockPos(0, 1, 0)), BULBASAUR, new BlockPos(2, 1, 8));
+        neverHurt(helper, worker);
+        helper.succeedWhen(() -> {
+            for (int x = 6; x <= 10; x++) {
+                for (int z = 6; z <= 10; z++) {
+                    BlockState bush = helper.getBlockState(new BlockPos(x, 1, z));
+                    helper.assertTrue(
+                            bush.is(Blocks.SWEET_BERRY_BUSH) && bush.getValue(SweetBerryBushBlock.AGE) < 3,
+                            "the bush at " + x + ", " + z + " picked, but it's " + bush);
+                }
+            }
         });
     }
 }
