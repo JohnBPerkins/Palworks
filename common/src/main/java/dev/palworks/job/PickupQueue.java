@@ -194,7 +194,7 @@ final class PickupQueue {
             WorkerInfo planter = planterFor(entity);
             if (planter != null) {
                 TrackedDrops.handOverTo(entity, planter.pokemonUUID);
-                seedRequests.handOver(assigner, planter, entity.blockPosition(), now);
+                seedRequests.handOver(assigner, planter, entity, now);
                 continue;
             }
             if (covered(entity, jobs)) {

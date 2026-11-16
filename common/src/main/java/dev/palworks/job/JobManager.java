@@ -515,7 +515,7 @@ public class JobManager {
 
         if (currentTime % FOLLOW_UP_RECHECK_INTERVAL == 0) {
             pool.dropGoneFollowUps(level);
-            seedRequests.cleanUp(level, pickups);
+            seedRequests.cleanUp(level, pickups, assigner);
             Watering.forgetExpired(level);
         }
         scanner.dropUnloaded(level);
@@ -616,8 +616,8 @@ public class JobManager {
 
     /**
      * A transporter has brought seeds to the planter that asked for them: it throws them to the
-     * planter's feet, as a player gives another an item, and the planter gets a job to pick them up
-     * once they've landed and a player could (see SeedRequests). Only that planter takes them;
+     * planter, as a player gives another an item, and the planter gets a job to pick them up where
+     * they land, once a player could (see SeedRequests). Only that planter takes them;
      * nobody else's pickups do.
      */
     public void handOverSeeds(Pokemon transporter) {
@@ -651,8 +651,7 @@ public class JobManager {
         // Marked once it's in: an item that comes into the world already marked (as one loaded with
         // its chunk does) was left for a planter that's long forgotten (see TrackedDrops)
         dev.palworks.drops.TrackedDrops.handOverTo(item, planter.pokemonUUID);
-        // Where it's thrown to: it lands about there, within the job's pickup radius
-        seedRequests.handOver(assigner, planter, planterEntity.blockPosition(), level.getGameTime());
+        seedRequests.handOver(assigner, planter, item, level.getGameTime());
         Palworks.LOGGER.debug(
                 "{} left {} for {} at {}",
                 transporter.getSpecies().getName(),

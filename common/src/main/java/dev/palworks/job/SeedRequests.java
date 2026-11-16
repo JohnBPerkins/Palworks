@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
  * Seeds on their way to planters. A planter can't take seeds out of a chest (only a worker that
  * transports can), so one that's run out of seeds for the open farmland (or soul sand) round it
  * asks for some: a transporter takes them from a chest, brings them to wherever the planter is
- * now and throws them to its feet, and the planter picks them up (TAKE_SEEDS). Seeds a player throws
+ * now and throws them to it, and the planter picks them up where they land (TAKE_SEEDS). Seeds a player throws
  * by a planter with room for them are handed to it the same way (see PickupQueue). In memory
  * only: after a restart a transporter still carrying seeds puts them away as any cargo, and the
  * planter asks again.
@@ -57,8 +57,24 @@ final class SeedRequests {
         }
     }
 
-    /** Seeds dropped for a planter at {@code pos}, at game time {@code at}. */
-    private record Handover(UUID planter, BlockPos pos, long at) {}
+    /**
+     * Seeds left for a planter at game time {@code at}: the item itself, and where its job to take
+     * them is, which is where they landed (null while they're still in the air).
+     */
+    private static final class Handover {
+        final UUID planter;
+        final UUID seeds;
+        final long at;
+
+        @Nullable
+        BlockPos job;
+
+        Handover(UUID planter, UUID seeds, long at) {
+            this.planter = planter;
+            this.seeds = seeds;
+            this.at = at;
+        }
+    }
 
     /** Whether this planter has asked for seeds (and isn't holding seeds handed to it yet). */
     boolean hasAsked(UUID planter) {
@@ -74,7 +90,7 @@ final class SeedRequests {
     /** Whether seeds have been left for this planter to pick up (it doesn't ask for more meanwhile). */
     boolean isHandedTo(UUID planter) {
         for (Handover handover : handovers) {
-            if (handover.planter().equals(planter)) {
+            if (handover.planter.equals(planter)) {
                 return true;
             }
         }
@@ -139,18 +155,39 @@ final class SeedRequests {
     }
 
     /**
-     * Seeds are on the ground at {@code pos} for {@code planter} (already marked as handed to it,
-     * see TrackedDrops): it gets a job to pick them up, offered to it straight away if it's idle.
-     * Only it can take them (JobChecks: room for seeds handed to it).
+     * These seeds have been left for {@code planter} (already marked as handed to it, see
+     * TrackedDrops): it gets a job to pick them up where they lie, once they've landed, offered to
+     * it straight away if it's idle. Only it can take them (JobChecks: room for seeds handed to
+     * it).
      */
-    void handOver(JobAssigner assigner, WorkerInfo planter, BlockPos pos, long now) {
+    void handOver(JobAssigner assigner, WorkerInfo planter, ItemEntity seeds, long now) {
         // Its request (if it had one: thrown seeds come unasked) is answered
         requests.remove(planter.pokemonUUID);
-        handovers.add(new Handover(planter.pokemonUUID, pos.immutable(), now));
+        Handover handover = new Handover(planter.pokemonUUID, seeds.getUUID(), now);
+        handovers.add(handover);
+        offerOnceLanded(assigner, handover, seeds, now);
+    }
+
+    /**
+     * Give the planter its job to take the seeds left for it, if they've landed: where they lie,
+     * not where the planter stood as they were thrown. A transporter throws them from a few
+     * blocks off and they come down short of the planter, so a job at the planter's feet could
+     * have none of them in its pickup radius (JobChecks.seedsHandedTo): while they were still in
+     * the air, or for good. The job was then dropped as one with nothing left to do (see
+     * JobPool.dropGoneFollowUps), and the planter waited out the minute by seeds it was never
+     * sent to take.
+     */
+    private void offerOnceLanded(JobAssigner assigner, Handover handover, ItemEntity seeds, long now) {
+        WorkerInfo planter = workers.get(handover.planter);
+        if (planter == null || !seeds.onGround()) {
+            return;
+        }
+        handover.job = JobChecks.spotOf(seeds);
         // The planter's skill that plants them: what a pickup job asks of it
         Suitability skill =
                 planter.suitabilities.contains(Suitability.PLANTING) ? Suitability.PLANTING : Suitability.NETHER;
-        JobRecord job = JobRecord.followUp(JobType.TAKE_SEEDS, pos, now, planter.pokemonUUID, EnumSet.of(skill));
+        JobRecord job =
+                JobRecord.followUp(JobType.TAKE_SEEDS, handover.job, now, planter.pokemonUUID, EnumSet.of(skill));
         if (!planter.idle || assigner.assignFirstReachable(planter, List.of(job)) == null) {
             pool.offer(job);
         }
@@ -158,16 +195,19 @@ final class SeedRequests {
 
     /** The planter has picked up the seeds handed to it: nothing's on its way to it any more. */
     void taken(UUID planter) {
-        handovers.removeIf(handover -> handover.planter().equals(planter));
+        handovers.removeIf(handover -> handover.planter.equals(planter));
         requests.remove(planter);
     }
 
     /**
      * Every so often: forget the requests of planters that have gone (put away, or out of loaded
-     * chunks) and let go of transporters that have; seeds handed to a planter that hasn't taken them
-     * in {@link #HANDOVER_TIMEOUT_TICKS} become an ordinary pickup, for a transporter to put away.
+     * chunks) and let go of transporters that have; seeds handed to a planter get their job once
+     * they've landed, and those it hasn't taken in {@link #HANDOVER_TIMEOUT_TICKS} become an
+     * ordinary pickup, for a transporter to put away. The seeds are found as the item they are,
+     * wherever it's got to, not by looking round where they were left: any that missed would
+     * stay marked as the planter's, which no transporter picks up.
      */
-    void cleanUp(ServerLevel level, PickupQueue pickups) {
+    void cleanUp(ServerLevel level, PickupQueue pickups, JobAssigner assigner) {
         long now = level.getGameTime();
         requests.values().removeIf(request -> workers.get(request.planter) == null);
         for (Request request : requests.values()) {
@@ -179,20 +219,31 @@ final class SeedRequests {
 
         for (Iterator<Handover> it = handovers.iterator(); it.hasNext(); ) {
             Handover handover = it.next();
-            if (now - handover.at() < HANDOVER_TIMEOUT_TICKS) {
+            // Gone (despawned, or their chunk unloaded: see TrackedDrops) if not there
+            ItemEntity seeds = level.getEntity(handover.seeds) instanceof ItemEntity item
+                            && item.isAlive()
+                            && handover.planter.equals(TrackedDrops.handedTo(item))
+                    ? item
+                    : null;
+            if (seeds != null && now - handover.at < HANDOVER_TIMEOUT_TICKS) {
+                if (handover.job == null) {
+                    offerOnceLanded(assigner, handover, seeds, now);
+                }
                 continue;
             }
             it.remove();
-            requests.remove(handover.planter());
-            pool.remove(new JobPool.JobKey(handover.pos(), JobType.TAKE_SEEDS));
-            for (ItemEntity item : JobChecks.seedsHandedTo(level, handover.pos(), handover.planter())) {
-                TrackedDrops.stopHandingOver(item);
-                pickups.track(item, null, null, false, now);
+            requests.remove(handover.planter);
+            if (handover.job != null) {
+                pool.remove(new JobPool.JobKey(handover.job, JobType.TAKE_SEEDS));
             }
-            Palworks.LOGGER.debug(
-                    "Planter {} never took the seeds left for it at {}: a pickup now",
-                    handover.planter(),
-                    handover.pos());
+            if (seeds != null) {
+                TrackedDrops.stopHandingOver(seeds);
+                pickups.track(seeds, null, null, false, now);
+                Palworks.LOGGER.debug(
+                        "Planter {} never took the seeds left for it at {}: a pickup now",
+                        handover.planter,
+                        seeds.blockPosition());
+            }
         }
     }
 }
