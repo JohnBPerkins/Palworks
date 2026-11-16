@@ -66,6 +66,11 @@ public final class WorkSkills {
         return "palworks.work_skill." + job.getId();
     }
 
+    /** The translation key of what a shown job does ("Waters growing crops..."). */
+    public static String descriptionKey(Suitability job) {
+        return nameKey(job) + ".description";
+    }
+
     /**
      * How many of {@code count} skills the summary's box names, one a row: all of them if they fit,
      * otherwise all but the last row, which says how many more there are.

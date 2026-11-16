@@ -16,6 +16,7 @@ import dev.palworks.suitability.Suitability;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  *   <li>by name, on the summary's Info page, in the empty box left of the experience box:
  *       "Watering 3", a row each, or the first and how many more if they don't all fit.</li>
  * </ul>
- * Hovering either lists them all, by name, in a tooltip. The levels are the server's (see
+ * Hovering either lists them all, by name, in a tooltip, each with a line on what it does. The levels are the server's (see
  * WorkLevelSync): the party's are kept up to date, and the PC's are asked for as it opens. Nothing is
  * shown for a Pokémon whose levels haven't come.
  *
@@ -274,7 +275,7 @@ public final class WorkSkillsOverlay {
         pose.popPose();
     }
 
-    /** Every shown skill by name, with its level: "Watering 3". */
+    /** Every shown skill by name, with its level ("Watering: level 3"), and what it does under it. */
     private static void drawTooltip(
             GuiGraphics graphics, Font font, List<WorkSkills.Shown> shown, int mouseX, int mouseY) {
         List<Component> lines = new ArrayList<>();
@@ -284,6 +285,8 @@ public final class WorkSkillsOverlay {
                     "palworks.ui.work_skills.entry",
                     Component.translatable(WorkSkills.nameKey(skill.job())),
                     skill.level()));
+            lines.add(Component.translatable(WorkSkills.descriptionKey(skill.job()))
+                    .withStyle(ChatFormatting.GRAY));
         }
         graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
     }
