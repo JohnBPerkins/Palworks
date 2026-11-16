@@ -60,6 +60,10 @@ public class WorkerAI {
     // in its stance, it steps in (STEP_IN_TICKS), then settles for where it is: that used to be
     // "not arrived" but also "not stuck", so it stood there until the 30s reservation expiry.
     private static final double SETTLED_DISTSQ = 3.0;
+    // How far past half its width from its stand tile's middle a wide worker's walk may end and
+    // still be next to it (see executeJob): the path's last node is at most a block's corner away
+    // from that middle (0.71), and a little for where it comes to rest
+    private static final double WALK_END_SLACK = 0.75;
     // Most ticks a worker spends stepping from where its walk ended onto its stand tile before it
     // settles for working from where it is (something's in the way: another mob, say).
     public static final int STEP_IN_TICKS = 40;
@@ -88,6 +92,8 @@ public class WorkerAI {
      */
     public static boolean tick(Pokemon pokemon, Mob entity, Level level) {
         boolean handled = tickWork(pokemon, entity, level);
+        // One whose job went while it was flying there comes down, whatever it's doing now
+        WorkerFlight.comeDown(entity);
         // Holding the food it's eating, and dropping crumbs
         EatingDisplay.tick(entity, level, WorkerStateManager.getOrCreate(pokemon));
         // After the tick, so they reflect where it ended up (e.g. a job dropped this tick): what
@@ -345,7 +351,14 @@ public class WorkerAI {
         boolean onStand =
                 distanceSq == 0 && offX * offX + offZ * offZ <= WorkPositions.ON_TILE_DIST * WorkPositions.ON_TILE_DIST;
         boolean inStance = WorkPositions.inStance(level, entity, targetPos, jobType, stance);
-        boolean nextToStand = distanceSq <= SETTLED_DISTSQ;
+        // Next to the stand tile: by whole blocks, or, for a wide Pokémon, as near as its walk can
+        // end. Cobblemon's navigation calls a walk done within half the mob's width of the path's
+        // last node, and for one over 3 blocks wide that node is at a block's corner (see
+        // BodyClearance), so its walk ends up to 2 blocks and more from the tile's middle: by
+        // blocks alone it never arrived anywhere, and stood there until its job timed out.
+        boolean nextToStand = distanceSq <= SETTLED_DISTSQ
+                || (Math.abs(entity.getY() - standPos.getY()) <= 1.0
+                        && Math.hypot(offX, offZ) <= entity.getBbWidth() / 2.0 + WALK_END_SLACK);
         if (walkEnded && nextToStand && !onStand && !inStance && state.getStepInTicks() < STEP_IN_TICKS) {
             if (holdForAnimation(entity)) {
                 return true;
@@ -471,6 +484,12 @@ public class WorkerAI {
                 .onTheWay(new JobContext(pokemon, entity, level, state, reservation));
         state.setWalkedToJob(true);
         state.resetStepIn();
+        // The 30 seconds it may hold a job without starting on it (see RESERVATION_TIMEOUT_TICKS)
+        // count from when it last got nearer, not from when it was given the job: a walk that takes
+        // longer (a slowed worker, a long way round) was given up part way, and started again
+        if (state.gotNearer(Math.sqrt(distanceSq))) {
+            state.setCurrentReservation(new ReservationId(targetPos, reservation.getJobType(), level.getGameTime()));
+        }
 
         // Track path failures for stuck detection: its walk has ended (on the ground, so not just
         // falling or knocked about) without getting next to the stand tile, so the path can't
@@ -783,9 +802,13 @@ public class WorkerAI {
         WorkerStateManager.save(pokemon, state);
     }
 
-    /** It falls asleep: Tired no more (it's sleeping it off), and it stops looking for a bed. */
+    /**
+     * It falls asleep: Tired no more (it's sleeping it off), and it stops looking for a bed. One
+     * already asleep and still Tired was napping when its bedtime came: its nap is its night's sleep
+     * now, so it's sleeping that off too. Left Tired, it was Tired (and its mood ran down) all night.
+     */
     private static void fallAsleep(Pokemon pokemon, WorkerState state) {
-        if (!state.isAsleep()) {
+        if (!state.isAsleep() || state.isTired()) {
             state.setAsleep(true);
             state.setTired(false);
             state.resetBedtimeIdleTicks();

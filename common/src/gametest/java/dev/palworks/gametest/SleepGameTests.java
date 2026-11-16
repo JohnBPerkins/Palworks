@@ -1004,4 +1004,29 @@ public class SleepGameTests {
                         state.getMood() > rested[0], "fed, rested and idle, it cheers up: " + state.getMood()))
                 .thenSucceed();
     }
+
+    @AfterBatch(batch = "sleep_nap_into_night")
+    public void afterNapIntoNight(ServerLevel level) {
+        morningAfter(level);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_nap_into_night", timeoutTicks = 1200)
+    public void aNapThatRunsIntoBedtimeIsItsNightsSleep(GameTestHelper helper) {
+        PokemonEntity squirtle = tiredInTheMorning(helper);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(inBed(squirtle), "napping"))
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    helper.assertTrue(stateOf(squirtle).isTired(), "still Tired while it naps");
+                    setTime(helper, MIDNIGHT);
+                })
+                .thenIdle(20)
+                // Asleep for the night, it's sleeping it off, as one that went to bed at bedtime is:
+                // left Tired, its mood ran down all night
+                .thenExecute(() -> {
+                    helper.assertTrue(inBed(squirtle), "still in its bed");
+                    helper.assertFalse(stateOf(squirtle).isTired(), "not Tired through the night");
+                })
+                .thenSucceed();
+    }
 }

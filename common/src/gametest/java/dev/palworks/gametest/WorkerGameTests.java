@@ -9,6 +9,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
 import com.mojang.brigadier.tree.CommandNode;
 import dev.palworks.ai.WorkStance;
+import dev.palworks.ai.WorkerAI;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.hunger.Hunger;
@@ -18,9 +19,11 @@ import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.inventory.WorkerInventoryMenu;
 import dev.palworks.job.JobChecks;
+import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityData;
@@ -33,6 +36,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
@@ -43,9 +47,12 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -59,6 +66,8 @@ import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.world.level.pathfinder.Path;
 
 /**
  * Real Cobblemon Pokémon doing real jobs, end to end: finding the job, walking there, doing it.
@@ -1005,5 +1014,224 @@ public class WorkerGameTests {
             helper.assertTrue(dev.getChild(WORKER).getChild(tool) != null, "in development: worker " + tool);
         }
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void whatAPlanterCantPlantIsCargoNotSeeds(GameTestHelper helper) {
+        // Workers plant fields (farmland, soul sand). Cocoa beans and sweet berries don't go in
+        // one: kept as seeds, a worker that plants never put its harvest of them in a chest
+        Set<Suitability> planter = EnumSet.of(Suitability.PLANTING, Suitability.TRANSPORTING);
+        for (var item : List.of(Items.COCOA_BEANS, Items.SWEET_BERRIES)) {
+            ItemStack stack = new ItemStack(item);
+            helper.assertTrue(WorkerInventory.isCargo(stack, planter), item + " is cargo");
+            helper.assertFalse(
+                    WorkerInventory.accepts(CarryMode.SEED_POUCH, stack), item + " doesn't go in a seed pouch");
+        }
+        for (var item : List.of(Items.WHEAT_SEEDS, Items.CARROT, Items.NETHER_WART)) {
+            ItemStack stack = new ItemStack(item);
+            helper.assertFalse(WorkerInventory.isCargo(stack, planter), item + " is kept to plant");
+            helper.assertTrue(WorkerInventory.accepts(CarryMode.SEED_POUCH, stack), item + " goes in a seed pouch");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_unreachable_moved", timeoutTicks = 450)
+    public void aWorkerThatsMovedLooksAgainAtWhatItCouldntReach(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Ripe wheat in a walled pen (too high to jump), the only job there is, and a worker
+        // outside it, 12 blocks off
+        BlockPos crop = new BlockPos(4, 1, 4);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        for (int i = 1; i <= 7; i++) {
+            for (int y = 1; y <= 2; y++) {
+                helper.setBlock(i, y, 1, Blocks.STONE);
+                helper.setBlock(i, y, 7, Blocks.STONE);
+                helper.setBlock(1, y, i, Blocks.STONE);
+                helper.setBlock(7, y, i, Blocks.STONE);
+            }
+        }
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, new BlockPos(-8, 1, 4));
+        JobManager jobs = JobManager.getInstance(helper.getLevel());
+        UUID uuid = worker.getPokemon().getUuid();
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertFalse(
+                        jobs.unreachableFor(uuid, helper.getLevel().getGameTime())
+                                .isEmpty(),
+                        "it can't get to the wheat"))
+                // Put down inside the pen: from here it can, long before it would give the spot
+                // another try anyway (30 seconds)
+                .thenExecute(() -> {
+                    BlockPos inside = helper.absolutePos(new BlockPos(3, 1, 3));
+                    worker.moveTo(inside.getX() + 0.5, inside.getY(), inside.getZ() + 0.5);
+                })
+                .thenWaitUntil(() -> helper.assertTrue(
+                        helper.getBlockState(crop).equals(WHEAT.getStateForAge(0)), "harvested, once it looked again"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_adopted", timeoutTicks = 600)
+    public void aJobKeptOverARestartStillNeedsItsSkills(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.STONE);
+        // A Grass type, which harvests whatever Gathering can; and a Ghost type that has ripe nether
+        // wart as its job the way it has after a restart: saved with it, and not in the (new) pool
+        Workers.sendOut(helper, "ivysaur level=20", START);
+        PokemonEntity gastly = Workers.sendOut(helper, "gastly level=20", new BlockPos(1, 1, 1));
+
+        helper.startSequence()
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    helper.setBlock(WART.below(), Blocks.SOUL_SAND);
+                    helper.setBlock(WART, Blocks.NETHER_WART.defaultBlockState().setValue(NetherWartBlock.AGE, 3));
+                    WorkerStateManager.getOrCreate(gastly.getPokemon())
+                            .setCurrentReservation(new ReservationId(
+                                    helper.absolutePos(WART),
+                                    JobType.HARVEST_CROPS,
+                                    helper.getLevel().getGameTime()));
+                    JobManager.getInstance(helper.getLevel())
+                            .registerWorker(gastly.getPokemon(), gastly, helper.getLevel());
+                    // Then it's recalled, and its job goes back for another worker
+                    gastly.discard();
+                })
+                .thenIdle(300)
+                .thenExecute(() -> helper.assertTrue(
+                        helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 3,
+                        "the nether wart was harvested by a Grass type"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_tether_box", timeoutTicks = 800)
+    public void aPasturedWorkerOnlyWorksWhereItsPastureLetsItRoam(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Wheat 3 blocks from its pasture, and more 12 blocks off: within its work range, but past
+        // where its pasture lets it roam (6 blocks here), where Cobblemon takes it back from
+        BlockPos near = new BlockPos(3, 1, 4);
+        BlockPos far = new BlockPos(3, 1, 13);
+        for (BlockPos crop : List.of(near, far)) {
+            helper.setBlock(crop.below(), Blocks.FARMLAND);
+            helper.setBlock(crop, WHEAT.getStateForAge(7));
+        }
+        PokemonEntity worker = Workers.sendOutPastured(helper, BULBASAUR, START);
+        Workers.tetherTo(helper, worker, START, 6);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(
+                        helper.getBlockState(near).equals(WHEAT.getStateForAge(0)),
+                        "the wheat by its pasture harvested"))
+                .thenIdle(300)
+                .thenExecute(() -> {
+                    helper.assertTrue(
+                            worker.isAlive() && worker.getTethering() != null, "it's still out, by its pasture");
+                    helper.assertTrue(
+                            helper.getBlockState(far).equals(WHEAT.getStateForAge(7)),
+                            "the wheat past its roam is left");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_off_stops", timeoutTicks = 600)
+    public void aWorkerSwitchedOffStopsWalkingToItsJob(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Wheat 14 blocks off, so it's a while on its way
+        BlockPos crop = new BlockPos(3, 1, 15);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        // Pastured: one from a party is called back to its owner's side as soon as it has no job
+        PokemonEntity worker = Workers.sendOutPastured(helper, BULBASAUR, START);
+        WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
+        double startZ = helper.absolutePos(START).getZ();
+        BlockPos wheat = helper.absolutePos(crop);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(
+                        state.getCurrentReservation() != null && worker.getZ() > startZ + 3, "on its way to the wheat"))
+                // As /palworks worker disable does
+                .thenExecute(() -> WorkerStateManager.setEnabled(worker.getPokemon(), false))
+                // Asked straight away, of where it's walking to: left a while it wanders about, as
+                // any Pokémon out of work does, and the wheat's way is as likely as any other
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    Path path = worker.getNavigation().getPath();
+                    Node end = path == null || worker.getNavigation().isDone() ? null : path.getEndNode();
+                    boolean toTheWheat = end != null && end.asBlockPos().closerThan(wheat, 4);
+                    helper.assertFalse(toTheWheat, "it's still walking to the job it gave up");
+                })
+                .thenIdle(40)
+                .thenExecute(() -> helper.assertTrue(
+                        helper.getBlockState(crop).equals(WHEAT.getStateForAge(7)), "the wheat is left"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_off_forgotten", timeoutTicks = 200)
+    public void aSwitchedOffWorkerIsForgottenOnceItsRecalled(GameTestHelper helper) {
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+        Pokemon pokemon = worker.getPokemon();
+
+        helper.startSequence()
+                .thenIdle(10)
+                .thenExecute(() -> WorkerStateManager.setEnabled(pokemon, false))
+                .thenIdle(10)
+                .thenExecute(() -> {
+                    // Something only its state in memory has (it isn't saved)
+                    WorkerStateManager.getOrCreate(pokemon).setWalkedToJob(true);
+                    worker.discard(); // recalled
+                })
+                // What's kept in memory for it goes, as a working one's does: it's read from its data
+                // again the next time it's out
+                .thenIdle(40)
+                .thenExecute(() -> helper.assertFalse(
+                        WorkerStateManager.getOrCreate(pokemon).hasWalkedToJob(),
+                        "its state was still in memory after it was recalled"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_slow_walk", timeoutTicks = 4000)
+    public void aSlowWorkerOnALongWalkKeepsItsJob(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos crop = new BlockPos(3, 1, 21); // 20 blocks off
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+        // Slowed so the walk takes longer than the 30 seconds a worker may hold a job without
+        // starting on it (as a long way round does)
+        worker.getAttribute(Attributes.MOVEMENT_SPEED)
+                .addTransientModifier(new AttributeModifier(
+                        ResourceLocation.fromNamespaceAndPath("palworks_gametest", "slow"),
+                        -0.72,
+                        AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+        WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
+        long[] since = {-1};
+        long[] walked = {-1};
+        boolean[] dropped = {false};
+        helper.onEachTick(() -> {
+            if (walked[0] >= 0) {
+                return;
+            }
+            boolean hasJob = state.getCurrentReservation() != null;
+            if (hasJob && since[0] < 0) {
+                since[0] = helper.getTick();
+            }
+            if (hasJob && state.isWorking()) {
+                walked[0] = helper.getTick() - since[0]; // there, and at work
+            }
+            if (!hasJob && since[0] >= 0) {
+                dropped[0] = true;
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(helper.getBlockState(crop).equals(WHEAT.getStateForAge(0)), "harvested");
+            if (walked[0] <= WorkerAI.RESERVATION_TIMEOUT_TICKS) {
+                helper.fail("the walk took " + walked[0] + " ticks: not the 30 seconds this is about");
+            }
+            helper.assertFalse(dropped[0], "it gave its job up on the way");
+        });
     }
 }

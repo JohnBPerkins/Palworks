@@ -1,5 +1,6 @@
 package dev.palworks.ai;
 
+import dev.palworks.ai.path.WorkerPathfinder;
 import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobChecks;
@@ -99,7 +100,7 @@ public final class WorkPositions {
         // tried one block up and down so slopes work (and, for a crystal, two down: see
         // CRYSTAL_STEPS). A worker eating from a trough stands square to one of its sides if it can,
         // so its head is over the food, not at a corner.
-        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
+        Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
         boolean squareOn = jobType == JobType.EAT_FOOD;
         int[] heights = jobType == JobType.MINE_CRYSTAL ? CRYSTAL_STEPS : SLOPE_STEPS;
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
@@ -155,7 +156,7 @@ public final class WorkPositions {
      */
     @Nullable
     private static BlockPos hangingFruitStand(Level level, BlockPos fruit, Mob entity, int distance) {
-        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
+        Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
@@ -212,7 +213,7 @@ public final class WorkPositions {
     public static TreeStand treeStandFor(Level level, BlockPos treePos, Mob entity, WorkStance stance) {
         List<BlockPos> trunk = trunkColumns(level, treePos);
         int closest = stance.ringFor(entity);
-        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
+        Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
         Predicate<BlockPos> fitsIfCleared = spot -> fitsIfLeavesCleared(level, spot, entity);
         for (int d = closest; d <= closest + 1; d++) {
             List<BlockPos> ring = ringAround(trunk, d);
@@ -269,7 +270,7 @@ public final class WorkPositions {
      */
     @Nullable
     private static BlockPos pickupStand(Level level, BlockPos jobPos, Mob entity) {
-        Predicate<BlockPos> fitsThere = spot -> fits(level, spot, entity);
+        Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
         for (ItemEntity item : PickupRoute.itemsInOrder(level, jobPos, entity)) {
             BlockPos at = JobChecks.spotOf(item);
             BlockPos on = firstHeight(at, SLOPE_STEPS, fitsThere);
@@ -585,31 +586,16 @@ public final class WorkPositions {
     }
 
     /**
-     * Whether the worker fits standing on this tile: every column its hitbox covers when centred
-     * on the tile is clear for its whole height, and there's floor under its centre. A wide
-     * Pokémon (Conkeldurr is 1.5 blocks wide, Hariyama nearly 3) also takes up the columns next to
-     * the tile; leaves or a trunk there used to leave it unable to stand where it was sent.
+     * Whether the worker fits standing on this tile (the block its feet go in): there's a floor in
+     * it, and room on that floor for its whole body, by its real hitbox and the blocks' real
+     * shapes. It's the pathfinder's own test of a tile it's sent to (see WorkerPathfinder.fitsOn),
+     * so the two agree on what a floor is. This used to go by whole blocks (a solid block under the
+     * tile, empty ones in it): on a carpet, a few layers of snow or a trapdoor, where it stands in
+     * the floor's own block, it chose the block above, which the pathfinder has no floor in, and
+     * every job there was out of reach.
      */
     public static boolean fits(Level level, BlockPos pos, Mob entity) {
-        if (!hasFloor(level, pos)) {
-            return false;
-        }
-        int[] box = footprint(pos, entity);
-        int headroom = headroomFor(entity);
-        BlockPos.MutableBlockPos space = new BlockPos.MutableBlockPos();
-        for (int x = box[0]; x <= box[1]; x++) {
-            for (int z = box[2]; z <= box[3]; z++) {
-                for (int y = 0; y < headroom; y++) {
-                    space.set(x, pos.getY() + y, z);
-                    if (!level.getBlockState(space)
-                            .getCollisionShape(level, space)
-                            .isEmpty()) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
+        return WorkerPathfinder.fitsOn(entity).test(pos);
     }
 
     private static boolean hasFloor(Level level, BlockPos pos) {

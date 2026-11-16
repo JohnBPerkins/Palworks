@@ -14,6 +14,7 @@ import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.hunger.HungerMath;
 import dev.palworks.hunger.StartingFullness;
+import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.reservation.ReservationId;
@@ -753,5 +754,67 @@ public class HungerGameTests {
         StartingFullness.onGained(pokemon);
         helper.assertTrue(changes.get() == 1, "got again, already marked, isn't: " + changes.get());
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_restock_unreachable", timeoutTicks = 500)
+    public void aTransporterDoesntFetchFoodForATroughItCantGetTo(GameTestHelper helper) {
+        Workers.isolate(helper);
+        BlockPos chest = new BlockPos(6, 1, 1);
+        helper.setBlock(chest, Blocks.CHEST);
+        ((net.minecraft.world.Container) helper.getBlockEntity(chest)).setItem(0, new ItemStack(oranBerry(), 64));
+        // Running low, up on a pillar: nowhere to stand by it (Doduo transports, but can't fly)
+        BlockPos high = new BlockPos(5, 5, 5);
+        for (int y = 1; y < high.getY(); y++) {
+            helper.setBlock(new BlockPos(high.getX(), y, high.getZ()), Blocks.STONE);
+        }
+        trough(helper, high).addFood(berries(3));
+        PokemonEntity doduo = Workers.sendOut(helper, "doduo level=20", TRANSPORTER);
+        boolean[] fetched = {false};
+        helper.onEachTick(() -> {
+            if (!WorkerInventoryManager.getOrCreate(doduo.getPokemon()).isEmpty()) {
+                fetched[0] = true;
+            }
+        });
+
+        helper.runAfterDelay(400, () -> {
+            helper.assertFalse(fetched[0], "it fetched food it had nowhere to take");
+            helper.assertTrue(inChest(helper, chest, oranBerry()) == 64, "the chest keeps its berries");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_eat_carpet", timeoutTicks = 800)
+    public void anEmptyWorkerEatsFromATroughOnACarpetedFloor(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // Carpet all round the trough: it stands on the carpet, in the carpet's own block, not the
+        // one above it
+        for (int x = 0; x < 8; x++) {
+            for (int z = 0; z < 8; z++) {
+                helper.setBlock(x, 1, z, Blocks.WHITE_CARPET);
+            }
+        }
+        TroughBlockEntity trough = trough(helper, TROUGH);
+        trough.addFood(berries(9));
+        PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
+        Pokemon pokemon = worker.getPokemon();
+        pokemon.setCurrentFullness(0);
+
+        helper.succeedWhen(() -> helper.assertTrue(pokemon.getCurrentFullness() > 0, "it's eaten"));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_eat_wide", timeoutTicks = 800)
+    public void aWorkerOverThreeBlocksWideEatsFromATrough(GameTestHelper helper) {
+        Workers.isolate(helper);
+        TroughBlockEntity trough = trough(helper, TROUGH);
+        trough.addFood(berries(9));
+        // A Venusaur a fifth bigger than usual: 3.17 blocks wide
+        PokemonEntity worker = Workers.sendOut(helper, "venusaur level=40 scale_modifier=1.2", START);
+        Pokemon pokemon = worker.getPokemon();
+        pokemon.setCurrentFullness(0);
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(worker.getBbWidth() > 3.0F, "it's over 3 wide: " + worker.getBbWidth());
+            helper.assertTrue(pokemon.getCurrentFullness() > 0, "it's eaten");
+        });
     }
 }

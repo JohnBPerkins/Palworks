@@ -37,6 +37,8 @@ public class WorkerState {
     private boolean walkedToJob;
     // Ticks spent stepping the last bit onto its stand tile after its walk ended just short (not saved)
     private int stepInTicks;
+    // The nearest (blocks) it's got to where it stands for its job on its walk there (not saved)
+    private double nearestToJob = Double.MAX_VALUE;
 
     // Fullness used up but not yet taken off (see dev.palworks.hunger.Hunger), in points: whole
     // points come off as they build up. Saved, so work done just before a reload still counts.
@@ -163,6 +165,19 @@ public class WorkerState {
         this.jobData = data != null ? data.copy() : new CompoundTag();
         this.walkedToJob = false;
         this.stepInTicks = 0;
+        this.nearestToJob = Double.MAX_VALUE;
+    }
+
+    /**
+     * Whether it's nearer where it stands for its job than it's been on this walk, by a block or
+     * more (so shuffling about on the spot doesn't count): it's getting there.
+     */
+    public boolean gotNearer(double distance) {
+        if (distance > nearestToJob - 1.0) {
+            return false;
+        }
+        nearestToJob = distance;
+        return true;
     }
 
     public boolean hasWalkedToJob() {

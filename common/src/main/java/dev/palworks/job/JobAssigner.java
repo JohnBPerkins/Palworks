@@ -140,6 +140,10 @@ final class JobAssigner {
         int assignedCount = 0;
         for (WorkerInfo worker : idleWorkers) {
             lastConsidered.put(worker.pokemonUUID, now);
+            // Before its jobs are listed: what it remembers as unreachable is left out of the list,
+            // so with nothing else to do the list was empty, and it never got as far as the look
+            // assignFirstReachable has at whether it's moved since
+            refreshUnreachableMemory(worker);
             Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
 
             // Sleep (pastured workers only): one Cobblemon has napping is left to nap; in its bedtime,
@@ -204,7 +208,7 @@ final class JobAssigner {
             // that's run out asks for some, and carries on with its other work meanwhile; a
             // transporter that's fetched some for one takes them to it before anything else
             if (pokemon != null) {
-                askForSeedsIfOut(worker, pokemon, now);
+                askForSeedsIfOut(worker, now);
                 SeedTrip trip = bringSeeds(worker, pokemon, now);
                 if (trip == SeedTrip.ON_ITS_WAY) {
                     assignedCount++;
@@ -374,8 +378,9 @@ final class JobAssigner {
 
     /**
      * FETCH_FOOD candidates for a transporter with room: if a trough in reach is running low (see
-     * TroughBlockEntity#isLow), the chests in reach with food in them, nearest first. Like
-     * deliveries, they aren't in the pool. Once it has the food, its delivery takes it to the trough.
+     * TroughBlockEntity#isLow) and it can get to it, the chests in reach with food in them, nearest
+     * first. Like deliveries, they aren't in the pool. Once it has the food, its delivery takes it
+     * to the trough.
      */
     private List<JobRecord> restockCandidates(ServerLevel level, WorkerInfo worker) {
         Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
@@ -383,16 +388,16 @@ final class JobAssigner {
             return List.of();
         }
         BlockPos workerPos = worker.position;
-        boolean troughLow = false;
+        List<BlockPos> lowTroughs = new ArrayList<>();
         for (BlockPos troughPos : troughsInReach(worker)) {
             if (nearEnoughToOwner(worker, troughPos)
+                    && !isRecentlyUnreachable(worker, troughPos)
                     && level.getBlockEntity(troughPos) instanceof dev.palworks.block.TroughBlockEntity trough
                     && trough.isLow()) {
-                troughLow = true;
-                break;
+                lowTroughs.add(troughPos);
             }
         }
-        if (!troughLow) {
+        if (lowTroughs.isEmpty()) {
             return List.of();
         }
         List<BlockPos> chests = new ArrayList<>();
@@ -400,9 +405,15 @@ final class JobAssigner {
             if (Math.abs(chestPos.getX() - workerPos.getX()) <= DELIVERY_SEARCH_RADIUS
                     && Math.abs(chestPos.getZ() - workerPos.getZ()) <= DELIVERY_SEARCH_RADIUS
                     && Math.abs(chestPos.getY() - workerPos.getY()) <= DELIVERY_SEARCH_VERTICAL
+                    && !isRecentlyUnreachable(worker, chestPos)
                     && JobChecks.isJobStillThere(level, JobType.FETCH_FOOD, chestPos)) {
                 chests.add(chestPos);
             }
+        }
+        // Last, as it's the costly one (a path): only with food to fetch, from a chest it hasn't
+        // just failed to get to
+        if (chests.isEmpty() || !canDeliverToOneOf(worker, lowTroughs)) {
+            return List.of();
         }
         chests.sort(Comparator.comparingDouble(workerPos::distSqr));
         List<JobRecord> candidates = new ArrayList<>(chests.size());
@@ -410,6 +421,33 @@ final class JobAssigner {
             candidates.add(JobRecord.of(JobType.FETCH_FOOD, chestPos, level.getGameTime()));
         }
         return candidates;
+    }
+
+    /**
+     * Whether the worker can get to one of these troughs to put food in it, as its delivery will
+     * ask once it has the food. Asked before it fetches any: food fetched for a trough it had no way
+     * to went back in the chest, and was fetched again, for as long as the trough was low. The
+     * troughs it can't get to are remembered as unreachable, so they aren't looked at again each
+     * time it's idle.
+     */
+    private boolean canDeliverToOneOf(WorkerInfo worker, List<BlockPos> troughs) {
+        PokemonEntity entity = workers.entity(worker.pokemonUUID);
+        if (entity == null) {
+            return false;
+        }
+        for (BlockPos troughPos : troughs) {
+            BlockPos standPos = WorkPositions.standingPosFor(level, troughPos, JobType.DELIVER_ITEMS, entity);
+            Reach reach =
+                    standPos == null ? Reach.NO : canPathTo(entity, standPos).reach();
+            if (reach == Reach.YES) {
+                return true;
+            }
+            if (reach == Reach.UNKNOWN) {
+                return false; // it can't pathfind right now (see assignFirstReachable): next time
+            }
+            rememberUnreachable(worker.pokemonUUID, worker.position, troughPos, level.getGameTime());
+        }
+        return false;
     }
 
     /**
@@ -485,6 +523,7 @@ final class JobAssigner {
                 // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
                 if (!inWorkRange(worker, job.position())
                         || isRecentlyUnreachable(worker, job.position())
+                        || job.isOutOfReachFor(worker.pokemonUUID)
                         || !canWorkerDo(worker, job)) {
                     continue;
                 }
@@ -562,12 +601,15 @@ final class JobAssigner {
             // chunks out there. A party Pokémon's must be near its owner too.
             if (!canDoJob(worker, job)
                     || !(inWorkRange(worker, job.position()) || isNeedNearHome(worker, job))
+                    || !mayRoamTo(worker, job.position())
                     || isRecentlyUnreachable(worker, job.position())
+                    || job.isOutOfReachFor(worker.pokemonUUID)
                     || !canWorkerDo(worker, job)) {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position(), job.type(), entity);
-            WorkerPathfinder.Result path = standPos == null
+            // Nowhere to stand, or only outside where its pasture lets it roam: no way to it
+            WorkerPathfinder.Result path = standPos == null || !mayRoamTo(worker, standPos)
                     ? new WorkerPathfinder.Result(Reach.NO, null)
                     : canPathTo(entity, standPos, isNeed(job.type()));
             Reach reach = path.reach();
@@ -588,11 +630,18 @@ final class JobAssigner {
                 return job;
             }
             if (job.type() == JobType.COLLECT_DROPS && job.isFollowUp()) {
-                // Items lying out of reach (on a furnace, in a tree's leaves): the pickup goes, and
-                // the item it went for (or, with nowhere to stand by any, all of them) waits a while
-                // for another (see PickupQueue), so the others round it get theirs. Left in the
-                // pool, every transporter path-checked it again whenever blocks near it changed,
-                // which on a busy farm is all the time.
+                // Out of this worker's reach, which says nothing of the others: one the other side
+                // of a wall may walk straight to it. It's left for them, and not offered to this
+                // one again.
+                job.markOutOfReachFor(worker.pokemonUUID);
+                if (anotherMayReach(worker, job)) {
+                    continue;
+                }
+                // Items lying out of everyone's reach (on a furnace, in a tree's leaves): the pickup
+                // goes, and the item it went for (or, with nowhere to stand by any, all of them)
+                // waits a while for another (see PickupQueue), so the others round it get theirs.
+                // Left in the pool, every transporter path-checked it again whenever blocks near it
+                // changed, which on a busy farm is all the time.
                 pool.remove(JobPool.JobKey.of(job));
                 if (unreachablePickups != null) {
                     unreachablePickups.accept(
@@ -611,6 +660,22 @@ final class JobAssigner {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a worker other than this one might yet get to a job this one can't: it has the skills
+     * for it, it's in its range, and it hasn't found it out of reach itself.
+     */
+    private boolean anotherMayReach(WorkerInfo worker, JobRecord job) {
+        for (WorkerInfo other : workers.all()) {
+            if (!other.pokemonUUID.equals(worker.pokemonUUID)
+                    && canDoJob(other, job)
+                    && inWorkRange(other, job.position())
+                    && !job.isOutOfReachFor(other.pokemonUUID)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -722,10 +787,21 @@ final class JobAssigner {
 
     /**
      * Whether {@code pos} is somewhere this worker may be sent: within its own work range and,
-     * for one from a party, within work range of its owner too (see {@link #nearEnoughToOwner}).
+     * for one from a party, within work range of its owner too (see {@link #nearEnoughToOwner});
+     * for a pastured one, where its pasture lets it roam (see {@link #mayRoamTo}).
      */
     private static boolean inWorkRange(WorkerInfo worker, BlockPos pos) {
-        return WorkRange.contains(worker.position, pos) && nearEnoughToOwner(worker, pos);
+        return WorkRange.contains(worker.position, pos) && nearEnoughToOwner(worker, pos) && mayRoamTo(worker, pos);
+    }
+
+    /**
+     * A pastured Pokémon only goes where its pasture lets it roam ({@link WorkerInfo#roam}). Sent
+     * to a job outside that, Cobblemon took it back to its pasture block as it stepped out (or
+     * recalled it), and it was sent again. Asked of the tile it stands on, as Cobblemon asks of
+     * where it is: its feet, at the middle of the tile.
+     */
+    private static boolean mayRoamTo(WorkerInfo worker, BlockPos pos) {
+        return worker.roam == null || worker.roam.contains(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
     }
 
     /**
@@ -954,10 +1030,11 @@ final class JobAssigner {
 
     /**
      * A planter that's run out of seeds for the open spots round it asks for some, if a seed chest
-     * in its range has any it can plant there (see SeedRequests). It looks every so often, not every
-     * time it's idle. One that has seeds again (a player threw it some) takes its request back.
+     * in its range has any it can plant there and has room for (see SeedRequests). It looks every so
+     * often, not every time it's idle. One that has seeds again (a player threw it some) takes its
+     * request back.
      */
-    private void askForSeedsIfOut(WorkerInfo worker, Pokemon pokemon, long now) {
+    private void askForSeedsIfOut(WorkerInfo worker, long now) {
         UUID planter = worker.pokemonUUID;
         if (!isPlanterThatAsks(worker)) {
             seedRequests.forget(planter); // it transports now (it evolved, say): it fetches its own
@@ -966,17 +1043,9 @@ final class JobAssigner {
         if (seedRequests.isHandedTo(planter) || !seedRequests.dueToLook(planter, now)) {
             return;
         }
-        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         boolean wantsSome = false;
-        Map<Suitability, List<BlockPos>> openSpots = new EnumMap<>(Suitability.class);
         for (BlockPos chest : seedChests()) {
-            if (WorkRange.contains(worker.position, chest)
-                    && seedToFetch(
-                                    chest,
-                                    worker.suitabilities,
-                                    inventory,
-                                    skill -> openSpots.computeIfAbsent(skill, s -> openSpotsNear(worker.position, s)))
-                            != null) {
+            if (WorkRange.contains(worker.position, chest) && seedFor(worker, chest) != null) {
                 wantsSome = true;
                 break;
             }
@@ -1017,34 +1086,37 @@ final class JobAssigner {
 
     /**
      * The request for seeds (see SeedRequests) this transporter could take on with seeds from the
-     * chest at {@code chestPos}: a waiting one, from a planter within its work range, that the
-     * chest has a seed for (one the open spots round the planter can take). Null if none.
+     * chest at {@code chestPos}: a waiting one it hasn't just given up, from a planter it may go to (within its work range,
+     * and its owner's, as {@link #bringSeeds} asks), that the chest has a seed for (one the open
+     * spots round the planter can take). Null if none.
      */
     @Nullable
     private SeedRequests.Request requestToTakeOn(WorkerInfo transporter, BlockPos chestPos) {
-        for (SeedRequests.Request request : seedRequests.waiting()) {
+        for (SeedRequests.Request request : seedRequests.waitingFor(transporter.pokemonUUID, level.getGameTime())) {
             WorkerInfo planter = workers.get(request.planter);
-            if (planter != null
-                    && WorkRange.contains(transporter.position, planter.position)
-                    && seedFor(planter, chestPos) != null) {
+            if (planter != null && inWorkRange(transporter, planter.position) && seedFor(planter, chestPos) != null) {
                 return request;
             }
         }
         return null;
     }
 
-    /** The seed a planter would want from this chest: one the open spots round it can take, if it has none. */
+    /**
+     * The seed a planter would want from this chest: one the open spots round it can take, if it
+     * has none, and that its pouch has room for. With no room (its pouch full of seeds it can't
+     * plant here), seeds were fetched for it, couldn't be handed over (see {@link #seedSlotFor}),
+     * went back in the chest and were fetched again.
+     */
     @Nullable
     private Item seedFor(WorkerInfo planter, BlockPos chestPos) {
         Pokemon pokemon = workers.pokemon(planter.pokemonUUID);
         if (pokemon == null) {
             return null;
         }
-        return seedToFetch(
-                chestPos,
-                planter.suitabilities,
-                WorkerInventoryManager.getOrCreate(pokemon),
-                skill -> openSpotsNear(planter.position, skill));
+        WorkerInventory pouch = WorkerInventoryManager.getOrCreate(pokemon);
+        Item seed =
+                seedToFetch(chestPos, planter.suitabilities, pouch, skill -> openSpotsNear(planter.position, skill));
+        return seed != null && pouch.roomFor(new net.minecraft.world.item.ItemStack(seed)) > 0 ? seed : null;
     }
 
     /**
@@ -1099,7 +1171,7 @@ final class JobAssigner {
                 || seedSlotFor(planter, WorkerInventoryManager.getOrCreate(pokemon)) < 0
                 || !inWorkRange(transporter, planterEntity.blockPosition())
                 || isRecentlyUnreachable(transporter, planterEntity.blockPosition())) {
-            seedRequests.giveUp(transporter.pokemonUUID);
+            seedRequests.giveUp(transporter.pokemonUUID, now);
             return SeedTrip.NONE;
         }
         JobRecord trip = JobRecord.of(JobType.BRING_SEEDS, planterEntity.blockPosition(), now);

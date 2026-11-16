@@ -3,7 +3,7 @@ package dev.palworks.station;
 import dev.palworks.Palworks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.item.crafting.AbstractCookingRecipe;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.Level;
@@ -36,8 +36,9 @@ public class FurnaceHelper {
             return false;
         }
 
-        // Only worth igniting if the input can actually be smelted in this furnace type.
-        if (!hasSmeltableInput(level, furnace)) {
+        // Only worth igniting if the input can actually be smelted in this furnace type, and
+        // there's room for what comes out.
+        if (!canSmelt(level, furnace)) {
             return false;
         }
 
@@ -72,31 +73,48 @@ public class FurnaceHelper {
      */
     public static boolean canUseHeat(Level level, BlockPos pos) {
         return level.getBlockEntity(pos) instanceof AbstractFurnaceBlockEntity furnace
-                && hasSmeltableInput(level, furnace)
+                && canSmelt(level, furnace)
                 && !hasOwnFuel(furnace)
                 && furnace.litTime <= getBurnDuration();
     }
 
     /**
-     * Check that the furnace's input can actually be smelted in this furnace type, so workers
-     * don't waste heat igniting a furnace full of non-smeltable junk. Picks the recipe type from
-     * the block entity (smelting / blasting / smoking).
+     * Check that the furnace can actually smelt what's in it, so workers don't waste heat igniting
+     * a furnace full of non-smeltable junk, or one with no room for what comes out: lit, that one
+     * burns without smelting anything, and its worker relit it for ever. Picks the recipe type from
+     * the block entity (smelting / blasting / smoking); the room it needs is what the furnace
+     * itself asks for before it smelts (AbstractFurnaceBlockEntity.canBurn).
      */
-    private static boolean hasSmeltableInput(Level level, AbstractFurnaceBlockEntity furnace) {
+    private static boolean canSmelt(Level level, AbstractFurnaceBlockEntity furnace) {
         ItemStack input = furnace.getItem(0);
         if (input.isEmpty()) {
             return false;
         }
 
-        SingleRecipeInput recipeInput = new SingleRecipeInput(input);
-        RecipeManager recipes = level.getRecipeManager();
-
+        RecipeType<? extends AbstractCookingRecipe> type = RecipeType.SMELTING;
         if (furnace instanceof BlastFurnaceBlockEntity) {
-            return recipes.getRecipeFor(RecipeType.BLASTING, recipeInput, level).isPresent();
+            type = RecipeType.BLASTING;
         } else if (furnace instanceof SmokerBlockEntity) {
-            return recipes.getRecipeFor(RecipeType.SMOKING, recipeInput, level).isPresent();
+            type = RecipeType.SMOKING;
         }
-        return recipes.getRecipeFor(RecipeType.SMELTING, recipeInput, level).isPresent();
+        return level.getRecipeManager()
+                .getRecipeFor(type, new SingleRecipeInput(input), level)
+                .map(recipe -> hasRoomFor(furnace, recipe.value().getResultItem(level.registryAccess())))
+                .orElse(false);
+    }
+
+    /** Whether the furnace's output slot (slot 2) can take what it would smelt next. */
+    private static boolean hasRoomFor(AbstractFurnaceBlockEntity furnace, ItemStack result) {
+        if (result.isEmpty()) {
+            return false;
+        }
+        ItemStack output = furnace.getItem(2);
+        if (output.isEmpty()) {
+            return true;
+        }
+        return ItemStack.isSameItemSameComponents(output, result)
+                && output.getCount() + result.getCount()
+                        <= Math.min(furnace.getMaxStackSize(), output.getMaxStackSize());
     }
 
     /**

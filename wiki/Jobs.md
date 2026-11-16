@@ -29,7 +29,8 @@ Put smeltable items in the input slot. **You don't need fuel.** A Kindling worke
 Ember on the furnace and lights it, and keeps relighting it until the input slot is empty.
 
 Workers only light a furnace whose input can be smelted in it, so a blast furnace full of raw food
-is left alone.
+is left alone. So is one with no room in its output slot for what it would smelt, until you take
+some out.
 
 ## Water crops
 
@@ -71,6 +72,9 @@ meanwhile:
 1. A Transporting worker takes a stack of the seeds from the chest.
 2. It brings them to wherever the planter is and throws them to its feet.
 3. The planter picks them up a moment later, as a player would, and plants them.
+
+A transporter that can't get the seeds to the planter puts them back in a chest, and leaves that
+planter's seeds to other transporters for 30 seconds before it tries again.
 
 You can also throw seeds (with Q) next to a planter that has room for them, and it picks them up.
 A worker that both plants and transports, such as a Grass/Flying type, takes its own seeds from
@@ -146,8 +150,8 @@ jobs.
 
 **Who:** Transporting
 
-When a [trough](Hunger) in reach has less than 16 feed left, a transporter fetches a stack of food
-from a chest that has some and takes it to the trough.
+When a [trough](Hunger) in reach has less than 16 feed left, a transporter that can get to it
+fetches a stack of food from a chest that has some and takes it to the trough.
 
 ## Mine crystals
 

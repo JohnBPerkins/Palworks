@@ -16,10 +16,12 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -117,6 +119,31 @@ public final class JobChecks {
             case FETCH_FOOD -> isChest(level.getBlockState(pos)) && hasTroughFood(level, pos);
             case SLEEP -> isBed(level.getBlockState(pos));
             default -> true;
+        };
+    }
+
+    /**
+     * The skills the job of this type at {@code pos} takes: its type's, except Nether work, which
+     * is known by what's there. Ripe nether wart is harvested with Nether alone (Gathering alone let
+     * any Grass type harvest it), soul sand is planted with it, and a nether tree takes it as well
+     * as Lumbering. The one place that says so: for the jobs the scan finds, and for one a worker
+     * still has after a restart (see JobManager.registerWorker).
+     */
+    static Set<Suitability> skillsFor(Level level, JobType type, BlockPos pos) {
+        return switch (type) {
+            case HARVEST_CROPS ->
+                level.getBlockState(pos).is(Blocks.NETHER_WART)
+                        ? EnumSet.of(Suitability.NETHER)
+                        : type.requiredSuitabilities();
+            case PLANT_SEEDS ->
+                level.getBlockState(pos.below()).is(Blocks.SOUL_SAND)
+                        ? EnumSet.of(Suitability.NETHER)
+                        : type.requiredSuitabilities();
+            case CHOP_TREE ->
+                TreeDetector.isNetherStem(level.getBlockState(pos))
+                        ? EnumSet.of(Suitability.LUMBERING, Suitability.NETHER)
+                        : type.requiredSuitabilities();
+            default -> type.requiredSuitabilities();
         };
     }
 

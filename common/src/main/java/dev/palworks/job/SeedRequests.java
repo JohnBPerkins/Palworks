@@ -30,6 +30,11 @@ final class SeedRequests {
     static final long HANDOVER_TIMEOUT_TICKS = 60 * 20;
     /** How often (ticks) an idle planter with no seeds looks for a chest with some to ask for. */
     static final long RECHECK_TICKS = 40;
+    /**
+     * How long (ticks) a transporter that gave up bringing a planter seeds leaves that planter's
+     * requests alone: as long as a worker leaves a job it couldn't reach.
+     */
+    static final long GIVEN_UP_TICKS = 30 * 20;
 
     private final JobPool pool;
     private final WorkerRegistry workers;
@@ -39,6 +44,10 @@ final class SeedRequests {
     // When each idle planter with no seeds last looked for some to ask for
     private final Map<UUID, Long> lastChecked = new HashMap<>();
     private final List<Handover> handovers = new ArrayList<>();
+    // By transporter: the planters it's given up bringing seeds to, and until when it leaves each
+    // one's requests alone. Not kept on the request: that goes and comes back (the planter stops
+    // asking while the seeds are out of the chest, and asks again once they're put back).
+    private final Map<UUID, Map<UUID, Long>> givenUp = new HashMap<>();
 
     SeedRequests(JobPool pool, WorkerRegistry workers) {
         this.pool = pool;
@@ -113,11 +122,15 @@ final class SeedRequests {
         Palworks.LOGGER.debug("Planter {} asked for seeds", planter);
     }
 
-    /** The requests no transporter has taken on yet. */
-    List<Request> waiting() {
+    /**
+     * The requests this transporter could take on: the ones no transporter has yet, but for those
+     * of planters it's just given up on (see {@link #giveUp}).
+     */
+    List<Request> waitingFor(UUID transporter, long now) {
+        Map<UUID, Long> left = givenUp.getOrDefault(transporter, Map.of());
         List<Request> waiting = new ArrayList<>();
         for (Request request : requests.values()) {
-            if (request.transporter == null) {
+            if (request.transporter == null && left.getOrDefault(request.planter, 0L) <= now) {
                 waiting.add(request);
             }
         }
@@ -141,11 +154,17 @@ final class SeedRequests {
         Palworks.LOGGER.debug("Transporter {} is bringing seeds to planter {}", transporter, request.planter);
     }
 
-    /** A transporter gives up the request it took on (it couldn't get the seeds there): it waits again. */
-    void giveUp(UUID transporter) {
+    /**
+     * A transporter gives up the request it took on (it couldn't get the seeds there): it waits
+     * again, for another transporter. This one leaves that planter's requests alone for
+     * {@link #GIVEN_UP_TICKS}: taking it straight on again, it fetched the seeds, found it still
+     * couldn't get them there, put them back, and fetched them again, for as long as the planter asked.
+     */
+    void giveUp(UUID transporter, long now) {
         Request request = takenOnBy(transporter);
         if (request != null) {
             request.transporter = null;
+            givenUp.computeIfAbsent(transporter, t -> new HashMap<>()).put(request.planter, now + GIVEN_UP_TICKS);
         }
     }
 
@@ -216,6 +235,8 @@ final class SeedRequests {
             }
         }
         lastChecked.keySet().removeIf(planter -> workers.get(planter) == null);
+        givenUp.keySet().removeIf(transporter -> workers.get(transporter) == null);
+        givenUp.values().forEach(planters -> planters.values().removeIf(until -> until <= now));
 
         for (Iterator<Handover> it = handovers.iterator(); it.hasNext(); ) {
             Handover handover = it.next();

@@ -270,4 +270,68 @@ public class SeedDeliveryGameTests {
         helper.succeedWhen(() -> helper.assertValueEqual(
                 count(WorkerInventoryManager.getOrCreate(pidgey.getPokemon()), Items.WHEAT_SEEDS), 6, "seeds carried"));
     }
+
+    @GameTest(template = Templates.EMPTY, batch = "seeds_no_room", timeoutTicks = 500)
+    public void seedsArentFetchedForAPlanterWithNoRoomForThem(GameTestHelper helper) {
+        farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
+        PokemonEntity bulbasaur = sendOut(helper, BULBASAUR, PLANTER);
+        // Its pouch is full of seeds this farmland doesn't take
+        WorkerInventory pouch = WorkerInventoryManager.getOrCreate(bulbasaur.getPokemon());
+        for (int slot = 0; slot < pouch.getContainerSize(); slot++) {
+            pouch.setItem(slot, new ItemStack(Items.NETHER_WART, 64));
+        }
+        PokemonEntity pidgey = sendOut(helper, PIDGEY, TRANSPORTER);
+        boolean[] fetched = {false};
+        helper.onEachTick(() -> {
+            if (count(WorkerInventoryManager.getOrCreate(pidgey.getPokemon()), Items.WHEAT_SEEDS) > 0) {
+                fetched[0] = true;
+            }
+        });
+
+        helper.runAfterDelay(400, () -> {
+            helper.assertFalse(fetched[0], "seeds were fetched for a planter with no room for them");
+            helper.succeed();
+        });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "seeds_unreachable_planter", timeoutTicks = 700)
+    public void seedsArentFetchedOverAndOverForAPlanterOutOfReach(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // A planter with farmland to plant, in a walled pen: too high to jump, too wide to throw
+        // seeds over
+        for (int i = 1; i <= 14; i++) {
+            for (int y = 1; y <= 2; y++) {
+                helper.setBlock(i, y, 1, Blocks.STONE);
+                helper.setBlock(i, y, 14, Blocks.STONE);
+                helper.setBlock(1, y, i, Blocks.STONE);
+                helper.setBlock(14, y, i, Blocks.STONE);
+            }
+        }
+        for (int x = 6; x <= 8; x++) {
+            helper.setBlock(x, 0, 6, Blocks.FARMLAND);
+        }
+        Workers.sendOut(helper, BULBASAUR, new BlockPos(8, 1, 8));
+        // Outside it: a chest of seeds, and a transporter that can't fly in
+        BlockPos chestPos = new BlockPos(-3, 1, 7);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        ChestBlockEntity chest = (ChestBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(chestPos));
+        chest.setItem(0, new ItemStack(Items.WHEAT_SEEDS, 8));
+        PokemonEntity doduo = Workers.sendOut(helper, "doduo level=20", new BlockPos(-5, 1, 7));
+        int[] fetches = {0};
+        boolean[] carrying = {false};
+        helper.onEachTick(() -> {
+            boolean has = count(WorkerInventoryManager.getOrCreate(doduo.getPokemon()), Items.WHEAT_SEEDS) > 0;
+            if (has && !carrying[0]) {
+                fetches[0]++;
+            }
+            carrying[0] = has;
+        });
+
+        // Once it's found it can't get them there, it leaves that planter's seeds for a while
+        // (30 seconds), rather than fetch them and put them back for as long as it asks
+        helper.runAfterDelay(550, () -> {
+            helper.assertTrue(fetches[0] <= 1, "seeds fetched " + fetches[0] + " times for a planter out of reach");
+            helper.succeed();
+        });
+    }
 }

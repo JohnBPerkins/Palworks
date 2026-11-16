@@ -250,4 +250,24 @@ public class JobGameTests {
     private static boolean canDo(GameTestHelper helper, Pokemon worker, JobType type, BlockPos rel) {
         return JobChecks.canWorkerDo(helper.getLevel(), worker, type, helper.absolutePos(rel));
     }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aFurnaceWithNoRoomForWhatItSmeltsIsntAJob(GameTestHelper helper) {
+        // Lit, it would burn without smelting anything, and its kindler would relight it for ever
+        BlockPos pos = new BlockPos(3, 1, 3);
+        BlockPos abs = helper.absolutePos(pos);
+        helper.setBlock(pos, Blocks.FURNACE);
+        var furnace = (AbstractFurnaceBlockEntity) helper.getLevel().getBlockEntity(abs);
+        furnace.setItem(0, new ItemStack(Items.RAW_IRON, 4));
+
+        furnace.setItem(2, new ItemStack(Items.IRON_INGOT, 63));
+        helper.assertTrue(there(helper, JobType.FUEL_FURNACE, pos), "room for one more ingot");
+        helper.assertTrue(FurnaceHelper.needsFuel(helper.getLevel(), abs), "room for one more ingot: found");
+        furnace.setItem(2, new ItemStack(Items.IRON_INGOT, 64));
+        helper.assertFalse(there(helper, JobType.FUEL_FURNACE, pos), "its output is full");
+        helper.assertFalse(FurnaceHelper.needsFuel(helper.getLevel(), abs), "its output is full: not found");
+        furnace.setItem(2, new ItemStack(Items.GOLD_INGOT, 1));
+        helper.assertFalse(there(helper, JobType.FUEL_FURNACE, pos), "something else is in its output");
+        helper.succeed();
+    }
 }

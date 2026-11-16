@@ -10,6 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -96,6 +97,18 @@ public class WorkerEligibility {
      */
     public static boolean withinOwnerLeash(Pokemon pokemon, Level level, BlockPos pos) {
         return !isFromParty(pokemon) || WorkRange.withinOwnerLeash(partyOwnerPosition(pokemon, level), pos);
+    }
+
+    /**
+     * Where a pastured Pokémon's pasture lets it roam, or null if it isn't tethered (or isn't a
+     * Pokémon). Cobblemon checks it every tick: one that steps outside is taken back to its pasture
+     * block, or recalled if there's no room there (PokemonEntity.checkPastureTether).
+     */
+    @Nullable
+    public static AABB roamOf(Entity entity) {
+        return entity instanceof PokemonEntity pokemon && pokemon.getTethering() != null
+                ? pokemon.getTethering().getBox()
+                : null;
     }
 
     /** The pasture block a pastured Pokémon is tethered to, or null if it isn't (or isn't a Pokémon). */

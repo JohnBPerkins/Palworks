@@ -9,6 +9,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.pathfinder.Node;
@@ -309,6 +310,106 @@ public class PathingGameTests {
                         helper.getBlockState(crop).equals(WHEAT.getStateForAge(0)),
                         "wheat at x=" + x + " harvested and reset, but it's " + helper.getBlockState(crop));
             }
+        });
+    }
+
+    // ---- Tiles it fits on ----
+
+    /** Blocks one on another from y=4 up, at a column of their own well off the ground. */
+    private static void column(GameTestHelper helper, int x, int z, BlockState... fromY4) {
+        for (int i = 0; i < fromY4.length; i++) {
+            helper.setBlock(x, 4 + i, z, fromY4[i]);
+        }
+    }
+
+    private static void assertFits(GameTestHelper helper, PokemonEntity mob, BlockPos tile, boolean fits, String what) {
+        helper.assertTrue(
+                WorkerPathfinder.fitsOn(mob).test(helper.absolutePos(tile)) == fits,
+                what + (fits ? ": it fits there" : ": it doesn't fit there"));
+    }
+
+    /**
+     * A tile is somewhere to stand by the floor in it, whatever that's made of. Plain floors (whole
+     * blocks, farmland, slabs) are worked out from the blocks themselves and the rest by asking the
+     * level for the shapes there: both have to come to the same thing.
+     */
+    @GameTest(template = Templates.ARENA, batch = "pathing_tiles", timeoutTicks = 200)
+    public void aTileIsSomewhereToStandByTheFloorInIt(GameTestHelper helper) {
+        Workers.isolate(helper);
+        helper.setBlock(START.below(), Blocks.STONE);
+        helper.setBlock(GOAL.below(), Blocks.STONE);
+        // Bulbasaur: under a block wide and tall. Machamp: 1.2 wide (3 columns), 2.16 tall (3 rows).
+        PokemonEntity small = Workers.sendOut(helper, BULBASAUR, START);
+        PokemonEntity wide = Workers.sendOut(helper, MACHAMP, GOAL);
+        BlockState air = Blocks.AIR.defaultBlockState();
+        BlockState stone = Blocks.STONE.defaultBlockState();
+        BlockState bottomSlab = Blocks.STONE_SLAB.defaultBlockState();
+        BlockState topSlab = bottomSlab.setValue(SlabBlock.TYPE, SlabType.TOP);
+        BlockState snow = Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 3);
+
+        column(helper, 1, 8, air, stone);
+        column(helper, 3, 8, air, Blocks.FARMLAND.defaultBlockState());
+        column(helper, 5, 8, air, bottomSlab);
+        column(helper, 7, 8, air, topSlab);
+        column(helper, 9, 8, stone, air);
+        column(helper, 11, 8, stone, Blocks.WHITE_CARPET.defaultBlockState());
+        column(helper, 13, 8, Blocks.OAK_FENCE.defaultBlockState(), air);
+        column(helper, 15, 8, air, stone, Blocks.GLASS.defaultBlockState());
+        column(helper, 1, 11, air, Blocks.OAK_STAIRS.defaultBlockState());
+        column(helper, 3, 11, stone, snow);
+        column(helper, 5, 11, air, stone, air, stone);
+        column(helper, 9, 11, air, stone, topSlab);
+        column(helper, 7, 11, air, stone, Blocks.CHEST.defaultBlockState());
+        // For the wide one, 3x3 at y=5: all stone; stone under one edge only; stone with a block
+        // at its head's height over one corner
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                helper.setBlock(2 + dx, 5, 14 + dz, stone);
+                helper.setBlock(12 + dx, 5, 14 + dz, stone);
+            }
+        }
+        helper.setBlock(8, 5, 14, stone);
+        helper.setBlock(13, 8, 15, stone);
+        // And one more 3x3, with a top slab over it that its head just clears
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                helper.setBlock(12 + dx, 5, 10 + dz, stone);
+            }
+        }
+        helper.setBlock(12, 8, 10, topSlab);
+        helper.setBlock(10, 6, 9, Blocks.OAK_FENCE); // a post beside it, in a column its edge is over
+        helper.setBlock(4, 6, 14, stone); // beside the first 3x3, at its body's height
+
+        helper.runAfterDelay(SETTLE_TICKS, () -> {
+            assertFits(helper, small, new BlockPos(1, 6, 8), true, "on a whole block");
+            assertFits(helper, small, new BlockPos(1, 7, 8), false, "a block above a whole block's top");
+            assertFits(helper, small, new BlockPos(1, 5, 8), false, "in a whole block");
+            assertFits(helper, small, new BlockPos(3, 5, 8), false, "in farmland");
+            assertFits(helper, small, new BlockPos(3, 6, 8), true, "on farmland");
+            assertFits(helper, small, new BlockPos(5, 6, 8), true, "on a bottom slab");
+            assertFits(helper, small, new BlockPos(7, 6, 8), true, "on a top slab");
+            assertFits(helper, small, new BlockPos(9, 6, 8), false, "over a block's gap");
+            assertFits(helper, small, new BlockPos(11, 5, 8), true, "on a carpet, in the carpet's block");
+            assertFits(helper, small, new BlockPos(11, 6, 8), false, "in the block above a carpet");
+            assertFits(helper, small, new BlockPos(13, 6, 8), true, "on a fence post, a block and a half tall");
+            assertFits(helper, small, new BlockPos(13, 5, 8), false, "in the block a fence post reaches into");
+            assertFits(helper, small, new BlockPos(15, 6, 8), false, "in a block of glass");
+            assertFits(helper, small, new BlockPos(1, 6, 11), true, "on stairs");
+            assertFits(helper, small, new BlockPos(3, 5, 11), true, "on layers of snow, in the snow's block");
+            assertFits(helper, small, new BlockPos(3, 6, 11), false, "in the block above layers of snow");
+            assertFits(helper, small, new BlockPos(5, 6, 11), true, "under a block over its head");
+            assertFits(helper, small, new BlockPos(9, 6, 11), false, "under a top slab lower than it's tall");
+            assertFits(helper, small, new BlockPos(7, 6, 11), false, "in a chest's block");
+            assertFits(helper, small, new BlockPos(7, 7, 11), true, "on a chest");
+
+            assertFits(helper, wide, new BlockPos(2, 6, 14), true, "a wide one on a floor under all of it");
+            assertFits(helper, wide, new BlockPos(7, 6, 14), true, "a wide one with a ledge under one edge");
+            assertFits(helper, wide, new BlockPos(6, 6, 14), false, "a wide one with no floor under any of it");
+            assertFits(helper, wide, new BlockPos(12, 6, 14), false, "a wide one with a block where its head goes");
+            assertFits(helper, wide, new BlockPos(12, 6, 10), true, "a wide one under a slab its head clears");
+            assertFits(helper, wide, new BlockPos(11, 6, 10), true, "a wide one beside a post its body misses");
+            assertFits(helper, wide, new BlockPos(3, 6, 14), false, "a wide one beside a block its body would be in");
+            helper.succeed();
         });
     }
 }
