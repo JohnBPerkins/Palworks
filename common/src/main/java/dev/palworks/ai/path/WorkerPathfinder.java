@@ -283,12 +283,8 @@ public final class WorkerPathfinder {
             }
 
             for (int[] d : step.from == null ? FROM_START : DIRECTIONS) {
-                Step next = move(body, step, atX, atZ, d[0], d[1], bounds);
+                Step next = move(body, step, atX, atZ, d[0], d[1], bounds, best);
                 if (next == null) {
-                    continue;
-                }
-                Step known = best.get(next.key());
-                if (known != null && (known.done || known.cost <= next.cost)) {
                     continue;
                 }
                 next.estimate = next.cost + heuristic(body, next, goalX, goalZ);
@@ -327,10 +323,19 @@ public final class WorkerPathfinder {
     /**
      * The step from {@code step} one node over (dx, dz), at whatever height the body ends up at
      * there: up onto what's in the way if it can jump onto it, level, or down off an edge as far as
-     * it can drop. Null if it can't go that way.
+     * it can drop. Null if it can't go that way, or it's no better a way there than the best so
+     * far ({@code best}).
      */
     @Nullable
-    private static Step move(BodyClearance body, Step step, double atX, double atZ, int dx, int dz, Bounds bounds) {
+    private static Step move(
+            BodyClearance body,
+            Step step,
+            double atX,
+            double atZ,
+            int dx,
+            int dz,
+            Bounds bounds,
+            Long2ObjectMap<Step> best) {
         int x = step.x + dx;
         int z = step.z + dz;
         if (x < bounds.minX() || x > bounds.maxX() || z < bounds.minZ() || z > bounds.maxZ()) {
@@ -343,17 +348,17 @@ public final class WorkerPathfinder {
         int up = step.y + 1;
         double floorUp = body.floorAtNode(x, up, z);
         if (!Double.isNaN(floorUp)) {
-            return arrive(body, step, atX, atZ, x, up, z, floorUp, bounds);
+            return arrive(body, step, atX, atZ, x, up, z, floorUp, bounds, best);
         }
         double floorLevel = body.floorAtNode(x, step.y, z);
         if (!Double.isNaN(floorLevel)) {
-            return arrive(body, step, atX, atZ, x, step.y, z, floorLevel, bounds);
+            return arrive(body, step, atX, atZ, x, step.y, z, floorLevel, bounds, best);
         }
         // Nothing to stand on at this height: down to the first floor below, if it's not too far
         for (int y = step.y - 1; y >= step.y - body.maxDrop - 1; y--) {
             double floor = body.floorAtNode(x, y, z);
             if (!Double.isNaN(floor)) {
-                return arrive(body, step, atX, atZ, x, y, z, floor, bounds);
+                return arrive(body, step, atX, atZ, x, y, z, floor, bounds, best);
             }
             if (!body.clear(body.box(toX, y, toZ))) {
                 return null; // no floor yet, but something in the way of dropping
@@ -364,8 +369,24 @@ public final class WorkerPathfinder {
 
     @Nullable
     private static Step arrive(
-            BodyClearance body, Step step, double atX, double atZ, int x, int y, int z, double floor, Bounds bounds) {
+            BodyClearance body,
+            Step step,
+            double atX,
+            double atZ,
+            int x,
+            int y,
+            int z,
+            double floor,
+            Bounds bounds,
+            Long2ObjectMap<Step> best) {
         if (!bounds.contains(x, y, z)) {
+            return null;
+        }
+        // Most of the ways to a node are to one already gone on from, or reached as cheaply (seven
+        // of the eight ways onto any node in the open): those are turned down here, before the
+        // body is tried against the blocks there and on the way, which is what a search costs
+        Step known = best.get(BlockPos.asLong(x, y, z));
+        if (known != null && known.done) {
             return null;
         }
         double toX = body.centre(x);
@@ -377,12 +398,15 @@ public final class WorkerPathfinder {
         if (BodyClearance.forbidden(malus)) {
             return null;
         }
-        if (!body.canMove(atX, step.floor, atZ, toX, floor, toZ)) {
-            return null;
-        }
         double distance = Math.hypot(toX - atX, toZ - atZ);
         double rise = floor - step.floor;
         double cost = step.cost + distance + malus + (rise > 1.0e-3 ? JUMP_COST : 0) + Math.max(0, -rise) * DROP_COST;
+        if (known != null && known.cost <= cost) {
+            return null;
+        }
+        if (!body.canMove(atX, step.floor, atZ, toX, floor, toZ)) {
+            return null;
+        }
         return new Step(x, y, z, floor, malus, step, cost);
     }
 
