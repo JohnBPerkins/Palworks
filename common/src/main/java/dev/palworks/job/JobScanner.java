@@ -105,9 +105,15 @@ final class JobScanner {
                 break;
             }
 
+            // One that isn't loaded has nothing to scan (see loadedChunk)
+            LevelChunk loaded = loadedChunk(level, chunk.x, chunk.z);
+            if (loaded == null) {
+                continue;
+            }
+
             // Scan this chunk's worker-height band for jobs
             int[] range = scanRanges.get(chunk);
-            blocksScannedThisTick += scanChunkForJobs(level, chunk, range[0], range[1]);
+            blocksScannedThisTick += scanChunkForJobs(level, loaded, range[0], range[1]);
         }
 
         if (Palworks.LOGGER.isTraceEnabled() && blocksScannedThisTick > 0) {
@@ -282,9 +288,22 @@ final class JobScanner {
     }
 
     /**
+     * The chunk, if it's loaded: null if not, without loading it. A worker's range reaches past the
+     * chunks loaded round it when the work range is set wide (or its pasture is far off), and
+     * {@code level.getChunk} would load each of those there and then, off the disk or made anew,
+     * on the server thread: again every few seconds, as {@link #dropUnloaded} dropped its index for
+     * not being loaded.
+     */
+    @Nullable
+    private static LevelChunk loadedChunk(ServerLevel level, int chunkX, int chunkZ) {
+        return level.getChunkSource().getChunkNow(chunkX, chunkZ);
+    }
+
+    /**
      * Scan a single chunk for job opportunities.
      */
-    private int scanChunkForJobs(ServerLevel level, ChunkPos chunkPos, int wantMinY, int wantMaxY) {
+    private int scanChunkForJobs(ServerLevel level, LevelChunk chunk, int wantMinY, int wantMaxY) {
+        ChunkPos chunkPos = chunk.getPos();
         ChunkIndex previous = chunkCaches.get(chunkPos);
         // Whole sections, with one more each way, so a worker stepping up or down a block doesn't
         // ask for a band this scan doesn't cover; and never less than the last scan covered
@@ -321,7 +340,6 @@ final class JobScanner {
                     chunkPos.getMaxBlockZ());
         }
 
-        LevelChunk chunk = level.getChunk(chunkPos.x, chunkPos.z);
         LevelChunkSection[] sections = chunk.getSections();
         for (int sectionY = SectionPos.blockToSectionCoord(scanMinY);
                 sectionY <= SectionPos.blockToSectionCoord(scanMaxY - 1);
@@ -343,12 +361,17 @@ final class JobScanner {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
                     for (int y = yFrom; y < yTo; y++) {
+                        blocksScanned++;
+                        // Most of even a section with work in it is air and plain terrain, never a
+                        // place or a job (what a whole section is skipped for, above): the block
+                        // itself, straight from the section, is all that's read of those
+                        BlockState state = section.getBlockState(x, y & 15, z);
+                        if (JobChecks.canNeverBeWork(state)) {
+                            continue;
+                        }
                         int worldX = chunkPos.getMinBlockX() + x;
                         int worldZ = chunkPos.getMinBlockZ() + z;
                         pos.set(worldX, y, worldZ);
-                        blocksScanned++;
-
-                        BlockState state = level.getBlockState(pos);
 
                         // Remember the places workers use (chests, troughs, beds), so
                         // delivery, eating and sleeping can pick one without a block search
@@ -509,16 +532,18 @@ final class JobScanner {
      * Whether every chunk in a worker's range has been scanned for jobs. The scan gets through a
      * couple of chunks a tick, so a worker just sent out (or arrived somewhere new) waits the few
      * ticks until it's done: assigning it straight away handed it the best of the jobs found so
-     * far, which could be the far side of its range with nearer ones not found yet.
+     * far, which could be the far side of its range with nearer ones not found yet. A chunk that
+     * isn't loaded isn't scanned ({@link #loadedChunk}), and isn't waited for.
      */
-    boolean hasScannedAround(WorkerInfo worker) {
+    boolean hasScannedAround(ServerLevel level, WorkerInfo worker) {
         int chunkRadius = WorkRange.chunkRadius(); // same chunks as getChunkScanRangesNearWorkers
         int baseChunkX = worker.position.getX() >> 4;
         int baseChunkZ = worker.position.getZ() >> 4;
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
                 ChunkIndex cache = chunkCaches.get(new ChunkPos(baseChunkX + dx, baseChunkZ + dz));
-                if (cache == null || cache.isDirty()) {
+                if ((cache == null || cache.isDirty())
+                        && loadedChunk(level, baseChunkX + dx, baseChunkZ + dz) != null) {
                     return false;
                 }
             }

@@ -12,6 +12,7 @@ import dev.palworks.ai.WorkStance;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.command.PalworksCommands;
+import dev.palworks.config.PalworksConfig;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.ModMenuTypes;
@@ -22,6 +23,7 @@ import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
+import dev.palworks.job.WorkRange;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
@@ -32,6 +34,7 @@ import dev.palworks.suitability.SuitabilityOverrides;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +48,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.AfterBatch;
+import net.minecraft.gametest.framework.BeforeBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
@@ -58,6 +62,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
@@ -84,6 +89,7 @@ public class WorkerGameTests {
 
     private static final CropBlock WHEAT = (CropBlock) Blocks.WHEAT;
     private static final BlockPos START = new BlockPos(3, 1, 1);
+    private static final String HARVESTED = "harvested and reset";
 
     /** Three ripe wheat in a row at z=5, on farmland. */
     private static void ripeWheatRow(GameTestHelper helper) {
@@ -114,7 +120,7 @@ public class WorkerGameTests {
         ripeWheatRow(helper);
         Workers.sendOut(helper, BULBASAUR, START);
 
-        helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested and reset"));
+        helper.succeedWhen(() -> assertWheatRow(helper, 0, HARVESTED));
     }
 
     @GameTest(template = Templates.EMPTY, batch = "worker_harvest_empty_section", timeoutTicks = 800)
@@ -151,6 +157,68 @@ public class WorkerGameTests {
         });
     }
 
+    private static final String WIDEST_RANGE_BATCH = "worker_widest_range";
+    private static PalworksConfig configBefore = PalworksConfig.DEFAULTS;
+
+    @BeforeBatch(batch = WIDEST_RANGE_BATCH)
+    public void widestRange(ServerLevel level) {
+        configBefore = PalworksConfig.current();
+        PalworksConfig d = PalworksConfig.DEFAULTS;
+        PalworksConfig.setCurrent(new PalworksConfig(
+                64,
+                d.workRangeVertical(),
+                d.ownerRange(),
+                d.pickupRadius(),
+                d.fertilizeChancePerLevel(),
+                d.wateringCooldownSeconds()));
+    }
+
+    @AfterBatch(batch = WIDEST_RANGE_BATCH)
+    public void afterWidestRange(ServerLevel level) {
+        PalworksConfig.setCurrent(configBefore);
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = WIDEST_RANGE_BATCH, timeoutTicks = 800)
+    public void theScanLeavesChunksThatArentLoadedAlone(GameTestHelper helper) {
+        // With the widest work range, a worker's reaches past the chunks loaded round it. The scan
+        // asked the level for each of those, which loads it there and then (off the disk, or
+        // made anew), and again every few seconds, as it was dropped for not being loaded.
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        ServerLevel level = helper.getLevel();
+        ChunkPos here = new ChunkPos(helper.absolutePos(START));
+        int reach = WorkRange.chunkRadius();
+        List<ChunkPos> notLoaded = new ArrayList<>();
+
+        helper.startSequence()
+                .thenIdle(40) // (clearing round the test loaded the chunks it touched: they go again)
+                .thenExecute(() -> {
+                    for (int dx = -reach; dx <= reach; dx++) {
+                        for (int dz = -reach; dz <= reach; dz++) {
+                            // (Nothing asking for it to be loaded: one that is being asked
+                            // for, and is still on its way in, would turn up later by itself)
+                            if (!level.hasChunk(here.x + dx, here.z + dz)) {
+                                notLoaded.add(new ChunkPos(here.x + dx, here.z + dz));
+                            }
+                        }
+                    }
+                    helper.assertFalse(
+                            notLoaded.isEmpty(), "the test needs a chunk in the worker's range that isn't loaded");
+                    Workers.sendOut(helper, BULBASAUR, START);
+                })
+                .thenExecuteFor(150, () -> {
+                    for (ChunkPos chunk : notLoaded) {
+                        helper.assertTrue(
+                                level.getChunkSource().getChunkNow(chunk.x, chunk.z) == null,
+                                "the scan loaded chunk " + chunk + " (" + notLoaded.size() + " weren't loaded)");
+                    }
+                })
+                // And they don't keep it waiting: its range counts as scanned without them
+                .thenWaitUntil(() -> assertWheatRow(helper, 0, HARVESTED))
+                .thenSucceed();
+    }
+
     private static LevelChunkSection sectionAt(GameTestHelper helper, BlockPos rel) {
         BlockPos abs = helper.absolutePos(rel);
         LevelChunk chunk = helper.getLevel().getChunkAt(abs);
@@ -183,7 +251,7 @@ public class WorkerGameTests {
                             + " degrees away");
         });
         helper.succeedWhen(() -> {
-            assertWheatRow(helper, 0, "harvested and reset");
+            assertWheatRow(helper, 0, HARVESTED);
             helper.assertTrue(playedOut[0], "its harvest animation played out");
             helper.assertTrue(WorkAnimator.playingOutAt(worker) == null, "its last animation is over");
         });
@@ -675,8 +743,8 @@ public class WorkerGameTests {
         ripeWart(helper);
         Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether
 
-        helper.succeedWhen(() -> helper.assertTrue(
-                helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, "harvested and reset"));
+        helper.succeedWhen(
+                () -> helper.assertTrue(helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, HARVESTED));
     }
 
     /** Soul sand for nether wart along z=5, and a chest holding these, for a planting test. */

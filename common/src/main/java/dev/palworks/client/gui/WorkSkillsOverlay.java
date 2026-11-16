@@ -6,7 +6,6 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.architectury.event.events.client.ClientGuiEvent;
-import dev.architectury.event.events.client.ClientPlayerEvent;
 import dev.palworks.Palworks;
 import dev.palworks.client.ClientWorkerData;
 import dev.palworks.mixin.client.PCGUIAccessor;
@@ -101,8 +100,6 @@ public final class WorkSkillsOverlay {
         });
         ClientGuiEvent.RENDER_POST.register(
                 (screen, graphics, mouseX, mouseY, delta) -> render(screen, graphics, mouseX, mouseY));
-        // Another world or server: these were its Pokémon
-        ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> ClientWorkerData.clearWorkLevels());
     }
 
     private static void render(Screen screen, GuiGraphics graphics, int mouseX, int mouseY) {

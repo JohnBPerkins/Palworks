@@ -11,7 +11,7 @@ import net.minecraft.world.entity.Mob;
 /**
  * Keeps each worker's owner told what it's doing ({@link WorkActivity}), for the party HUD. Called
  * every worker tick; sends only when the activity changes, plus a refresh every
- * {@link #REFRESH_TICKS} so an owner who rejoins or changes dimension catches up.
+ * {@link #REFRESH_TICKS} so an owner who rejoins catches up (their client forgot it as they left).
  */
 public final class WorkActivitySync {
     static final int REFRESH_TICKS = 100;

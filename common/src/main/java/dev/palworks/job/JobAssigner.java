@@ -124,7 +124,7 @@ final class JobAssigner {
     void assign(ServerLevel level) {
         List<WorkerInfo> idle = workers.all().stream()
                 .filter(w -> w.idle && w.currentReservation == null)
-                .filter(scanner::hasScannedAround)
+                .filter(worker -> scanner.hasScannedAround(level, worker))
                 .collect(Collectors.toList());
         // The longest waiting first: in the registry's order (the same every tick), workers that
         // stay idle with no job they can do (Water types while there's no watering) had the whole

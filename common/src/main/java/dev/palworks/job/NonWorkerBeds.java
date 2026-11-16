@@ -1,6 +1,7 @@
 package dev.palworks.job;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import dev.palworks.Palworks;
 import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.sleep.Beds;
 import dev.palworks.worker.WorkerEligibility;
@@ -31,6 +32,10 @@ final class NonWorkerBeds {
     private static final long STALE_TICKS = 5;
     // After it couldn't get to a bed, how long before it asks again (30s)
     private static final long RETRY_TICKS = 600;
+    // After it found no bed free, how long before it looks again (5s). Looking reads every block
+    // round its pasture (9,801 of them), and one that goes to bed by the clock asks every tick of
+    // its bedtime
+    static final long LOOK_AGAIN_TICKS = 100;
 
     /** A bed a non-worker has, since when, when it last reported in, and whether it's lying in it yet. */
     record Claim(BlockPos bed, long since, long lastSeen, boolean inBed) {}
@@ -66,7 +71,8 @@ final class NonWorkerBeds {
 
     /**
      * It wants a bed: it takes a free one by its pasture (or by itself, if it isn't tethered to
-     * one), if there is one and it hasn't just failed to get to one. Null if it gets none.
+     * one), if there is one and it hasn't just failed to get to one, or to find one. Null if it
+     * gets none.
      */
     @Nullable
     Claim claim(ServerLevel level, PokemonEntity entity) {
@@ -78,7 +84,12 @@ final class NonWorkerBeds {
         }
         BlockPos pasture = WorkerEligibility.pastureOf(entity);
         BlockPos bed = freeBedFor(level, entity, pasture != null ? pasture : entity.blockPosition());
+        Palworks.LOGGER.debug(
+                "{} is sleepy: {}",
+                entity.getPokemon().getSpecies().getName(),
+                bed == null ? "no bed free" : "off to the bed at " + bed.toShortString());
         if (bed == null) {
+            retryAfter.put(uuid, now + LOOK_AGAIN_TICKS);
             return null;
         }
         Claim claim = new Claim(bed, now, now, false);
