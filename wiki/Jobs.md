@@ -147,8 +147,8 @@ jobs.
 
 **Who:** Transporting
 
-When a [trough](Hunger) in reach has less than 16 feed left, a transporter fetches a stack of food
-from a chest that has some and takes it to the trough.
+When a [trough](Hunger) in reach has less than 16 feed left, a transporter that can get to it
+fetches a stack of food from a chest that has some and takes it to the trough.
 
 ## Mine crystals
 

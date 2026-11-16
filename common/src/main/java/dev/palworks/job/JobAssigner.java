@@ -378,8 +378,9 @@ final class JobAssigner {
 
     /**
      * FETCH_FOOD candidates for a transporter with room: if a trough in reach is running low (see
-     * TroughBlockEntity#isLow), the chests in reach with food in them, nearest first. Like
-     * deliveries, they aren't in the pool. Once it has the food, its delivery takes it to the trough.
+     * TroughBlockEntity#isLow) and it can get to it, the chests in reach with food in them, nearest
+     * first. Like deliveries, they aren't in the pool. Once it has the food, its delivery takes it
+     * to the trough.
      */
     private List<JobRecord> restockCandidates(ServerLevel level, WorkerInfo worker) {
         Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
@@ -387,16 +388,16 @@ final class JobAssigner {
             return List.of();
         }
         BlockPos workerPos = worker.position;
-        boolean troughLow = false;
+        List<BlockPos> lowTroughs = new ArrayList<>();
         for (BlockPos troughPos : troughsInReach(worker)) {
             if (nearEnoughToOwner(worker, troughPos)
+                    && !isRecentlyUnreachable(worker, troughPos)
                     && level.getBlockEntity(troughPos) instanceof dev.palworks.block.TroughBlockEntity trough
                     && trough.isLow()) {
-                troughLow = true;
-                break;
+                lowTroughs.add(troughPos);
             }
         }
-        if (!troughLow) {
+        if (lowTroughs.isEmpty()) {
             return List.of();
         }
         List<BlockPos> chests = new ArrayList<>();
@@ -404,9 +405,15 @@ final class JobAssigner {
             if (Math.abs(chestPos.getX() - workerPos.getX()) <= DELIVERY_SEARCH_RADIUS
                     && Math.abs(chestPos.getZ() - workerPos.getZ()) <= DELIVERY_SEARCH_RADIUS
                     && Math.abs(chestPos.getY() - workerPos.getY()) <= DELIVERY_SEARCH_VERTICAL
+                    && !isRecentlyUnreachable(worker, chestPos)
                     && JobChecks.isJobStillThere(level, JobType.FETCH_FOOD, chestPos)) {
                 chests.add(chestPos);
             }
+        }
+        // Last, as it's the costly one (a path): only with food to fetch, from a chest it hasn't
+        // just failed to get to
+        if (chests.isEmpty() || !canDeliverToOneOf(worker, lowTroughs)) {
+            return List.of();
         }
         chests.sort(Comparator.comparingDouble(workerPos::distSqr));
         List<JobRecord> candidates = new ArrayList<>(chests.size());
@@ -414,6 +421,33 @@ final class JobAssigner {
             candidates.add(JobRecord.of(JobType.FETCH_FOOD, chestPos, level.getGameTime()));
         }
         return candidates;
+    }
+
+    /**
+     * Whether the worker can get to one of these troughs to put food in it, as its delivery will
+     * ask once it has the food. Asked before it fetches any: food fetched for a trough it had no way
+     * to went back in the chest, and was fetched again, for as long as the trough was low. The
+     * troughs it can't get to are remembered as unreachable, so they aren't looked at again each
+     * time it's idle.
+     */
+    private boolean canDeliverToOneOf(WorkerInfo worker, List<BlockPos> troughs) {
+        PokemonEntity entity = workers.entity(worker.pokemonUUID);
+        if (entity == null) {
+            return false;
+        }
+        for (BlockPos troughPos : troughs) {
+            BlockPos standPos = WorkPositions.standingPosFor(level, troughPos, JobType.DELIVER_ITEMS, entity);
+            Reach reach =
+                    standPos == null ? Reach.NO : canPathTo(entity, standPos).reach();
+            if (reach == Reach.YES) {
+                return true;
+            }
+            if (reach == Reach.UNKNOWN) {
+                return false; // it can't pathfind right now (see assignFirstReachable): next time
+            }
+            rememberUnreachable(worker.pokemonUUID, worker.position, troughPos, level.getGameTime());
+        }
+        return false;
     }
 
     /**
