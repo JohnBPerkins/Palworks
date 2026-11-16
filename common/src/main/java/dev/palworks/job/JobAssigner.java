@@ -208,7 +208,7 @@ final class JobAssigner {
             // that's run out asks for some, and carries on with its other work meanwhile; a
             // transporter that's fetched some for one takes them to it before anything else
             if (pokemon != null) {
-                askForSeedsIfOut(worker, pokemon, now);
+                askForSeedsIfOut(worker, now);
                 SeedTrip trip = bringSeeds(worker, pokemon, now);
                 if (trip == SeedTrip.ON_ITS_WAY) {
                     assignedCount++;
@@ -1017,10 +1017,11 @@ final class JobAssigner {
 
     /**
      * A planter that's run out of seeds for the open spots round it asks for some, if a seed chest
-     * in its range has any it can plant there (see SeedRequests). It looks every so often, not every
-     * time it's idle. One that has seeds again (a player threw it some) takes its request back.
+     * in its range has any it can plant there and has room for (see SeedRequests). It looks every so
+     * often, not every time it's idle. One that has seeds again (a player threw it some) takes its
+     * request back.
      */
-    private void askForSeedsIfOut(WorkerInfo worker, Pokemon pokemon, long now) {
+    private void askForSeedsIfOut(WorkerInfo worker, long now) {
         UUID planter = worker.pokemonUUID;
         if (!isPlanterThatAsks(worker)) {
             seedRequests.forget(planter); // it transports now (it evolved, say): it fetches its own
@@ -1029,17 +1030,9 @@ final class JobAssigner {
         if (seedRequests.isHandedTo(planter) || !seedRequests.dueToLook(planter, now)) {
             return;
         }
-        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         boolean wantsSome = false;
-        Map<Suitability, List<BlockPos>> openSpots = new EnumMap<>(Suitability.class);
         for (BlockPos chest : seedChests()) {
-            if (WorkRange.contains(worker.position, chest)
-                    && seedToFetch(
-                                    chest,
-                                    worker.suitabilities,
-                                    inventory,
-                                    skill -> openSpots.computeIfAbsent(skill, s -> openSpotsNear(worker.position, s)))
-                            != null) {
+            if (WorkRange.contains(worker.position, chest) && seedFor(worker, chest) != null) {
                 wantsSome = true;
                 break;
             }
@@ -1080,34 +1073,37 @@ final class JobAssigner {
 
     /**
      * The request for seeds (see SeedRequests) this transporter could take on with seeds from the
-     * chest at {@code chestPos}: a waiting one, from a planter within its work range, that the
-     * chest has a seed for (one the open spots round the planter can take). Null if none.
+     * chest at {@code chestPos}: a waiting one, from a planter it may go to (within its work range,
+     * and its owner's, as {@link #bringSeeds} asks), that the chest has a seed for (one the open
+     * spots round the planter can take). Null if none.
      */
     @Nullable
     private SeedRequests.Request requestToTakeOn(WorkerInfo transporter, BlockPos chestPos) {
         for (SeedRequests.Request request : seedRequests.waiting()) {
             WorkerInfo planter = workers.get(request.planter);
-            if (planter != null
-                    && WorkRange.contains(transporter.position, planter.position)
-                    && seedFor(planter, chestPos) != null) {
+            if (planter != null && inWorkRange(transporter, planter.position) && seedFor(planter, chestPos) != null) {
                 return request;
             }
         }
         return null;
     }
 
-    /** The seed a planter would want from this chest: one the open spots round it can take, if it has none. */
+    /**
+     * The seed a planter would want from this chest: one the open spots round it can take, if it
+     * has none, and that its pouch has room for. With no room (its pouch full of seeds it can't
+     * plant here), seeds were fetched for it, couldn't be handed over (see {@link #seedSlotFor}),
+     * went back in the chest and were fetched again.
+     */
     @Nullable
     private Item seedFor(WorkerInfo planter, BlockPos chestPos) {
         Pokemon pokemon = workers.pokemon(planter.pokemonUUID);
         if (pokemon == null) {
             return null;
         }
-        return seedToFetch(
-                chestPos,
-                planter.suitabilities,
-                WorkerInventoryManager.getOrCreate(pokemon),
-                skill -> openSpotsNear(planter.position, skill));
+        WorkerInventory pouch = WorkerInventoryManager.getOrCreate(pokemon);
+        Item seed =
+                seedToFetch(chestPos, planter.suitabilities, pouch, skill -> openSpotsNear(planter.position, skill));
+        return seed != null && pouch.roomFor(new net.minecraft.world.item.ItemStack(seed)) > 0 ? seed : null;
     }
 
     /**

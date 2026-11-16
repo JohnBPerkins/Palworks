@@ -270,4 +270,27 @@ public class SeedDeliveryGameTests {
         helper.succeedWhen(() -> helper.assertValueEqual(
                 count(WorkerInventoryManager.getOrCreate(pidgey.getPokemon()), Items.WHEAT_SEEDS), 6, "seeds carried"));
     }
+
+    @GameTest(template = Templates.EMPTY, batch = "seeds_no_room", timeoutTicks = 500)
+    public void seedsArentFetchedForAPlanterWithNoRoomForThem(GameTestHelper helper) {
+        farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
+        PokemonEntity bulbasaur = sendOut(helper, BULBASAUR, PLANTER);
+        // Its pouch is full of seeds this farmland doesn't take
+        WorkerInventory pouch = WorkerInventoryManager.getOrCreate(bulbasaur.getPokemon());
+        for (int slot = 0; slot < pouch.getContainerSize(); slot++) {
+            pouch.setItem(slot, new ItemStack(Items.NETHER_WART, 64));
+        }
+        PokemonEntity pidgey = sendOut(helper, PIDGEY, TRANSPORTER);
+        boolean[] fetched = {false};
+        helper.onEachTick(() -> {
+            if (count(WorkerInventoryManager.getOrCreate(pidgey.getPokemon()), Items.WHEAT_SEEDS) > 0) {
+                fetched[0] = true;
+            }
+        });
+
+        helper.runAfterDelay(400, () -> {
+            helper.assertFalse(fetched[0], "seeds were fetched for a planter with no room for them");
+            helper.succeed();
+        });
+    }
 }
