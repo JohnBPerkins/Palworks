@@ -97,6 +97,17 @@ final class BodyClearance {
     }
 
     /**
+     * Whether the body fits standing in this tile (the block its feet go in), its middle at the
+     * tile's, on whatever floor is in the tile's row, among the blocks there.
+     */
+    boolean fitsOnTile(BlockPos tile) {
+        double cx = tile.getX() + 0.5;
+        double cz = tile.getZ() + 0.5;
+        double floor = floorAt(cx, tile.getY(), cz);
+        return !Double.isNaN(floor) && level.noBlockCollision(mob, box(cx, floor, cz));
+    }
+
+    /**
      * The floor under a body with its middle at (cx, cz) and its feet in node row {@code y}: the
      * highest collision top under any part of it within that row ({@code [y - 0.5, y + 0.5)}), so a
      * wide Pokémon half over a ledge stands on the ledge. NaN if there's nothing to stand on in that

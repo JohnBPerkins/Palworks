@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Queue;
+import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.pathfinder.Node;
@@ -97,6 +98,17 @@ public final class WorkerPathfinder {
             }
         }
         return !mob.isPassenger();
+    }
+
+    /**
+     * A test of whether the mob's body fits standing on a tile, on whatever floor is in it: what
+     * {@link #find} asks of the tile it's sent to, so that a tile that passes is one it can plan
+     * to. (By the blocks there: anything else in the way, a boat, it finds as it plans.) One test
+     * for many tiles.
+     */
+    public static Predicate<BlockPos> fitsOn(Mob mob) {
+        BodyClearance body = new BodyClearance(mob);
+        return body::fitsOnTile;
     }
 
     /**

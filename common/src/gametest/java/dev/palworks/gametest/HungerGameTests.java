@@ -782,4 +782,23 @@ public class HungerGameTests {
             helper.succeed();
         });
     }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_eat_carpet", timeoutTicks = 800)
+    public void anEmptyWorkerEatsFromATroughOnACarpetedFloor(GameTestHelper helper) {
+        Workers.isolate(helper);
+        // Carpet all round the trough: it stands on the carpet, in the carpet's own block, not the
+        // one above it
+        for (int x = 0; x < 8; x++) {
+            for (int z = 0; z < 8; z++) {
+                helper.setBlock(x, 1, z, Blocks.WHITE_CARPET);
+            }
+        }
+        TroughBlockEntity trough = trough(helper, TROUGH);
+        trough.addFood(berries(9));
+        PokemonEntity worker = Workers.sendOut(helper, WORKER, START);
+        Pokemon pokemon = worker.getPokemon();
+        pokemon.setCurrentFullness(0);
+
+        helper.succeedWhen(() -> helper.assertTrue(pokemon.getCurrentFullness() > 0, "it's eaten"));
+    }
 }
