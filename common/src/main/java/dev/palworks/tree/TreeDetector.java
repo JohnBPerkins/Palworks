@@ -599,6 +599,25 @@ public class TreeDetector {
                 .orElse(null);
     }
 
+    /**
+     * A tree block this sapling is what's replanted for (a log or root {@link #saplingFor} gives
+     * it for, found by name), or null if it isn't one.
+     */
+    @Nullable
+    public static Block treeBlockFor(Item sapling) {
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(sapling);
+        for (String path : SaplingNames.treeBlockCandidates(id.getPath())) {
+            ResourceLocation candidate = ResourceLocation.tryBuild(id.getNamespace(), path);
+            Block block = candidate == null
+                    ? null
+                    : BuiltInRegistries.BLOCK.getOptional(candidate).orElse(null);
+            if (block != null && isTreeBlock(block.defaultBlockState()) && sapling.equals(saplingFor(block))) {
+                return block;
+            }
+        }
+        return null;
+    }
+
     private static Optional<Item> findSaplingByName(Block block) {
         ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         for (String path : SaplingNames.saplingCandidates(id.getPath())) {
