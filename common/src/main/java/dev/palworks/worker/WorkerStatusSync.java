@@ -46,9 +46,10 @@ public final class WorkerStatusSync {
 
     /**
      * What it shows now: what's wrong with it as a worker, only while Palworks' hunger or sleep
-     * applies to it (its work is on; sleep only for a pastured one); and that it's asleep, if its
-     * species has no sleep animation to show it. {@code state} is its worker state, null if it has
-     * none (it was never a worker).
+     * applies to it (its work is on; sleep only for a pastured one); what kept it from working at
+     * its last look for a job (no way to its work, nowhere to take what it carries), while its work
+     * is on and it's awake; and that it's asleep, if its species has no sleep animation to show it.
+     * {@code state} is its worker state, null if it has none (it was never a worker).
      */
     public static Set<WorkerStatus> statusesOf(Pokemon pokemon, @Nullable WorkerState state) {
         Set<WorkerStatus> statuses = EnumSet.noneOf(WorkerStatus.class);
@@ -65,6 +66,22 @@ public final class WorkerStatusSync {
             statuses.add(WorkerStatus.UNHAPPY);
         }
         PokemonEntity entity = pokemon.getEntity();
+        // What its last look for a job found keeping it from work (see JobAssigner), while it's
+        // working: not while its work is off, it's asleep or on strike, which are reasons of their own
+        if (state != null
+                && (state.cantReach() || state.cantDeliver())
+                && WorkerEligibility.works(pokemon, state)
+                && !state.isAsleep()
+                && (entity == null || !Sleep.cobblemonHasItAsleep(entity))
+                && !statuses.contains(WorkerStatus.STRIKING)) {
+            // Not once it has a job, if one came to it since some other way (a pickup offered it)
+            if (state.cantReach() && state.getCurrentReservation() == null) {
+                statuses.add(WorkerStatus.CANT_REACH);
+            }
+            if (state.cantDeliver()) {
+                statuses.add(WorkerStatus.CANT_DELIVER);
+            }
+        }
         if (entity != null
                 && !Sleep.hasSleepPose(entity)
                 && ((sleeps && state.isAsleep()) || NonWorkerSleep.isInBed(entity))) {

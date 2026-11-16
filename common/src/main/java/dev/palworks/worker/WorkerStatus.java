@@ -33,6 +33,18 @@ public enum WorkerStatus {
     STRIKING(null, "palworks:status/striking"),
 
     /**
+     * Idle because every job it would do is somewhere it can't get to (see JobAssigner). A brick
+     * wall.
+     */
+    CANT_REACH(null, "palworks:status/cant_reach"),
+
+    /**
+     * Carrying items with nowhere to take them: no chest in reach with room, or none it can get to
+     * (see JobAssigner). A chest.
+     */
+    CANT_DELIVER(null, "palworks:status/cant_deliver"),
+
+    /**
      * Asleep (a worker in its bedtime, or a non-worker in a bed: see dev.palworks.sleep), for a
      * species with no sleep animation of its own, which only lies still. A crescent moon: not
      * Tired's "z", which is a worker awake and slow.
