@@ -1006,4 +1006,23 @@ public class WorkerGameTests {
         }
         helper.succeed();
     }
+
+    @GameTest(template = Templates.EMPTY)
+    public void whatAPlanterCantPlantIsCargoNotSeeds(GameTestHelper helper) {
+        // Workers plant fields (farmland, soul sand). Cocoa beans and sweet berries don't go in
+        // one: kept as seeds, a worker that plants never put its harvest of them in a chest
+        Set<Suitability> planter = EnumSet.of(Suitability.PLANTING, Suitability.TRANSPORTING);
+        for (var item : List.of(Items.COCOA_BEANS, Items.SWEET_BERRIES)) {
+            ItemStack stack = new ItemStack(item);
+            helper.assertTrue(WorkerInventory.isCargo(stack, planter), item + " is cargo");
+            helper.assertFalse(
+                    WorkerInventory.accepts(CarryMode.SEED_POUCH, stack), item + " doesn't go in a seed pouch");
+        }
+        for (var item : List.of(Items.WHEAT_SEEDS, Items.CARROT, Items.NETHER_WART)) {
+            ItemStack stack = new ItemStack(item);
+            helper.assertFalse(WorkerInventory.isCargo(stack, planter), item + " is kept to plant");
+            helper.assertTrue(WorkerInventory.accepts(CarryMode.SEED_POUCH, stack), item + " goes in a seed pouch");
+        }
+        helper.succeed();
+    }
 }

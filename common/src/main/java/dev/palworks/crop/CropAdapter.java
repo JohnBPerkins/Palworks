@@ -303,24 +303,13 @@ public class CropAdapter {
     }
 
     /**
-     * Whether an item is a seed or other plantable item (what a planter's seed pouch may hold).
+     * Whether an item is a seed: one workers plant (see {@link #fieldCropOf}), which is what a
+     * planter's seed pouch may hold and what a worker that plants keeps rather than puts away.
+     * Cocoa beans and sweet berries plant something too, but not in a field: workers never plant
+     * them, so counted as seeds they stayed in the pouch of the worker that harvested them.
      */
     public static boolean isSeed(Item item) {
-        return getPlantedBlock(item) != null;
-    }
-
-    /**
-     * Get the block that should be placed when planting a seed.
-     * Returns null if the seed cannot be planted.
-     */
-    @Nullable
-    public static Block getPlantedBlock(Item seed) {
-        Block crop = fieldCropOf(seed);
-        if (crop != null) return crop;
-        if (seed.equals(Items.COCOA_BEANS)) return Blocks.COCOA;
-        if (seed.equals(Items.SWEET_BERRIES)) return Blocks.SWEET_BERRY_BUSH;
-
-        return null;
+        return fieldCropOf(item) != null;
     }
 
     /**
