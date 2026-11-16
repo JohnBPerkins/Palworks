@@ -783,9 +783,13 @@ public class WorkerAI {
         WorkerStateManager.save(pokemon, state);
     }
 
-    /** It falls asleep: Tired no more (it's sleeping it off), and it stops looking for a bed. */
+    /**
+     * It falls asleep: Tired no more (it's sleeping it off), and it stops looking for a bed. One
+     * already asleep and still Tired was napping when its bedtime came: its nap is its night's sleep
+     * now, so it's sleeping that off too. Left Tired, it was Tired (and its mood ran down) all night.
+     */
     private static void fallAsleep(Pokemon pokemon, WorkerState state) {
-        if (!state.isAsleep()) {
+        if (!state.isAsleep() || state.isTired()) {
             state.setAsleep(true);
             state.setTired(false);
             state.resetBedtimeIdleTicks();
