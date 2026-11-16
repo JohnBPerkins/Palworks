@@ -14,6 +14,7 @@ import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
@@ -23,6 +24,7 @@ import dev.palworks.worker.WorkerStatusSync;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
@@ -281,7 +283,7 @@ public class JobManager {
         // another worker is given it too. If another worker has it already, that one keeps it.
         if (stateReservation != null
                 && !stateReservation.equals(info.currentReservation)
-                && !pool.adopt(stateReservation, uuid, level.getGameTime())) {
+                && !pool.adopt(stateReservation, uuid, asFound(stateReservation, level))) {
             state.clearReservation();
             WorkerStateManager.save(pokemon, state);
             stateReservation = null;
@@ -311,6 +313,21 @@ public class JobManager {
         if (entity instanceof PokemonEntity pokemonEntity) {
             workers.putEntity(uuid, pokemonEntity);
         }
+    }
+
+    /**
+     * The job a worker still has from before a restart, as it would be found now: with the skills
+     * it takes (see JobChecks.skillsFor), and as a follow-up if it's one that only comes as one (a
+     * pickup). Built from its type alone, nether wart it let go of went back in the pool as any
+     * crop, for a Grass type to harvest, and a pickup as a job no rescan or clean-up ever removes.
+     */
+    private static JobRecord asFound(ReservationId reservation, Level level) {
+        JobType type = reservation.getJobType();
+        BlockPos pos = reservation.getStationPos();
+        Set<Suitability> skills = JobChecks.skillsFor(level, type, pos);
+        return type == JobType.COLLECT_DROPS || type == JobType.TAKE_SEEDS
+                ? JobRecord.followUp(type, pos, level.getGameTime(), null, skills)
+                : JobRecord.of(type, pos, level.getGameTime(), skills);
     }
 
     /**

@@ -22,6 +22,7 @@ import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityData;
@@ -1062,6 +1063,37 @@ public class WorkerGameTests {
                 })
                 .thenWaitUntil(() -> helper.assertTrue(
                         helper.getBlockState(crop).equals(WHEAT.getStateForAge(0)), "harvested, once it looked again"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_wart_adopted", timeoutTicks = 600)
+    public void aJobKeptOverARestartStillNeedsItsSkills(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.STONE);
+        // A Grass type, which harvests whatever Gathering can; and a Ghost type that has ripe nether
+        // wart as its job the way it has after a restart: saved with it, and not in the (new) pool
+        Workers.sendOut(helper, "ivysaur level=20", START);
+        PokemonEntity gastly = Workers.sendOut(helper, "gastly level=20", new BlockPos(1, 1, 1));
+
+        helper.startSequence()
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    helper.setBlock(WART.below(), Blocks.SOUL_SAND);
+                    helper.setBlock(WART, Blocks.NETHER_WART.defaultBlockState().setValue(NetherWartBlock.AGE, 3));
+                    WorkerStateManager.getOrCreate(gastly.getPokemon())
+                            .setCurrentReservation(new ReservationId(
+                                    helper.absolutePos(WART),
+                                    JobType.HARVEST_CROPS,
+                                    helper.getLevel().getGameTime()));
+                    JobManager.getInstance(helper.getLevel())
+                            .registerWorker(gastly.getPokemon(), gastly, helper.getLevel());
+                    // Then it's recalled, and its job goes back for another worker
+                    gastly.discard();
+                })
+                .thenIdle(300)
+                .thenExecute(() -> helper.assertTrue(
+                        helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 3,
+                        "the nether wart was harvested by a Grass type"))
                 .thenSucceed();
     }
 }

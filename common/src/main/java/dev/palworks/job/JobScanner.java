@@ -8,12 +8,10 @@ import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
-import dev.palworks.suitability.Suitability;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -427,10 +425,9 @@ final class JobScanner {
         // Check for gathering jobs (harvestable crops)
         if (CropAdapter.isFullyGrown(level, pos)) {
             // Nether wart is Nether work (Ghost types), like planting it and fetching it from
-            // chests: Gathering alone let any Grass type harvest it
-            return state.is(Blocks.NETHER_WART)
-                    ? JobRecord.of(JobType.HARVEST_CROPS, pos, now, EnumSet.of(Suitability.NETHER))
-                    : JobRecord.of(JobType.HARVEST_CROPS, pos, now);
+            // chests (see JobChecks.skillsFor)
+            return JobRecord.of(
+                    JobType.HARVEST_CROPS, pos, now, JobChecks.skillsFor(level, JobType.HARVEST_CROPS, pos));
         }
 
         // A crop still growing, not watered lately (Watering)
@@ -450,9 +447,8 @@ final class JobScanner {
                             pos,
                             abovePos);
                 }
-                return nether
-                        ? JobRecord.of(JobType.PLANT_SEEDS, abovePos, now, EnumSet.of(Suitability.NETHER))
-                        : JobRecord.of(JobType.PLANT_SEEDS, abovePos, now);
+                return JobRecord.of(
+                        JobType.PLANT_SEEDS, abovePos, now, JobChecks.skillsFor(level, JobType.PLANT_SEEDS, abovePos));
             }
         }
 
@@ -480,10 +476,8 @@ final class JobScanner {
             // The same spot for the tree whichever base this scan found it from, so a tree seen
             // from two chunks (or by scans of different heights) is one job, not one per base
             BlockPos chopPos = TreeDetector.chopPosition(level, tree);
-            return TreeDetector.isNetherStem(state)
-                    ? JobRecord.of(
-                            JobType.CHOP_TREE, chopPos, now, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER))
-                    : JobRecord.of(JobType.CHOP_TREE, chopPos, now);
+            return JobRecord.of(
+                    JobType.CHOP_TREE, chopPos, now, JobChecks.skillsFor(level, JobType.CHOP_TREE, chopPos));
         }
 
         // Grown crystals (amethyst, tumblestone, type gems): Mining

@@ -125,12 +125,12 @@ class JobPoolTest {
         UUID worker = UUID.randomUUID();
         ReservationId saved = new ReservationId(CROP, JobType.HARVEST_CROPS, 0L);
 
-        assertTrue(pool.adopt(saved, worker, 10L));
+        assertTrue(pool.adopt(saved, worker, asFound(saved)));
         assertTrue(pool.isReserved(JobKey.of(saved)));
         assertFalse(
                 offeredTo(pool, FARMER).stream().anyMatch(job -> job.position().equals(CROP)), "not offered");
         assertGroupsMatch(pool);
-        assertTrue(pool.adopt(saved, worker, 20L), "already its own");
+        assertTrue(pool.adopt(saved, worker, asFound(saved)), "already its own");
     }
 
     @Test
@@ -139,8 +139,33 @@ class JobPoolTest {
         UUID worker = UUID.randomUUID();
         ReservationId saved = new ReservationId(TREE, JobType.CHOP_TREE, 0L);
 
-        assertTrue(pool.adopt(saved, worker, 10L));
+        assertTrue(pool.adopt(saved, worker, asFound(saved)));
         assertTrue(pool.isReserved(JobKey.of(saved)));
+    }
+
+    @Test
+    void aSavedReservationNotInThePoolGoesBackInItAsItWasFound() {
+        JobPool pool = new JobPool();
+        UUID worker = UUID.randomUUID();
+        // Nether wart: Nether work, not any farmer's
+        ReservationId saved = new ReservationId(CROP, JobType.HARVEST_CROPS, 0L);
+        pool.adopt(saved, worker, JobRecord.of(JobType.HARVEST_CROPS, CROP, 10L, EnumSet.of(Suitability.NETHER)));
+        // And a pickup: a follow-up
+        ReservationId pickup = new ReservationId(FARMLAND, JobType.COLLECT_DROPS, 0L);
+        pool.adopt(pickup, worker, JobRecord.followUp(JobType.COLLECT_DROPS, FARMLAND, 10L, null));
+
+        pool.release(JobKey.of(saved), 20L);
+        pool.release(JobKey.of(pickup), 20L);
+
+        assertTrue(offeredTo(pool, FARMER).isEmpty(), "the nether wart isn't a farmer's");
+        assertEquals(1, offeredTo(pool, EnumSet.of(Suitability.NETHER)).size());
+        pool.expire(1000L, 500L);
+        assertEquals(1, pool.available().size(), "the pickup is a follow-up still: it goes with age");
+        assertGroupsMatch(pool);
+    }
+
+    private static JobRecord asFound(ReservationId saved) {
+        return JobRecord.of(saved.getJobType(), saved.getStationPos(), 10L);
     }
 
     @Test
@@ -148,9 +173,9 @@ class JobPoolTest {
         JobPool pool = new JobPool();
         ReservationId saved = new ReservationId(CROP, JobType.HARVEST_CROPS, 0L);
         UUID first = UUID.randomUUID();
-        assertTrue(pool.adopt(saved, first, 10L));
+        assertTrue(pool.adopt(saved, first, asFound(saved)));
 
-        assertFalse(pool.adopt(saved, UUID.randomUUID(), 10L), "the first keeps it");
+        assertFalse(pool.adopt(saved, UUID.randomUUID(), asFound(saved)), "the first keeps it");
         assertTrue(pool.reserved().iterator().next().isReservedBy(first));
     }
 }
