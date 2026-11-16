@@ -3,6 +3,7 @@ package dev.palworks.tree;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class SaplingNamesTest {
@@ -58,5 +59,13 @@ class SaplingNamesTest {
         assertTrue(
                 SaplingNames.saplingCandidates(blockPath).contains(sapling),
                 blockPath + " should give " + sapling + ", got " + SaplingNames.saplingCandidates(blockPath));
+    }
+
+    @Test
+    void aSaplingNamesTheTreeBlocksItCouldBeFor() {
+        assertTrue(SaplingNames.treeBlockCandidates("dark_oak_sapling").contains("dark_oak_log"));
+        assertTrue(SaplingNames.treeBlockCandidates("mangrove_propagule").contains("mangrove_log"));
+        assertTrue(SaplingNames.treeBlockCandidates("crimson_fungus").contains("crimson_stem"));
+        assertEquals(List.of(), SaplingNames.treeBlockCandidates("birch_planks"), "not named as a sapling");
     }
 }
