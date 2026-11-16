@@ -3,7 +3,7 @@
 ## Requirements
 
 - Minecraft **1.21.1**
-- [Cobblemon](https://cobblemon.com) **1.8** (1.8.0 or later)
+- [Cobblemon](https://cobblemon.com) **1.8** (any 1.8 version, from 1.8.0; not 1.7 or 1.9)
 - **Fabric Loader + Fabric API**, or **NeoForge**
 - [Architectury API](https://modrinth.com/mod/architectury-api) **13.0.8** or later (the shared
   library Palworks uses to run on both loaders)
@@ -16,7 +16,7 @@ Palworks isn't on a mod host yet, so for now you build the jar yourself. You nee
 ```bash
 git clone https://github.com/JohnBPerkins/Palworks.git
 cd Palworks
-./gradlew build
+./gradlew assemble
 ```
 
 Then:

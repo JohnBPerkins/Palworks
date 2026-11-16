@@ -156,6 +156,18 @@ class PalworksConfigTest {
     }
 
     @Test
+    void aFractionForAWholeNumberIsRefusedNotRoundedDown() {
+        // As /palworks config set refuses it: 40.5 blocks used to be read as 40, without a word
+        List<String> warnings = new ArrayList<>();
+        assertEquals(PalworksConfig.DEFAULTS, parse("{\"work_range_horizontal\": 40.5}", warnings));
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.get(0).contains("40.5"), warnings.get(0));
+        // A whole number written with a point is still one
+        assertEquals(40, parse("{\"work_range_horizontal\": 40.0}", warnings).workRangeHorizontal());
+        assertEquals(1, warnings.size(), String.join("\n", warnings));
+    }
+
+    @Test
     void theWrongTypeOrBrokenJsonMeansTheDefaultsWithAWarning() {
         List<String> warnings = new ArrayList<>();
         assertEquals(PalworksConfig.DEFAULTS, parse("{\"work_range_vertical\": \"far\"}", warnings));
@@ -209,6 +221,18 @@ class PalworksConfigTest {
     void aValidFileLeavesNoCopy(@TempDir Path configDir) throws IOException {
         Files.writeString(configDir.resolve(FILE), "{\"owner_range\": 16}");
         PalworksConfig.load(configDir);
+        assertFalse(Files.exists(configDir.resolve(FILE + InvalidFiles.SUFFIX)));
+    }
+
+    @Test
+    void aMisspeltSettingIsLeftOutAndTheRestUsed(@TempDir Path configDir) throws IOException {
+        // It's only logged (see ConfigKeysTest): the file is valid, and its other settings count
+        Files.writeString(configDir.resolve(FILE), "{\"work_range_horizontl\": 40, \"pickup_radius\": 2.5}");
+        PalworksConfig.load(configDir);
+        assertEquals(2.5, PalworksConfig.current().pickupRadius());
+        assertEquals(
+                PalworksConfig.DEFAULTS.workRangeHorizontal(),
+                PalworksConfig.current().workRangeHorizontal());
         assertFalse(Files.exists(configDir.resolve(FILE + InvalidFiles.SUFFIX)));
     }
 

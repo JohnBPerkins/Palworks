@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +28,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.MangrovePropaguleBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -376,7 +378,8 @@ public class TreeDetector {
      * shroomlights never decay the way leaves do. Copies the FallingTree mod's rule: canopy blocks
      * reachable from the tree's stems through other canopy blocks (diagonals included), within
      * {@link #WART_BREAK_RADIUS} blocks of {@code origin} on x and z, and at most one block above the
-     * top stem.
+     * top stem. And none below the lowest stem (FallingTree has no such rule): a fungus's hat hangs
+     * no lower than its foot, and wart blocks under that are the forest's floor, or someone's.
      *
      * <p>Unlike FallingTree, neighbouring fungi keep their canopy: each canopy block belongs to the
      * nearest stem (by x/z distance; ties go to the tree being chopped), and blocks that belong to a
@@ -433,7 +436,8 @@ public class TreeDetector {
                         if (!visited.add(neighbor)
                                 || Math.abs(neighbor.getX() - origin.getX()) > WART_BREAK_RADIUS
                                 || Math.abs(neighbor.getZ() - origin.getZ()) > WART_BREAK_RADIUS
-                                || neighbor.getY() > topY + 1) {
+                                || neighbor.getY() > topY + 1
+                                || neighbor.getY() < bottomY) {
                             continue;
                         }
                         if (isNetherCanopy(level.getBlockState(neighbor))
@@ -623,6 +627,9 @@ public class TreeDetector {
      * a 2x2 of logs (dark oak, which only grows from a 2x2 of saplings, and giant spruce and jungle)
      * is replanted as a 2x2 in the same four spots; any other tree gets one sapling at its base.
      * Based on the trunk's shape rather than a list of tree types, so it covers any 2x2 tree.
+     * Trees that touch are found as one (their logs join), so every trunk among the blocks is
+     * replanted: one sapling for two oaks lost a tree each time, and one for two dark oaks was a
+     * sapling that never grows. They all get the one sapling {@link #getSaplingForTree} finds.
      * Mangroves stand on roots, not logs, so they always get one propagule, under the trunk (see
      * {@link #mangrovePropagulePos}).
      *
@@ -634,22 +641,44 @@ public class TreeDetector {
         if (propagule != null) {
             return List.of(propagule);
         }
-        int bottomY = Integer.MAX_VALUE;
+        // Every trunk among its blocks: a log standing on ground with more of the tree on top of
+        // it (a branch that ends on a hillside isn't one)
+        List<BlockPos> trunks = new ArrayList<>();
         for (BlockPos pos : treeBlocks) {
-            bottomY = Math.min(bottomY, pos.getY());
-        }
-        List<BlockPos> bottom = new ArrayList<>();
-        for (BlockPos pos : treeBlocks) {
-            if (pos.getY() == bottomY) {
-                bottom.add(pos);
+            BlockState state = level.getBlockState(pos);
+            if (isLog(state) && treeBlocks.contains(pos.above()) && standsOnGround(level, pos, state)) {
+                trunks.add(pos);
             }
         }
-        if (bottom.size() == 4
-                && isTwoByTwo(bottom)
-                && bottom.stream().allMatch(pos -> isLog(level.getBlockState(pos)))) {
-            return bottom;
+        trunks.sort((a, b) -> isBefore(a, b) ? -1 : isBefore(b, a) ? 1 : 0); // the same spots each time
+        Set<BlockPos> spots = new LinkedHashSet<>();
+        for (BlockPos trunk : trunks) {
+            if (!spots.contains(trunk)) {
+                spots.addAll(twoByTwoWith(level, treeBlocks, trunk, spots));
+            }
         }
-        return List.of(basePos);
+        return spots.isEmpty() ? List.of(basePos) : List.copyOf(spots);
+    }
+
+    /**
+     * The four logs of the 2x2 trunk {@code trunk} is a corner of, at its height, none of them
+     * replanted already ({@code taken}); or just {@code trunk}, if it's a trunk on its own.
+     */
+    private static List<BlockPos> twoByTwoWith(
+            Level level, Set<BlockPos> treeBlocks, BlockPos trunk, Set<BlockPos> taken) {
+        for (int dx = -1; dx <= 0; dx++) {
+            for (int dz = -1; dz <= 0; dz++) {
+                BlockPos corner = trunk.offset(dx, 0, dz);
+                List<BlockPos> square = List.of(
+                        corner, corner.east(), corner.south(), corner.east().south());
+                if (square.stream()
+                        .allMatch(pos ->
+                                treeBlocks.contains(pos) && !taken.contains(pos) && isLog(level.getBlockState(pos)))) {
+                    return square;
+                }
+            }
+        }
+        return List.of(trunk);
     }
 
     /** How far below a mangrove's trunk to look for the ground its propagule grew on. */
@@ -721,22 +750,6 @@ public class TreeDetector {
         return a.getZ() < b.getZ();
     }
 
-    /** Whether four positions (on one Y level) form a 2x2 square. */
-    private static boolean isTwoByTwo(List<BlockPos> positions) {
-        int minX = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        int maxZ = Integer.MIN_VALUE;
-        for (BlockPos pos : positions) {
-            minX = Math.min(minX, pos.getX());
-            maxX = Math.max(maxX, pos.getX());
-            minZ = Math.min(minZ, pos.getZ());
-            maxZ = Math.max(maxZ, pos.getZ());
-        }
-        // Four distinct positions within a 2x2 box fill it
-        return maxX - minX == 1 && maxZ - minZ == 1 && new HashSet<>(positions).size() == 4;
-    }
-
     /**
      * Check if a sapling can be planted at this position: the spot is air (or a water source, for a
      * sapling that can be waterlogged, like a mangrove propagule), and the sapling itself says it
@@ -774,6 +787,11 @@ public class TreeDetector {
         BlockState saplingState = saplingBlock.defaultBlockState();
         if (isWaterSource(level.getBlockState(pos)) && saplingState.hasProperty(BlockStateProperties.WATERLOGGED)) {
             saplingState = saplingState.setValue(BlockStateProperties.WATERLOGGED, true);
+        }
+        if (saplingBlock instanceof MangrovePropaguleBlock) {
+            // As the item places it: fully grown. Its default age is a hanging one's first, and its
+            // loot only drops at the last, so one planted at that gave nothing when it was broken.
+            saplingState = saplingState.setValue(MangrovePropaguleBlock.AGE, MangrovePropaguleBlock.MAX_AGE);
         }
         level.setBlock(pos, saplingState, 3);
         return true;

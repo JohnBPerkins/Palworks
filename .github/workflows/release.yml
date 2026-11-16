@@ -3,6 +3,10 @@ name: Release
 # Run from the Actions tab: Release -> Run workflow. The workflow picks the next version from the
 # latest vX.Y.Z tag, builds both loaders, creates the tag and GitHub Release, and uploads the jars
 # to Modrinth/CurseForge when those are configured. See "Releasing" in .github/CONTRIBUTING.md.
+#
+# The release job makes the tag; each upload to a mod site is then a publish job of its own. If an
+# upload fails (a bad token, the site down), use "Re-run failed jobs" on that run: it uploads the
+# same jars under the same version. Running the workflow again would release the next version.
 
 on:
   workflow_dispatch:
@@ -42,6 +46,11 @@ jobs:
       contents: write # create the tag and the GitHub Release
     env:
       GH_TOKEN: ${{ github.token }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      minecraft: ${{ steps.version.outputs.minecraft }}
+      modrinth: ${{ steps.targets.outputs.modrinth }}
+      curseforge: ${{ steps.targets.outputs.curseforge }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -67,6 +76,12 @@ jobs:
           fi
           if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
             echo "::error::Tag v$version already exists."
+            exit 1
+          fi
+          # A second run on the commit just released is almost always a retry of a failed upload,
+          # and would release the same code again as the next version.
+          if [ -n "$previous" ] && [ "$(git rev-list -n1 "$previous")" = "$GITHUB_SHA" ]; then
+            echo "::error::$previous is already this commit: there's nothing new to release. To retry a failed upload, use 'Re-run failed jobs' on that release's run."
             exit 1
           fi
           minecraft=$(sed -n 's/^minecraft_version *= *//p' gradle.properties)
@@ -223,7 +238,7 @@ jobs:
             else
               echo "## Releasing v$VERSION ($CHANNEL)"
               echo
-              echo "Each target's own step below shows whether it succeeded."
+              echo "Each upload to a mod site is a publish job of its own. If one fails, use **Re-run failed jobs** on this run (not the workflow again, which would release the next version)."
             fi
             echo
             echo "| Target | Result |"
@@ -255,45 +270,76 @@ jobs:
             --notes-file release-notes.md \
             "${flags[@]}"
 
-      # Each site is skipped while its token is empty (i.e. until its project ID is configured).
-      - name: Publish Fabric jar to Modrinth and CurseForge
-        if: ${{ !inputs.dry_run && (steps.targets.outputs.modrinth == 'true' || steps.targets.outputs.curseforge == 'true') }}
-        uses: Kira-NT/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
-        with:
-          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
-          modrinth-token: ${{ steps.targets.outputs.modrinth == 'true' && secrets.MODRINTH_TOKEN || '' }}
-          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          curseforge-token: ${{ steps.targets.outputs.curseforge == 'true' && secrets.CURSEFORGE_TOKEN || '' }}
-          files: ${{ steps.jars.outputs.fabric }}
-          name: Palworks ${{ steps.version.outputs.version }} (Fabric)
-          version: ${{ steps.version.outputs.version }}+fabric
-          version-type: ${{ inputs.channel }}
-          changelog-file: release-notes.md
-          loaders: fabric
-          game-versions: ${{ steps.version.outputs.minecraft }}
-          java: 21
-          dependencies: |
-            fabric-api(required)
-            architectury-api(required)
-            cobblemon(required)
+      # For the publish jobs, and for re-running one that failed
+      - name: Collect the release's files
+        if: ${{ !inputs.dry_run }}
+        env:
+          FABRIC_JAR: ${{ steps.jars.outputs.fabric }}
+          NEOFORGE_JAR: ${{ steps.jars.outputs.neoforge }}
+        run: |
+          mkdir release-files
+          cp "$FABRIC_JAR" "$NEOFORGE_JAR" release-notes.md release-files/
 
-      - name: Publish NeoForge jar to Modrinth and CurseForge
-        if: ${{ !inputs.dry_run && (steps.targets.outputs.modrinth == 'true' || steps.targets.outputs.curseforge == 'true') }}
+      - name: Upload the release's files
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-files
+          path: release-files/
+          if-no-files-found: error
+          retention-days: 30
+
+  # One job per site and loader, so that an upload that fails can be re-run alone ("Re-run failed
+  # jobs"): nothing that already went up is uploaded twice, and the version stays the one tagged.
+  publish:
+    name: publish (${{ matrix.site }}, ${{ matrix.loader }})
+    needs: release
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    # Upload tokens are stored as secrets of this environment, which only main can use.
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [modrinth, curseforge]
+        loader: [fabric, neoforge]
+        include:
+          - loader: fabric
+            loader_name: Fabric
+            dependencies: |
+              fabric-api(required)
+              architectury-api(required)
+              cobblemon(required)
+          - loader: neoforge
+            loader_name: NeoForge
+            dependencies: |
+              architectury-api(required)
+              cobblemon(required)
+              kotlin-for-forge(required)
+    steps:
+      # A site is skipped until its project ID is configured (see "Check publishing setup").
+      - name: Download the release's files
+        if: ${{ needs.release.outputs[matrix.site] == 'true' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: release-files
+          path: release-files
+
+      - name: Publish
+        if: ${{ needs.release.outputs[matrix.site] == 'true' }}
         uses: Kira-NT/mc-publish@c23376546a97f5ba7984e94445da359459b14419 # v3.3.2
         with:
-          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
-          modrinth-token: ${{ steps.targets.outputs.modrinth == 'true' && secrets.MODRINTH_TOKEN || '' }}
-          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          curseforge-token: ${{ steps.targets.outputs.curseforge == 'true' && secrets.CURSEFORGE_TOKEN || '' }}
-          files: ${{ steps.jars.outputs.neoforge }}
-          name: Palworks ${{ steps.version.outputs.version }} (NeoForge)
-          version: ${{ steps.version.outputs.version }}+neoforge
+          # Only this job's site is given its ID and token; mc-publish skips a site without them.
+          modrinth-id: ${{ matrix.site == 'modrinth' && vars.MODRINTH_PROJECT_ID || '' }}
+          modrinth-token: ${{ matrix.site == 'modrinth' && secrets.MODRINTH_TOKEN || '' }}
+          curseforge-id: ${{ matrix.site == 'curseforge' && vars.CURSEFORGE_PROJECT_ID || '' }}
+          curseforge-token: ${{ matrix.site == 'curseforge' && secrets.CURSEFORGE_TOKEN || '' }}
+          files: release-files/palworks-${{ matrix.loader }}-${{ needs.release.outputs.version }}.jar
+          name: Palworks ${{ needs.release.outputs.version }} (${{ matrix.loader_name }})
+          version: ${{ needs.release.outputs.version }}+${{ matrix.loader }}
           version-type: ${{ inputs.channel }}
-          changelog-file: release-notes.md
-          loaders: neoforge
-          game-versions: ${{ steps.version.outputs.minecraft }}
+          changelog-file: release-files/release-notes.md
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ needs.release.outputs.minecraft }}
           java: 21
-          dependencies: |
-            architectury-api(required)
-            cobblemon(required)
-            kotlin-for-forge(required)
+          dependencies: ${{ matrix.dependencies }}

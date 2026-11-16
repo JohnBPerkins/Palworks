@@ -4,15 +4,20 @@ import com.cobblemon.mod.common.CobblemonSounds;
 import com.cobblemon.mod.common.block.GrowableStoneBlock;
 import com.cobblemon.mod.common.block.TumblestoneBlock;
 import com.cobblemon.mod.common.block.TypeGemClusterBlock;
+import com.cobblemon.mod.common.block.TypeGemCoreBlock;
 import com.cobblemon.mod.common.item.TumblestoneItem;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -46,21 +51,41 @@ public final class CrystalAdapter {
     /** How many stages up a tumblestone's growth to follow (each colour has four). */
     private static final int MAX_STAGES = 8;
 
-    /** Whether this is a fully grown crystal, ready to be mined. */
-    public static boolean isRipe(BlockState state) {
+    // Cobblemon's gem blocks, which gem clusters grow on. By id: its tag fields differ across 1.8.x.
+    private static final TagKey<Block> TYPE_GEM_BLOCKS =
+            TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("cobblemon", "type_gem_blocks"));
+
+    /**
+     * Whether the crystal at {@code pos} is one to mine: fully grown, and where another grows in
+     * its place. An amethyst cluster only on budding amethyst, a gem cluster only on a gem block or
+     * a crystal core (what Cobblemon grows them on); a tumblestone cluster anywhere, since it's put
+     * back from its own drops. One put somewhere else to look at (a cluster on a wall) is left
+     * alone: mined, it'd be gone for good.
+     */
+    public static boolean isRipe(BlockGetter level, BlockPos pos, BlockState state) {
         Block block = state.getBlock();
         if (state.is(Blocks.AMETHYST_CLUSTER)) {
-            return true;
+            return supportOf(level, pos, state).is(Blocks.BUDDING_AMETHYST);
         }
         if (block instanceof TumblestoneBlock tumblestone) {
             return tumblestone.getNextStage() == null; // the cluster: it grows no further
         }
         if (block instanceof TypeGemClusterBlock) {
             IntegerProperty stage = TypeGemClusterBlock.Companion.getSTAGE();
-            return state.hasProperty(stage)
-                    && state.getValue(stage).intValue() == Collections.max(stage.getPossibleValues());
+            if (!state.hasProperty(stage)
+                    || state.getValue(stage).intValue() != Collections.max(stage.getPossibleValues())) {
+                return false;
+            }
+            BlockState support = supportOf(level, pos, state);
+            return support.is(TYPE_GEM_BLOCKS) || support.getBlock() instanceof TypeGemCoreBlock;
         }
         return false;
+    }
+
+    /** The block a crystal grows out of: the one behind the face it's on. */
+    private static BlockState supportOf(BlockGetter level, BlockPos pos, BlockState crystal) {
+        return level.getBlockState(
+                pos.relative(crystal.getValue(DirectionalBlock.FACING).getOpposite()));
     }
 
     /**
@@ -69,7 +94,7 @@ public final class CrystalAdapter {
      */
     public static boolean harvest(Level level, BlockPos pos, @Nullable Entity miner) {
         BlockState state = level.getBlockState(pos);
-        if (!isRipe(state)) {
+        if (!isRipe(level, pos, state)) {
             return false;
         }
         if (state.getBlock() instanceof TumblestoneBlock

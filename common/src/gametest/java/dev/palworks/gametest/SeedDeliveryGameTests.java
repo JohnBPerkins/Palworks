@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -181,6 +182,29 @@ public class SeedDeliveryGameTests {
             // A player's throw can be picked up after 2 seconds
             helper.assertTrue(taken[0] - thrown[0] >= 40, "the seeds lay there a moment before they were taken");
         });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "seeds_thrown_short", timeoutTicks = 1000)
+    public void seedsThatLandShortOfThePlanterAreStillItsToTake(GameTestHelper helper) {
+        farmlandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8));
+        PokemonEntity planter = sendOut(helper, BULBASAUR, PLANTER);
+        PokemonEntity pidgey = sendOut(helper, PIDGEY, TRANSPORTER);
+
+        // Thrown the moment it has them, from 6 blocks off: about as far as a transporter is
+        // from a planter that's stepped away since it asked. They come down 4 blocks short of
+        // it, outside the pickup radius round where it stands. (From 4 blocks, as it usually
+        // is, they only start outside it: the job was lost if it was checked just then, which
+        // failed the tests above one run in a dozen.)
+        boolean[] thrown = {false};
+        helper.onEachTick(() -> {
+            if (!thrown[0] && count(WorkerInventoryManager.getOrCreate(pidgey.getPokemon()), Items.WHEAT_SEEDS) > 0) {
+                thrown[0] = true;
+                pidgey.moveTo(planter.getX() + 6, planter.getY(), planter.getZ());
+                JobManager.getInstance(helper.getLevel()).handOverSeeds(pidgey.getPokemon());
+            }
+        });
+
+        helper.succeedWhen(() -> assertPlanted(helper));
     }
 
     @GameTest(template = Templates.EMPTY, batch = "seeds_recalled", timeoutTicks = 2600)

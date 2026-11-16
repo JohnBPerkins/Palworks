@@ -104,7 +104,7 @@ public final class JobChecks {
             case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
             case WATER_CROPS -> Watering.needsWater(level, pos);
             case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
-            case MINE_CRYSTAL -> CrystalAdapter.isRipe(level.getBlockState(pos));
+            case MINE_CRYSTAL -> CrystalAdapter.isRipe(level, pos, level.getBlockState(pos));
             case GET_SEEDS ->
                 isChest(level.getBlockState(pos))
                         && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));

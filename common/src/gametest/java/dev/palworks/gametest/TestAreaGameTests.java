@@ -176,7 +176,7 @@ public class TestAreaGameTests {
                 BlockPos.betweenClosed(area.min(), area.max().atY(area.min().getY() + 3))) {
             BlockState state = level.getBlockState(pos);
             String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
-            if (CrystalAdapter.isRipe(state)) {
+            if (CrystalAdapter.isRipe(level, pos, state)) {
                 found.merge(state.getBlock() instanceof TypeGemClusterBlock ? "gem cluster" : id, 1, Integer::sum);
             } else if (state.getBlock() instanceof WorkerBedBlock) {
                 found.merge("bed", 1, Integer::sum);

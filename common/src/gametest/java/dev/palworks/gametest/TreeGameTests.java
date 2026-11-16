@@ -13,9 +13,11 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.MangrovePropaguleBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
@@ -245,7 +247,93 @@ public class TreeGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = Templates.EMPTY)
+    public void wartBlocksInTheGroundArentAFungussCanopy(GameTestHelper helper) {
+        // A crimson forest's floor has patches of wart blocks, and a player's floor may be made of
+        // them: the canopy search used to go down into them from the foot of the stem
+        Scenes.floor(helper, Blocks.CRIMSON_NYLIUM);
+        helper.setBlock(4, 0, 3, Blocks.NETHER_WART_BLOCK);
+        helper.setBlock(4, 0, 4, Blocks.NETHER_WART_BLOCK);
+        helper.setBlock(5, 0, 4, Blocks.NETHER_WART_BLOCK);
+        crimsonFungus(helper, 3, 3, 4);
+
+        TreeValidationResult tree = validate(helper, 3, 1, 3);
+        helper.assertTrue(tree.isValid(), "still a tree: " + tree.getReason());
+        Set<BlockPos> canopy =
+                TreeDetector.findNetherCanopyToBreak(helper.getLevel(), tree.getLogPositions(), abs(helper, 3, 1, 3));
+        helper.assertTrue(canopy.size() == 27 - 2, "its 25 canopy blocks and no more, got " + canopy.size());
+        helper.assertFalse(canopy.contains(abs(helper, 4, 0, 3)), "the ground stays");
+        helper.succeed();
+    }
+
     // ---- Where to replant ----
+
+    @GameTest(template = Templates.EMPTY)
+    public void treesThatTouchAreEachReplanted(GameTestHelper helper) {
+        // Two oaks side by side are found as one tree (their logs join). One sapling for the pair
+        // lost a tree each time they were chopped.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockState leaves = Scenes.naturalLeaves(Blocks.OAK_LEAVES);
+        Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, leaves);
+        Scenes.tree(helper, 4, 3, 4, Blocks.OAK_LOG, leaves);
+        for (int y = 1; y <= 4; y++) {
+            helper.setBlock(3, y, 3, Blocks.OAK_LOG); // the second tree's leaves went over this trunk
+        }
+
+        TreeValidationResult tree = validate(helper, 3, 1, 3);
+        helper.assertTrue(tree.isValid(), "the pair is a tree: " + tree.getReason());
+        Set<BlockPos> spots = new HashSet<>(
+                TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition()));
+        helper.assertTrue(
+                spots.equals(Set.of(abs(helper, 3, 1, 3), abs(helper, 4, 1, 3))),
+                "a sapling where each trunk stood, got " + spots);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void twoByTwoTreesThatTouchAreEachReplantedAsTwoByTwo(GameTestHelper helper) {
+        // Two dark oaks side by side: eight logs at the bottom. One sapling for them (they aren't
+        // "a 2x2") is a dark oak sapling on its own, which never grows.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockState leaves = Scenes.naturalLeaves(Blocks.DARK_OAK_LEAVES);
+        for (int x = 2; x <= 5; x++) {
+            for (int z = 3; z <= 4; z++) {
+                Scenes.tree(helper, x, z, 4, Blocks.DARK_OAK_LOG, leaves);
+            }
+        }
+        Set<BlockPos> trunks = new HashSet<>();
+        for (int x = 2; x <= 5; x++) {
+            for (int z = 3; z <= 4; z++) {
+                for (int y = 1; y <= 4; y++) {
+                    helper.setBlock(x, y, z, Blocks.DARK_OAK_LOG);
+                }
+                trunks.add(abs(helper, x, 1, z));
+            }
+        }
+
+        TreeValidationResult tree = validate(helper, 2, 1, 3);
+        helper.assertTrue(tree.isValid(), "the pair is a tree: " + tree.getReason());
+        Set<BlockPos> spots = new HashSet<>(
+                TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition()));
+        helper.assertTrue(spots.equals(trunks), "four saplings where each trunk stood, got " + spots);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aBranchRestingOnTheGroundIsntReplanted(GameTestHelper helper) {
+        // A big oak's branch can end on a hillside: only a trunk (a log with more on top) is a tree
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        Scenes.tree(helper, 3, 3, 4, Blocks.OAK_LOG, Scenes.naturalLeaves(Blocks.OAK_LEAVES));
+        helper.setBlock(4, 1, 3, Blocks.GRASS_BLOCK); // the hillside
+        helper.setBlock(4, 2, 3, Blocks.OAK_LOG); // the branch, lying on it
+
+        TreeValidationResult tree = validate(helper, 3, 1, 3);
+        helper.assertTrue(tree.getLogPositions().contains(abs(helper, 4, 2, 3)), "the branch is part of the tree");
+        List<BlockPos> spots =
+                TreeDetector.saplingPositions(helper.getLevel(), tree.getLogPositions(), tree.getBasePosition());
+        helper.assertTrue(spots.equals(List.of(abs(helper, 3, 1, 3))), "one sapling, at the trunk, got " + spots);
+        helper.succeed();
+    }
 
     @GameTest(template = Templates.EMPTY)
     public void aTwoByTwoTrunkIsReplantedInAllFourSpots(GameTestHelper helper) {
@@ -331,6 +419,24 @@ public class TreeGameTests {
         BlockState planted = helper.getLevel().getBlockState(spot);
         helper.assertTrue(planted.is(Blocks.MANGROVE_PROPAGULE), "it's a propagule");
         helper.assertTrue(planted.getValue(BlockStateProperties.WATERLOGGED), "and waterlogged");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aReplantedPropaguleIsAsOnePlantedByHand(GameTestHelper helper) {
+        // The item places it fully grown (age 4), and its loot only drops at that age: one planted
+        // at the block's default age 0 gave nothing back when it was broken
+        helper.setBlock(3, 0, 3, Blocks.MUD);
+        BlockPos spot = abs(helper, 3, 1, 3);
+        helper.assertTrue(TreeDetector.plantSapling(helper.getLevel(), spot, Items.MANGROVE_PROPAGULE), "it's planted");
+        BlockState planted = helper.getLevel().getBlockState(spot);
+        helper.assertValueEqual(
+                planted.getValue(MangrovePropaguleBlock.AGE), MangrovePropaguleBlock.MAX_AGE, "its age, as by hand");
+        helper.assertFalse(planted.getValue(MangrovePropaguleBlock.HANGING), "standing, not hanging");
+        List<ItemStack> drops = Block.getDrops(planted, helper.getLevel(), spot, null);
+        helper.assertTrue(
+                drops.size() == 1 && drops.get(0).is(Items.MANGROVE_PROPAGULE),
+                "broken, it gives the propagule back, got " + drops);
         helper.succeed();
     }
 

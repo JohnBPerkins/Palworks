@@ -4,7 +4,9 @@ import com.cobblemon.mod.common.api.Priority;
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
 import com.cobblemon.mod.common.api.events.pokemon.PokemonGainedEvent;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.worker.PersistentData;
 import java.util.function.Consumer;
+import net.minecraft.nbt.ByteTag;
 
 /**
  * A Pokémon starts as full as troughs fill it ({@link Hunger#troughCap}, half its max by default).
@@ -17,7 +19,7 @@ import java.util.function.Consumer;
  */
 public final class StartingFullness {
     /** Set in the Pokémon's persistent data once it's had its starting fullness. */
-    static final String MARKER = "palworks:started_fullness";
+    public static final String MARKER = "palworks:started_fullness";
 
     private StartingFullness() {}
 
@@ -31,7 +33,9 @@ public final class StartingFullness {
         if (!Hunger.enabled() || pokemon.getPersistentData().getBoolean(MARKER)) {
             return;
         }
-        pokemon.getPersistentData().putBoolean(MARKER, true);
+        // Saved even when it's full enough already and nothing else about it changes: a marker
+        // that's lost has it topped up again the next time it moves between party and PC
+        PersistentData.put(pokemon, MARKER, ByteTag.ONE);
         int start = Hunger.troughCap(pokemon);
         if (pokemon.getCurrentFullness() < start) {
             pokemon.setCurrentFullness(start);

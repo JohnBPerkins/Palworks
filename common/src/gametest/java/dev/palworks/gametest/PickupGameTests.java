@@ -1,6 +1,7 @@
 package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import java.util.HashSet;
@@ -191,6 +192,29 @@ public class PickupGameTests {
         helper.assertBlockNotPresent(Blocks.DIRT, block);
 
         helper.succeedWhen(() -> helper.assertValueEqual(carried(pidgey, Items.DIRT), 1, "dirt carried"));
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aBreakThatFailsStopsMarkingDrops(GameTestHelper helper) {
+        ServerPlayer player = Workers.owner(helper, new BlockPos(4, 1, 2));
+        // A break that never returns: here it throws (there's nowhere to break), as a mod's break
+        // handler might, or one that ends the break its own way
+        boolean threw = false;
+        try {
+            player.gameMode.destroyBlock(null);
+        } catch (RuntimeException e) { // NOPMD - whatever it throws, the break never returned
+            threw = true;
+        }
+        helper.assertTrue(threw, "the break should have thrown");
+
+        // What spawns afterwards isn't the player's: nothing is being broken any more
+        BlockPos at = helper.absolutePos(new BlockPos(5, 1, 5));
+        ItemEntity item = new ItemEntity(
+                helper.getLevel(), at.getX() + 0.5, at.getY(), at.getZ() + 0.5, new ItemStack(Items.WHEAT));
+        helper.getLevel().addFreshEntity(item);
+        helper.assertFalse(TrackedDrops.isTracked(item), "an item that spawns after a failed break isn't to pick up");
+        item.discard();
+        helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY, batch = "pickup_death", timeoutTicks = 400)

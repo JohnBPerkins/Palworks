@@ -5,10 +5,10 @@ owned [Cobblemon](https://cobblemon.com) Pokémon into automated workers — Pal
 
 Send one of your Pokémon out into the world and it scans for nearby work and does it on its own:
 smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on its
-**suitability** (derived from its type/species), so different Pals are better at different jobs.
+**work skills** (derived from its type/species), so different Pals are better at different jobs.
 
 > **Requires [Cobblemon](https://cobblemon.com).** Palworks reads your owned Pokémon and assigns
-> them jobs; it does nothing on its own without Cobblemon installed.
+> them jobs, so the game won't start with Palworks installed and Cobblemon missing.
 
 ## Features
 
@@ -16,7 +16,7 @@ smelting, farming, lumbering, and hauling. What a Pokémon is good at depends on
   See [Workers](https://github.com/JohnBPerkins/Palworks/wiki/Workers).
 - **Jobs**: lighting furnaces, planting, watering and harvesting crops, nether wart, chopping trees,
   mining crystals, and hauling to chests and troughs. Mining ores is in progress. See [Jobs](https://github.com/JohnBPerkins/Palworks/wiki/Jobs).
-- **Suitabilities**: a Pokémon's types and species decide which work it can do, and its base stats
+- **Work skills**: a Pokémon's types and species decide which work it can do, and its base stats
   how well. See [Suitabilities](https://github.com/JohnBPerkins/Palworks/wiki/Suitabilities), or look any Pokémon up in
   [Work skills by Pokémon](https://github.com/JohnBPerkins/Palworks/wiki/Work-Skills-by-Pokemon).
 - **Hunger, sleep and mood**: workers eat from [troughs](https://github.com/JohnBPerkins/Palworks/wiki/Hunger), sleep in
@@ -32,7 +32,7 @@ commands, and customizing Palworks with datapacks and resource packs.
 ## Requirements
 
 - Minecraft **1.21.1**
-- [Cobblemon](https://cobblemon.com) **1.8** (1.8.0 or later)
+- [Cobblemon](https://cobblemon.com) **1.8** (any 1.8 version, from 1.8.0; not 1.7 or 1.9)
 - **Fabric Loader + Fabric API**, _or_ **NeoForge**
 - [Architectury API](https://modrinth.com/mod/architectury-api) **13.0.8** or later (the shared
   library Palworks uses to run on both loaders)
@@ -55,10 +55,11 @@ With **JDK 21** and Git installed:
 ```bash
 git clone https://github.com/JohnBPerkins/Palworks.git
 cd Palworks
-./gradlew build
+./gradlew assemble
 ```
 
-The jars land in `fabric/build/libs/` and `neoforge/build/libs/`.
+The jars land in `fabric/build/libs/` and `neoforge/build/libs/`. (`./gradlew build` also runs the
+lint checks and the tests, in-game ones included: see [CONTRIBUTING.md](.github/CONTRIBUTING.md).)
 
 ## Contributing
 
