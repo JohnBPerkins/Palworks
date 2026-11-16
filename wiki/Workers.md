@@ -72,6 +72,9 @@ Workers use regular **chests** and **trapped chests**, both to take seeds from a
 Barrels, shulker boxes and storage from other mods aren't supported yet. Transporters take
 [trough food](Hunger) to troughs before chests.
 
+A chest opens while a worker takes something out or puts something in, as it does for you: the lid
+lifts, it makes its sound, and a trapped chest gives off its redstone signal.
+
 ## What the icons mean
 
 - **PC and summary:** each Pokémon's work skills and [levels](Suitabilities#work-levels) show as

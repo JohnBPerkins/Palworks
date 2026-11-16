@@ -15,7 +15,9 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -354,6 +356,39 @@ public class PickupGameTests {
             helper.assertTrue(
                     gapWhenDelivered[0] < 1.0, "delivered from " + gapWhenDelivered[0] + " blocks from the chest");
         });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "deliver_lid", timeoutTicks = 600)
+    public void aChestIsOpenWhileATransporterDeliversToItAndClosesAfter(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // A double chest: both halves open, as they do for a player (only one of them makes the sound)
+        BlockPos left = new BlockPos(5, 1, 5);
+        BlockPos right = left.east();
+        helper.setBlock(left, Blocks.CHEST.defaultBlockState().setValue(ChestBlock.TYPE, ChestType.LEFT));
+        helper.setBlock(right, Blocks.CHEST.defaultBlockState().setValue(ChestBlock.TYPE, ChestType.RIGHT));
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        carrying(pidgey, new ItemStack(Items.WHEAT, 8));
+        helper.assertValueEqual(openCount(helper, left) + openCount(helper, right), 0, "open before it gets there");
+        int[] openWhenDelivered = {-1, -1};
+        helper.onEachTick(() -> {
+            if (openWhenDelivered[0] < 0
+                    && inChest(helper, left, Items.WHEAT) + inChest(helper, right, Items.WHEAT) > 0) {
+                openWhenDelivered[0] = openCount(helper, left);
+                openWhenDelivered[1] = openCount(helper, right);
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertValueEqual(openWhenDelivered[0], 1, "left half's openers as the wheat went in");
+            helper.assertValueEqual(openWhenDelivered[1], 1, "right half's openers as the wheat went in");
+            helper.assertValueEqual(openCount(helper, left) + openCount(helper, right), 0, "open afterwards");
+        });
+    }
+
+    /** How many have the chest open (what lifts its lid, and a trapped chest's signal). */
+    private static int openCount(GameTestHelper helper, BlockPos rel) {
+        return ChestBlockEntity.getOpenCount(helper.getLevel(), helper.absolutePos(rel));
     }
 
     @GameTest(template = Templates.EMPTY, batch = "pickup_another_can_reach", timeoutTicks = 400)
