@@ -89,6 +89,9 @@ public final class WorkerNavigator {
             // Landed (there, or it gave up flying there): it walks from here
             WALKS.remove(mob);
         }
+        if (WorkerFlight.isComingDown(mob)) {
+            return; // from a flight it's done with: it walks once it's down
+        }
         if (!WorkerPathfinder.handles(mob)) {
             // Flying or swimming: Cobblemon's navigation plans that
             WALKS.remove(mob);

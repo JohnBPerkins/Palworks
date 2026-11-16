@@ -53,6 +53,8 @@ public final class WorkerFlight {
         int stalled;
         // It's as high as it flies here: it goes across at the highest it got, and doesn't climb again
         boolean topped;
+        // How fast it's flown (as flyTo was last asked): it comes down as fast
+        double speed;
 
         Flight(BlockPos goal, double cruiseY, long giveUpAt) {
             this.goal = goal;
@@ -61,7 +63,11 @@ public final class WorkerFlight {
         }
     }
 
+    /** A mob coming down where it is, its flight over: how fast, and when it's given up on (it drops). */
+    private record Landing(double speed, long giveUpAt) {}
+
     private static final Map<Mob, Flight> FLIGHTS = new WeakHashMap<>();
+    private static final Map<Mob, Landing> LANDINGS = new WeakHashMap<>();
     // Goals a flight to was given up on (it walks there instead), until it heads somewhere else
     private static final Map<Mob, BlockPos> GROUNDED = new WeakHashMap<>();
 
@@ -135,6 +141,8 @@ public final class WorkerFlight {
             FLIGHTS.put(mob, flight);
             mob.getNavigation().stop();
         }
+        flight.speed = speed;
+        LANDINGS.remove(mob); // off again before it was down
         if (now > flight.giveUpAt) {
             GROUNDED.put(mob, flight.goal);
             land(mob);
@@ -157,7 +165,8 @@ public final class WorkerFlight {
         boolean overIt = dx * dx + dz * dz <= OVER_IT * OVER_IT;
         if (overIt) {
             if (mob.getY() - goal.getY() <= LANDING_HEIGHT) {
-                land(mob);
+                FLIGHTS.remove(mob);
+                pather.setFlying(false);
                 return false;
             }
             mob.getMoveControl().setWantedPosition(goalX, goal.getY(), goalZ, speed);
@@ -178,12 +187,62 @@ public final class WorkerFlight {
         return true;
     }
 
-    /** Bring it down where it is (it's there, or it's done with flying there), and forget the flight. */
+    /**
+     * Bring it down where it is (it's done with flying there), and forget the flight. Up in the air
+     * (its job went mid-flight, or it gave the flight up), it flies down, a tick at a time (see
+     * {@link #comeDown}): just no longer flying, it dropped from as high as it was, which hurt it.
+     */
     public static void land(Mob mob) {
-        FLIGHTS.remove(mob);
-        if (mob instanceof OmniPathingEntity pather && pather.isFlying()) {
-            pather.setFlying(false);
+        Flight flight = FLIGHTS.remove(mob);
+        if (LANDINGS.containsKey(mob) || !(mob instanceof OmniPathingEntity pather) || !pather.isFlying()) {
+            return;
         }
+        double drop = mob.getY() - groundBelow(mob);
+        if (flight != null && !mob.onGround() && drop > LANDING_HEIGHT) {
+            long giveUpAt = mob.level().getGameTime() + SPARE_TICKS + (long) (drop / BLOCKS_PER_TICK);
+            LANDINGS.put(mob, new Landing(flight.speed, giveUpAt));
+            return;
+        }
+        pather.setFlying(false);
+    }
+
+    /** Whether it's on its way down from a flight it's done with (see {@link #land}). */
+    public static boolean isComingDown(Mob mob) {
+        return LANDINGS.containsKey(mob);
+    }
+
+    /**
+     * Fly a mob that's coming down (see {@link #land}) a tick nearer the ground straight below it,
+     * until it's there. Called every tick, whatever else it's doing; does nothing for any other mob.
+     */
+    public static void comeDown(Mob mob) {
+        Landing landing = LANDINGS.get(mob);
+        if (landing == null) {
+            return;
+        }
+        if (!(mob instanceof OmniPathingEntity pather) || !pather.isFlying()) {
+            LANDINGS.remove(mob); // something else has landed it
+            return;
+        }
+        double ground = groundBelow(mob);
+        if (mob.onGround()
+                || mob.getY() - ground <= LANDING_HEIGHT
+                || mob.level().getGameTime() > landing.giveUpAt()) {
+            LANDINGS.remove(mob);
+            pather.setFlying(false);
+            return;
+        }
+        // Nothing else steers it meanwhile (as in flyTo)
+        if (mob.getNavigation().isInProgress()) {
+            mob.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+            mob.getNavigation().stop();
+        }
+        mob.getMoveControl().setWantedPosition(mob.getX(), ground, mob.getZ(), landing.speed());
+    }
+
+    /** The top of the ground straight below the mob: it flies with nothing over it. */
+    private static double groundBelow(Mob mob) {
+        return mob.level().getHeight(Heightmap.Types.MOTION_BLOCKING, mob.getBlockX(), mob.getBlockZ());
     }
 
     /** Forget its flight and any goal it gave up flying to (it's done with the job). */

@@ -6,6 +6,7 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -129,5 +130,34 @@ public class FlightGameTests {
             helper.assertValueEqual(carried(pidgey, Items.WHEAT), 4, WHEAT_CARRIED);
             helper.assertTrue(flight[0] == 0, "it flew under the roof");
         });
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "flight_job_gone", timeoutTicks = 600)
+    public void aFlyingWorkerWhoseJobGoesComesDownUnhurt(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // A wall 12 high on its way, so it climbs well past what it can fall without getting hurt
+        for (int y = 1; y <= 12; y++) {
+            for (int x = 0; x <= 10; x++) {
+                helper.setBlock(new BlockPos(x, y, 8), Blocks.STONE);
+            }
+        }
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, START);
+        ItemEntity wheat = Scenes.dropToPickUp(helper, new BlockPos(4, 1, 14), new ItemStack(Items.WHEAT, 4));
+        double floor = helper.absolutePos(START).getY();
+        float[] health = new float[1];
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(pidgey.isFlying() && pidgey.getY() - floor > 10, "flying high"))
+                // Its job goes while it's up there (someone else picked the wheat up)
+                .thenExecute(() -> {
+                    health[0] = pidgey.getHealth();
+                    wheat.discard();
+                })
+                .thenWaitUntil(() -> helper.assertTrue(pidgey.onGround() && !pidgey.isFlying(), "back on the ground"))
+                .thenExecute(() -> helper.assertTrue(
+                        pidgey.getHealth() >= health[0],
+                        "it came down hurt: health " + pidgey.getHealth() + ", from " + health[0]))
+                .thenSucceed();
     }
 }

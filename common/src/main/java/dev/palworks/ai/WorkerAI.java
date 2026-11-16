@@ -88,6 +88,8 @@ public class WorkerAI {
      */
     public static boolean tick(Pokemon pokemon, Mob entity, Level level) {
         boolean handled = tickWork(pokemon, entity, level);
+        // One whose job went while it was flying there comes down, whatever it's doing now
+        WorkerFlight.comeDown(entity);
         // Holding the food it's eating, and dropping crumbs
         EatingDisplay.tick(entity, level, WorkerStateManager.getOrCreate(pokemon));
         // After the tick, so they reflect where it ended up (e.g. a job dropped this tick): what
