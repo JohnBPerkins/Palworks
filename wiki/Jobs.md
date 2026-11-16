@@ -143,8 +143,8 @@ It stands right in front of a chest to put items in or take them out.
 **Who:** Transporting
 
 A transporter carrying items takes them to the nearest chest with room. [Trough food](Hunger) goes
-to a trough with room first. If no chest has room, it keeps the items and carries on with its other
-jobs.
+to a trough with room first. If no chest has room, or it can't get to one, it keeps the items,
+shows a chest over its head, and carries on with its other jobs.
 
 ## Restock troughs
 

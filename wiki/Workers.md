@@ -87,6 +87,8 @@ lifts, it makes its sound, and a trapped chest gives off its redstone signal.
   paused (evolving, say), or a red cross if its work is off. In a battle Cobblemon swaps these
   cards for its battle display, so no icon shows until it's over.
 - **Over its head:** what's holding its work back: a half hunger shank when it's out of food, a "z"
-  when it's Tired, a sad face when it's unhappy, an anger mark when it's on strike, and a moon while
-  it's asleep, if its species has no sleep animation to show it. Each player can turn these off
-  (`show_status_icons`, see [Configuration](Configuration#display-settings)).
+  when it's Tired, a sad face when it's unhappy, an anger mark when it's on strike, a brick wall
+  when it's idle because it can't get to any of the work there is, a chest when it's carrying items
+  and has no chest with room it can get to, and a moon while it's asleep, if its species has no
+  sleep animation to show it. Each player can turn these off (`show_status_icons`, see
+  [Configuration](Configuration#display-settings)).
