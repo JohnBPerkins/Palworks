@@ -152,8 +152,12 @@ public final class Workers {
      * pasture block is placed: the worker only needs to know where it is.
      */
     public static void tetherTo(GameTestHelper helper, PokemonEntity worker, BlockPos pastureRel) {
+        tetherTo(helper, worker, pastureRel, 64); // Cobblemon's pastureMaxWanderDistance
+    }
+
+    /** Tether a pastured worker (see above) to a pasture that lets it roam {@code roam} blocks. */
+    public static void tetherTo(GameTestHelper helper, PokemonEntity worker, BlockPos pastureRel, int roam) {
         BlockPos pasture = helper.absolutePos(pastureRel);
-        int roam = 64; // Cobblemon's pastureMaxWanderDistance
         Pokemon pokemon = worker.getPokemon();
         UUID tetheringId = UUID.randomUUID();
         ServerPlayer owner = pokemon.getOwnerPlayer();

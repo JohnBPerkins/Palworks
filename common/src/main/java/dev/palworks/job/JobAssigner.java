@@ -601,13 +601,15 @@ final class JobAssigner {
             // chunks out there. A party Pokémon's must be near its owner too.
             if (!canDoJob(worker, job)
                     || !(inWorkRange(worker, job.position()) || isNeedNearHome(worker, job))
+                    || !mayRoamTo(worker, job.position())
                     || isRecentlyUnreachable(worker, job.position())
                     || job.isOutOfReachFor(worker.pokemonUUID)
                     || !canWorkerDo(worker, job)) {
                 continue;
             }
             BlockPos standPos = WorkPositions.standingPosFor(level, job.position(), job.type(), entity);
-            WorkerPathfinder.Result path = standPos == null
+            // Nowhere to stand, or only outside where its pasture lets it roam: no way to it
+            WorkerPathfinder.Result path = standPos == null || !mayRoamTo(worker, standPos)
                     ? new WorkerPathfinder.Result(Reach.NO, null)
                     : canPathTo(entity, standPos, isNeed(job.type()));
             Reach reach = path.reach();
@@ -785,10 +787,21 @@ final class JobAssigner {
 
     /**
      * Whether {@code pos} is somewhere this worker may be sent: within its own work range and,
-     * for one from a party, within work range of its owner too (see {@link #nearEnoughToOwner}).
+     * for one from a party, within work range of its owner too (see {@link #nearEnoughToOwner});
+     * for a pastured one, where its pasture lets it roam (see {@link #mayRoamTo}).
      */
     private static boolean inWorkRange(WorkerInfo worker, BlockPos pos) {
-        return WorkRange.contains(worker.position, pos) && nearEnoughToOwner(worker, pos);
+        return WorkRange.contains(worker.position, pos) && nearEnoughToOwner(worker, pos) && mayRoamTo(worker, pos);
+    }
+
+    /**
+     * A pastured Pokémon only goes where its pasture lets it roam ({@link WorkerInfo#roam}). Sent
+     * to a job outside that, Cobblemon took it back to its pasture block as it stepped out (or
+     * recalled it), and it was sent again. Asked of the tile it stands on, as Cobblemon asks of
+     * where it is: its feet, at the middle of the tile.
+     */
+    private static boolean mayRoamTo(WorkerInfo worker, BlockPos pos) {
+        return worker.roam == null || worker.roam.contains(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
     }
 
     /**

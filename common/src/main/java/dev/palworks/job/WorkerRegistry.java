@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /** A level's active workers, and their entities (by Pokémon UUID), as they last reported in. */
@@ -103,6 +104,11 @@ final class WorkerRegistry {
         // it's wandered for work.
         @Nullable
         BlockPos home;
+
+        // Where its pasture lets it roam (see WorkerEligibility.roamOf): it's only sent to jobs
+        // inside it. Null for one from a party.
+        @Nullable
+        AABB roam;
 
         Set<Suitability> suitabilities = EnumSet.noneOf(Suitability.class);
 

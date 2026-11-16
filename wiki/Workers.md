@@ -28,6 +28,9 @@ Admins can also use `/palworks worker enable` and `disable` (see [Commands](Comm
   `work_range_horizontal` and `work_range_vertical` [settings](Configuration)).
 - A **party** Pokémon only takes jobs within **24 blocks** of you (`owner_range`). Cobblemon brings
   a party Pokémon back to its owner past 32 blocks, so it can't be more.
+- A **pastured** Pokémon only takes jobs where its pasture lets it roam (64 blocks from the pasture
+  block, unless your Cobblemon settings say otherwise). Cobblemon brings one that steps outside
+  back to its pasture.
 - Each job is reserved by one worker at a time, so two Pokémon won't fight over the same furnace or
   crop.
 - A worker picks the best job from how close it is and how important it is. See

@@ -296,6 +296,7 @@ public class JobManager {
         info.ownerPosition = info.fromParty ? WorkerEligibility.partyOwnerPosition(pokemon, level) : null;
         // A pastured one's home is its pasture block; a party one stays by its owner, so needs none
         info.home = info.fromParty ? null : WorkerEligibility.pastureOf(entity);
+        info.roam = info.fromParty ? null : WorkerEligibility.roamOf(entity);
         if (newlyActive) {
             // Just sent out (or back in range): its first job comes from a fresh look round, not
             // from chunk scans up to 2s old that may have missed what's there now

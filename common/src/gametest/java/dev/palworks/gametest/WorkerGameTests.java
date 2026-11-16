@@ -1096,4 +1096,34 @@ public class WorkerGameTests {
                         "the nether wart was harvested by a Grass type"))
                 .thenSucceed();
     }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_tether_box", timeoutTicks = 800)
+    public void aPasturedWorkerOnlyWorksWhereItsPastureLetsItRoam(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Wheat 3 blocks from its pasture, and more 12 blocks off: within its work range, but past
+        // where its pasture lets it roam (6 blocks here), where Cobblemon takes it back from
+        BlockPos near = new BlockPos(3, 1, 4);
+        BlockPos far = new BlockPos(3, 1, 13);
+        for (BlockPos crop : List.of(near, far)) {
+            helper.setBlock(crop.below(), Blocks.FARMLAND);
+            helper.setBlock(crop, WHEAT.getStateForAge(7));
+        }
+        PokemonEntity worker = Workers.sendOutPastured(helper, BULBASAUR, START);
+        Workers.tetherTo(helper, worker, START, 6);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(
+                        helper.getBlockState(near).equals(WHEAT.getStateForAge(0)),
+                        "the wheat by its pasture harvested"))
+                .thenIdle(300)
+                .thenExecute(() -> {
+                    helper.assertTrue(
+                            worker.isAlive() && worker.getTethering() != null, "it's still out, by its pasture");
+                    helper.assertTrue(
+                            helper.getBlockState(far).equals(WHEAT.getStateForAge(7)),
+                            "the wheat past its roam is left");
+                })
+                .thenSucceed();
+    }
 }
