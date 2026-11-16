@@ -358,6 +358,8 @@ public class PathingGameTests {
         column(helper, 1, 11, air, Blocks.OAK_STAIRS.defaultBlockState());
         column(helper, 3, 11, stone, snow);
         column(helper, 5, 11, air, stone, air, stone);
+        column(helper, 9, 11, air, stone, topSlab);
+        column(helper, 7, 11, air, stone, Blocks.CHEST.defaultBlockState());
         // For the wide one, 3x3 at y=5: all stone; stone under one edge only; stone with a block
         // at its head's height over one corner
         for (int dx = -1; dx <= 1; dx++) {
@@ -368,10 +370,21 @@ public class PathingGameTests {
         }
         helper.setBlock(8, 5, 14, stone);
         helper.setBlock(13, 8, 15, stone);
+        // And one more 3x3, with a top slab over it that its head just clears
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                helper.setBlock(12 + dx, 5, 10 + dz, stone);
+            }
+        }
+        helper.setBlock(12, 8, 10, topSlab);
+        helper.setBlock(10, 6, 9, Blocks.OAK_FENCE); // a post beside it, in a column its edge is over
+        helper.setBlock(4, 6, 14, stone); // beside the first 3x3, at its body's height
 
         helper.runAfterDelay(SETTLE_TICKS, () -> {
             assertFits(helper, small, new BlockPos(1, 6, 8), true, "on a whole block");
             assertFits(helper, small, new BlockPos(1, 7, 8), false, "a block above a whole block's top");
+            assertFits(helper, small, new BlockPos(1, 5, 8), false, "in a whole block");
+            assertFits(helper, small, new BlockPos(3, 5, 8), false, "in farmland");
             assertFits(helper, small, new BlockPos(3, 6, 8), true, "on farmland");
             assertFits(helper, small, new BlockPos(5, 6, 8), true, "on a bottom slab");
             assertFits(helper, small, new BlockPos(7, 6, 8), true, "on a top slab");
@@ -385,11 +398,17 @@ public class PathingGameTests {
             assertFits(helper, small, new BlockPos(3, 5, 11), true, "on layers of snow, in the snow's block");
             assertFits(helper, small, new BlockPos(3, 6, 11), false, "in the block above layers of snow");
             assertFits(helper, small, new BlockPos(5, 6, 11), true, "under a block over its head");
+            assertFits(helper, small, new BlockPos(9, 6, 11), false, "under a top slab lower than it's tall");
+            assertFits(helper, small, new BlockPos(7, 6, 11), false, "in a chest's block");
+            assertFits(helper, small, new BlockPos(7, 7, 11), true, "on a chest");
 
             assertFits(helper, wide, new BlockPos(2, 6, 14), true, "a wide one on a floor under all of it");
             assertFits(helper, wide, new BlockPos(7, 6, 14), true, "a wide one with a ledge under one edge");
             assertFits(helper, wide, new BlockPos(6, 6, 14), false, "a wide one with no floor under any of it");
             assertFits(helper, wide, new BlockPos(12, 6, 14), false, "a wide one with a block where its head goes");
+            assertFits(helper, wide, new BlockPos(12, 6, 10), true, "a wide one under a slab its head clears");
+            assertFits(helper, wide, new BlockPos(11, 6, 10), true, "a wide one beside a post its body misses");
+            assertFits(helper, wide, new BlockPos(3, 6, 14), false, "a wide one beside a block its body would be in");
             helper.succeed();
         });
     }
