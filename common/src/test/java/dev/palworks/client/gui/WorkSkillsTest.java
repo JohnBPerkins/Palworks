@@ -74,6 +74,17 @@ class WorkSkillsTest {
     }
 
     @Test
+    void everyShownJobSaysWhatItDoes() throws IOException {
+        JsonObject lang = JsonParser.parseString(Files.readString(ASSETS.resolve("palworks/lang/en_us.json")))
+                .getAsJsonObject();
+        for (Suitability job : Suitability.values()) {
+            if (WorkSkills.icon(job) != null) {
+                assertTrue(lang.has(WorkSkills.descriptionKey(job)), "no description for " + job);
+            }
+        }
+    }
+
+    @Test
     void theBoxNamesAllThatFitOrAllButTheLastRow() {
         assertEquals(0, WorkSkills.namedInBox(0));
         assertEquals(1, WorkSkills.namedInBox(1));
