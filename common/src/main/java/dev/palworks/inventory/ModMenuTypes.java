@@ -1,5 +1,6 @@
 package dev.palworks.inventory;
 
+import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.architectury.registry.menu.MenuRegistry;
 import dev.architectury.registry.registries.DeferredRegister;
@@ -36,19 +37,26 @@ public final class ModMenuTypes {
         MENUS.register();
     }
 
+    // How far past a player's reach a worker's inventory screen stays open: vanilla's own figure
+    // for a screen opened on an entity (a horse's, a chest boat's)
+    private static final double REACH_MARGIN = 4.0;
+
     /**
      * The server's side of a worker's inventory screen: on the inventory the worker itself uses,
-     * and open only while it stays that (see {@link WorkerInventoryManager#isCarriedBy}).
+     * and open only while it stays that (see {@link WorkerInventoryManager#isCarriedBy}) and the
+     * player is near enough, as for a horse's or a chest boat's: the wheel that opens it needs
+     * the worker in reach, and a screen left open as either walks off shouldn't reach across a
+     * base.
      */
     public static WorkerInventoryMenu menuFor(int containerId, Inventory playerInventory, Pokemon pokemon) {
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
         return new WorkerInventoryMenu(
-                WORKER_INVENTORY.get(),
-                containerId,
-                playerInventory,
-                inventory,
-                pokemon.getUuid(),
-                () -> WorkerInventoryManager.isCarriedBy(pokemon, inventory));
+                WORKER_INVENTORY.get(), containerId, playerInventory, inventory, pokemon.getUuid(), player -> {
+                    PokemonEntity entity = pokemon.getEntity();
+                    return entity != null
+                            && WorkerInventoryManager.isCarriedBy(pokemon, inventory)
+                            && player.canInteractWithEntity(entity, REACH_MARGIN);
+                });
     }
 
     /** Open a worker's inventory for a player. */

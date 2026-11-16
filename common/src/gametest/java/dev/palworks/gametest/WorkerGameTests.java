@@ -919,6 +919,22 @@ public class WorkerGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "inventory_screen_reach")
+    public void anInventoryScreenClosesOnceItsPlayerIsOutOfReach(GameTestHelper helper) {
+        Workers.isolate(helper);
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        PokemonEntity pidgey = Workers.sendOut(helper, owner, PIDGEY, new BlockPos(4, 1, 4));
+        helper.runAfterDelay(2, () -> {
+            WorkerInventoryMenu screen = ModMenuTypes.menuFor(1, owner.getInventory(), pidgey.getPokemon());
+            owner.moveTo(pidgey.getX() + 1, pidgey.getY(), pidgey.getZ());
+            helper.assertTrue(screen.stillValid(owner), "open beside it");
+            // As a horse's or a chest boat's screen: shut once it's 4 blocks past the player's reach
+            owner.moveTo(pidgey.getX() + 20, pidgey.getY(), pidgey.getZ());
+            helper.assertFalse(screen.stillValid(owner), "closed 20 blocks from it");
+            helper.succeed();
+        });
+    }
+
     @GameTest(template = Templates.EMPTY, timeoutTicks = 200)
     public void aPokemonWithNoWorkSkillsIsntAWorker(GameTestHelper helper) {
         Workers.isolate(helper);

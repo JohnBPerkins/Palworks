@@ -57,6 +57,7 @@ What a worker carries depends on its work skills:
 
 **To open it:** use Cobblemon's interaction wheel on your Pokémon and choose **Inventory**. The
 button is only there for workers that carry something. You can move items in and out like a chest.
+Like a horse's inventory, the screen closes if the two of you end up too far apart.
 
 **What it holds shows in its hand**, as a held item would, but only while it has no Cobblemon held
 item. Its real held item (Leftovers, a Choice item...) is never touched.
