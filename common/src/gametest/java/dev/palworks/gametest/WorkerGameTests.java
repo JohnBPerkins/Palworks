@@ -66,6 +66,8 @@ import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.pathfinder.Node;
+import net.minecraft.world.level.pathfinder.Path;
 
 /**
  * Real Cobblemon Pokémon doing real jobs, end to end: finding the job, walking there, doing it.
@@ -1143,20 +1145,25 @@ public class WorkerGameTests {
         PokemonEntity worker = Workers.sendOutPastured(helper, BULBASAUR, START);
         WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
         double startZ = helper.absolutePos(START).getZ();
-        double cropZ = helper.absolutePos(crop).getZ();
+        BlockPos wheat = helper.absolutePos(crop);
 
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(
                         state.getCurrentReservation() != null && worker.getZ() > startZ + 3, "on its way to the wheat"))
                 // As /palworks worker disable does
                 .thenExecute(() -> WorkerStateManager.setEnabled(worker.getPokemon(), false))
-                .thenIdle(200)
+                // Asked straight away, of where it's walking to: left a while it wanders about, as
+                // any Pokémon out of work does, and the wheat's way is as likely as any other
+                .thenIdle(2)
                 .thenExecute(() -> {
-                    helper.assertTrue(
-                            cropZ - worker.getZ() > 4,
-                            "it walked on to the job it gave up: " + (cropZ - worker.getZ()) + " blocks from it");
-                    helper.assertTrue(helper.getBlockState(crop).equals(WHEAT.getStateForAge(7)), "the wheat is left");
+                    Path path = worker.getNavigation().getPath();
+                    Node end = path == null || worker.getNavigation().isDone() ? null : path.getEndNode();
+                    boolean toTheWheat = end != null && end.asBlockPos().closerThan(wheat, 4);
+                    helper.assertFalse(toTheWheat, "it's still walking to the job it gave up");
                 })
+                .thenIdle(40)
+                .thenExecute(() -> helper.assertTrue(
+                        helper.getBlockState(crop).equals(WHEAT.getStateForAge(7)), "the wheat is left"))
                 .thenSucceed();
     }
 
