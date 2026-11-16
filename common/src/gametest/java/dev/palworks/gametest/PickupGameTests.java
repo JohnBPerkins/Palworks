@@ -355,4 +355,28 @@ public class PickupGameTests {
                     gapWhenDelivered[0] < 1.0, "delivered from " + gapWhenDelivered[0] + " blocks from the chest");
         });
     }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_another_can_reach", timeoutTicks = 400)
+    public void aPickupOneTransporterCantReachIsLeftForOneThatCan(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Wheat in a walled pen (too high to jump) with a transporter that's busy for now (as in a
+        // battle); another outside it, which is asked first, and can't get in
+        for (int i = 1; i <= 7; i++) {
+            for (int y = 1; y <= 2; y++) {
+                helper.setBlock(i, y, 1, Blocks.STONE);
+                helper.setBlock(i, y, 7, Blocks.STONE);
+                helper.setBlock(1, y, i, Blocks.STONE);
+                helper.setBlock(7, y, i, Blocks.STONE);
+            }
+        }
+        PokemonEntity inside = Workers.sendOut(helper, "doduo level=20", new BlockPos(3, 1, 3));
+        inside.getBusyLocks().add("palworks-test");
+        Workers.sendOut(helper, "doduo level=20", new BlockPos(-3, 1, 4));
+        Scenes.dropToPickUp(helper, new BlockPos(5, 1, 5), new ItemStack(Items.WHEAT, 4));
+
+        helper.runAfterDelay(100, () -> inside.getBusyLocks().remove("palworks-test"));
+        helper.succeedWhen(() -> helper.assertValueEqual(
+                carried(inside, Items.WHEAT), 4, "wheat carried by the one that can get to it"));
+    }
 }

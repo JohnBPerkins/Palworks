@@ -3,6 +3,7 @@ package dev.palworks.job;
 import dev.palworks.suitability.Suitability;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -35,6 +36,11 @@ public final class JobRecord {
 
     @Nullable
     private CompoundTag resumeData;
+
+    // The workers that found it out of reach (a pickup: see JobAssigner.assignFirstReachable). Kept
+    // on the job, not in their own memory of what they couldn't reach: that's wiped whenever a
+    // block near them changes, which on a busy farm is all the time.
+    private final Set<UUID> outOfReachFor = new HashSet<>();
 
     private JobRecord(
             JobType type, BlockPos position, long discoveryTime, Set<Suitability> required, boolean followUp) {
@@ -75,6 +81,15 @@ public final class JobRecord {
 
     public BlockPos position() {
         return position;
+    }
+
+    /** This worker found no way to it: it isn't offered it again. */
+    void markOutOfReachFor(UUID worker) {
+        outOfReachFor.add(worker);
+    }
+
+    boolean isOutOfReachFor(UUID worker) {
+        return outOfReachFor.contains(worker);
     }
 
     public JobType type() {

@@ -489,6 +489,7 @@ final class JobAssigner {
                 // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
                 if (!inWorkRange(worker, job.position())
                         || isRecentlyUnreachable(worker, job.position())
+                        || job.isOutOfReachFor(worker.pokemonUUID)
                         || !canWorkerDo(worker, job)) {
                     continue;
                 }
@@ -567,6 +568,7 @@ final class JobAssigner {
             if (!canDoJob(worker, job)
                     || !(inWorkRange(worker, job.position()) || isNeedNearHome(worker, job))
                     || isRecentlyUnreachable(worker, job.position())
+                    || job.isOutOfReachFor(worker.pokemonUUID)
                     || !canWorkerDo(worker, job)) {
                 continue;
             }
@@ -592,11 +594,18 @@ final class JobAssigner {
                 return job;
             }
             if (job.type() == JobType.COLLECT_DROPS && job.isFollowUp()) {
-                // Items lying out of reach (on a furnace, in a tree's leaves): the pickup goes, and
-                // the item it went for (or, with nowhere to stand by any, all of them) waits a while
-                // for another (see PickupQueue), so the others round it get theirs. Left in the
-                // pool, every transporter path-checked it again whenever blocks near it changed,
-                // which on a busy farm is all the time.
+                // Out of this worker's reach, which says nothing of the others: one the other side
+                // of a wall may walk straight to it. It's left for them, and not offered to this
+                // one again.
+                job.markOutOfReachFor(worker.pokemonUUID);
+                if (anotherMayReach(worker, job)) {
+                    continue;
+                }
+                // Items lying out of everyone's reach (on a furnace, in a tree's leaves): the pickup
+                // goes, and the item it went for (or, with nowhere to stand by any, all of them)
+                // waits a while for another (see PickupQueue), so the others round it get theirs.
+                // Left in the pool, every transporter path-checked it again whenever blocks near it
+                // changed, which on a busy farm is all the time.
                 pool.remove(JobPool.JobKey.of(job));
                 if (unreachablePickups != null) {
                     unreachablePickups.accept(
@@ -615,6 +624,22 @@ final class JobAssigner {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a worker other than this one might yet get to a job this one can't: it has the skills
+     * for it, it's in its range, and it hasn't found it out of reach itself.
+     */
+    private boolean anotherMayReach(WorkerInfo worker, JobRecord job) {
+        for (WorkerInfo other : workers.all()) {
+            if (!other.pokemonUUID.equals(worker.pokemonUUID)
+                    && canDoJob(other, job)
+                    && inWorkRange(other, job.position())
+                    && !job.isOutOfReachFor(other.pokemonUUID)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
