@@ -595,4 +595,51 @@ public class PathingGameTests {
             }
         });
     }
+
+    @GameTest(template = Templates.ARENA, batch = "pathing_hurting_own_walks", timeoutTicks = 200)
+    public void anOwnedPokemonsOwnWalksKeepClearOfBlocksThatHurt(GameTestHelper helper) {
+        // The walks Cobblemon plans (here, asked of its navigation as following its owner or
+        // wandering would): its own pathfinder takes a berry bush for open ground. For an owned
+        // Pokémon the walk goes round, a tile clear of the bushes (it follows a path loosely), so
+        // through the middle of a gap 3 wide. One that starts closer than that can still walk
+        // (out from between two bushes), and gets clear of them where it can (not along a hedge)
+        Workers.isolate(helper);
+        RealTreeGameTests.arenaFloor(helper, Blocks.GRASS_BLOCK);
+        hedge(helper, GAP_Z - 1, GAP_Z + 1);
+        helper.setBlock(13, 1, 12, YOUNG_BUSH);
+        helper.setBlock(13, 1, 14, YOUNG_BUSH);
+        var owner = Workers.owner(helper, new BlockPos(0, 1, 0));
+        PokemonEntity walker = Workers.sendOut(helper, owner, BULBASAUR, new BlockPos(3, 1, 4));
+        PokemonEntity hemmedIn = Workers.sendOut(helper, owner, BULBASAUR, new BlockPos(13, 1, 13));
+        PokemonEntity byTheHedge = Workers.sendOut(helper, owner, BULBASAUR, new BlockPos(7, 1, 11));
+
+        helper.runAfterDelay(SETTLE_TICKS, () -> {
+            Path path = walker.getNavigation().createPath(helper.absolutePos(new BlockPos(12, 1, 4)), 0);
+            helper.assertTrue(path != null && path.canReach(), "it has a way past the hedge");
+            boolean crossed = false;
+            for (int i = 0; i < path.getNodeCount(); i++) {
+                BlockPos node = nodeRel(helper, path, i);
+                boolean passingTheHedge = Math.abs(node.getX() - HEDGE_X) <= 1;
+                if (passingTheHedge) {
+                    helper.assertTrue(
+                            node.getZ() == GAP_Z,
+                            "it passes the hedge a tile clear of its bushes, but goes by " + node);
+                    crossed = true;
+                }
+            }
+            helper.assertTrue(crossed, "its way is through the gap");
+
+            Path out = hemmedIn.getNavigation().createPath(helper.absolutePos(new BlockPos(13, 1, 4)), 0);
+            helper.assertTrue(
+                    out != null && out.canReach(), "one standing between two bushes can still walk out from them");
+
+            Path along = byTheHedge.getNavigation().createPath(helper.absolutePos(new BlockPos(7, 1, 15)), 0);
+            helper.assertTrue(along != null && along.canReach(), "one by the hedge has a way along it");
+            for (int i = 1; i + 1 < along.getNodeCount(); i++) {
+                BlockPos node = nodeRel(helper, along, i);
+                helper.assertTrue(node.getX() <= 6, "it goes along the hedge a tile out from it, but goes by " + node);
+            }
+            helper.succeed();
+        });
+    }
 }
