@@ -29,7 +29,8 @@ Put smeltable items in the input slot. **You don't need fuel.** A Kindling worke
 Ember on the furnace and lights it, and keeps relighting it until the input slot is empty.
 
 Workers only light a furnace whose input can be smelted in it, so a blast furnace full of raw food
-is left alone.
+is left alone. So is one with no room in its output slot for what it would smelt, until you take
+some out.
 
 ## Water crops
 
