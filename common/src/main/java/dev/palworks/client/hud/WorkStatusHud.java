@@ -11,10 +11,8 @@ import dev.palworks.client.ClientWorkerData;
 import dev.palworks.job.JobType;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
-import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,9 +51,6 @@ public final class WorkStatusHud {
 
     public static final ResourceLocation OFF_ICON = icon("off");
 
-    @Nullable
-    private static ClientLevel lastLevel;
-
     private WorkStatusHud() {}
 
     private static ResourceLocation icon(String name) {
@@ -69,11 +64,6 @@ public final class WorkStatusHud {
 
     public static void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
-        // A new world or server: what we were told about the old one's workers no longer applies.
-        if (!Objects.equals(minecraft.level, lastLevel)) {
-            lastLevel = minecraft.level;
-            ClientWorkerData.clearActivity();
-        }
         // In a battle Cobblemon draws its battle overlay in place of the party's cards (though the
         // party overlay still says it can render: the battle screen is one it shows through)
         if (minecraft.level == null
