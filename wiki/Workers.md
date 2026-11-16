@@ -79,8 +79,9 @@ Barrels, shulker boxes and storage from other mods aren't supported yet. Transpo
   summary's Info page names them, in the box beside the experience bar. Hover either for the full
   list. Its [mood](Mood) shows in the bottom-left corner: a face and the number.
 - **Party HUD:** in the top-left corner of each sent-out party member's card, next to the "sent
-  out" icon: its job's icon while it works, faded while it walks there, greyed out while it's in a
-  battle, or a red cross if its work is off.
+  out" icon: its job's icon while it works, faded while it walks there, greyed out while it's
+  paused (evolving, say), or a red cross if its work is off. In a battle Cobblemon swaps these
+  cards for its battle display, so no icon shows until it's over.
 - **Over its head:** what's holding its work back: a half hunger shank when it's out of food, a "z"
   when it's Tired, a sad face when it's unhappy, an anger mark when it's on strike, and a moon while
   it's asleep, if its species has no sleep animation to show it. Each player can turn these off

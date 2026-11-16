@@ -28,6 +28,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>a red cross when its work is switched off,</li>
  *   <li>nothing while it has no job.</li>
  * </ul>
+ * None of them while the player is in a battle: Cobblemon draws its battle overlay then, in place
+ * of the cards.
  * That corner is the only free spot on the card (Cobblemon 1.8.x draws nothing there); the rest
  * is taken (state icon, level, held item, HP/EXP/status bars, ball, name) or would cover the
  * Pokémon's portrait.
@@ -72,7 +74,11 @@ public final class WorkStatusHud {
             lastLevel = minecraft.level;
             ClientWorkerData.clearActivity();
         }
-        if (minecraft.level == null || !PartyOverlay.Companion.canRender()) {
+        // In a battle Cobblemon draws its battle overlay in place of the party's cards (though the
+        // party overlay still says it can render: the battle screen is one it shows through)
+        if (minecraft.level == null
+                || !PartyOverlay.Companion.canRender()
+                || CobblemonClient.INSTANCE.getBattle() != null) {
             return;
         }
 
