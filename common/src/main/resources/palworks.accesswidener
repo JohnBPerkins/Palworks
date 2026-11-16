@@ -8,3 +8,7 @@ accessible	field	net/minecraft/world/level/block/entity/AbstractFurnaceBlockEnti
 # A navigation's target, cleared while a worker walks one of Palworks' own paths so vanilla's
 # recomputing doesn't swap it for one of Cobblemon's. (Used by dev.palworks.ai.path.WorkerNavigator.)
 accessible	field	net/minecraft/world/entity/ai/navigation/PathNavigation	targetPos	Lnet/minecraft/core/BlockPos;
+
+# A chest's count of who has it open, so a worker at one can be counted as a player is and its lid
+# lifts. (Used by dev.palworks.station.ChestHelper, see ContainerOpenersCounterMixin.)
+accessible	field	net/minecraft/world/level/block/entity/ChestBlockEntity	openersCounter	Lnet/minecraft/world/level/block/entity/ContainerOpenersCounter;
