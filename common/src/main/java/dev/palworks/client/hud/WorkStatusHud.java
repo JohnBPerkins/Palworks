@@ -11,10 +11,8 @@ import dev.palworks.client.ClientWorkerData;
 import dev.palworks.job.JobType;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
-import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,6 +26,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>a red cross when its work is switched off,</li>
  *   <li>nothing while it has no job.</li>
  * </ul>
+ * None of them while the player is in a battle: Cobblemon draws its battle overlay then, in place
+ * of the cards.
  * That corner is the only free spot on the card (Cobblemon 1.8.x draws nothing there); the rest
  * is taken (state icon, level, held item, HP/EXP/status bars, ball, name) or would cover the
  * Pokémon's portrait.
@@ -51,9 +51,6 @@ public final class WorkStatusHud {
 
     public static final ResourceLocation OFF_ICON = icon("off");
 
-    @Nullable
-    private static ClientLevel lastLevel;
-
     private WorkStatusHud() {}
 
     private static ResourceLocation icon(String name) {
@@ -67,12 +64,11 @@ public final class WorkStatusHud {
 
     public static void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
-        // A new world or server: what we were told about the old one's workers no longer applies.
-        if (!Objects.equals(minecraft.level, lastLevel)) {
-            lastLevel = minecraft.level;
-            ClientWorkerData.clearActivity();
-        }
-        if (minecraft.level == null || !PartyOverlay.Companion.canRender()) {
+        // In a battle Cobblemon draws its battle overlay in place of the party's cards (though the
+        // party overlay still says it can render: the battle screen is one it shows through)
+        if (minecraft.level == null
+                || !PartyOverlay.Companion.canRender()
+                || CobblemonClient.INSTANCE.getBattle() != null) {
             return;
         }
 

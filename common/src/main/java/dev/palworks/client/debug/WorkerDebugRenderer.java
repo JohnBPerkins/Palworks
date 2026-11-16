@@ -10,7 +10,6 @@ import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkerState;
 import java.util.List;
-import java.util.Objects;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -55,19 +54,11 @@ public final class WorkerDebugRenderer {
     private static final MultiBufferSource.BufferSource BUFFERS =
             MultiBufferSource.immediate(new ByteBufferBuilder(1 << 12));
 
-    @Nullable
-    private static ClientLevel lastLevel;
-
     private WorkerDebugRenderer() {}
 
     public static void render(Camera camera, float partialTick) {
         Minecraft minecraft = Minecraft.getInstance();
         ClientLevel level = minecraft.level;
-        // A new world or server: the entity ids we were sent belong to the old one.
-        if (!Objects.equals(level, lastLevel)) {
-            lastLevel = level;
-            ClientWorkerData.setDebugEntries(List.of());
-        }
         List<WorkerDebugPacket.Entry> entries = ClientWorkerData.debugEntries();
         if (level == null || entries.isEmpty()) {
             return;

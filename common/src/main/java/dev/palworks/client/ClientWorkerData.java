@@ -26,7 +26,13 @@ import org.jetbrains.annotations.Nullable;
  *       summary screens ({@code WorkSkillsOverlay}), by Pokémon UUID;</li>
  *   <li>their moods (WorkerMoodPacket), for the same screens, by Pokémon UUID.</li>
  * </ul>
- * Has no client-only imports, so it is safe to load on a dedicated server (where Cobblemon still
+ * All of it is the world or server's the player is in, and is forgotten as they leave it
+ * ({@link #clear}, from {@code PalworksClient}), and only then: the server keeps each of them up to
+ * date as it changes, and a change of dimension changes none of it. (The party HUD used to forget
+ * what the workers were doing whenever the client's level changed, a new dimension included, and
+ * was blank until the server next said.)
+ *
+ * <p>Has no client-only imports, so it is safe to load on a dedicated server (where Cobblemon still
  * constructs the client packet handlers).
  */
 public final class ClientWorkerData {
@@ -42,6 +48,15 @@ public final class ClientWorkerData {
 
     private ClientWorkerData() {}
 
+    /** Forget all of it: the player has left the world or server it was about. */
+    public static void clear() {
+        ACTIVITY.clear();
+        STATUS.clear();
+        debugEntries = List.of();
+        WORK_LEVELS.clear();
+        MOODS.clear();
+    }
+
     // --- Work activity (party HUD) ---
 
     public static void putActivity(UUID pokemonUUID, WorkActivity activity) {
@@ -51,10 +66,6 @@ public final class ClientWorkerData {
     @Nullable
     public static WorkActivity activity(UUID pokemonUUID) {
         return ACTIVITY.get(pokemonUUID);
-    }
-
-    public static void clearActivity() {
-        ACTIVITY.clear();
     }
 
     // --- Work status (interact wheel) ---
@@ -92,11 +103,6 @@ public final class ClientWorkerData {
     @Nullable
     public static Map<Suitability, Integer> workLevels(UUID pokemonUUID) {
         return WORK_LEVELS.get(pokemonUUID);
-    }
-
-    public static void clearWorkLevels() {
-        WORK_LEVELS.clear();
-        MOODS.clear();
     }
 
     // --- Mood (PC and summary) ---
