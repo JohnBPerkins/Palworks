@@ -1126,4 +1126,57 @@ public class WorkerGameTests {
                 })
                 .thenSucceed();
     }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_off_stops", timeoutTicks = 600)
+    public void aWorkerSwitchedOffStopsWalkingToItsJob(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        // Wheat 14 blocks off, so it's a while on its way
+        BlockPos crop = new BlockPos(3, 1, 15);
+        helper.setBlock(crop.below(), Blocks.FARMLAND);
+        helper.setBlock(crop, WHEAT.getStateForAge(7));
+        // Pastured: one from a party is called back to its owner's side as soon as it has no job
+        PokemonEntity worker = Workers.sendOutPastured(helper, BULBASAUR, START);
+        WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
+        double startZ = helper.absolutePos(START).getZ();
+        double cropZ = helper.absolutePos(crop).getZ();
+
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(
+                        state.getCurrentReservation() != null && worker.getZ() > startZ + 3, "on its way to the wheat"))
+                // As /palworks worker disable does
+                .thenExecute(() -> WorkerStateManager.setEnabled(worker.getPokemon(), false))
+                .thenIdle(200)
+                .thenExecute(() -> {
+                    helper.assertTrue(
+                            cropZ - worker.getZ() > 4,
+                            "it walked on to the job it gave up: " + (cropZ - worker.getZ()) + " blocks from it");
+                    helper.assertTrue(helper.getBlockState(crop).equals(WHEAT.getStateForAge(7)), "the wheat is left");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_off_forgotten", timeoutTicks = 200)
+    public void aSwitchedOffWorkerIsForgottenOnceItsRecalled(GameTestHelper helper) {
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+        Pokemon pokemon = worker.getPokemon();
+
+        helper.startSequence()
+                .thenIdle(10)
+                .thenExecute(() -> WorkerStateManager.setEnabled(pokemon, false))
+                .thenIdle(10)
+                .thenExecute(() -> {
+                    // Something only its state in memory has (it isn't saved)
+                    WorkerStateManager.getOrCreate(pokemon).setWalkedToJob(true);
+                    worker.discard(); // recalled
+                })
+                // What's kept in memory for it goes, as a working one's does: it's read from its data
+                // again the next time it's out
+                .thenIdle(40)
+                .thenExecute(() -> helper.assertFalse(
+                        WorkerStateManager.getOrCreate(pokemon).hasWalkedToJob(),
+                        "its state was still in memory after it was recalled"))
+                .thenSucceed();
+    }
 }

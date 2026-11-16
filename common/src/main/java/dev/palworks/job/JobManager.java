@@ -3,6 +3,7 @@ package dev.palworks.job;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.crop.Watering;
@@ -22,6 +23,7 @@ import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import dev.palworks.worker.WorkerStatusSync;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,6 +51,12 @@ import org.jetbrains.annotations.Nullable;
 public class JobManager {
 
     private static final int WORKER_STALE_TICKS = 5; // Unregister a worker this long after it stops ticking
+
+    // Pokémon out in the world that report in but aren't working (their work is off, or they've no
+    // work skill left), and the game time each last did. They aren't in the worker registry, so
+    // nothing unregistered them when they were recalled, and their state and inventory stayed in
+    // memory until the server stopped.
+    private final Map<UUID, Long> notWorking = new HashMap<>();
     // (a little slack so a skipped tick isn't a despawn)
     private static final int FOLLOW_UP_RECHECK_INTERVAL = 20; // Ticks between checks that follow-up jobs still exist
     private static final long JOB_POOL_EXPIRY_TICKS = 5 * 60 * 20; // Drop jobs nobody has taken in 5 minutes
@@ -251,6 +259,14 @@ public class JobManager {
         // would keep handing it work; and it lets its own job go.
         if (!WorkerEligibility.works(pokemon, state)) {
             WorkerInfo removed = workers.remove(uuid);
+            if (removed != null) {
+                // It was working until now: it stops where it is, rather than walk on to the job
+                // it's just dropped, and what's remembered of it as a worker goes
+                entity.getNavigation().stop();
+                WorkerNavigator.forget(entity);
+                assigner.forget(uuid);
+                workers.forgetEntity(uuid);
+            }
             if (removed != null && removed.currentReservation != null) {
                 pool.release(JobKey.of(removed.currentReservation), level.getGameTime());
             }
@@ -258,8 +274,10 @@ public class JobManager {
                 state.clearReservation();
                 WorkerStateManager.save(pokemon, state);
             }
+            notWorking.put(uuid, level.getGameTime());
             return;
         }
+        notWorking.remove(uuid);
 
         // Create or update worker info
         boolean newlyActive = !workers.contains(uuid);
@@ -372,7 +390,11 @@ public class JobManager {
                 WorkerStateManager.save(gone.getPokemon(), state);
             }
         }
-        // Drop per-worker caches so they don't leak after the worker is gone.
+        forgetCaches(pokemonUUID);
+    }
+
+    /** Drop what's kept in memory for a Pokémon that's gone, so it doesn't build up. */
+    private void forgetCaches(UUID pokemonUUID) {
         workers.forgetEntity(pokemonUUID);
         assigner.forget(pokemonUUID);
         WorkerInventoryManager.unload(pokemonUUID);
@@ -396,6 +418,16 @@ public class JobManager {
         for (UUID uuid : toRemove) {
             unregisterWorker(uuid);
         }
+
+        // Those out but not working stop reporting in too, once they're recalled: what's kept in
+        // memory for them goes then, as a worker's does
+        notWorking.entrySet().removeIf(entry -> {
+            if (now - entry.getValue() <= WORKER_STALE_TICKS) {
+                return false;
+            }
+            forgetCaches(entry.getKey());
+            return true;
+        });
     }
 
     // ============================================
