@@ -361,12 +361,17 @@ final class JobScanner {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
                     for (int y = yFrom; y < yTo; y++) {
+                        blocksScanned++;
+                        // Most of even a section with work in it is air and plain terrain, never a
+                        // place or a job (what a whole section is skipped for, above): the block
+                        // itself, straight from the section, is all that's read of those
+                        BlockState state = section.getBlockState(x, y & 15, z);
+                        if (JobChecks.canNeverBeWork(state)) {
+                            continue;
+                        }
                         int worldX = chunkPos.getMinBlockX() + x;
                         int worldZ = chunkPos.getMinBlockZ() + z;
                         pos.set(worldX, y, worldZ);
-                        blocksScanned++;
-
-                        BlockState state = level.getBlockState(pos);
 
                         // Remember the places workers use (chests, troughs, beds), so
                         // delivery, eating and sleeping can pick one without a block search
