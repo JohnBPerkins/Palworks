@@ -60,6 +60,10 @@ public class WorkerAI {
     // in its stance, it steps in (STEP_IN_TICKS), then settles for where it is: that used to be
     // "not arrived" but also "not stuck", so it stood there until the 30s reservation expiry.
     private static final double SETTLED_DISTSQ = 3.0;
+    // How far past half its width from its stand tile's middle a wide worker's walk may end and
+    // still be next to it (see executeJob): the path's last node is at most a block's corner away
+    // from that middle (0.71), and a little for where it comes to rest
+    private static final double WALK_END_SLACK = 0.75;
     // Most ticks a worker spends stepping from where its walk ended onto its stand tile before it
     // settles for working from where it is (something's in the way: another mob, say).
     public static final int STEP_IN_TICKS = 40;
@@ -347,7 +351,14 @@ public class WorkerAI {
         boolean onStand =
                 distanceSq == 0 && offX * offX + offZ * offZ <= WorkPositions.ON_TILE_DIST * WorkPositions.ON_TILE_DIST;
         boolean inStance = WorkPositions.inStance(level, entity, targetPos, jobType, stance);
-        boolean nextToStand = distanceSq <= SETTLED_DISTSQ;
+        // Next to the stand tile: by whole blocks, or, for a wide Pokémon, as near as its walk can
+        // end. Cobblemon's navigation calls a walk done within half the mob's width of the path's
+        // last node, and for one over 3 blocks wide that node is at a block's corner (see
+        // BodyClearance), so its walk ends up to 2 blocks and more from the tile's middle: by
+        // blocks alone it never arrived anywhere, and stood there until its job timed out.
+        boolean nextToStand = distanceSq <= SETTLED_DISTSQ
+                || (Math.abs(entity.getY() - standPos.getY()) <= 1.0
+                        && Math.hypot(offX, offZ) <= entity.getBbWidth() / 2.0 + WALK_END_SLACK);
         if (walkEnded && nextToStand && !onStand && !inStance && state.getStepInTicks() < STEP_IN_TICKS) {
             if (holdForAnimation(entity)) {
                 return true;

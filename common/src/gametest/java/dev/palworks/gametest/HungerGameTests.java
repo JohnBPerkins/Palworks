@@ -801,4 +801,20 @@ public class HungerGameTests {
 
         helper.succeedWhen(() -> helper.assertTrue(pokemon.getCurrentFullness() > 0, "it's eaten"));
     }
+
+    @GameTest(template = Templates.EMPTY, batch = "hunger_eat_wide", timeoutTicks = 800)
+    public void aWorkerOverThreeBlocksWideEatsFromATrough(GameTestHelper helper) {
+        Workers.isolate(helper);
+        TroughBlockEntity trough = trough(helper, TROUGH);
+        trough.addFood(berries(9));
+        // A Venusaur a fifth bigger than usual: 3.17 blocks wide
+        PokemonEntity worker = Workers.sendOut(helper, "venusaur level=40 scale_modifier=1.2", START);
+        Pokemon pokemon = worker.getPokemon();
+        pokemon.setCurrentFullness(0);
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(worker.getBbWidth() > 3.0F, "it's over 3 wide: " + worker.getBbWidth());
+            helper.assertTrue(pokemon.getCurrentFullness() > 0, "it's eaten");
+        });
+    }
 }
