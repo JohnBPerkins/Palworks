@@ -9,6 +9,12 @@ skill.
 To look up a particular Pokémon, see [Work skills by Pokémon](Work-Skills-by-Pokemon), or its PC
 and summary screens in game.
 
+To find the Pokémon that have a particular work skill, use the **Pokédex**: the small cog at the
+right of its search bar, beside the "search by" button, filters the list by work skill. Each click
+picks the next skill (hover it to see which), and after the last it goes back to showing every
+Pokémon. It lists the species that can have the skill in any of their forms, out of those you've
+seen, and works together with the search and the filter at the bottom of the list.
+
 ## From types
 
 <!-- generated:type-table -->
