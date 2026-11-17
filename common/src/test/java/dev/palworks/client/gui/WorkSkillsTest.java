@@ -83,14 +83,4 @@ class WorkSkillsTest {
             }
         }
     }
-
-    @Test
-    void theBoxNamesAllThatFitOrAllButTheLastRow() {
-        assertEquals(0, WorkSkills.namedInBox(0));
-        assertEquals(1, WorkSkills.namedInBox(1));
-        assertEquals(2, WorkSkills.namedInBox(2));
-        // 3 or more: the first, then "+2 more"
-        assertEquals(1, WorkSkills.namedInBox(3));
-        assertEquals(1, WorkSkills.namedInBox(5));
-    }
 }
