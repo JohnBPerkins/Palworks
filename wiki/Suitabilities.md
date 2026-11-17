@@ -12,8 +12,9 @@ and summary screens in game.
 To find the Pokémon that have a particular work skill, use the **Pokédex**: the small cog at the
 right of its search bar, beside the "search by" button, filters the list by work skill. Each click
 picks the next skill (hover it to see which), and after the last it goes back to showing every
-Pokémon. It lists the species that can have the skill in any of their forms, out of those you've
-seen, and works together with the search and the filter at the bottom of the list.
+Pokémon. It lists every species that can have the skill in any of its forms, including the ones
+you haven't seen yet (shown as the Pokédex shows any it doesn't know), and works together with the
+search and the filter at the bottom of the list: pick "Owned" there to see only the ones you have.
 
 ## From types
 

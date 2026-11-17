@@ -1,10 +1,8 @@
 package dev.palworks.client.gui;
 
 import com.cobblemon.mod.common.CobblemonSounds;
-import com.cobblemon.mod.common.api.pokedex.PokedexEntryProgress;
 import com.cobblemon.mod.common.api.pokedex.entry.PokedexEntry;
 import com.cobblemon.mod.common.api.pokedex.filter.EntryFilter;
-import com.cobblemon.mod.common.client.CobblemonClient;
 import com.cobblemon.mod.common.client.gui.pokedex.PokedexGUI;
 import com.cobblemon.mod.common.client.gui.pokedex.PokedexGUIConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -32,8 +30,9 @@ import org.jetbrains.annotations.Nullable;
  * species that can have it, in any form; hovering the button names it. It works with Cobblemon's
  * own search and category filter, not in place of them.
  *
- * <p>As Cobblemon's own searches, it shows nothing about a Pokémon the player has never seen: one
- * seen but not caught is listed, one unregistered isn't.
+ * <p>It lists every species with the skill, whether the player has seen it or not: one they
+ * haven't is listed as the Pokédex shows any it doesn't know, so they can see how many there are to
+ * find. (Cobblemon's own searches leave those out; this one is for finding what to catch.)
  *
  * <p>Which species have which skills is the server's (its datapacks and admins' changes): asked for
  * as the Pokédex opens (see WorkLevelSync.sendDex) and kept in {@link ClientWorkerData}. Until it
@@ -125,7 +124,7 @@ public final class DexWorkSkillFilter {
         return mouseX >= x && mouseX < x + ICON_SIZE && mouseY >= y && mouseY < y + ICON_SIZE;
     }
 
-    /** Keeps the species that can have a work skill, of those the player has seen. */
+    /** Keeps the species that can have a work skill, seen by the player or not. */
     private static final class SkillFilter extends EntryFilter {
         private final Suitability skill;
 
@@ -135,9 +134,7 @@ public final class DexWorkSkillFilter {
 
         @Override
         public boolean test(PokedexEntry entry) {
-            return CobblemonClient.INSTANCE.getClientPokedexData().getHighestKnowledgeFor(entry)
-                            != PokedexEntryProgress.UNREGISTERED
-                    && ClientWorkerData.speciesHasSkill(entry.getSpeciesId(), skill);
+            return ClientWorkerData.speciesHasSkill(entry.getSpeciesId(), skill);
         }
     }
 
