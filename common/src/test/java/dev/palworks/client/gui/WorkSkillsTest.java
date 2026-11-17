@@ -13,6 +13,7 @@ import dev.palworks.suitability.Suitability;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -81,5 +82,20 @@ class WorkSkillsTest {
         // 3 or more: the first, then "+2 more"
         assertEquals(1, WorkSkills.namedInBox(3));
         assertEquals(1, WorkSkills.namedInBox(5));
+    }
+
+    @Test
+    void thePokedexFilterGoesFromNoneThroughEveryShownSkillAndBackToNone() {
+        List<Suitability> picked = new ArrayList<>();
+        for (Suitability skill = WorkSkills.nextFilter(null); skill != null; skill = WorkSkills.nextFilter(skill)) {
+            picked.add(skill);
+        }
+        List<Suitability> shown = new ArrayList<>();
+        for (Suitability skill : Suitability.values()) {
+            if (WorkSkills.icon(skill) != null) {
+                shown.add(skill);
+            }
+        }
+        assertEquals(shown, picked);
     }
 }
