@@ -16,6 +16,7 @@ import dev.palworks.suitability.Suitability;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,15 +26,10 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shows a Pokémon's work skills ({@link WorkSkills}) on Cobblemon's PC and summary screens:
- * <ul>
- *   <li>at a glance, in the top-left corner of its portrait (the shiny star is in the top-right):
- *       each job's icon with its level beside it, on the PC (for the Pokémon hovered or picked) and
- *       on the summary;</li>
- *   <li>by name, on the summary's Info page, in the empty box left of the experience box:
- *       "Watering 3", a row each, or the first and how many more if they don't all fit.</li>
- * </ul>
- * Hovering either lists them all, by name, in a tooltip. The levels are the server's (see
+ * Shows a Pokémon's work skills ({@link WorkSkills}) on Cobblemon's PC and summary screens, in the
+ * top-left corner of its portrait (the shiny star is in the top-right): each job's icon with its
+ * level beside it, on the PC (for the Pokémon hovered or picked) and on the summary. Hovering them
+ * lists them all, by name, in a tooltip, each with a line on what it does. The levels are the server's (see
  * WorkLevelSync): the party's are kept up to date, and the PC's are asked for as it opens. Nothing is
  * shown for a Pokémon whose levels haven't come.
  *
@@ -61,18 +57,13 @@ public final class WorkSkillsOverlay {
     private static final int PC_HEIGHT = 205;
     private static final float PC_PORTRAIT_X = 6;
     private static final float PC_PORTRAIT_Y = 27;
-    // Summary: its size, where its portrait is, and where its Info page's empty box is
+    // Summary: its size, and where its portrait is
     private static final int SUMMARY_WIDTH = 331;
     private static final int SUMMARY_HEIGHT = 161;
     private static final float SUMMARY_PORTRAIT_X = 6;
     private static final float SUMMARY_PORTRAIT_Y = 32;
     // Both screens' portraits are this square (PCGUI and Summary's PORTRAIT_SIZE, in 1.8.x)
     private static final float PORTRAIT_SIZE = 66;
-    private static final int SUMMARY_INFO_PAGE = 0;
-    private static final float BOX_X = 77 + 5; // the Info page is at 77, 12; the box at 5, 123 in it
-    private static final float BOX_Y = 12 + 123;
-    private static final float BOX_WIDTH = 61;
-    private static final float BOX_HEIGHT = 19;
 
     // As far in from the portrait's top-left as the shiny star is from its top-right
     private static final float CORNER_INSET_X = 2;
@@ -85,7 +76,6 @@ public final class WorkSkillsOverlay {
     private static final float TEXT_SCALE = 0.5F;
     private static final float TEXT_DROP = 2; // half-size text sits this far down an 8-high row
     private static final int WHITE = 0xFFFFFFFF;
-    private static final int GREY = 0xFFA0A0A0;
 
     // A worker this happy or more has the happy face; below it, content, down to unhappy
     private static final int HAPPY_FROM = 75;
@@ -125,15 +115,11 @@ public final class WorkSkillsOverlay {
                 drawMood(graphics, pokemon, left + PC_PORTRAIT_X, top + PC_PORTRAIT_Y, mouseX, mouseY);
             }
         } else if (screen instanceof Summary) {
-            SummaryAccessor summary = (SummaryAccessor) (Object) screen;
-            Pokemon pokemon = summary.palworks$selectedPokemon();
+            Pokemon pokemon = ((SummaryAccessor) (Object) screen).palworks$selectedPokemon();
             int left = (screen.width - SUMMARY_WIDTH) / 2;
             int top = (screen.height - SUMMARY_HEIGHT) / 2;
             drawCorner(graphics, pokemon, left + SUMMARY_PORTRAIT_X, top + SUMMARY_PORTRAIT_Y, mouseX, mouseY);
             drawMood(graphics, pokemon, left + SUMMARY_PORTRAIT_X, top + SUMMARY_PORTRAIT_Y, mouseX, mouseY);
-            if (summary.palworks$mainScreenIndex() == SUMMARY_INFO_PAGE) {
-                drawBox(graphics, pokemon, left + BOX_X, top + BOX_Y, mouseX, mouseY);
-            }
         }
     }
 
@@ -202,54 +188,6 @@ public final class WorkSkillsOverlay {
         return mood.mood() >= HAPPY_FROM ? "happy" : "content";
     }
 
-    /** The summary's work box: each job by name with its level, or as many as fit. */
-    private static void drawBox(GuiGraphics graphics, Pokemon pokemon, float boxX, float boxY, int mouseX, int mouseY) {
-        Map<Suitability, Integer> levels = ClientWorkerData.workLevels(pokemon.getUuid());
-        if (levels == null) {
-            return; // not sent yet
-        }
-        List<WorkSkills.Shown> shown = WorkSkills.shown(levels);
-        Font font = Minecraft.getInstance().font;
-        float x = boxX + 2;
-        float y = boxY + (BOX_HEIGHT - WorkSkills.BOX_ROWS * ROW_HEIGHT) / 2 + 0.5F;
-        if (shown.isEmpty()) {
-            Component none = Component.translatable("palworks.ui.work_skills.none");
-            drawText(
-                    graphics,
-                    font,
-                    none.getString(),
-                    boxX + (BOX_WIDTH - font.width(none) * TEXT_SCALE) / 2,
-                    boxY + (BOX_HEIGHT - font.lineHeight * TEXT_SCALE) / 2,
-                    GREY);
-            return;
-        }
-        int named = WorkSkills.namedInBox(shown.size());
-        for (int i = 0; i < named; i++) {
-            WorkSkills.Shown skill = shown.get(i);
-            float rowY = y + i * ROW_HEIGHT;
-            drawIcon(graphics, WorkSkills.icon(skill.job()), x, rowY);
-            String name =
-                    Component.translatable(WorkSkills.nameKey(skill.job())).getString();
-            drawText(graphics, font, name, x + ICON_SIZE + 2, rowY + TEXT_DROP, WHITE);
-            String level = String.valueOf(skill.level());
-            drawText(
-                    graphics,
-                    font,
-                    level,
-                    boxX + BOX_WIDTH - 3 - font.width(level) * TEXT_SCALE,
-                    rowY + TEXT_DROP,
-                    WHITE);
-        }
-        if (named < shown.size()) {
-            String more = Component.translatable("palworks.ui.work_skills.more", shown.size() - named)
-                    .getString();
-            drawText(graphics, font, more, x + ICON_SIZE + 2, y + named * ROW_HEIGHT + TEXT_DROP, GREY);
-        }
-        if (within(mouseX, mouseY, boxX, boxY, BOX_WIDTH, BOX_HEIGHT)) {
-            drawTooltip(graphics, font, shown, mouseX, mouseY);
-        }
-    }
-
     private static void drawIcon(GuiGraphics graphics, @Nullable ResourceLocation icon, float x, float y) {
         if (icon == null) {
             return;
@@ -274,7 +212,7 @@ public final class WorkSkillsOverlay {
         pose.popPose();
     }
 
-    /** Every shown skill by name, with its level: "Watering 3". */
+    /** Every shown skill by name, with its level ("Watering: level 3"), and what it does under it. */
     private static void drawTooltip(
             GuiGraphics graphics, Font font, List<WorkSkills.Shown> shown, int mouseX, int mouseY) {
         List<Component> lines = new ArrayList<>();
@@ -284,6 +222,8 @@ public final class WorkSkillsOverlay {
                     "palworks.ui.work_skills.entry",
                     Component.translatable(WorkSkills.nameKey(skill.job())),
                     skill.level()));
+            lines.add(Component.translatable(WorkSkills.descriptionKey(skill.job()))
+                    .withStyle(ChatFormatting.GRAY));
         }
         graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
     }

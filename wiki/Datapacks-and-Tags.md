@@ -57,10 +57,14 @@ Aprijuices. Datapacks can add to the tag, and set how much feed an item is worth
 
 See [Hunger and Troughs](Hunger).
 
+Blocks added to the tags below also say which work skill works them in their item's tooltip, while
+Shift is held (see [Workers](Workers#what-the-icons-mean)).
+
 ## `#palworks:furnaces`
 
 The blocks [Kindling](Jobs#light-furnaces) workers light: by default the furnace, blast furnace and
-smoker. A modded block needs a furnace block entity to work.
+smoker. A modded block needs a furnace block entity to work (one without still says Kindling in its
+tooltip).
 
 ## `#palworks:ores`
 
@@ -99,7 +103,8 @@ excluded, so workers never chop them.
 ## Berries: `#cobblemon:berries`
 
 [Gathering](Jobs#harvest-crops) workers harvest Cobblemon's berry bushes once they're ripe. Only
-Cobblemon's own bushes ripen: another mod's block added to the tag is never harvested.
+Cobblemon's own bushes ripen: another mod's block added to the tag is never harvested (though its
+tooltip still says Gathering and Watering).
 
 ## Work animations
 

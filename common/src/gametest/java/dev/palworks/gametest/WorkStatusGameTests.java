@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.debug.WorkerDebugSync;
 import dev.palworks.inventory.CarryMode;
+import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.net.packets.WorkActivityPacket;
 import dev.palworks.net.packets.WorkerDebugPacket;
@@ -11,6 +12,7 @@ import dev.palworks.net.packets.WorkerStatusPacket;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerStateManager;
+import dev.palworks.worker.WorkerStatus;
 import io.netty.buffer.Unpooled;
 import java.util.EnumSet;
 import java.util.List;
@@ -20,8 +22,12 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.world.Container;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -184,6 +190,159 @@ public class WorkStatusGameTests {
             helper.assertTrue(
                     entry.unreachable().contains(cropAbs),
                     "the wheat reported as unreachable, got " + entry.unreachable());
+        });
+    }
+
+    // Long enough to take in a retry of the jobs a worker couldn't reach: it forgets them after 600
+    // ticks (JobAssigner.JOB_FAILURE_BLACKLIST_TICKS) and tries again
+    private static final int STEADY_TICKS = 700;
+    // How soon an icon goes once what caused it has: a worker idle with nothing to do is looked at
+    // every tick or so
+    private static final int CLEARS_WITHIN = 40;
+    private static final BlockPos BOXED = new BlockPos(1, 1, 1);
+    private static final BlockPos BOXED_WHEAT = new BlockPos(5, 1, 5);
+
+    /**
+     * A Bulbasaur in a glass box at {@link #BOXED}, with a ripe wheat outside it at
+     * {@link #BOXED_WHEAT} that it would harvest: work it can't get to.
+     */
+    private static PokemonEntity boxedInAwayFromRipeWheat(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        helper.setBlock(BOXED_WHEAT.below(), Blocks.FARMLAND);
+        helper.setBlock(BOXED_WHEAT, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int y = 1; y <= 3; y++) {
+                    if (!(dx == 0 && dz == 0 && y <= 2)) {
+                        helper.setBlock(BOXED.getX() + dx, y, BOXED.getZ() + dz, Blocks.GLASS);
+                    }
+                }
+            }
+        }
+        return Workers.sendOut(helper, "bulbasaur level=20", BOXED);
+    }
+
+    /** A Pidgey (Transporting) carrying wheat, with no chest anywhere. */
+    private static PokemonEntity transporterWithNowhereToDeliver(GameTestHelper helper, BlockPos at) {
+        PokemonEntity pidgey = Workers.sendOut(helper, "pidgey level=20", at);
+        WorkerInventoryManager.getOrCreate(pidgey.getPokemon()).setItem(0, new ItemStack(Items.WHEAT, 10));
+        return pidgey;
+    }
+
+    private static boolean shows(PokemonEntity worker, WorkerStatus status) {
+        return worker.getAspects().contains(status.aspect());
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "work_status_cant_reach", timeoutTicks = 1200)
+    public void aWorkerThatCantReachItsWorkShowsItSteadilyUntilItsLetOut(GameTestHelper helper) {
+        PokemonEntity bulbasaur = boxedInAwayFromRipeWheat(helper);
+        long[] shownAt = {-1};
+        long[] openedAt = {-1};
+        long[] clearedAt = {-1};
+        String[] flickered = {null};
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            boolean shown = shows(bulbasaur, WorkerStatus.CANT_REACH);
+            if (openedAt[0] < 0) {
+                if (shown && shownAt[0] < 0) {
+                    shownAt[0] = now;
+                } else if (!shown && shownAt[0] >= 0 && flickered[0] == null) {
+                    flickered[0] = "went off at tick " + now + ", " + (now - shownAt[0]) + " after it showed";
+                }
+                if (shownAt[0] >= 0 && now - shownAt[0] >= STEADY_TICKS) {
+                    // A way out, towards the wheat
+                    helper.setBlock(BOXED.east(), Blocks.AIR);
+                    helper.setBlock(BOXED.east().above(), Blocks.AIR);
+                    openedAt[0] = now;
+                }
+            } else if (!shown && clearedAt[0] < 0) {
+                clearedAt[0] = now;
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(shownAt[0] >= 0, "it shows it can't reach the wheat");
+            helper.assertTrue(flickered[0] == null, "and keeps showing it while it can't: " + flickered[0]);
+            helper.assertTrue(openedAt[0] >= 0, "shown for " + STEADY_TICKS + " ticks before it's let out");
+            helper.assertTrue(clearedAt[0] >= 0, "it stops showing it once it's let out");
+            helper.assertTrue(
+                    clearedAt[0] - openedAt[0] <= CLEARS_WITHIN,
+                    "within " + CLEARS_WITHIN + " ticks, not " + (clearedAt[0] - openedAt[0]));
+            helper.assertFalse(shows(bulbasaur, WorkerStatus.CANT_DELIVER), "it has nothing to deliver");
+            BlockState wheat = helper.getBlockState(BOXED_WHEAT);
+            helper.assertFalse(
+                    wheat.getBlock() instanceof CropBlock crop && crop.isMaxAge(wheat), "and it harvests the wheat");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "work_status_cant_deliver", timeoutTicks = 600)
+    public void aTransporterWithNowhereToDeliverShowsItUntilThereIsAChest(GameTestHelper helper) {
+        Workers.isolate(helper);
+        BlockPos chest = new BlockPos(6, 1, 6);
+        PokemonEntity pidgey = transporterWithNowhereToDeliver(helper, new BlockPos(2, 1, 2));
+        long[] shownAt = {-1};
+        long[] placedAt = {-1};
+        long[] clearedAt = {-1};
+        String[] flickered = {null};
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            boolean shown = shows(pidgey, WorkerStatus.CANT_DELIVER);
+            if (placedAt[0] < 0) {
+                if (shown && shownAt[0] < 0) {
+                    shownAt[0] = now;
+                } else if (!shown && shownAt[0] >= 0 && flickered[0] == null) {
+                    flickered[0] = "went off at tick " + now;
+                }
+                if (shownAt[0] >= 0 && now - shownAt[0] >= 100) {
+                    helper.setBlock(chest, Blocks.CHEST);
+                    placedAt[0] = now;
+                }
+            } else if (!shown && clearedAt[0] < 0) {
+                clearedAt[0] = now;
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(shownAt[0] >= 0, "it shows it has nowhere to deliver");
+            helper.assertTrue(flickered[0] == null, "and keeps showing it while it hasn't: " + flickered[0]);
+            helper.assertTrue(placedAt[0] >= 0, "until a chest is placed");
+            helper.assertTrue(clearedAt[0] >= 0, "then it stops showing it");
+            helper.assertTrue(
+                    clearedAt[0] - placedAt[0] <= CLEARS_WITHIN,
+                    "within " + CLEARS_WITHIN + " ticks, not " + (clearedAt[0] - placedAt[0]));
+            helper.assertFalse(shows(pidgey, WorkerStatus.CANT_REACH), "there's no work it can't reach");
+            helper.assertTrue(
+                    ((Container) helper.getBlockEntity(chest)).countItem(Items.WHEAT) == 10,
+                    "and it delivers the wheat");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "work_status_held_off", timeoutTicks = 400)
+    public void aWorkerWhoseWorkIsOffShowsNeitherIcon(GameTestHelper helper) {
+        PokemonEntity bulbasaur = boxedInAwayFromRipeWheat(helper);
+        PokemonEntity pidgey = transporterWithNowhereToDeliver(helper, new BlockPos(6, 1, 2));
+        long[] offAt = {-1};
+        String[] shownWhileOff = {null};
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            if (offAt[0] < 0) {
+                if (shows(bulbasaur, WorkerStatus.CANT_REACH) && shows(pidgey, WorkerStatus.CANT_DELIVER)) {
+                    WorkerStateManager.setEnabled(bulbasaur.getPokemon(), false);
+                    WorkerStateManager.setEnabled(pidgey.getPokemon(), false);
+                    offAt[0] = now;
+                }
+            } else if (now > offAt[0] + 2
+                    && shownWhileOff[0] == null
+                    && (shows(bulbasaur, WorkerStatus.CANT_REACH) || shows(pidgey, WorkerStatus.CANT_DELIVER))) {
+                shownWhileOff[0] = "still shown " + (now - offAt[0]) + " ticks after its work went off";
+            }
+        });
+
+        helper.succeedWhen(() -> {
+            helper.assertTrue(offAt[0] >= 0, "both icons shown while their work was on");
+            helper.assertTrue(helper.getTick() - offAt[0] >= 100, "then watched with their work off");
+            helper.assertTrue(shownWhileOff[0] == null, "neither shown with their work off: " + shownWhileOff[0]);
         });
     }
 }

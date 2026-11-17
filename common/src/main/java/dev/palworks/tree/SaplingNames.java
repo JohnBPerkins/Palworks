@@ -35,6 +35,24 @@ public final class SaplingNames {
         return name;
     }
 
+    /**
+     * The other way: the id paths of the tree blocks a sapling could be named for, "dark_oak_sapling"
+     * -> dark_oak_log, dark_oak_wood... None if it isn't named as a sapling.
+     */
+    public static List<String> treeBlockCandidates(String saplingPath) {
+        List<String> candidates = new ArrayList<>(SUFFIXES.length);
+        for (String saplingSuffix : SAPLING_SUFFIXES) {
+            if (saplingPath.endsWith(saplingSuffix)) {
+                String name = saplingPath.substring(0, saplingPath.length() - saplingSuffix.length());
+                for (String suffix : SUFFIXES) {
+                    candidates.add(name + suffix);
+                }
+                break;
+            }
+        }
+        return candidates;
+    }
+
     /** Sapling id paths to look for, in order: "dark_oak_log" -> dark_oak_sapling, _propagule, _fungus. */
     public static List<String> saplingCandidates(String blockPath) {
         String name = treeName(blockPath);

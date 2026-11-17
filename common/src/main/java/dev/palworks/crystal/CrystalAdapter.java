@@ -56,6 +56,18 @@ public final class CrystalAdapter {
             TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("cobblemon", "type_gem_blocks"));
 
     /**
+     * Whether a block is a kind of crystal that's mined once it's grown (see {@link #isRipe}): an
+     * amethyst cluster, a tumblestone, a type gem cluster. Nothing else ever is, so it's what work
+     * this kind of block takes whatever its state (the "Worked by" tooltip).
+     */
+    public static boolean isCrystal(BlockState state) {
+        Block block = state.getBlock();
+        return state.is(Blocks.AMETHYST_CLUSTER)
+                || block instanceof TumblestoneBlock
+                || block instanceof TypeGemClusterBlock;
+    }
+
+    /**
      * Whether the crystal at {@code pos} is one to mine: fully grown, and where another grows in
      * its place. An amethyst cluster only on budding amethyst, a gem cluster only on a gem block or
      * a crystal core (what Cobblemon grows them on); a tumblestone cluster anywhere, since it's put
@@ -63,6 +75,9 @@ public final class CrystalAdapter {
      * alone: mined, it'd be gone for good.
      */
     public static boolean isRipe(BlockGetter level, BlockPos pos, BlockState state) {
+        if (!isCrystal(state)) {
+            return false;
+        }
         Block block = state.getBlock();
         if (state.is(Blocks.AMETHYST_CLUSTER)) {
             return supportOf(level, pos, state).is(Blocks.BUDDING_AMETHYST);

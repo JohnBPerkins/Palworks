@@ -6,6 +6,7 @@ import dev.architectury.registry.menu.MenuRegistry;
 import dev.palworks.client.gui.DexWorkSkillFilter;
 import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.gui.WorkSkillsOverlay;
+import dev.palworks.client.gui.WorkedByTooltip;
 import dev.palworks.config.PalworksClientConfig;
 import dev.palworks.inventory.ModMenuTypes;
 import dev.palworks.inventory.WorkerInventoryScreen;
@@ -34,6 +35,9 @@ public final class PalworksClient {
 
         // Work skills on Cobblemon's PC and summary screens
         WorkSkillsOverlay.init();
+
+        // "Worked by" on the items of blocks Pokémon work on, while Shift is held
+        WorkedByTooltip.init();
 
         // A work skill filter on Cobblemon's Pokédex
         DexWorkSkillFilter.init();

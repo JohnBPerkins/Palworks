@@ -145,6 +145,11 @@ final class JobAssigner {
             // assignFirstReachable has at whether it's moved since
             refreshUnreachableMemory(worker);
             Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
+            // Why it's left idle is worked out again on every look (see hasWorkOutOfReach below)
+            WorkerState held = pokemon == null ? null : WorkerStateManager.get(pokemon);
+            if (held != null) {
+                held.setCantReach(false);
+            }
 
             // Sleep (pastured workers only): one Cobblemon has napping is left to nap; in its bedtime,
             // it's only given a bed (none to be had, and it sleeps where it is: see WorkerAI)
@@ -240,11 +245,23 @@ final class JobAssigner {
 
                 // Nothing left to pick up: deliver. Nearest chests with room first; the first one it
                 // can actually reach wins
-                if (assignFirstReachable(worker, deliveryCandidates(level, worker, pokemon)) != null) {
+                List<JobRecord> deliveries = deliveryCandidates(level, worker, pokemon);
+                if (assignFirstReachable(worker, deliveries) != null) {
+                    if (held != null) {
+                        held.setCantDeliver(false);
+                    }
                     assignedCount++;
                     continue;
                 }
-                // No chest it can use: fall through to its other jobs
+                // No chest it can use: none with room, or none it can get to (one it couldn't pathfind
+                // to just now, in the air, isn't remembered, and says nothing). Its cargo stays put
+                // until one turns up; it falls through to its other jobs.
+                if (held != null) {
+                    held.setCantDeliver(deliveries.isEmpty()
+                            || deliveries.stream().anyMatch(job -> isRecentlyUnreachable(worker, job.position())));
+                }
+            } else if (held != null) {
+                held.setCantDeliver(false); // nothing to deliver
             }
 
             // A transporter with room restocks a trough that's running low from a chest of food
@@ -264,6 +281,8 @@ final class JobAssigner {
                 if (assigned.type() == JobType.GET_SEEDS && pokemon != null) {
                     takeOnSeedRequest(worker, WorkerInventoryManager.getOrCreate(pokemon), assigned.position());
                 }
+            } else if (held != null) {
+                held.setCantReach(hasWorkOutOfReach(worker));
             }
         }
 
@@ -1209,6 +1228,30 @@ final class JobAssigner {
             net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
             if (!stack.isEmpty() && plantableOnAny(stack.getItem(), openSpots)) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a job in the pool that this worker would do (it has the skills, the spot is in its
+     * range and still wants doing by it) is at a spot it remembers it couldn't reach: what leaves a
+     * worker that's been given nothing idle, rather than there being no work. Seed chests aren't
+     * counted: whether a transporter would fetch from one depends on what it, or a planter, needs
+     * (poolCandidates), and a chest it couldn't reach to deliver to is remembered by its spot too.
+     */
+    private boolean hasWorkOutOfReach(WorkerInfo worker) {
+        if (!recentlyFailedJobs.containsKey(worker.pokemonUUID)) {
+            return false;
+        }
+        for (Collection<JobRecord> group : pool.availableFor(worker.suitabilities)) {
+            for (JobRecord job : group) {
+                if (job.type() != JobType.GET_SEEDS
+                        && isRecentlyUnreachable(worker, job.position())
+                        && inWorkRange(worker, job.position())
+                        && canWorkerDo(worker, job)) {
+                    return true;
+                }
             }
         }
         return false;

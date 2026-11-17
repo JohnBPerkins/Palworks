@@ -9,15 +9,22 @@ import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.tree.TreeDetector;
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
@@ -62,6 +69,48 @@ public class JobGameTests {
         // And the soils seeds do go in aren't on the list
         helper.assertFalse(JobChecks.canNeverBeWork(Blocks.FARMLAND.defaultBlockState()), "farmland");
         helper.assertFalse(JobChecks.canNeverBeWork(Blocks.SOUL_SAND.defaultBlockState()), "soul sand");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void theItemsOfBlocksPokemonWorkOnSayWhichSkillsWorkThem(GameTestHelper helper) {
+        // What the "Worked by" tooltip shows, from the job checks (tags are loaded here, not in unit
+        // tests). Whether the block in the world is ripe, lit or part of a tree doesn't come into it.
+        Map<Item, Set<Suitability>> expected = new LinkedHashMap<>();
+        expected.put(Items.FURNACE, EnumSet.of(Suitability.KINDLING));
+        expected.put(Items.BLAST_FURNACE, EnumSet.of(Suitability.KINDLING));
+        expected.put(Items.SMOKER, EnumSet.of(Suitability.KINDLING));
+        Set<Suitability> fieldCrop = EnumSet.of(Suitability.WATERING, Suitability.PLANTING, Suitability.GATHERING);
+        expected.put(Items.WHEAT_SEEDS, fieldCrop);
+        expected.put(Items.CARROT, fieldCrop);
+        expected.put(Items.PUMPKIN_SEEDS, fieldCrop); // its pumpkins are gathered from the stem
+        expected.put(Items.SWEET_BERRIES, EnumSet.of(Suitability.WATERING, Suitability.GATHERING));
+        expected.put(Items.COCOA_BEANS, EnumSet.of(Suitability.GATHERING));
+        expected.put(Items.NETHER_WART, EnumSet.of(Suitability.NETHER));
+        expected.put(Items.SOUL_SAND, EnumSet.of(Suitability.NETHER));
+        expected.put(Items.OAK_LOG, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.STRIPPED_BIRCH_LOG, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.MANGROVE_ROOTS, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.CRIMSON_STEM, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER));
+        expected.put(Items.OAK_SAPLING, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.AZALEA, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.FLOWERING_AZALEA, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.MANGROVE_PROPAGULE, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.WARPED_FUNGUS, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER));
+        expected.put(Items.AMETHYST_CLUSTER, EnumSet.of(Suitability.MINING));
+        expected.put(Items.CHEST, EnumSet.of(Suitability.TRANSPORTING));
+        expected.put(Items.TRAPPED_CHEST, EnumSet.of(Suitability.TRANSPORTING));
+        expected.put(
+                BuiltInRegistries.ITEM.get(dev.palworks.Palworks.id("oak_trough")),
+                EnumSet.of(Suitability.TRANSPORTING));
+        // Nothing Pokémon work on
+        expected.put(Items.STONE, EnumSet.noneOf(Suitability.class));
+        expected.put(Items.BARREL, EnumSet.noneOf(Suitability.class));
+        expected.put(Items.PUMPKIN, EnumSet.noneOf(Suitability.class)); // only as a stem's fruit
+        expected.put(Items.AMETHYST_SHARD, EnumSet.noneOf(Suitability.class));
+        expected.put(Items.IRON_ORE, EnumSet.noneOf(Suitability.class)); // ores aren't mined yet
+        expected.forEach(
+                (item, skills) -> helper.assertValueEqual(JobChecks.workedWith(item), skills, item.toString()));
         helper.succeed();
     }
 

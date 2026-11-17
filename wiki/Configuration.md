@@ -106,5 +106,6 @@ player's own display settings:
 
 - **`show_status_icons`**: whether Pokémon show over their heads what's holding their work back (a
   half hunger shank when they're out of food, a "z" when they're Tired, a sad face when they're
-  unhappy and an anger mark when they're on strike), and a moon while they're asleep, if their
+  unhappy, an anger mark when they're on strike, a brick wall when they can't get to their work and
+  a chest when they have nowhere to put what they carry), and a moon while they're asleep, if their
   species has no sleep animation to show it.
