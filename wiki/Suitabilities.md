@@ -41,7 +41,8 @@ for its species.
 | Cooling | Cooling containers | Not yet |
 | Farming | Producing ranch items | Not yet |
 
-The PC and summary only show the skills that have work so far.
+The PC and summary only show the skills that have work so far. Hover them there to see what each
+one does.
 
 ## Work levels
 

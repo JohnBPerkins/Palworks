@@ -20,9 +20,6 @@ public final class WorkSkills {
     /** One work skill to show. */
     public record Shown(Suitability job, int level) {}
 
-    /** How many rows the summary's work box has (see WorkSkillsOverlay). */
-    public static final int BOX_ROWS = 2;
-
     // The icon each shown job has: the party HUD's for its main job, or its own
     private static final Map<Suitability, ResourceLocation> ICONS = new EnumMap<>(Suitability.class);
 
@@ -66,11 +63,8 @@ public final class WorkSkills {
         return "palworks.work_skill." + job.getId();
     }
 
-    /**
-     * How many of {@code count} skills the summary's box names, one a row: all of them if they fit,
-     * otherwise all but the last row, which says how many more there are.
-     */
-    public static int namedInBox(int count) {
-        return count <= BOX_ROWS ? count : BOX_ROWS - 1;
+    /** The translation key of what a shown job does ("Waters growing crops..."). */
+    public static String descriptionKey(Suitability job) {
+        return nameKey(job) + ".description";
     }
 }

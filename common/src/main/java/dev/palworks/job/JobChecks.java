@@ -29,11 +29,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
@@ -130,17 +132,18 @@ public final class JobChecks {
      * still has after a restart (see JobManager.registerWorker).
      */
     static Set<Suitability> skillsFor(Level level, JobType type, BlockPos pos) {
+        return skillsFor(type, level.getBlockState(pos), level.getBlockState(pos.below()));
+    }
+
+    /** {@link #skillsFor(Level, JobType, BlockPos)}, by the block at the job and the one under it. */
+    private static Set<Suitability> skillsFor(JobType type, BlockState at, BlockState below) {
         return switch (type) {
             case HARVEST_CROPS ->
-                level.getBlockState(pos).is(Blocks.NETHER_WART)
-                        ? EnumSet.of(Suitability.NETHER)
-                        : type.requiredSuitabilities();
+                at.is(Blocks.NETHER_WART) ? EnumSet.of(Suitability.NETHER) : type.requiredSuitabilities();
             case PLANT_SEEDS ->
-                level.getBlockState(pos.below()).is(Blocks.SOUL_SAND)
-                        ? EnumSet.of(Suitability.NETHER)
-                        : type.requiredSuitabilities();
+                below.is(Blocks.SOUL_SAND) ? EnumSet.of(Suitability.NETHER) : type.requiredSuitabilities();
             case CHOP_TREE ->
-                TreeDetector.isNetherStem(level.getBlockState(pos))
+                TreeDetector.isNetherStem(at)
                         ? EnumSet.of(Suitability.LUMBERING, Suitability.NETHER)
                         : type.requiredSuitabilities();
             default -> type.requiredSuitabilities();
@@ -297,6 +300,54 @@ public final class JobChecks {
 
     static boolean hasPlantableSeeds(Level level, BlockPos pos) {
         return !ChestHelper.itemsMatching(level, pos, JobChecks::isFarmlandSeed).isEmpty();
+    }
+
+    /**
+     * The work skills an item's block is worked with: the checks the scan finds jobs by
+     * (JobScanner.scanPositionForJob), and the chests and troughs transporters deliver to, asked of
+     * the kind of block only, not of one in the world. A furnace is lit (Kindling) whether it has
+     * anything to smelt now or not, a crop is harvested (Gathering) once it's ripe, a log is chopped
+     * (Lumbering) when it's part of a tree. Also the seeds planters plant and the saplings
+     * lumberjacks replant. For the "Worked by" tooltip (see client.gui.WorkedByTooltip); nothing
+     * for an item that's none of these.
+     */
+    public static Set<Suitability> workedWith(Item item) {
+        Set<Suitability> skills = EnumSet.noneOf(Suitability.class);
+        BlockState air = Blocks.AIR.defaultBlockState();
+        if (isFarmlandSeed(item)) {
+            skills.addAll(JobType.PLANT_SEEDS.requiredSuitabilities());
+        }
+        Block tree = TreeDetector.treeBlockFor(item); // it's a sapling, replanted where that tree was
+        if (tree != null) {
+            skills.addAll(skillsFor(JobType.CHOP_TREE, tree.defaultBlockState(), air));
+        }
+        if (!(item instanceof BlockItem blockItem)) {
+            return skills;
+        }
+        BlockState state = blockItem.getBlock().defaultBlockState();
+        if (state.is(JobBlockTags.FURNACES)) {
+            skills.addAll(JobType.FUEL_FURNACE.requiredSuitabilities());
+        }
+        // A stem's own fruit is harvested (the scan finds it from the stem)
+        if (CropAdapter.isHarvestable(state) || state.getBlock() instanceof StemBlock) {
+            skills.addAll(skillsFor(JobType.HARVEST_CROPS, state, air));
+        }
+        if (CropAdapter.isWatered(state)) {
+            skills.addAll(JobType.WATER_CROPS.requiredSuitabilities());
+        }
+        if (CropAdapter.isPlantableSurface(state)) {
+            skills.addAll(skillsFor(JobType.PLANT_SEEDS, air, state));
+        }
+        if (isChest(state) || isTrough(state)) {
+            skills.addAll(JobType.DELIVER_ITEMS.requiredSuitabilities());
+        }
+        if (TreeDetector.isTreeBlock(state)) {
+            skills.addAll(skillsFor(JobType.CHOP_TREE, state, air));
+        }
+        if (CrystalAdapter.isCrystal(state)) {
+            skills.addAll(JobType.MINE_CRYSTAL.requiredSuitabilities());
+        }
+        return skills; // not ores: mining them isn't scanned for yet (JobScanner.MINING_JOBS_ENABLED)
     }
 
     /**

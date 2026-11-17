@@ -73,6 +73,12 @@ public class WorkerState {
 
     private long homewardSince;
 
+    // What kept it from working at its last look for a job (see JobAssigner), for the icons over its
+    // head: every job it would do there was out of its reach, or it carries items it has nowhere to
+    // take. Not saved: the next look works them out again.
+    private boolean cantReach;
+    private boolean cantDeliver;
+
     // Mood (see dev.palworks.mood.Mood), 0 to MAX_MOOD, and whether it's on strike: it reached 0 and
     // hasn't come back up enough yet. Saved, so neither is lost in the PC or a reload.
     private double mood = MAX_MOOD;
@@ -372,6 +378,24 @@ public class WorkerState {
     public void setHomeward(@Nullable BlockPos leg, long now) {
         this.homeward = leg;
         this.homewardSince = now;
+    }
+
+    /** Whether it was left idle at its last look for a job because it can't get to the work there is. */
+    public boolean cantReach() {
+        return cantReach;
+    }
+
+    public void setCantReach(boolean cantReach) {
+        this.cantReach = cantReach;
+    }
+
+    /** Whether, at its last look for a job, it carried items and had nowhere it could take them. */
+    public boolean cantDeliver() {
+        return cantDeliver;
+    }
+
+    public void setCantDeliver(boolean cantDeliver) {
+        this.cantDeliver = cantDeliver;
     }
 
     public void resetBedtimeIdleTicks() {

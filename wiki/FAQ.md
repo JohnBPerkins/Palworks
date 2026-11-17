@@ -15,6 +15,7 @@ Check these in order:
    needs the space above it empty, and a Planting worker needs seeds in a chest and a Transporting
    worker to bring them.
 5. **Can it reach the spot?** If there's no path, the worker skips that spot for up to 30 seconds.
+   A worker left with nothing to do because of it shows a brick wall over its head.
 6. **Is it hungry, Tired, unhappy or on strike?** Look over its head. See [Hunger](Hunger),
    [Sleep](Sleep) and [Mood](Mood).
 7. **Is the job working yet?** Mining ores isn't (crystals are), and nothing uses Handiwork, Medicine Production,
@@ -27,8 +28,9 @@ don't pick items up. Add a Flying worker to your farm, and a chest with room for
 
 ## My transporter is carrying items around
 
-It's trying to [deliver](Jobs#deliver-items) them but can't find a chest with room. It carries on
-with its other jobs meanwhile. Place a chest with free space nearby.
+It's trying to [deliver](Jobs#deliver-items) them but can't find a chest with room, or can't get
+to one, and shows a chest over its head. It carries on with its other jobs meanwhile. Place a chest
+with free space nearby.
 
 ## A worker chopped down something I built
 

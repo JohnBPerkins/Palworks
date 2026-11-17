@@ -78,14 +78,20 @@ lifts, it makes its sound, and a trapped chest gives off its redstone signal.
 ## What the icons mean
 
 - **PC and summary:** each Pokémon's work skills and [levels](Suitabilities#work-levels) show as
-  icons in the corner of its portrait, in the PC as you hover over it and on its summary. The
-  summary's Info page names them, in the box beside the experience bar. Hover either for the full
-  list. Its [mood](Mood) shows in the bottom-left corner: a face and the number.
+  icons in the corner of its portrait, in the PC as you hover over it and on its summary. Hover
+  them for the full list by name, with a line on what each skill does. Its [mood](Mood) shows in
+  the bottom-left corner: a face and the number.
 - **Party HUD:** in the top-left corner of each sent-out party member's card, next to the "sent
   out" icon: its job's icon while it works, faded while it walks there, greyed out while it's
   paused (evolving, say), or a red cross if its work is off. In a battle Cobblemon swaps these
   cards for its battle display, so no icon shows until it's over.
+- **Item tooltips:** hold **Shift** over an item whose block Pokémon work on to see which work
+  skills do it: "Worked by: Kindling" on a furnace, "Worked by: Watering, Planting, Gathering" on
+  wheat seeds. It covers furnaces, crops and their seeds, logs and saplings, crystals, nether wart
+  and soul sand, and the chests and troughs transporters fill.
 - **Over its head:** what's holding its work back: a half hunger shank when it's out of food, a "z"
-  when it's Tired, a sad face when it's unhappy, an anger mark when it's on strike, and a moon while
-  it's asleep, if its species has no sleep animation to show it. Each player can turn these off
-  (`show_status_icons`, see [Configuration](Configuration#display-settings)).
+  when it's Tired, a sad face when it's unhappy, an anger mark when it's on strike, a brick wall
+  when it's idle because it can't get to any of the work there is, a chest when it's carrying items
+  and has no chest with room it can get to, and a moon while it's asleep, if its species has no
+  sleep animation to show it. Each player can turn these off (`show_status_icons`, see
+  [Configuration](Configuration#display-settings)).

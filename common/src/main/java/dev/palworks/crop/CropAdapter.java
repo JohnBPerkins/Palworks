@@ -57,8 +57,11 @@ public class CropAdapter {
      * Check if a block is a plantable crop surface (e.g., farmland).
      */
     public static boolean isPlantableSurface(Level level, BlockPos pos) {
-        BlockState state = level.getBlockState(pos);
+        return isPlantableSurface(level.getBlockState(pos));
+    }
 
+    /** Whether a block is one crops are planted on (farmland, or soul sand for nether wart). */
+    public static boolean isPlantableSurface(BlockState state) {
         // Farmland for most crops (grass types with PLANTING)
         if (state.is(Blocks.FARMLAND)) {
             return true;
@@ -117,11 +120,32 @@ public class CropAdapter {
     }
 
     /**
+     * Whether a block is a kind of crop that's harvested once it's grown (see {@link #isFullyGrown}):
+     * a field crop, nether wart, cocoa, an apricorn, a berry bush or berry tree, glow berries, a
+     * torchflower or pitcher plant. Nothing else ever is, so it's what work this kind of block takes
+     * whatever its state (the "Worked by" tooltip). Not a pumpkin or melon: those are harvested as
+     * the fruit of the stem beside them (see {@link #attachedFruitPos}).
+     */
+    public static boolean isHarvestable(BlockState state) {
+        Block block = state.getBlock();
+        return block instanceof CropBlock
+                || block instanceof NetherWartBlock
+                || block instanceof CocoaBlock
+                || isApricorn(state)
+                || isBerry(state)
+                || state.is(Blocks.TORCHFLOWER)
+                || state.is(Blocks.PITCHER_CROP);
+    }
+
+    /**
      * Check if a block is a fully grown crop ready for harvest.
      */
     public static boolean isFullyGrown(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
+        if (!isHarvestable(state)) {
+            return false;
+        }
 
         // A two-block crop (hearty grains, a pitcher plant) is harvested from its lower half, which
         // takes the top with it. Its upper half is just as grown, and counted as a crop of its own it
@@ -246,17 +270,26 @@ public class CropAdapter {
     public static boolean isGrowing(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
-        boolean watered = block instanceof CropBlock
-                || block instanceof StemBlock
-                || block instanceof SweetBerryBushBlock
-                || block instanceof PitcherCropBlock
-                || state.is(COBBLEMON_BERRIES);
+        boolean watered = isWatered(state);
         boolean upperHalf = state.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)
                 && state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.UPPER;
         if (!watered || upperHalf) {
             return false;
         }
         return block instanceof BonemealableBlock crop && crop.isValidBonemealTarget(level, pos, state);
+    }
+
+    /**
+     * Whether a block is a kind of crop that's watered while it grows (see {@link #isGrowing}): a
+     * field crop, a stem, a berry bush or berry tree, a pitcher plant.
+     */
+    public static boolean isWatered(BlockState state) {
+        Block block = state.getBlock();
+        return block instanceof CropBlock
+                || block instanceof StemBlock
+                || block instanceof SweetBerryBushBlock
+                || block instanceof PitcherCropBlock
+                || state.is(COBBLEMON_BERRIES);
     }
 
     /**

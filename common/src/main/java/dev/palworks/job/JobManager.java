@@ -266,6 +266,8 @@ public class JobManager {
                 WorkerNavigator.forget(entity);
                 assigner.forget(uuid);
                 workers.forgetEntity(uuid);
+                state.setCantReach(false);
+                state.setCantDeliver(false);
             }
             if (removed != null && removed.currentReservation != null) {
                 pool.release(JobKey.of(removed.currentReservation), level.getGameTime());
