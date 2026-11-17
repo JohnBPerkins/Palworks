@@ -93,6 +93,8 @@ public class JobGameTests {
         expected.put(Items.MANGROVE_ROOTS, EnumSet.of(Suitability.LUMBERING));
         expected.put(Items.CRIMSON_STEM, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER));
         expected.put(Items.OAK_SAPLING, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.AZALEA, EnumSet.of(Suitability.LUMBERING));
+        expected.put(Items.FLOWERING_AZALEA, EnumSet.of(Suitability.LUMBERING));
         expected.put(Items.MANGROVE_PROPAGULE, EnumSet.of(Suitability.LUMBERING));
         expected.put(Items.WARPED_FUNGUS, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER));
         expected.put(Items.AMETHYST_CLUSTER, EnumSet.of(Suitability.MINING));

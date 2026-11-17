@@ -601,10 +601,14 @@ public class TreeDetector {
 
     /**
      * A tree block this sapling is what's replanted for (a log or root {@link #saplingFor} gives
-     * it for, found by name), or null if it isn't one.
+     * it for, found by name), or null if it isn't one. An azalea's is an oak log: its tree grows
+     * them, and {@link #getSaplingForTree} names it by hand.
      */
     @Nullable
     public static Block treeBlockFor(Item sapling) {
+        if (sapling.equals(Items.AZALEA) || sapling.equals(Items.FLOWERING_AZALEA)) {
+            return Blocks.OAK_LOG;
+        }
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(sapling);
         for (String path : SaplingNames.treeBlockCandidates(id.getPath())) {
             ResourceLocation candidate = ResourceLocation.tryBuild(id.getNamespace(), path);
