@@ -26,6 +26,8 @@
   "palworks.ui.work_skills.entry": "%s: level %s",
   "palworks.ui.work_skills.more": "+%s more",
   "palworks.ui.work_skills.none": "Can't work",
+  "palworks.ui.dex_filter.any": "Work skill: Any",
+  "palworks.ui.dex_filter.skill": "Work skill: %s",
   "palworks.ui.mood.title": "Mood: %s/100",
   "palworks.ui.mood.happy": "Happy",
   "palworks.ui.mood.content": "Content",

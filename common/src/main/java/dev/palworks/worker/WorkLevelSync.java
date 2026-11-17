@@ -5,16 +5,20 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.mood.Mood;
 import dev.palworks.mood.MoodMath;
+import dev.palworks.net.packets.DexWorkSkillsPacket;
 import dev.palworks.net.packets.WorkLevelsPacket;
 import dev.palworks.net.packets.WorkerMoodPacket;
+import dev.palworks.suitability.SpeciesWorkSkills;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -33,6 +37,10 @@ import net.minecraft.server.level.ServerPlayer;
  * <p>Their moods ({@link WorkerMoodPacket}, see dev.palworks.mood.Mood) go the same way, at the same
  * times: the party's when they change (as whole points), the PC's as it opens. While mood is off, a
  * player who was sent moods is told once to drop them.
+ *
+ * <p>Every species' work skills ({@link DexWorkSkillsPacket}, see SpeciesWorkSkills), for the
+ * Pokédex's work skill filter, go when the client asks as the Pokédex opens, and only if they've
+ * changed since that player was last sent them.
  */
 public final class WorkLevelSync {
     static final int PARTY_CHECK_TICKS = 20;
@@ -44,6 +52,8 @@ public final class WorkLevelSync {
     private static final Map<UUID, Map<UUID, WorkerMoodPacket.Shown>> SENT_MOODS = new ConcurrentHashMap<>();
     // Server tick each player last asked for their PC's levels
     private static final Map<UUID, Integer> LAST_PC_REQUEST = new ConcurrentHashMap<>();
+    // The species' work skills each player was last sent
+    private static final Map<UUID, Map<ResourceLocation, Set<Suitability>>> SENT_DEX = new ConcurrentHashMap<>();
 
     private WorkLevelSync() {}
 
@@ -144,6 +154,20 @@ public final class WorkLevelSync {
         }
     }
 
+    /**
+     * Send a player every species' work skills, as their Pokédex opens, unless they have them: the
+     * client keeps them until it leaves, so they go once, and again after a {@code /reload} or an
+     * admin's change. Whether they were sent.
+     */
+    public static boolean sendDex(ServerPlayer player) {
+        Map<ResourceLocation, Set<Suitability>> skills = SpeciesWorkSkills.current();
+        if (skills.equals(SENT_DEX.put(player.getUUID(), skills))) {
+            return false;
+        }
+        new DexWorkSkillsPacket(skills).sendToPlayer(player);
+        return true;
+    }
+
     /** What this player was last sent about this party Pokémon's levels, if anything (tests). */
     public static Optional<Map<Suitability, Integer>> lastSent(UUID player, UUID pokemon) {
         return Optional.ofNullable(SENT.getOrDefault(player, Map.of()).get(pokemon));
@@ -159,6 +183,7 @@ public final class WorkLevelSync {
         SENT.remove(player);
         SENT_MOODS.remove(player);
         LAST_PC_REQUEST.remove(player);
+        SENT_DEX.remove(player);
     }
 
     /** Drop everything (server stop). */
@@ -166,5 +191,6 @@ public final class WorkLevelSync {
         SENT.clear();
         SENT_MOODS.clear();
         LAST_PC_REQUEST.clear();
+        SENT_DEX.clear();
     }
 }

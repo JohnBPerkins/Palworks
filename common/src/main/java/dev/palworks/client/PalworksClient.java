@@ -3,6 +3,7 @@ package dev.palworks.client;
 import dev.architectury.event.events.client.ClientPlayerEvent;
 import dev.architectury.platform.Platform;
 import dev.architectury.registry.menu.MenuRegistry;
+import dev.palworks.client.gui.DexWorkSkillFilter;
 import dev.palworks.client.gui.PokemonInteractHandler;
 import dev.palworks.client.gui.WorkSkillsOverlay;
 import dev.palworks.config.PalworksClientConfig;
@@ -33,6 +34,9 @@ public final class PalworksClient {
 
         // Work skills on Cobblemon's PC and summary screens
         WorkSkillsOverlay.init();
+
+        // A work skill filter on Cobblemon's Pokédex
+        DexWorkSkillFilter.init();
 
         // Another world or server: what this one said about its workers was about its own
         ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> ClientWorkerData.clear());
