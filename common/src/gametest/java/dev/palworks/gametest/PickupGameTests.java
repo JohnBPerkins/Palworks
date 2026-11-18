@@ -4,11 +4,17 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityOverrides;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
+import net.minecraft.gametest.framework.BeforeBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
@@ -26,7 +32,46 @@ import net.minecraft.world.phys.AABB;
  */
 public class PickupGameTests {
     private static final BlockPos TRANSPORTER = new BlockPos(1, 1, 1);
-    private static final String PIDGEY = "pidgey level=20"; // Flying: Transporting
+    private static final String PIDGEY = "pidgey level=20"; // Flying: Transporting 1, so 1 slot
+    private static final String PIDGEY_ID = "cobblemon:pidgey";
+
+    /** Give every Pidgey this Transporting level (one slot a level), for a batch: undone after it. */
+    static void pidgeysAtTransporting(int level) throws IOException {
+        SuitabilityOverrides.set(PIDGEY_ID, Suitability.TRANSPORTING, level);
+    }
+
+    // Tests of what a transporter does with several kinds of item carry them at level 3: 3 slots,
+    // as every transporter had before levels counted
+
+    @BeforeBatch(batch = "pickup_fill_up")
+    public void beforeFillUp(ServerLevel level) throws IOException {
+        pidgeysAtTransporting(3);
+    }
+
+    @AfterBatch(batch = "pickup_fill_up")
+    public void afterFillUp(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @BeforeBatch(batch = "pickup_close")
+    public void beforeClose(ServerLevel level) throws IOException {
+        pidgeysAtTransporting(3);
+    }
+
+    @AfterBatch(batch = "pickup_close")
+    public void afterClose(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @BeforeBatch(batch = "pickup_level_five")
+    public void beforeLevelFive(ServerLevel level) throws IOException {
+        pidgeysAtTransporting(5);
+    }
+
+    @AfterBatch(batch = "pickup_level_five")
+    public void afterLevelFive(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
 
     /** Drop {@code count} of an item at a spot (not moving), for transporters to pick up. */
     private static void dropForPickup(GameTestHelper helper, BlockPos rel, Item item, int count) {
@@ -413,5 +458,83 @@ public class PickupGameTests {
         helper.runAfterDelay(100, () -> inside.getBusyLocks().remove("palworks-test"));
         helper.succeedWhen(() -> helper.assertValueEqual(
                 carried(inside, Items.WHEAT), 4, "wheat carried by the one that can get to it"));
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_level_one", timeoutTicks = 1200)
+    public void aLevelOneTransporterDeliversEachKindBeforeTakingTheNext(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos chestPos = new BlockPos(3, 1, 3);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        helper.assertValueEqual(
+                WorkerInventoryManager.getOrCreate(pidgey.getPokemon()).getCapacity(), 1, "a Pidgey's slots");
+        dropForPickup(helper, new BlockPos(1, 1, 6), Items.WHEAT, 5);
+        dropForPickup(helper, new BlockPos(6, 1, 6), Items.CARROT, 5);
+
+        // It never carries both: one slot
+        helper.onEachTick(() -> helper.assertFalse(
+                carried(pidgey, Items.WHEAT) > 0 && carried(pidgey, Items.CARROT) > 0, "carrying two kinds at once"));
+        helper.succeedWhen(() -> {
+            helper.assertValueEqual(inChest(helper, chestPos, Items.WHEAT), 5, "wheat in the chest");
+            helper.assertValueEqual(inChest(helper, chestPos, Items.CARROT), 5, "carrots in the chest");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_level_five", timeoutTicks = 1200)
+    public void aLevelFiveTransporterCarriesFiveKinds(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        // No chest: what it picks up stays with it
+        Item[] kinds = {Items.WHEAT, Items.CARROT, Items.POTATO, Items.BEETROOT, Items.APPLE};
+        BlockPos[] spots = {
+            new BlockPos(1, 1, 6),
+            new BlockPos(3, 1, 6),
+            new BlockPos(5, 1, 6),
+            new BlockPos(6, 1, 4),
+            new BlockPos(6, 1, 2)
+        };
+        for (int i = 0; i < kinds.length; i++) {
+            dropForPickup(helper, spots[i], kinds[i], 5);
+        }
+
+        helper.succeedWhen(() -> {
+            for (Item kind : kinds) {
+                helper.assertValueEqual(carried(pidgey, kind), 5, "carried: " + kind);
+            }
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_past_capacity", timeoutTicks = 600)
+    public void whatsCarriedPastATransportersSlotsIsDeliveredToo(GameTestHelper helper) {
+        // A world from before levels counted: a Pidgey (1 slot now) with all 3 of the old slots full
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos chestPos = new BlockPos(3, 1, 3);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        carrying(pidgey, new ItemStack(Items.WHEAT, 10), new ItemStack(Items.DIRT, 10), new ItemStack(Items.STONE, 10));
+
+        helper.succeedWhen(() -> {
+            helper.assertValueEqual(inChest(helper, chestPos, Items.WHEAT), 10, "wheat in the chest");
+            helper.assertValueEqual(inChest(helper, chestPos, Items.DIRT), 10, "dirt in the chest");
+            helper.assertValueEqual(inChest(helper, chestPos, Items.STONE), 10, "stone in the chest");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_spare_seeds", timeoutTicks = 600)
+    public void aTransporterThatPlantsTakesSeedsItHasNowhereToPlantToAChest(GameTestHelper helper) {
+        // Hoppip: Grass/Flying, Planting and Transporting 1. Seeds kept to plant would fill its one
+        // slot for good; with no farmland round it, they go in the chest
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos chestPos = new BlockPos(3, 1, 3);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        PokemonEntity hoppip = Workers.sendOut(helper, "hoppip level=20", TRANSPORTER);
+        carrying(hoppip, new ItemStack(Items.WHEAT_SEEDS, 12));
+
+        helper.succeedWhen(
+                () -> helper.assertValueEqual(inChest(helper, chestPos, Items.WHEAT_SEEDS), 12, "seeds in the chest"));
     }
 }

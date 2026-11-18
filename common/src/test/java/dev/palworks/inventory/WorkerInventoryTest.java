@@ -4,9 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.palworks.suitability.Suitability;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.junit.jupiter.api.BeforeAll;
@@ -111,5 +114,65 @@ class WorkerInventoryTest {
         inventory.addItem(stack);
 
         assertEquals(10, stack.getCount(), "callers decide what to do with the leftover count");
+    }
+
+    @Test
+    void aTransporterUsesOnlyAsManySlotsAsItsCapacity() {
+        for (int capacity = 1; capacity <= WorkerInventory.INVENTORY_SIZE; capacity++) {
+            WorkerInventory inventory = inventory(CarryMode.FULL);
+            inventory.setCapacity(capacity);
+            Item[] kinds = {Items.WHEAT, Items.OAK_LOG, Items.CARROT, Items.STICK, Items.APPLE, Items.COBBLESTONE};
+            for (int i = 0; i < capacity; i++) {
+                assertEquals(0, inventory.addItem(new ItemStack(kinds[i], 64)), "kind " + (i + 1) + " of " + capacity);
+            }
+            assertFalse(inventory.hasSpace());
+            assertEquals(0, inventory.roomFor(new ItemStack(kinds[capacity], 1)));
+            assertEquals(5, inventory.addItem(new ItemStack(kinds[capacity], 5)), "one kind more doesn't fit");
+            if (capacity < WorkerInventory.INVENTORY_SIZE) {
+                assertFalse(inventory.canPlaceItem(capacity, new ItemStack(Items.FLINT)), "the slot past its capacity");
+            }
+        }
+    }
+
+    @Test
+    void itemsInSlotsPastItsCapacityStayAndAreStillCargo() {
+        // A world from before levels counted: a level 1 transporter with 3 slots full
+        WorkerInventory inventory = inventory(CarryMode.FULL);
+        inventory.addItem(new ItemStack(Items.WHEAT, 64));
+        inventory.addItem(new ItemStack(Items.OAK_LOG, 64));
+        inventory.addItem(new ItemStack(Items.CARROT, 64));
+        inventory.setCapacity(1);
+
+        assertEquals(64, inventory.getItem(2).getCount(), "kept");
+        assertEquals(0, inventory.roomFor(new ItemStack(Items.CARROT, 1)), "nothing more goes in past its capacity");
+        assertTrue(inventory.hasCargo(Set.of(Suitability.TRANSPORTING)));
+        inventory.setItem(0, ItemStack.EMPTY);
+        inventory.setItem(1, ItemStack.EMPTY);
+        assertTrue(inventory.hasCargo(Set.of(Suitability.TRANSPORTING)), "what's past its capacity is delivered too");
+    }
+
+    @Test
+    void aTransporterThatPlantsKeepsItsSeedsOnlyWhileItHasSomewhereToPlantThem() {
+        Set<Suitability> plantsToo = Set.of(Suitability.TRANSPORTING, Suitability.PLANTING);
+        WorkerInventory inventory = inventory(CarryMode.FULL);
+        inventory.addItem(new ItemStack(Items.WHEAT_SEEDS, 16));
+        assertFalse(inventory.hasCargo(plantsToo), "seeds to plant aren't cargo");
+        inventory.setKeepsSeeds(false);
+        assertTrue(inventory.hasCargo(plantsToo), "with nowhere to plant them, they go to a chest");
+        assertEquals(Items.WHEAT_SEEDS, inventory.firstCargo(plantsToo).getItem());
+    }
+
+    @Test
+    void anOldInventoryOfThreeSlotsLoadsAndOneOfFiveIsSavedWhole() {
+        WorkerInventory inventory = inventory(CarryMode.FULL);
+        inventory.setCapacity(5);
+        for (Item kind : new Item[] {Items.WHEAT, Items.OAK_LOG, Items.CARROT, Items.STICK, Items.APPLE}) {
+            inventory.addItem(new ItemStack(kind, 3));
+        }
+        var registries = net.minecraft.core.RegistryAccess.fromRegistryOfRegistries(
+                net.minecraft.core.registries.BuiltInRegistries.REGISTRY);
+        WorkerInventory loaded =
+                WorkerInventory.fromNBT(UUID.randomUUID(), inventory.serializeNBT(registries), registries);
+        assertEquals(Items.APPLE, loaded.getItem(4).getItem(), "the fifth slot is saved and loaded");
     }
 }

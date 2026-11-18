@@ -223,6 +223,13 @@ final class JobAssigner {
                 }
             }
 
+            // A transporter that plants keeps its seeds while there's somewhere round it to plant
+            // them; after that they're cargo, so they don't take up its slots for good
+            if (pokemon != null && worker.suitabilities.contains(Suitability.TRANSPORTING)) {
+                WorkerInventory carried = WorkerInventoryManager.getOrCreate(pokemon);
+                carried.setKeepsSeeds(hasSeedsToPlant(worker, carried));
+            }
+
             // A transporter carrying cargo (anything but a planter's seeds) fills up before it
             // delivers: it takes pickups it has room for, nearest first (a free slot takes anything;
             // once every slot is used, only items matching what it carries), and goes to a chest
@@ -359,7 +366,7 @@ final class JobAssigner {
     private static net.minecraft.world.item.ItemStack carriedTroughFood(WorkerInventory inventory, WorkerInfo worker) {
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
-            if (WorkerInventory.isCargo(stack, worker.suitabilities) && TroughFood.accepts(stack)) {
+            if (inventory.carriesAsCargo(stack, worker.suitabilities) && TroughFood.accepts(stack)) {
                 return stack;
             }
         }
@@ -1221,6 +1228,17 @@ final class JobAssigner {
             }
         }
         return -1;
+    }
+
+    /** Whether a worker carries seeds that open spots in its range, for a planting skill it has, take. */
+    private boolean hasSeedsToPlant(WorkerInfo worker, WorkerInventory inventory) {
+        for (Suitability skill : PLANTING_SKILLS) {
+            if (worker.suitabilities.contains(skill)
+                    && carriesSeedForAny(inventory, openSpotsNear(worker.position, skill))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the worker carries a seed one of {@code openSpots} can take. */

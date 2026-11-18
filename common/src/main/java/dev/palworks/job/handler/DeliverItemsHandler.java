@@ -34,12 +34,13 @@ final class DeliverItemsHandler implements JobHandler {
             return;
         }
 
-        // A worker that plants keeps its seeds to plant with; everything else goes in the chest
+        // A worker that plants keeps its seeds to plant with (while there's somewhere to plant
+        // them); everything else goes in the chest
         Set<Suitability> suitabilities = SuitabilityDetector.getSuitabilities(ctx.pokemon());
         int totalDelivered = 0;
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             ItemStack stack = inventory.getItem(i);
-            if (WorkerInventory.isCargo(stack, suitabilities)) {
+            if (inventory.carriesAsCargo(stack, suitabilities)) {
                 int count = stack.getCount();
                 int left = ChestHelper.insertItems(ctx.level(), chestPos, stack);
                 totalDelivered += count - left;
