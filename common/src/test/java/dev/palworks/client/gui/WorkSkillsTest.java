@@ -86,6 +86,29 @@ class WorkSkillsTest {
     }
 
     @Test
+    void theSkillsWhoseLevelChangesSomethingSayWhatEachLevelGives() throws IOException {
+        JsonObject lang = JsonParser.parseString(Files.readString(ASSETS.resolve("palworks/lang/en_us.json")))
+                .getAsJsonObject();
+        for (Suitability job : List.of(Suitability.LUMBERING, Suitability.TRANSPORTING, Suitability.MINING)) {
+            for (int level = 1; level <= 5; level++) {
+                WorkSkills.LevelEffect effect = WorkSkills.levelEffect(job, level);
+                assertNotNull(effect, job + " at level " + level);
+                assertTrue(lang.has(effect.key()), "no text for " + effect.key());
+            }
+        }
+        assertEquals(
+                List.of(32), WorkSkills.levelEffect(Suitability.LUMBERING, 2).args(), "a level 2's trees");
+        assertEquals(
+                List.of(4), WorkSkills.levelEffect(Suitability.TRANSPORTING, 4).args(), "a level 4's slots");
+        assertEquals(
+                "palworks.work_skill.mining.level.5",
+                WorkSkills.levelEffect(Suitability.MINING, 5).key());
+        // Watering's chance is the server's config; the rest have no level effect yet
+        assertNull(WorkSkills.levelEffect(Suitability.WATERING, 3));
+        assertNull(WorkSkills.levelEffect(Suitability.KINDLING, 3));
+    }
+
+    @Test
     void thePokedexFilterGoesFromNoneThroughEveryShownSkillAndBackToNone() {
         List<Suitability> picked = new ArrayList<>();
         for (Suitability skill = WorkSkills.nextFilter(null); skill != null; skill = WorkSkills.nextFilter(skill)) {

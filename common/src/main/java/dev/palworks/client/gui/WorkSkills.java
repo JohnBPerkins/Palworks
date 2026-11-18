@@ -1,7 +1,9 @@
 package dev.palworks.client.gui;
 
 import dev.palworks.Palworks;
+import dev.palworks.inventory.CarryMode;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.tree.TreeSize;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -19,6 +21,9 @@ import org.jetbrains.annotations.Nullable;
 public final class WorkSkills {
     /** One work skill to show. */
     public record Shown(Suitability job, int level) {}
+
+    /** What a skill's level gives: a translation key, and the numbers that go in it. */
+    public record LevelEffect(String key, List<Object> args) {}
 
     // The icon each shown job has: the party HUD's for its main job, or its own
     private static final Map<Suitability, ResourceLocation> ICONS = new EnumMap<>(Suitability.class);
@@ -77,5 +82,22 @@ public final class WorkSkills {
     /** The translation key of what a shown job does ("Waters growing crops..."). */
     public static String descriptionKey(Suitability job) {
         return nameKey(job) + ".description";
+    }
+
+    /**
+     * What this level of a skill gives ("Chops trees of up to 32 logs"), or null for a skill whose
+     * level changes nothing, or (Watering) changes it by the server's config, which the client
+     * doesn't have.
+     */
+    @Nullable
+    public static LevelEffect levelEffect(Suitability job, int level) {
+        String key = nameKey(job) + ".level";
+        return switch (job) {
+            case LUMBERING -> new LevelEffect(key, List.of(TreeSize.maxLogs(level)));
+            case TRANSPORTING -> new LevelEffect(key, List.of(CarryMode.slotsForLevel(level)));
+            // Its pickaxe (see MiningTool), one line a level
+            case MINING -> new LevelEffect(key + "." + Math.clamp(level, 1, 5), List.of());
+            default -> null;
+        };
     }
 }

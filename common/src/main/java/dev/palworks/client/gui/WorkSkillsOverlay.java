@@ -212,7 +212,10 @@ public final class WorkSkillsOverlay {
         pose.popPose();
     }
 
-    /** Every shown skill by name, with its level ("Watering: level 3"), and what it does under it. */
+    /**
+     * Every shown skill by name, with its level ("Watering: level 3"), what it does under it, and
+     * what its level gives, where that's known here.
+     */
     private static void drawTooltip(
             GuiGraphics graphics, Font font, List<WorkSkills.Shown> shown, int mouseX, int mouseY) {
         List<Component> lines = new ArrayList<>();
@@ -224,6 +227,11 @@ public final class WorkSkillsOverlay {
                     skill.level()));
             lines.add(Component.translatable(WorkSkills.descriptionKey(skill.job()))
                     .withStyle(ChatFormatting.GRAY));
+            WorkSkills.LevelEffect effect = WorkSkills.levelEffect(skill.job(), skill.level());
+            if (effect != null) {
+                lines.add(Component.translatable(effect.key(), effect.args().toArray())
+                        .withStyle(ChatFormatting.DARK_GRAY));
+            }
         }
         graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
     }
