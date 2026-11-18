@@ -5,6 +5,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -111,6 +112,8 @@ final class WorkerRegistry {
         AABB roam;
 
         Set<Suitability> suitabilities = EnumSet.noneOf(Suitability.class);
+        // Its work level in each of them
+        final Map<Suitability, Integer> levels = new EnumMap<>(Suitability.class);
 
         @Nullable
         ReservationId currentReservation;

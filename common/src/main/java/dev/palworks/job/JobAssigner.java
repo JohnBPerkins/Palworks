@@ -540,7 +540,8 @@ final class JobAssigner {
         for (Collection<JobRecord> group : pool.availableFor(worker.suitabilities)) {
             for (JobRecord job : group) {
                 // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
-                if (!inWorkRange(worker, job.position())
+                if (!canDoJob(worker, job)
+                        || !inWorkRange(worker, job.position())
                         || isRecentlyUnreachable(worker, job.position())
                         || job.isOutOfReachFor(worker.pokemonUUID)
                         || !canWorkerDo(worker, job)) {
@@ -699,10 +700,10 @@ final class JobAssigner {
 
     /**
      * Whether a worker has every suitability a job needs (e.g. nether trees need Nether as well as
-     * Lumbering).
+     * Lumbering), and the work level it asks for in its type's own (a big tree).
      */
     static boolean canDoJob(WorkerInfo worker, JobRecord job) {
-        return job.canBeDoneWith(worker.suitabilities);
+        return job.canBeDoneWith(worker.suitabilities) && job.canBeDoneAt(worker.levels);
     }
 
     /** {@link JobChecks#canWorkerDo} for a worker being offered a job. One that isn't loaded can't do any. */
@@ -1247,6 +1248,7 @@ final class JobAssigner {
         for (Collection<JobRecord> group : pool.availableFor(worker.suitabilities)) {
             for (JobRecord job : group) {
                 if (job.type() != JobType.GET_SEEDS
+                        && canDoJob(worker, job)
                         && isRecentlyUnreachable(worker, job.position())
                         && inWorkRange(worker, job.position())
                         && canWorkerDo(worker, job)) {

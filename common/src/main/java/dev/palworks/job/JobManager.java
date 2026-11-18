@@ -324,6 +324,10 @@ public class JobManager {
         }
         // From its species and types as they are now, so an evolution or form change counts at once
         info.suitabilities = SuitabilityDetector.getSuitabilities(pokemon);
+        info.levels.clear();
+        for (Suitability skill : info.suitabilities) {
+            info.levels.put(skill, SuitabilityDetector.getSuitabilityLevel(pokemon, skill));
+        }
         info.currentReservation = stateReservation;
         // A busy worker (in a battle, evolving) gets no new jobs; WorkerAI drops the one it had.
         info.idle = (stateReservation == null) && !WorkerEligibility.isBusy(entity);
