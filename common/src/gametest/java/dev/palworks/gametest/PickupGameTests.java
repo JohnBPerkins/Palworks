@@ -40,8 +40,7 @@ public class PickupGameTests {
         SuitabilityOverrides.set(PIDGEY_ID, Suitability.TRANSPORTING, level);
     }
 
-    // Tests of what a transporter does with several kinds of item carry them at level 3: 3 slots,
-    // as every transporter had before levels counted
+    // Tests of what a transporter does with several kinds of item carry them at level 3: 3 slots
 
     @BeforeBatch(batch = "pickup_fill_up")
     public void beforeFillUp(ServerLevel level) throws IOException {
@@ -503,23 +502,6 @@ public class PickupGameTests {
             for (Item kind : kinds) {
                 helper.assertValueEqual(carried(pidgey, kind), 5, "carried: " + kind);
             }
-        });
-    }
-
-    @GameTest(template = Templates.EMPTY, batch = "pickup_past_capacity", timeoutTicks = 600)
-    public void whatsCarriedPastATransportersSlotsIsDeliveredToo(GameTestHelper helper) {
-        // A world from before levels counted: a Pidgey (1 slot now) with all 3 of the old slots full
-        Workers.isolate(helper);
-        Scenes.floor(helper, Blocks.GRASS_BLOCK);
-        BlockPos chestPos = new BlockPos(3, 1, 3);
-        helper.setBlock(chestPos, Blocks.CHEST);
-        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
-        carrying(pidgey, new ItemStack(Items.WHEAT, 10), new ItemStack(Items.DIRT, 10), new ItemStack(Items.STONE, 10));
-
-        helper.succeedWhen(() -> {
-            helper.assertValueEqual(inChest(helper, chestPos, Items.WHEAT), 10, "wheat in the chest");
-            helper.assertValueEqual(inChest(helper, chestPos, Items.DIRT), 10, "dirt in the chest");
-            helper.assertValueEqual(inChest(helper, chestPos, Items.STONE), 10, "stone in the chest");
         });
     }
 

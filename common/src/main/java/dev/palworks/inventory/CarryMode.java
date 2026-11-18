@@ -20,8 +20,8 @@ public enum CarryMode {
     /** The full inventory: any item, as many slots as its Transporting level (see {@link #slotsForLevel}). */
     FULL;
 
-    /** The worker inventory slot a seed pouch uses: the middle one, so the GUI shows it centred. */
-    public static final int POUCH_SLOT = 1;
+    /** The worker inventory slot a seed pouch uses. */
+    public static final int POUCH_SLOT = 0;
 
     /**
      * Transporting gets the full inventory (and plants from it if it can also plant). Planting, or
@@ -37,10 +37,7 @@ public enum CarryMode {
         return NONE;
     }
 
-    /**
-     * How many slots a transporter of this Transporting level carries: one a level, 1 to 5. A level
-     * 3 one carries 3, as every transporter did before levels counted.
-     */
+    /** How many slots a transporter of this Transporting level carries: one a level, 1 to 5. */
     public static int slotsForLevel(int transportingLevel) {
         return Math.clamp(transportingLevel, 1, WorkerInventory.INVENTORY_SIZE);
     }

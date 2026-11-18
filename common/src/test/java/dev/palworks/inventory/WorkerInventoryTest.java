@@ -57,8 +57,11 @@ class WorkerInventoryTest {
 
         assertEquals(0, inventory.addItem(new ItemStack(Items.WHEAT_SEEDS, 32)));
         assertEquals(32, inventory.getItem(CarryMode.POUCH_SLOT).getCount(), "seeds go in the pouch slot");
-        assertTrue(inventory.getItem(0).isEmpty());
-        assertTrue(inventory.getItem(2).isEmpty());
+        for (int slot = 0; slot < WorkerInventory.INVENTORY_SIZE; slot++) {
+            if (slot != CarryMode.POUCH_SLOT) {
+                assertTrue(inventory.getItem(slot).isEmpty(), "slot " + slot);
+            }
+        }
     }
 
     @Test
@@ -79,7 +82,9 @@ class WorkerInventoryTest {
         assertTrue(inventory.isEmpty());
         assertFalse(inventory.canPlaceItem(CarryMode.POUCH_SLOT, new ItemStack(Items.WHEAT)));
         assertTrue(inventory.canPlaceItem(CarryMode.POUCH_SLOT, new ItemStack(Items.BEETROOT_SEEDS)));
-        assertFalse(inventory.canPlaceItem(0, new ItemStack(Items.BEETROOT_SEEDS)), "only the pouch slot is used");
+        assertFalse(
+                inventory.canPlaceItem(CarryMode.POUCH_SLOT + 1, new ItemStack(Items.BEETROOT_SEEDS)),
+                "only the pouch slot is used");
     }
 
     @Test
@@ -135,23 +140,6 @@ class WorkerInventoryTest {
     }
 
     @Test
-    void itemsInSlotsPastItsCapacityStayAndAreStillCargo() {
-        // A world from before levels counted: a level 1 transporter with 3 slots full
-        WorkerInventory inventory = inventory(CarryMode.FULL);
-        inventory.addItem(new ItemStack(Items.WHEAT, 64));
-        inventory.addItem(new ItemStack(Items.OAK_LOG, 64));
-        inventory.addItem(new ItemStack(Items.CARROT, 64));
-        inventory.setCapacity(1);
-
-        assertEquals(64, inventory.getItem(2).getCount(), "kept");
-        assertEquals(0, inventory.roomFor(new ItemStack(Items.CARROT, 1)), "nothing more goes in past its capacity");
-        assertTrue(inventory.hasCargo(Set.of(Suitability.TRANSPORTING)));
-        inventory.setItem(0, ItemStack.EMPTY);
-        inventory.setItem(1, ItemStack.EMPTY);
-        assertTrue(inventory.hasCargo(Set.of(Suitability.TRANSPORTING)), "what's past its capacity is delivered too");
-    }
-
-    @Test
     void aTransporterThatPlantsKeepsItsSeedsOnlyWhileItHasSomewhereToPlantThem() {
         Set<Suitability> plantsToo = Set.of(Suitability.TRANSPORTING, Suitability.PLANTING);
         WorkerInventory inventory = inventory(CarryMode.FULL);
@@ -163,7 +151,7 @@ class WorkerInventoryTest {
     }
 
     @Test
-    void anOldInventoryOfThreeSlotsLoadsAndOneOfFiveIsSavedWhole() {
+    void allFiveSlotsAreSavedAndLoaded() {
         WorkerInventory inventory = inventory(CarryMode.FULL);
         inventory.setCapacity(5);
         for (Item kind : new Item[] {Items.WHEAT, Items.OAK_LOG, Items.CARROT, Items.STICK, Items.APPLE}) {

@@ -93,13 +93,12 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
     }
 
     /**
-     * Where a worker slot goes across the screen: the ones its mode uses side by side, centred (a
-     * lone slot at x=80, the middle of the 176-wide screen).
+     * Where a worker slot goes across the screen: the ones its mode uses side by side from slot 0,
+     * centred (a lone slot at x=80, the middle of the 176-wide screen).
      */
     static int slotX(int slot, CarryMode mode, int capacity) {
-        int first = mode == CarryMode.SEED_POUCH ? CarryMode.POUCH_SLOT : 0;
         int shown = mode == CarryMode.SEED_POUCH ? 1 : Math.clamp(capacity, 1, WorkerInventory.INVENTORY_SIZE);
-        return 80 - 9 * (shown - 1) + 18 * (slot - first);
+        return 80 - 9 * (shown - 1) + 18 * slot;
     }
 
     public UUID getPokemonUUID() {

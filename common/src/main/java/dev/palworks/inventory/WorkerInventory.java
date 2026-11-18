@@ -17,8 +17,7 @@ import net.minecraft.world.item.ItemStack;
  * A worker Pokemon's carried items. Always 5 slots of storage, but how many it may use, and for
  * what, depends on its {@link CarryMode} and capacity: one a Transporting level for a transporter,
  * one seeds-only slot for planters, none for everyone else. Adding items ({@link #addItem}, the
- * GUI) respects them. Items in a slot it no longer uses (its level went down; a world from before
- * levels counted, when every transporter had 3) stay there and go out with its next delivery.
+ * GUI) respects them.
  */
 public class WorkerInventory implements Container {
     public static final int INVENTORY_SIZE = 5;
