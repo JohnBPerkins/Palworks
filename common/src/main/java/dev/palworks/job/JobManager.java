@@ -17,6 +17,8 @@ import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
+import dev.palworks.tree.TreeDetector;
+import dev.palworks.tree.TreeSize;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
@@ -350,9 +352,15 @@ public class JobManager {
         JobType type = reservation.getJobType();
         BlockPos pos = reservation.getStationPos();
         Set<Suitability> skills = JobChecks.skillsFor(level, type, pos);
-        return type == JobType.COLLECT_DROPS || type == JobType.TAKE_SEEDS
-                ? JobRecord.followUp(type, pos, level.getGameTime(), null, skills)
-                : JobRecord.of(type, pos, level.getGameTime(), skills);
+        if (type == JobType.COLLECT_DROPS || type == JobType.TAKE_SEEDS) {
+            return JobRecord.followUp(type, pos, level.getGameTime(), null, skills);
+        }
+        // A tree by its size, as the scan does (one already chopped, its replant left, is anyone's)
+        int minLevel = type == JobType.CHOP_TREE
+                ? TreeSize.levelNeeded(
+                        TreeDetector.validateTree(level, pos).getLogPositions().size())
+                : 1;
+        return JobRecord.of(type, pos, level.getGameTime(), skills, minLevel);
     }
 
     /**

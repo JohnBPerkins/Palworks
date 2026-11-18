@@ -8,7 +8,10 @@ import dev.palworks.drops.TrackedDrops;
 import dev.palworks.hunger.HungerMath;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
+import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.tree.TreeDetector;
+import dev.palworks.tree.TreeSize;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -83,6 +86,13 @@ final class ChopTreeHandler implements JobHandler {
             // breaking "just this log" is how builds that fail tree detection got griefed.
             Palworks.LOGGER.debug(
                     "{} found no valid tree at {} ({}), leaving it alone", ctx.name(), treePos, treeResult.getReason());
+            return false;
+        }
+
+        // Bigger than this worker chops (it's grown into the tree beside it since the job was found,
+        // or the worker's level was changed): left for one that does
+        int lumbering = SuitabilityDetector.getSuitabilityLevel(ctx.pokemon(), Suitability.LUMBERING);
+        if (treeResult.getLogPositions().size() > TreeSize.maxLogs(lumbering)) {
             return false;
         }
 
