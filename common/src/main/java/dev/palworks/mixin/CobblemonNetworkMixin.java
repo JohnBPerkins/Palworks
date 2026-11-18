@@ -2,7 +2,9 @@ package dev.palworks.mixin;
 
 import com.cobblemon.mod.common.CobblemonNetwork;
 import com.cobblemon.mod.common.net.PacketRegisterInfo;
+import dev.palworks.net.handlers.DexWorkSkillsHandler;
 import dev.palworks.net.handlers.OpenInventoryHandler;
+import dev.palworks.net.handlers.RequestDexWorkSkillsHandler;
 import dev.palworks.net.handlers.RequestPcWorkLevelsHandler;
 import dev.palworks.net.handlers.ToggleWorkerHandler;
 import dev.palworks.net.handlers.WorkActivityHandler;
@@ -10,7 +12,9 @@ import dev.palworks.net.handlers.WorkLevelsHandler;
 import dev.palworks.net.handlers.WorkerDebugHandler;
 import dev.palworks.net.handlers.WorkerMoodHandler;
 import dev.palworks.net.handlers.WorkerStatusHandler;
+import dev.palworks.net.packets.DexWorkSkillsPacket;
 import dev.palworks.net.packets.OpenInventoryPacket;
+import dev.palworks.net.packets.RequestDexWorkSkillsPacket;
 import dev.palworks.net.packets.RequestPcWorkLevelsPacket;
 import dev.palworks.net.packets.ToggleWorkerPacket;
 import dev.palworks.net.packets.WorkActivityPacket;
@@ -49,6 +53,12 @@ public abstract class CobblemonNetworkMixin {
                 RequestPcWorkLevelsPacket::decode,
                 new RequestPcWorkLevelsHandler(),
                 null));
+
+        list.add(new PacketRegisterInfo<>(
+                RequestDexWorkSkillsPacket.ID,
+                RequestDexWorkSkillsPacket::decode,
+                new RequestDexWorkSkillsHandler(),
+                null));
     }
 
     /**
@@ -71,5 +81,8 @@ public abstract class CobblemonNetworkMixin {
         cir.getReturnValue()
                 .add(new PacketRegisterInfo<>(
                         WorkerMoodPacket.ID, WorkerMoodPacket::decode, new WorkerMoodHandler(), null));
+        cir.getReturnValue()
+                .add(new PacketRegisterInfo<>(
+                        DexWorkSkillsPacket.ID, DexWorkSkillsPacket::decode, new DexWorkSkillsHandler(), null));
     }
 }

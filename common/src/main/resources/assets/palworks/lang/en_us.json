@@ -33,6 +33,8 @@
   "palworks.ui.work_skills.title": "Work skills",
   "palworks.ui.work_skills.entry": "%s: level %s",
   "palworks.ui.worked_by": "Worked by: %s",
+  "palworks.ui.dex_filter.any": "Work skill: Any",
+  "palworks.ui.dex_filter.skill": "Work skill: %s",
   "palworks.ui.mood.title": "Mood: %s/100",
   "palworks.ui.mood.happy": "Happy",
   "palworks.ui.mood.content": "Content",

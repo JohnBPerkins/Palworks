@@ -52,6 +52,17 @@ public final class WorkSkills {
         return shown;
     }
 
+    /**
+     * The skill after {@code current} as the Pokédex's work skill filter is clicked through: from
+     * none (null) to each shown skill in turn, then back to none.
+     */
+    @Nullable
+    public static Suitability nextFilter(@Nullable Suitability current) {
+        List<Suitability> all = List.copyOf(ICONS.keySet());
+        int next = current == null ? 0 : all.indexOf(current) + 1;
+        return next < all.size() ? all.get(next) : null;
+    }
+
     /** A shown job's icon (16x16), or null if it isn't shown. */
     @Nullable
     public static ResourceLocation icon(Suitability job) {

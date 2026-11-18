@@ -4,25 +4,30 @@ import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
+import dev.palworks.net.packets.DexWorkSkillsPacket;
 import dev.palworks.net.packets.WorkLevelsPacket;
+import dev.palworks.suitability.SpeciesWorkSkills;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityData;
 import dev.palworks.worker.WorkLevelSync;
 import io.netty.buffer.Unpooled;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Players are sent their Pokémon's work levels, for the PC and summary screens: their party's, and
- * again whenever they change.
+ * again whenever they change. And every species' work skills, for the Pokédex's filter, once until
+ * they change.
  */
 public class WorkLevelSyncGameTests {
     private static final UUID BLASTOISE = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -107,5 +112,65 @@ public class WorkLevelSyncGameTests {
             WorkLevelSync.forget(player);
         }
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void speciesWorkSkillsSurviveThePacket(GameTestHelper helper) {
+        Map<ResourceLocation, Set<Suitability>> skills = Map.of(
+                species("charmander"), Set.of(Suitability.KINDLING),
+                species("marowak"), Set.of(Suitability.MINING, Suitability.KINDLING, Suitability.NETHER),
+                species("gyarados"), Set.of(Suitability.WATERING, Suitability.TRANSPORTING));
+        RegistryFriendlyByteBuf buffer =
+                new RegistryFriendlyByteBuf(Unpooled.buffer(), helper.getLevel().registryAccess());
+        new DexWorkSkillsPacket(skills).encode(buffer);
+        Map<ResourceLocation, Set<Suitability>> decoded =
+                DexWorkSkillsPacket.decode(buffer).getSkills();
+        helper.assertTrue(decoded.equals(skills), "decoded " + decoded + ", sent " + skills);
+        helper.assertTrue(buffer.readableBytes() == 0, "all of it was read");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aSpeciesWorkSkillsAreThoseOfAnyOfItsForms(GameTestHelper helper) {
+        Map<ResourceLocation, Set<Suitability>> skills = SpeciesWorkSkills.current();
+        helper.assertValueEqual(skills.get(species("charmander")), Set.of(Suitability.KINDLING), "Charmander's");
+        // Ground as it is in Kanto, Fire and Ghost in Alola
+        helper.assertValueEqual(
+                skills.get(species("marowak")),
+                Set.of(Suitability.MINING, Suitability.KINDLING, Suitability.NETHER),
+                "Marowak's, Alolan form included");
+        helper.assertTrue(!skills.containsKey(species("ekans")), "a Poison type has none, so it's left out");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "work_level_sync")
+    public void theSpeciesWorkSkillsAreSentOnceUntilTheyChange(GameTestHelper helper) {
+        // Changes the data for every test, so it's in this batch, and undone within this tick
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        MinecraftServer server = helper.getLevel().getServer();
+        CommandSourceStack admin = server.createCommandSourceStack().withSuppressedOutput();
+        try {
+            helper.assertTrue(WorkLevelSync.sendDex(owner), "sent as its Pokédex first opens");
+            helper.assertTrue(!WorkLevelSync.sendDex(owner), "not again while it has them");
+
+            server.getCommands().performPrefixedCommand(admin, "palworks suitability set ekans kindling 2");
+            helper.assertValueEqual(
+                    SpeciesWorkSkills.current().get(species("ekans")),
+                    Set.of(Suitability.KINDLING),
+                    "Ekans' after the admin's change");
+            helper.assertTrue(WorkLevelSync.sendDex(owner), "sent again once they've changed");
+            helper.assertTrue(!WorkLevelSync.sendDex(owner), "and then not again");
+
+            WorkLevelSync.forget(owner.getUUID());
+            helper.assertTrue(WorkLevelSync.sendDex(owner), "sent afresh to a player who left and came back");
+        } finally {
+            server.getCommands().performPrefixedCommand(admin, "palworks suitability reset all");
+            WorkLevelSync.forget(owner.getUUID());
+        }
+        helper.succeed();
+    }
+
+    private static ResourceLocation species(String name) {
+        return ResourceLocation.fromNamespaceAndPath("cobblemon", name);
     }
 }

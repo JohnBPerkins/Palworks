@@ -7,8 +7,10 @@ import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -24,7 +26,9 @@ import org.jetbrains.annotations.Nullable;
  *       ({@code WorkerDebugRenderer}). Empty unless the player has {@code /palworks debug} on;</li>
  *   <li>the work levels of the player's Pokémon, party and PC (WorkLevelsPacket), for the PC and
  *       summary screens ({@code WorkSkillsOverlay}), by Pokémon UUID;</li>
- *   <li>their moods (WorkerMoodPacket), for the same screens, by Pokémon UUID.</li>
+ *   <li>their moods (WorkerMoodPacket), for the same screens, by Pokémon UUID;</li>
+ *   <li>which work skills each species can have (DexWorkSkillsPacket), for the Pokédex's work
+ *       skill filter ({@code DexWorkSkillFilter}), by species id.</li>
  * </ul>
  * All of it is the world or server's the player is in, and is forgotten as they leave it
  * ({@link #clear}, from {@code PalworksClient}), and only then: the server keeps each of them up to
@@ -45,6 +49,7 @@ public final class ClientWorkerData {
     private static final Map<UUID, Map<Suitability, Integer>> WORK_LEVELS = new ConcurrentHashMap<>();
     private static final Map<UUID, WorkerMoodPacket.Shown> MOODS = new ConcurrentHashMap<>();
     private static volatile int strikeUntil;
+    private static volatile Map<ResourceLocation, Set<Suitability>> speciesSkills = Map.of();
 
     private ClientWorkerData() {}
 
@@ -55,6 +60,7 @@ public final class ClientWorkerData {
         debugEntries = List.of();
         WORK_LEVELS.clear();
         MOODS.clear();
+        speciesSkills = Map.of();
     }
 
     // --- Work activity (party HUD) ---
@@ -126,5 +132,16 @@ public final class ClientWorkerData {
     /** The mood a worker on strike works again at (the server's config). */
     public static int strikeUntil() {
         return strikeUntil;
+    }
+
+    // --- Species' work skills (Pokédex filter) ---
+
+    public static void setSpeciesSkills(Map<ResourceLocation, Set<Suitability>> skills) {
+        speciesSkills = Map.copyOf(skills);
+    }
+
+    /** Whether a species can have this work skill, in any form. False until the server has said. */
+    public static boolean speciesHasSkill(ResourceLocation species, Suitability skill) {
+        return speciesSkills.getOrDefault(species, Set.of()).contains(skill);
     }
 }
