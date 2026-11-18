@@ -53,7 +53,9 @@ that can't fly in Cobblemon, such as Doduo, always walk.
 
 What a worker carries depends on its work skills:
 
-- **Transporting** workers have a **3-slot inventory** for the items they pick up and deliver.
+- **Transporting** workers have an inventory for the items they pick up and deliver: **one slot for
+  each [work level](Suitabilities#work-levels)**, 1 to 5. One whose level goes down keeps what was
+  in its other slots until it next delivers.
 - **Planting** and **Nether** workers have a **1-slot seed pouch** that only holds seeds (or nether
   wart). A Transporting worker brings them a stack from a chest, and they keep it until it's
   planted.

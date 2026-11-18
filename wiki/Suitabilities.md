@@ -75,6 +75,23 @@ A Pokémon's level for a job (1 to 5) comes from how strong it is: its **base st
 
 A Pokémon's level only changes as it evolves or changes form, not as it levels up.
 
-Levels so far change how often a Watering worker fertilizes crops: 10% a level by default (the
-`fertilize_chance_per_level` [setting](Configuration)), so a level 1 Squirtle fertilizes 10% of
-the crops it waters and a level 3 Blastoise 30%.
+What a level changes, so far:
+
+| Skill | Level 1 | Level 2 | Level 3 | Level 4 | Level 5 |
+|---|---|---|---|---|---|
+| **Lumbering**: the biggest tree it chops | 12 logs | 32 logs | 64 logs | 128 logs | 256 logs |
+| **Transporting**: inventory slots | 1 | 2 | 3 | 4 | 5 |
+| **Mining**: mines as with | a wooden pickaxe | a diamond pickaxe | a diamond pickaxe with Fortune I | Fortune II | Fortune III |
+| **Watering**: crops it fertilizes | 10% | 20% | 30% | 40% | 50% |
+
+- **Lumbering:** oaks, birches, spruces and acacias are 12 logs or fewer, so any lumberjack chops
+  them. Cherries and big oaks need level 2, dark oaks and mangroves level 3, and giant spruces and
+  jungle trees level 4. A tree too big for every lumberjack you have is left standing.
+- **Mining:** every pickaxe gets a crystal's full loot (4 amethyst shards, where a hand gets 2), so
+  levels 1 and 2 mine crystals the same. Fortune gives more amethyst and tumblestone, and type gem
+  clusters a gem more a third, two thirds or all of the time.
+- **Watering:** 10% a level is the default; the `fertilize_chance_per_level`
+  [setting](Configuration) changes it.
+
+The Pokémon's work skills tooltip, on the PC and summary screens, says what its levels give.
+Kindling, Planting, Gathering and Nether work don't change with level yet.

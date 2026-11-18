@@ -78,7 +78,7 @@ planter's seeds to other transporters for 30 seconds before it tries again.
 
 You can also throw seeds (with Q) next to a planter that has room for them, and it picks them up.
 A worker that both plants and transports, such as a Grass/Flying type, takes its own seeds from
-chests.
+chests. Seeds it has nowhere to plant go back in a chest, so they don't take up its slots.
 
 Any item that plants a crop or stem counts as seeds, so modded and Cobblemon seeds work too.
 Pitcher pods can't be planted.
@@ -101,6 +101,10 @@ A worker with both Nether Work and Lumbering also chops **crimson and warped tre
 A Lumbering worker chops down a **whole tree** at once, then replants it itself: a sapling at the
 base, four for a 2×2 trunk, and a propagule under a mangrove. Trees grown into each other come
 down together, and each gets its sapling back. Afterwards a Transporting worker picks up the logs.
+
+How big a tree it chops depends on its [work level](Suitabilities#work-levels): any lumberjack
+chops an oak or a birch, but a giant spruce needs level 4. A tree too big for every lumberjack
+nearby is left standing.
 
 To protect your builds, a group of logs only counts as a tree if:
 
@@ -133,7 +137,8 @@ It goes round the items nearest first, picking each up from beside it as a playe
 anything it passes on the way), taking everything within 3 blocks of where they landed (the
 `pickup_radius` [setting](Configuration)) in one go. One that can fly [flies](Workers#flying) to
 items it can't walk to, like ones on top of a tree. It fills up before a trip: anything while it has a free slot,
-then only items matching what it carries. Items no worker can get to are tried again later, less
+then only items matching what it carries. It has one slot for each
+[work level](Suitabilities#work-levels) in Transporting. Items no worker can get to are tried again later, less
 often each time, until they despawn.
 
 It stands right in front of a chest to put items in or take them out.
@@ -158,16 +163,19 @@ fetches a stack of food from a chest that has some and takes it to the trough.
 **Who:** Mining (Ground, Rock and Fighting types)
 
 Mining workers mine crystals once they're fully grown, getting exactly what you'd get breaking them
-by hand. They leave what the crystals grow from alone, so the crystals grow back. And they only
+with a pickaxe: a wooden one at level 1, a diamond one at level 2, and a diamond one with Fortune I
+to III at levels 3 to 5 (see [work levels](Suitabilities#work-levels)). They leave what the
+crystals grow from alone, so the crystals grow back. And they only
 mine a crystal where another will grow: one you've put somewhere else, as decoration or a light,
 is left alone.
 
-- **Amethyst clusters** on budding amethyst (2 shards). Buds aren't mined, and the budding
+- **Amethyst clusters** on budding amethyst (4 shards, more with Fortune). Buds aren't mined, and the budding
   amethyst grows new ones.
-- **Tumblestone clusters** of every colour (4 tumblestone). The worker puts a new tumblestone back
+- **Tumblestone clusters** of every colour (4 tumblestone, more with Fortune). The worker puts a new tumblestone back
   where the cluster was, using one of the four. It grows again if there's lava or a magma block
   next to it. A cluster under water isn't put back, because tumblestone can't be placed in water.
-- **Type gem clusters** at their last stage, on a gem block or a crystal core (2-4 gems). Gem
+- **Type gem clusters** at their last stage, on a gem block or a crystal core (2-4 gems, one more
+  with Fortune III). Gem
   blocks and the deepslate crystal core are never mined. Gem blocks joined to a core grow new
   clusters. Left alone, a fully grown cluster turns into a gem block, so a formation a worker
   keeps mined stays the same size.
