@@ -2,6 +2,7 @@ package dev.palworks.client.gui;
 
 import dev.palworks.Palworks;
 import dev.palworks.inventory.CarryMode;
+import dev.palworks.station.KindlingHeat;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.tree.TreeSize;
 import java.util.ArrayList;
@@ -93,6 +94,11 @@ public final class WorkSkills {
     public static LevelEffect levelEffect(Suitability job, int level) {
         String key = nameKey(job) + ".level";
         return switch (job) {
+            // A level 1 kindler's Ember smelts one item, and it stays to light it again
+            case KINDLING ->
+                KindlingHeat.staysAtItsFurnace(level)
+                        ? new LevelEffect(key + ".one", List.of())
+                        : new LevelEffect(key, List.of(KindlingHeat.itemsPerEmber(level)));
             case LUMBERING -> new LevelEffect(key, List.of(TreeSize.maxLogs(level)));
             case TRANSPORTING -> new LevelEffect(key, List.of(CarryMode.slotsForLevel(level)));
             // Its pickaxe (see MiningTool), one line a level

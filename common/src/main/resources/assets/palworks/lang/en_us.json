@@ -30,6 +30,8 @@
   "palworks.work_skill.mining.description": "Mines amethyst, tumblestone and type gems",
   "palworks.work_skill.transporting.description": "Picks up drops, delivers them, restocks troughs",
   "palworks.work_skill.nether.description": "Farms nether wart; chops nether trees with Lumbering",
+  "palworks.work_skill.kindling.level.one": "Each Ember smelts 1 item, so it stays to relight",
+  "palworks.work_skill.kindling.level": "Each Ember smelts %s items, so it can light other furnaces",
   "palworks.work_skill.lumbering.level": "Chops trees of up to %s logs",
   "palworks.work_skill.transporting.level": "Inventory slots: %s",
   "palworks.work_skill.mining.level.1": "Mines as with a wooden pickaxe",
