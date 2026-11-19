@@ -26,7 +26,10 @@ and Farming are planned; nothing uses them yet.
 **Blocks:** furnace, blast furnace, smoker (the `#palworks:furnaces` tag)
 
 Put smeltable items in the input slot. **You don't need fuel.** A Kindling worker walks over, uses
-Ember on the furnace and lights it, and keeps relighting it until the input slot is empty.
+Ember on the furnace and lights it. How long one Ember burns depends on its
+[work level](Suitabilities#work-levels): at level 1 it smelts one item, so the worker stays and
+relights the furnace until the input slot is empty. Higher levels burn longer, so the worker lights
+a furnace, goes on to light others, and comes back once it goes out.
 
 Workers only light a furnace whose input can be smelted in it, so a blast furnace full of raw food
 is left alone. So is one with no room in its output slot for what it would smelt, until you take

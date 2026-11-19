@@ -79,11 +79,16 @@ What a level changes, so far:
 
 | Skill | Level 1 | Level 2 | Level 3 | Level 4 | Level 5 |
 |---|---|---|---|---|---|
+| **Kindling**: items one Ember smelts | 1 | 2 | 4 | 8 | 16 |
 | **Lumbering**: the biggest tree it chops | 12 logs | 32 logs | 64 logs | 128 logs | 256 logs |
 | **Transporting**: inventory slots | 1 | 2 | 3 | 4 | 5 |
 | **Mining**: mines as with | a wooden pickaxe | a diamond pickaxe | a diamond pickaxe with Fortune I | Fortune II | Fortune III |
 | **Watering**: crops it fertilizes | 10% | 20% | 30% | 40% | 50% |
 
+- **Kindling:** a level 1 kindler stays at its furnace and relights it for each item. From level 2
+  it lights a furnace and moves on to the next, so one kindler keeps several going. Blast furnaces
+  and smokers cook twice as fast, so they get through twice as many items on one Ember, as with
+  real fuel.
 - **Lumbering:** oaks, birches, spruces and acacias are 12 logs or fewer, so any lumberjack chops
   them. Cherries and big oaks need level 2, dark oaks and mangroves level 3, and giant spruces and
   jungle trees level 4. A tree too big for every lumberjack you have is left standing.
@@ -94,4 +99,4 @@ What a level changes, so far:
   [setting](Configuration) changes it.
 
 The Pokémon's work skills tooltip, on the PC and summary screens, says what its levels give.
-Kindling, Planting, Gathering and Nether work don't change with level yet.
+Planting, Gathering and Nether work don't change with level.
