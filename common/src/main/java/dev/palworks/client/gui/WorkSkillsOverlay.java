@@ -13,15 +13,18 @@ import dev.palworks.mixin.client.SummaryAccessor;
 import dev.palworks.net.packets.RequestPcWorkLevelsPacket;
 import dev.palworks.net.packets.WorkerMoodPacket;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityData;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,7 +32,8 @@ import org.jetbrains.annotations.Nullable;
  * Shows a Pokémon's work skills ({@link WorkSkills}) on Cobblemon's PC and summary screens, in the
  * top-left corner of its portrait (the shiny star is in the top-right): each job's icon with its
  * level beside it (if its level changes anything, see WorkSkills.isLevelled), on the PC (for the Pokémon hovered or picked) and on the summary. Hovering them
- * lists them all, by name, in a tooltip, each with a line on what it does. The levels are the server's (see
+ * lists them all, by name, in a tooltip, each with a line on what it does and one on what its
+ * level gives (every level's, while Shift is held). The levels are the server's (see
  * WorkLevelSync): the party's are kept up to date, and the PC's are asked for as it opens. Nothing is
  * shown for a Pokémon whose levels haven't come.
  *
@@ -216,10 +220,14 @@ public final class WorkSkillsOverlay {
 
     /**
      * Every shown skill by name, with its level where it has one that matters ("Watering: level 3"),
-     * what it does under it, and what its level gives, where that's known here.
+     * what it does under it, and what its level gives. With Shift held, what every level gives
+     * instead, this Pokémon's in white; without, a last line saying so.
      */
     private static void drawTooltip(
             GuiGraphics graphics, Font font, List<WorkSkills.Shown> shown, int mouseX, int mouseY) {
+        boolean everyLevel = Screen.hasShiftDown();
+        double fertilizeChance = ClientWorkerData.fertilizeChancePerLevel();
+        boolean anyLevelled = false;
         List<Component> lines = new ArrayList<>();
         lines.add(Component.translatable("palworks.ui.work_skills.title"));
         for (WorkSkills.Shown skill : shown) {
@@ -230,13 +238,36 @@ public final class WorkSkillsOverlay {
                             : name);
             lines.add(Component.translatable(WorkSkills.descriptionKey(skill.job()))
                     .withStyle(ChatFormatting.GRAY));
-            WorkSkills.LevelEffect effect = WorkSkills.levelEffect(skill.job(), skill.level());
-            if (effect != null) {
-                lines.add(Component.translatable(effect.key(), effect.args().toArray())
-                        .withStyle(ChatFormatting.DARK_GRAY));
+            if (!WorkSkills.isLevelled(skill.job())) {
+                continue;
+            }
+            anyLevelled = true;
+            if (everyLevel) {
+                for (int level = 1; level <= SuitabilityData.MAX_LEVEL; level++) {
+                    lines.add(Component.translatable(
+                                    "palworks.ui.work_skills.every_level",
+                                    level,
+                                    effectText(skill.job(), level, fertilizeChance))
+                            .withStyle(level == skill.level() ? ChatFormatting.WHITE : ChatFormatting.DARK_GRAY));
+                }
+            } else {
+                lines.add(
+                        effectText(skill.job(), skill.level(), fertilizeChance).withStyle(ChatFormatting.DARK_GRAY));
             }
         }
+        if (anyLevelled && !everyLevel) {
+            lines.add(Component.translatable("palworks.ui.work_skills.hold_shift")
+                    .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
+        }
         graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
+    }
+
+    /** What a level of a levelled skill gives, as text. */
+    private static MutableComponent effectText(Suitability job, int level, double fertilizeChancePerLevel) {
+        // Never null for a levelled skill (WorkSkillsTest)
+        WorkSkills.LevelEffect effect =
+                Objects.requireNonNull(WorkSkills.levelEffect(job, level, fertilizeChancePerLevel));
+        return Component.translatable(effect.key(), effect.args().toArray());
     }
 
     private static boolean within(int mouseX, int mouseY, float x, float y, float width, float height) {

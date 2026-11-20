@@ -27,7 +27,7 @@ class ClientWorkerDataTest {
         ClientWorkerData.putStatus(entity, new ClientWorkerData.Status(true, CarryMode.FULL));
         ClientWorkerData.setDebugEntries(
                 List.of(new WorkerDebugPacket.Entry(1, WorkActivity.OFF, null, List.of(), null, List.of())));
-        ClientWorkerData.putWorkLevels(Map.of(pokemon, Map.of(Suitability.KINDLING, 2)));
+        ClientWorkerData.putWorkLevels(Map.of(pokemon, Map.of(Suitability.KINDLING, 2)), 0.1);
         ClientWorkerData.putMoods(Map.of(pokemon, new WorkerMoodPacket.Shown(40, true, false)), 30);
         ResourceLocation charmander = ResourceLocation.fromNamespaceAndPath("cobblemon", "charmander");
         assertFalse(ClientWorkerData.speciesHasSkill(charmander, Suitability.KINDLING), "not until the server says");

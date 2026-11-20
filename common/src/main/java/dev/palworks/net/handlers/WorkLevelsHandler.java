@@ -11,6 +11,6 @@ public class WorkLevelsHandler implements ClientNetworkPacketHandler<WorkLevelsP
 
     @Override
     public void handle(@NotNull WorkLevelsPacket packet, @NotNull Minecraft client) {
-        ClientWorkerData.putWorkLevels(packet.getLevels());
+        ClientWorkerData.putWorkLevels(packet.getLevels(), packet.getFertilizeChancePerLevel());
     }
 }

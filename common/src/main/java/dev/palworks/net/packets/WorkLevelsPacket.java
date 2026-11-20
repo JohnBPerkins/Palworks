@@ -15,19 +15,27 @@ import org.jetbrains.annotations.NotNull;
  * Sent from server to a player: the work levels of some of their Pokémon (party or PC), by Pokémon
  * UUID, for the PC and summary screens. The client can't work these out itself: they come from
  * the server's datapacks, and from forms it evolved from, which Cobblemon 1.8.x doesn't sync. A
- * Pokémon with an empty map can't do any work. Only for display: the server never reads it back.
+ * Pokémon with an empty map can't do any work. With them, the server's fertilize chance per
+ * Watering level (its config), so the tooltip can say what each Watering level gives. Only for
+ * display: the server never reads it back.
  */
 public class WorkLevelsPacket implements NetworkPacket<WorkLevelsPacket> {
     public static final ResourceLocation ID = Palworks.id("work_levels");
 
     private final Map<UUID, Map<Suitability, Integer>> levels;
+    private final double fertilizeChancePerLevel;
 
-    public WorkLevelsPacket(Map<UUID, Map<Suitability, Integer>> levels) {
+    public WorkLevelsPacket(Map<UUID, Map<Suitability, Integer>> levels, double fertilizeChancePerLevel) {
         this.levels = levels;
+        this.fertilizeChancePerLevel = fertilizeChancePerLevel;
     }
 
     public Map<UUID, Map<Suitability, Integer>> getLevels() {
         return levels;
+    }
+
+    public double getFertilizeChancePerLevel() {
+        return fertilizeChancePerLevel;
     }
 
     @NotNull
@@ -48,6 +56,7 @@ public class WorkLevelsPacket implements NetworkPacket<WorkLevelsPacket> {
                 buffer.writeVarInt(level);
             });
         });
+        buffer.writeDouble(fertilizeChancePerLevel);
     }
 
     public static WorkLevelsPacket decode(RegistryFriendlyByteBuf buffer) {
@@ -63,6 +72,6 @@ public class WorkLevelsPacket implements NetworkPacket<WorkLevelsPacket> {
             }
             levels.put(pokemon, byJob);
         }
-        return new WorkLevelsPacket(levels);
+        return new WorkLevelsPacket(levels, buffer.readDouble());
     }
 }

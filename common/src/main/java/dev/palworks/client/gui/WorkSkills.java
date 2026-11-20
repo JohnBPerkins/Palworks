@@ -1,6 +1,7 @@
 package dev.palworks.client.gui;
 
 import dev.palworks.Palworks;
+import dev.palworks.crop.Watering;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.station.KindlingHeat;
 import dev.palworks.suitability.Suitability;
@@ -42,7 +43,7 @@ public final class WorkSkills {
         ICONS.put(Suitability.NETHER, Palworks.id("textures/gui/work_skill/nether.png"));
     }
 
-    // The skills whose level changes how a worker works (see levelEffect); the rest show no level,
+    // The skills whose level changes how a worker works (those levelEffect has a line for); the rest show no level,
     // which would promise a difference there isn't
     private static final Set<Suitability> LEVELLED = EnumSet.of(
             Suitability.KINDLING,
@@ -108,13 +109,14 @@ public final class WorkSkills {
 
     /**
      * What this level of a skill gives ("Chops trees of up to 32 logs"), or null for a skill whose
-     * level changes nothing, or (Watering) changes it by the server's config, which the client
-     * doesn't have.
+     * level changes nothing. Watering's comes from the server's fertilize chance per level.
      */
     @Nullable
-    public static LevelEffect levelEffect(Suitability job, int level) {
+    public static LevelEffect levelEffect(Suitability job, int level, double fertilizeChancePerLevel) {
         String key = nameKey(job) + ".level";
         return switch (job) {
+            case WATERING ->
+                new LevelEffect(key, List.of(percent(Watering.fertilizeChance(level, fertilizeChancePerLevel))));
             // A level 1 kindler's Ember smelts one item, and it stays to light it again
             case KINDLING ->
                 KindlingHeat.staysAtItsFurnace(level)
@@ -126,5 +128,11 @@ public final class WorkSkills {
             case MINING -> new LevelEffect(key + "." + Math.clamp(level, 1, 5), List.of());
             default -> null;
         };
+    }
+
+    /** A chance (0 to 1) as a percentage to a tenth at most: 0.3 is "30", 0.025 is "2.5". */
+    static String percent(double chance) {
+        long tenths = Math.round(chance * 1000);
+        return tenths % 10 == 0 ? Long.toString(tenths / 10) : (tenths / 10) + "." + (tenths % 10);
     }
 }

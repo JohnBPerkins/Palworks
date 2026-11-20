@@ -98,7 +98,8 @@ What a level changes, so far:
 - **Watering:** 10% a level is the default; the `fertilize_chance_per_level`
   [setting](Configuration) changes it.
 
-The Pokémon's work skills tooltip, on the PC and summary screens, says what its levels give.
+The Pokémon's work skills tooltip, on the PC and summary screens, says what its levels give. Hold
+Shift over it to see what every level gives, with the Pokémon's own level in white.
 Planting, Gathering and Nether work don't change with level yet, so those screens show their
 icons with no number.
 Planting, Gathering and Nether work don't change with level.
