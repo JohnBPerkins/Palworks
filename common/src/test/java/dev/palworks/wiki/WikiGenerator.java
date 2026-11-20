@@ -83,9 +83,14 @@ public final class WikiGenerator {
         this.files = files;
         this.lang = lang;
         this.cobblemonVersion = cobblemonVersion;
+        this.data = dataFrom(files);
+    }
+
+    /** The suitability data these files (by job) make, as the game would read them. */
+    static SuitabilityData dataFrom(Map<Suitability, JsonObject> files) {
         Map<String, JsonElement> byId = new HashMap<>();
         files.forEach((job, file) -> byId.put("palworks:" + job.getId(), file));
-        this.data = SuitabilityData.fromFiles(byId, warning -> {
+        return SuitabilityData.fromFiles(byId, warning -> {
             throw new IllegalStateException("Shipped suitability file: " + warning);
         });
     }
