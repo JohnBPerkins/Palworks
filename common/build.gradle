@@ -63,36 +63,46 @@ tasks.register('generateWiki', JavaExec) {
     } as CommandLineArgumentProvider)
 }
 
-// The reference library's list of every Pokémon and form (implemented or not, battle-only or not),
-// with the work skill levels the shipped suitability files give each, and columns for proposed
-// levels and notes filled in by hand, which regenerating keeps (dev.palworks.wiki.PokemonList). It
-// goes to .claude/.references/data/pokemon-work-skills.csv in the main checkout, even when run from a
-// worktree: the library is gitignored and lives only there. -PpokemonList=<file> writes it elsewhere.
+// The reference library's generated lists, for checking work skills: every Pokémon and form with
+// its levels (generatePokemonList, dev.palworks.wiki.PokemonList) and every job type with the skill
+// it needs (generateJobList, JobList). Some of their columns are filled in by hand, which
+// regenerating keeps. They go to .claude/.references/data/ in the main checkout, even when run from a
+// worktree: the library is gitignored and lives only there. -P<property>=<file> writes one elsewhere.
+def root = rootProject.projectDir
+def referenceList = { String property, String name ->
+    def out = providers.gradleProperty(property).orNull
+    if (out != null) {
+        return new File(out).isAbsolute() ? out : new File(root, out).path
+    }
+    // The main checkout: this one, or (in a worktree, whose .git is a file naming its git
+    // directory, whose commondir names the repository's) the one whose .git that is
+    def main = root
+    def dotGit = new File(root, '.git')
+    if (dotGit.isFile()) {
+        def gitDir = new File(dotGit.text.trim().substring('gitdir:'.length()).trim())
+        def commonDir = new File(gitDir, 'commondir')
+        main = (commonDir.isFile() ? new File(gitDir, commonDir.text.trim()) : gitDir).canonicalFile.parentFile
+    }
+    return new File(main, ".claude/.references/data/${name}").path
+}
+
 tasks.register('generatePokemonList', JavaExec) {
     group = 'documentation'
     description = 'Lists every Cobblemon species and form with its work skill levels, into the reference library.'
-    def root = rootProject.projectDir
-    def override = providers.gradleProperty('pokemonList')
     inputs.files(wikiCobblemon)
     outputs.upToDateWhen { false } // it reads and rewrites the same file
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'dev.palworks.wiki.PokemonList'
     argumentProviders.add({
-        def out = override.orNull
-        if (out == null) {
-            // The main checkout: this one, or (in a worktree, whose .git is a file naming its git
-            // directory, whose commondir names the repository's) the one whose .git that is
-            def main = root
-            def dotGit = new File(root, '.git')
-            if (dotGit.isFile()) {
-                def gitDir = new File(dotGit.text.trim().substring('gitdir:'.length()).trim())
-                def commonDir = new File(gitDir, 'commondir')
-                main = (commonDir.isFile() ? new File(gitDir, commonDir.text.trim()) : gitDir).canonicalFile.parentFile
-            }
-            out = new File(main, '.claude/.references/data/pokemon-work-skills.csv').path
-        } else if (!new File(out).isAbsolute()) {
-            out = new File(root, out).path
-        }
-        [wikiCobblemon.singleFile.path, out]
+        [wikiCobblemon.singleFile.path, referenceList('pokemonList', 'pokemon-work-skills.csv')]
     } as CommandLineArgumentProvider)
+}
+
+tasks.register('generateJobList', JavaExec) {
+    group = 'documentation'
+    description = 'Lists every job type with the work skill it needs, into the reference library.'
+    outputs.upToDateWhen { false } // it reads and rewrites the same file
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.palworks.wiki.JobList'
+    argumentProviders.add({ [referenceList('jobList', 'job-types.csv')] } as CommandLineArgumentProvider)
 }

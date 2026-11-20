@@ -71,7 +71,7 @@ class PokemonListTest {
         assertEquals("3", cell(rows, hisui, "proposed_kindling"));
         assertEquals("a ghost, \"spooky\"", cell(rows, hisui, "notes"));
         // Written out and read back, as the next run reads it
-        Map<String, String> readBack = PokemonList.kept(PokemonList.parse(PokemonList.format(rows)))
+        Map<String, String> readBack = PokemonList.kept(ReferenceCsv.parse(ReferenceCsv.format(rows)))
                 .get(PokemonList.key("cobblemon:typhlosion", "Hisui"));
         assertEquals("3", readBack.get("proposed_kindling"));
         assertEquals("a ghost, \"spooky\"", readBack.get("notes"));
@@ -91,18 +91,5 @@ class PokemonListTest {
                 CobblemonSpecies.all(WikiGeneratorTest.typhlosionLine()),
                 DATA,
                 Map.of(PokemonList.key("cobblemon:gone", null), Map.of("notes", "")));
-    }
-
-    @Test
-    void csvAsASpreadsheetSavesItReadsBack() {
-        assertEquals(
-                List.of(List.of("a", "b,c", "d\"e"), List.of("line\nbreak", "", "x")),
-                PokemonList.parse("a,\"b,c\",\"d\"\"e\"\r\n\"line\nbreak\",,x\r\n"));
-        assertEquals(
-                List.of(List.of("", "a\r\nb", "c")),
-                PokemonList.parse("\"\",\"a\r\nb\",c"),
-                "an empty quoted field, and a line break kept inside quotes");
-        List<List<String>> rows = List.of(List.of("a", "b,c", "d\"e"), List.of("line\nbreak", "", "x"));
-        assertEquals(rows, PokemonList.parse(PokemonList.format(rows)));
     }
 }
