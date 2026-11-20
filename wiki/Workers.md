@@ -82,7 +82,8 @@ lifts, it makes its sound, and a trapped chest gives off its redstone signal.
   icons in the corner of its portrait, in the PC as you hover over it and on its summary (a
   skill whose level changes nothing yet shows no number). Hover
   them for the full list by name, with a line on what each skill does. Its [mood](Mood) shows in
-  the bottom-left corner: a face and the number.
+  the bottom-left corner as a face (hover it for the number), and as a bar on the summary's Stats
+  page, under Other.
 - **Party HUD:** in the top-left corner of each sent-out party member's card, next to the "sent
   out" icon: its job's icon while it works, faded while it walks there, greyed out while it's
   paused (evolving, say), or a red cross if its work is off. In a battle Cobblemon swaps these

@@ -38,8 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * shown for a Pokémon whose levels haven't come.
  *
  * <p>A worker's mood (see dev.palworks.mood.Mood) shows in the portrait's bottom-left corner, on the PC
- * and the summary: a face (happy, content, unhappy or on strike) and the number, with a tooltip saying
- * what it means. Only for a Pokémon that can work, and only once the server has sent it (never while
+ * and the summary: a face (happy, content, unhappy or on strike), with a tooltip giving the number and
+ * saying what it means (the summary also has a mood bar, MoodBar). Only for a Pokémon that can work, and only once the server has sent it (never while
  * mood is off).
  *
  * <p>Drawn over the screen once it's drawn (Architectury's screen render event, on both loaders),
@@ -153,7 +153,10 @@ public final class WorkSkillsOverlay {
         }
     }
 
-    /** Its mood's face and number, in the portrait's bottom-left corner. */
+    /**
+     * Its mood's face, in the portrait's bottom-left corner, with the number in its tooltip. On the
+     * summary the number is a bar too, under Other on the Stats page (MoodBar).
+     */
     private static void drawMood(
             GuiGraphics graphics, Pokemon pokemon, float portraitX, float portraitY, int mouseX, int mouseY) {
         WorkerMoodPacket.Shown mood = ClientWorkerData.mood(pokemon.getUuid());
@@ -165,10 +168,7 @@ public final class WorkSkillsOverlay {
         float x = portraitX + CORNER_INSET_X;
         float y = portraitY + PORTRAIT_SIZE - ICON_SIZE - CORNER_INSET_Y;
         drawIcon(graphics, Palworks.id("textures/gui/mood/" + face(mood) + ".png"), x, y);
-        String number = String.valueOf(mood.mood());
-        drawText(graphics, font, number, x + ICON_SIZE + 1.5F, y + TEXT_DROP, WHITE);
-        float width = ICON_SIZE + 1.5F + font.width(number) * TEXT_SCALE;
-        if (within(mouseX, mouseY, x, y, width, ICON_SIZE)) {
+        if (within(mouseX, mouseY, x, y, ICON_SIZE, ICON_SIZE)) {
             List<Component> lines = new ArrayList<>();
             lines.add(Component.translatable("palworks.ui.mood.title", mood.mood()));
             if (mood.striking()) {
@@ -183,8 +183,8 @@ public final class WorkSkillsOverlay {
         }
     }
 
-    /** Which face a mood shows: its texture's name. */
-    private static String face(WorkerMoodPacket.Shown mood) {
+    /** Which face a mood shows: its texture's name ("happy", "content", "unhappy" or "striking"). */
+    static String face(WorkerMoodPacket.Shown mood) {
         if (mood.striking()) {
             return "striking";
         }
