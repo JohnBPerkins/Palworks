@@ -6,6 +6,7 @@ import dev.palworks.block.TroughBlockEntity;
 import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
+import dev.palworks.crop.TallPlants;
 import dev.palworks.crop.Watering;
 import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.drops.TrackedDrops;
@@ -105,6 +106,8 @@ public final class JobChecks {
         return switch (type) {
             case FUEL_FURNACE -> FurnaceHelper.canUseHeat(level, pos);
             case HARVEST_CROPS -> CropAdapter.isFullyGrown(level, pos) || CropAdapter.isAttachedFruit(level, pos);
+            case HARVEST_SUGAR_CANE, HARVEST_CACTUS, HARVEST_BAMBOO, HARVEST_KELP, HARVEST_NETHER_VINES ->
+                TallPlants.ripeJobAt(level, pos) == type;
             case PLANT_SEEDS -> level.getBlockState(pos).isAir() && CropAdapter.isPlantableSurface(level, pos.below());
             case WATER_CROPS -> Watering.needsWater(level, pos);
             case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
@@ -331,6 +334,10 @@ public final class JobChecks {
         // A stem's own fruit is harvested (the scan finds it from the stem)
         if (CropAdapter.isHarvestable(state) || state.getBlock() instanceof StemBlock) {
             skills.addAll(skillsFor(JobType.HARVEST_CROPS, state, air));
+        }
+        JobType tallPlant = TallPlants.jobFor(state);
+        if (tallPlant != null) {
+            skills.addAll(tallPlant.requiredSuitabilities());
         }
         if (CropAdapter.isWatered(state)) {
             skills.addAll(JobType.WATER_CROPS.requiredSuitabilities());

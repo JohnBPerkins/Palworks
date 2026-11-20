@@ -8,6 +8,7 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | [Light furnaces](#light-furnaces) | Kindling | Working |
 | [Water crops](#water-crops) | Watering | Working |
 | [Harvest crops](#harvest-crops) | Gathering | Working |
+| [Cut tall plants](#cut-tall-plants) | Gathering | Working |
 | [Plant crops](#plant-crops) | Planting | Working |
 | [Nether wart](#nether-wart) | Nether Work | Working |
 | [Chop trees](#chop-trees) | Lumbering | Working |
@@ -62,6 +63,21 @@ A harvested crop is **replanted in place** by the worker that harvested it, usin
 what it dropped. Berry bushes regrow on their own. A Transporting worker then picks up the drops.
 
 Nether wart is Nether work: see [below](#nether-wart).
+
+## Cut tall plants
+
+**Who:** Gathering, for now. These will probably move to the particular Pokémon suited to each
+plant later.
+
+A Gathering worker cuts **sugar cane**, **cactus**, **bamboo**, **kelp**, **weeping vines** and
+**twisting vines** as soon as they've grown a second block. It cuts everything but the block the
+plant grows from, which stays and grows back, as you'd farm them yourself. Each block drops what
+it would by hand (a vine only drops itself now and then), and a Transporting worker picks the drops
+up.
+
+The worker stands up to two blocks away and works from the ground beside the plant, so it can cut
+kelp from the shore and weeping vines under a low ceiling. Weeping vines hanging from a high
+ceiling are out of its reach.
 
 ## Plant crops
 
