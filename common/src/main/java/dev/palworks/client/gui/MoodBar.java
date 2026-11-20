@@ -21,10 +21,11 @@ public final class MoodBar extends BarSummarySpeciesFeatureRenderer {
     private static final ResourceLocation OVERLAY = ResourceLocation.fromNamespaceAndPath(
             "cobblemon", "textures/gui/summary/summary_stats_generic_overlay.png");
 
-    // Fullness's bar's three colours (Cobblemon's FullnessFeatureRenderer): green, yellow, red
-    private static final Vec3 HAPPY = new Vec3(120 / 255.0, 200 / 255.0, 80 / 255.0);
-    private static final Vec3 CONTENT = new Vec3(240 / 255.0, 200 / 255.0, 65 / 255.0);
-    private static final Vec3 UNHAPPY = new Vec3(230 / 255.0, 80 / 255.0, 65 / 255.0);
+    // Fullness's bar's three colours (Cobblemon's FullnessFeatureRenderer): green, yellow, red. In
+    // 0 to 255: the bar divides each by 255 (0 to 1 drew it black)
+    private static final Vec3 HAPPY = new Vec3(120, 200, 80);
+    private static final Vec3 CONTENT = new Vec3(240, 200, 65);
+    private static final Vec3 UNHAPPY = new Vec3(230, 80, 65);
 
     public MoodBar(Pokemon pokemon, WorkerMoodPacket.Shown mood) {
         super(
