@@ -8,8 +8,10 @@ import dev.palworks.tree.TreeSize;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,13 +42,25 @@ public final class WorkSkills {
         ICONS.put(Suitability.NETHER, Palworks.id("textures/gui/work_skill/nether.png"));
     }
 
+    // The skills whose level changes how a worker works (see levelEffect); the rest show no level,
+    // which would promise a difference there isn't
+    private static final Set<Suitability> LEVELLED = EnumSet.of(
+            Suitability.KINDLING,
+            Suitability.WATERING,
+            Suitability.LUMBERING,
+            Suitability.TRANSPORTING,
+            Suitability.MINING);
+
     private WorkSkills() {}
 
     private static ResourceLocation hudIcon(String job) {
         return Palworks.id("textures/gui/hud/work_" + job + ".png");
     }
 
-    /** The skills to show for these levels: those with work to do, highest level first. */
+    /**
+     * The skills to show for these levels: those with work to do, the levelled ones first, highest
+     * level first, then the rest in job order.
+     */
     public static List<Shown> shown(Map<Suitability, Integer> levels) {
         List<Shown> shown = new ArrayList<>();
         levels.forEach((job, level) -> {
@@ -54,8 +68,15 @@ public final class WorkSkills {
                 shown.add(new Shown(job, level));
             }
         });
-        shown.sort(Comparator.comparingInt(Shown::level).reversed().thenComparing(Shown::job));
+        shown.sort(Comparator.comparing((Shown skill) -> !isLevelled(skill.job()))
+                .thenComparingInt(skill -> isLevelled(skill.job()) ? -skill.level() : 0)
+                .thenComparing(Shown::job));
         return shown;
+    }
+
+    /** Whether a skill's level changes how a worker works, so it's shown. */
+    public static boolean isLevelled(Suitability job) {
+        return LEVELLED.contains(job);
     }
 
     /**

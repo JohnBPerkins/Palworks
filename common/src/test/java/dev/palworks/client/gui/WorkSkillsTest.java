@@ -26,13 +26,32 @@ class WorkSkillsTest {
     private static final Path ASSETS = Path.of("src/main/resources/assets");
 
     @Test
-    void highestLevelFirstThenInJobOrder() {
+    void levelledSkillsFirstHighestLevelFirstThenTheRestInJobOrder() {
         assertEquals(
                 List.of(
                         new Shown(Suitability.WATERING, 3),
+                        new Shown(Suitability.TRANSPORTING, 3),
+                        new Shown(Suitability.KINDLING, 1),
                         new Shown(Suitability.PLANTING, 1),
-                        new Shown(Suitability.GATHERING, 1)),
-                WorkSkills.shown(Map.of(Suitability.GATHERING, 1, Suitability.WATERING, 3, Suitability.PLANTING, 1)));
+                        new Shown(Suitability.GATHERING, 4)),
+                WorkSkills.shown(Map.of(
+                        Suitability.GATHERING, 4,
+                        Suitability.WATERING, 3,
+                        Suitability.PLANTING, 1,
+                        Suitability.TRANSPORTING, 3,
+                        Suitability.KINDLING, 1)));
+    }
+
+    @Test
+    void onlySkillsWhoseLevelChangesSomethingShowALevel() {
+        for (Suitability job : Suitability.values()) {
+            if (WorkSkills.icon(job) == null) {
+                continue;
+            }
+            // Watering's level effect is the server's config, so it has no line here, but it has one
+            boolean changesSomething = job == Suitability.WATERING || WorkSkills.levelEffect(job, 3) != null;
+            assertEquals(changesSomething, WorkSkills.isLevelled(job), job.toString());
+        }
     }
 
     @Test

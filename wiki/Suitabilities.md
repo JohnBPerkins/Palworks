@@ -99,4 +99,6 @@ What a level changes, so far:
   [setting](Configuration) changes it.
 
 The Pokémon's work skills tooltip, on the PC and summary screens, says what its levels give.
+Planting, Gathering and Nether work don't change with level yet, so those screens show their
+icons with no number.
 Planting, Gathering and Nether work don't change with level.

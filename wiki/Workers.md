@@ -79,7 +79,8 @@ lifts, it makes its sound, and a trapped chest gives off its redstone signal.
 ## What the icons mean
 
 - **PC and summary:** each Pokémon's work skills and [levels](Suitabilities#work-levels) show as
-  icons in the corner of its portrait, in the PC as you hover over it and on its summary. Hover
+  icons in the corner of its portrait, in the PC as you hover over it and on its summary (a
+  skill whose level changes nothing yet shows no number). Hover
   them for the full list by name, with a line on what each skill does. Its [mood](Mood) shows in
   the bottom-left corner: a face and the number.
 - **Party HUD:** in the top-left corner of each sent-out party member's card, next to the "sent
