@@ -106,8 +106,8 @@ subprojects {
         options.compilerArgs << '-Werror'
         options.errorprone {
             // Mixin handlers are called by the injected code, not by anything Error Prone can see.
-            option('UnusedMethod:ExemptingMethodAnnotations', 'org.spongepowered.asm.mixin.injection.Inject,org.spongepowered.asm.mixin.injection.ModifyConstant,org.spongepowered.asm.mixin.injection.ModifyVariable,org.spongepowered.asm.mixin.injection.Redirect,com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod,com.llamalad7.mixinextras.injector.ModifyExpressionValue')
-            option('Unused:methodAnnotationsExemptingParameters', 'org.spongepowered.asm.mixin.injection.Inject,org.spongepowered.asm.mixin.injection.ModifyConstant,org.spongepowered.asm.mixin.injection.ModifyVariable,org.spongepowered.asm.mixin.injection.Redirect,com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod,com.llamalad7.mixinextras.injector.ModifyExpressionValue')
+            option('UnusedMethod:ExemptingMethodAnnotations', 'org.spongepowered.asm.mixin.injection.Inject,org.spongepowered.asm.mixin.injection.ModifyConstant,org.spongepowered.asm.mixin.injection.ModifyVariable,org.spongepowered.asm.mixin.injection.Redirect,com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod,com.llamalad7.mixinextras.injector.ModifyExpressionValue,com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation')
+            option('Unused:methodAnnotationsExemptingParameters', 'org.spongepowered.asm.mixin.injection.Inject,org.spongepowered.asm.mixin.injection.ModifyConstant,org.spongepowered.asm.mixin.injection.ModifyVariable,org.spongepowered.asm.mixin.injection.Redirect,com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod,com.llamalad7.mixinextras.injector.ModifyExpressionValue,com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation')
         }
     }
 

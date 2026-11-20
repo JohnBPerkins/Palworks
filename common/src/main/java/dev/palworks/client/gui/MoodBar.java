@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.client.gui.summary.featurerenderers.BarSummarySp
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.net.packets.WorkerMoodPacket;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
@@ -36,6 +37,17 @@ public final class MoodBar extends BarSummarySpeciesFeatureRenderer {
                 100,
                 mood.mood(),
                 colour(mood));
+    }
+
+    /**
+     * Draws the bar, as Cobblemon's fullness and friendship bars' {@code render} do; StatWidgetMixin
+     * calls this in place of {@code render}. The inherited {@code render} draws a bar only for a
+     * species feature of the bar's name, and a Pokémon has none called this, so it drew nothing. It
+     * can't be overridden here instead: Kotlin compiled it as a bridge method, and javac always warns
+     * on overriding one (no lint category, so no suppressing it under -Werror).
+     */
+    public void draw(GuiGraphics graphics, float x, float y, Pokemon pokemon) {
+        renderElement(graphics, x, y, pokemon, getValue());
     }
 
     private static Vec3 colour(WorkerMoodPacket.Shown mood) {

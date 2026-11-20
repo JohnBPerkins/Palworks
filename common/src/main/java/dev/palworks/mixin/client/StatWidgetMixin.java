@@ -4,12 +4,15 @@ import com.cobblemon.mod.common.client.gui.summary.featurerenderers.BarSummarySp
 import com.cobblemon.mod.common.client.gui.summary.widgets.screens.stats.StatWidget;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import dev.palworks.client.ClientWorkerData;
 import dev.palworks.client.gui.MoodBar;
 import dev.palworks.net.packets.WorkerMoodPacket;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.gui.GuiGraphics;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -56,5 +59,33 @@ public abstract class StatWidgetMixin {
         List<BarSummarySpeciesFeatureRenderer> withMood = new ArrayList<>(features);
         withMood.add(new MoodBar(pokemon, mood));
         return withMood;
+    }
+
+    /**
+     * Draws the mood bar where the page draws each bar ({@code bar.render(...)}, the one call to it
+     * in renderWidget): see MoodBar.draw for why it isn't drawn by its own {@code render}. The method
+     * by both its names (development and NeoForge's, and Fabric's intermediary one), and the call by
+     * owner and name alone: this mixin keeps Cobblemon's names as they are (remap = false), and a
+     * Minecraft class in a descriptor would be left in the development names.
+     */
+    @WrapOperation(
+            method = {"renderWidget", "method_48579"},
+            at =
+                    @At(
+                            value = "INVOKE",
+                            target =
+                                    "Lcom/cobblemon/mod/common/client/gui/summary/featurerenderers/BarSummarySpeciesFeatureRenderer;render"))
+    private boolean palworks$drawMoodBar(
+            BarSummarySpeciesFeatureRenderer bar,
+            GuiGraphics graphics,
+            float x,
+            float y,
+            Pokemon pokemon,
+            Operation<Boolean> original) {
+        if (bar instanceof MoodBar mood) {
+            mood.draw(graphics, x, y, pokemon);
+            return true;
+        }
+        return original.call(bar, graphics, x, y, pokemon);
     }
 }
