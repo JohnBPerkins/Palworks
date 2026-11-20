@@ -48,6 +48,7 @@
   "palworks.ui.dex_filter.any": "Work skill: Any",
   "palworks.ui.dex_filter.skill": "Work skill: %s",
   "palworks.ui.mood.title": "Mood: %s/100",
+  "palworks.ui.mood.bar": "Mood",
   "palworks.ui.mood.happy": "Happy",
   "palworks.ui.mood.content": "Content",
   "palworks.ui.mood.unhappy": "Unhappy: close to going on strike",

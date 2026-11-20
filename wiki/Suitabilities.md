@@ -102,4 +102,3 @@ The Pokémon's work skills tooltip, on the PC and summary screens, says what its
 Shift over it to see what every level gives, with the Pokémon's own level in white.
 Planting, Gathering and Nether work don't change with level yet, so those screens show their
 icons with no number.
-Planting, Gathering and Nether work don't change with level.
