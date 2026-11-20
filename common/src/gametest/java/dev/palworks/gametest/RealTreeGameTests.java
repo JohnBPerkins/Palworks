@@ -3,16 +3,25 @@ package dev.palworks.gametest;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.suitability.Suitability;
+import dev.palworks.suitability.SuitabilityOverrides;
 import dev.palworks.tree.TreeDetector;
+import dev.palworks.tree.TreeSize;
+import dev.palworks.worker.WorkerState;
+import dev.palworks.worker.WorkerStateManager;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.features.TreeFeatures;
+import net.minecraft.gametest.framework.AfterBatch;
+import net.minecraft.gametest.framework.BeforeBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -30,6 +39,7 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
  */
 public class RealTreeGameTests {
     private static final String MACHOP = "machop";
+    private static final String MACHOP_ID = "cobblemon:machop";
     // Ticks after a chop for the leaves' distances to catch up (one block a tick, at most 7)
     private static final int LEAVES_SETTLE_TICKS = 20;
 
@@ -211,6 +221,39 @@ public class RealTreeGameTests {
     public void machopChopsARealAcacia(GameTestHelper helper) {
         // Acacia trunks bend diagonally
         chopRealTree(helper, TreeFeatures.ACACIA, 5, MACHOP, Blocks.ACACIA_SAPLING);
+    }
+
+    // A cherry, a dark oak and a mangrove are more than a Machop's Lumbering 1 chops (see TreeSize):
+    // these three are about the trees' shapes, so their batches give every Machop level 3
+
+    @BeforeBatch(batch = "real_cherry")
+    public void beforeRealCherry(ServerLevel level) throws IOException {
+        SuitabilityOverrides.set(MACHOP_ID, Suitability.LUMBERING, 3);
+    }
+
+    @AfterBatch(batch = "real_cherry")
+    public void afterRealCherry(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @BeforeBatch(batch = "real_dark_oak")
+    public void beforeRealDarkOak(ServerLevel level) throws IOException {
+        SuitabilityOverrides.set(MACHOP_ID, Suitability.LUMBERING, 3);
+    }
+
+    @AfterBatch(batch = "real_dark_oak")
+    public void afterRealDarkOak(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @BeforeBatch(batch = "real_mangrove")
+    public void beforeRealMangrove(ServerLevel level) throws IOException {
+        SuitabilityOverrides.set(MACHOP_ID, Suitability.LUMBERING, 3);
+    }
+
+    @AfterBatch(batch = "real_mangrove")
+    public void afterRealMangrove(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
     }
 
     @GameTest(template = Templates.ARENA, batch = "real_cherry", timeoutTicks = 300)
@@ -448,5 +491,100 @@ public class RealTreeGameTests {
                         item.getItem() + " on the ground isn't marked to pick up");
             }
         });
+    }
+
+    /** How many logs the tree grown in the arena has, as the scan counts them: from a block of it on the ground. */
+    private static int logsOfTheTree(GameTestHelper helper) {
+        var level = helper.getLevel();
+        for (BlockPos rel : treeBlocks(helper)) {
+            BlockPos pos = helper.absolutePos(rel);
+            if (TreeDetector.standsOnGround(level, pos, level.getBlockState(pos))) {
+                TreeDetector.TreeValidationResult tree = TreeDetector.validateTree(level, pos);
+                helper.assertTrue(tree.isValid(), "a real tree is a tree: " + tree.getReason());
+                return tree.getLogPositions().size();
+            }
+        }
+        helper.fail("no tree standing in the arena");
+        return 0;
+    }
+
+    /** Clear what a tree left in and over the arena (a giant one is taller and wider than it). */
+    private static void clearTree(GameTestHelper helper) {
+        var level = helper.getLevel();
+        for (int x = -8; x < 24; x++) {
+            for (int z = -8; z < 24; z++) {
+                for (int y = 1; y < 60; y++) {
+                    BlockPos pos = helper.absolutePos(new BlockPos(x, y, z));
+                    if (!level.getBlockState(pos).isAir()) {
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
+        }
+    }
+
+    private void assertLevelNeeded(
+            GameTestHelper helper, ResourceKey<ConfiguredFeature<?, ?>> tree, long seed, Block floor, int level) {
+        arenaFloor(helper, floor);
+        grow(helper, tree, seed);
+        int logs = logsOfTheTree(helper);
+        helper.assertTrue(
+                TreeSize.levelNeeded(logs) == level,
+                tree.location().getPath() + " (seed " + seed + ", " + logs + " logs) should need Lumbering " + level
+                        + ", but needs " + TreeSize.levelNeeded(logs));
+        clearTree(helper);
+    }
+
+    // In a batch of its own: the giant trees reach past the arena, and so does clearing them
+    @GameTest(template = Templates.ARENA, batch = "real_tree_sizes")
+    public void realTreesNeedTheLumberingLevelOfTheirSize(GameTestHelper helper) {
+        // Small trees are anyone's
+        assertLevelNeeded(helper, TreeFeatures.OAK, 1, Blocks.GRASS_BLOCK, 1);
+        assertLevelNeeded(helper, TreeFeatures.BIRCH, 3, Blocks.GRASS_BLOCK, 1);
+        assertLevelNeeded(helper, TreeFeatures.SPRUCE, 4, Blocks.GRASS_BLOCK, 1);
+        assertLevelNeeded(helper, TreeFeatures.ACACIA, 3, Blocks.GRASS_BLOCK, 1);
+        // Spreading ones need 2
+        assertLevelNeeded(helper, TreeFeatures.CHERRY, 1, Blocks.GRASS_BLOCK, 2);
+        assertLevelNeeded(helper, TreeFeatures.FANCY_OAK, 5, Blocks.GRASS_BLOCK, 2);
+        // 2x2 dark oaks and big mangroves 3
+        assertLevelNeeded(helper, TreeFeatures.DARK_OAK, 4, Blocks.GRASS_BLOCK, 3);
+        assertLevelNeeded(helper, TreeFeatures.MANGROVE, 6, Blocks.MUD, 3);
+        // Giant spruce and jungle trees 4
+        assertLevelNeeded(helper, TreeFeatures.MEGA_SPRUCE, 1, Blocks.GRASS_BLOCK, 4);
+        assertLevelNeeded(helper, TreeFeatures.MEGA_JUNGLE_TREE, 6, Blocks.GRASS_BLOCK, 4);
+        helper.succeed();
+    }
+
+    @AfterBatch(batch = "tree_too_big")
+    public void afterTreeTooBig(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "tree_too_big", timeoutTicks = 600)
+    public void aLumberjackLeavesATreeTooBigForItsLevelUntilItsLevelIsEnough(GameTestHelper helper) {
+        // Changes every Machop's level, so it's in a batch of its own, undone after it
+        Workers.isolate(helper);
+        arenaFloor(helper, Blocks.GRASS_BLOCK);
+        grow(helper, TreeFeatures.DARK_OAK, 7);
+        int logs = treeBlocks(helper).size();
+        helper.assertTrue(TreeSize.levelNeeded(logsOfTheTree(helper)) == 3, "this dark oak needs Lumbering 3");
+        PokemonEntity machop = Workers.sendOut(helper, "machop level=30", new BlockPos(8, 1, 3));
+        WorkerState state = WorkerStateManager.getOrCreate(machop.getPokemon());
+
+        helper.startSequence()
+                // Long enough to have chopped it several times over (see the timeout note above)
+                .thenIdle(250)
+                .thenExecute(() -> {
+                    helper.assertTrue(
+                            treeBlocks(helper).size() == logs, "a Lumbering 1 Machop leaves a dark oak standing");
+                    helper.assertTrue(state.getCurrentReservation() == null, "and isn't given it");
+                    try {
+                        SuitabilityOverrides.set(MACHOP_ID, Suitability.LUMBERING, 3);
+                    } catch (IOException e) {
+                        helper.fail("couldn't change its level: " + e);
+                    }
+                })
+                .thenWaitUntil(() -> helper.assertTrue(treeBlocks(helper).isEmpty(), "at Lumbering 3 it chops it"))
+                .thenSucceed();
     }
 }

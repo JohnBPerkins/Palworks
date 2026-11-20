@@ -17,6 +17,8 @@ import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityDetector;
+import dev.palworks.tree.TreeDetector;
+import dev.palworks.tree.TreeSize;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
@@ -324,6 +326,7 @@ public class JobManager {
         }
         // From its species and types as they are now, so an evolution or form change counts at once
         info.suitabilities = SuitabilityDetector.getSuitabilities(pokemon);
+        readLevels(pokemon, info);
         info.currentReservation = stateReservation;
         // A busy worker (in a battle, evolving) gets no new jobs; WorkerAI drops the one it had.
         info.idle = (stateReservation == null) && !WorkerEligibility.isBusy(entity);
@@ -337,6 +340,19 @@ public class JobManager {
     }
 
     /**
+     * The worker's level in each of its skills. Its own method, not a loop in registerWorker: there
+     * the loop's iterator shared a local slot with the PokemonEntity below it, and the Architectury
+     * transformer (NeoForge dev runs), recomputing the frames, loads PokemonEntity to merge the two,
+     * which crashes against vanilla's final LivingEntity methods.
+     */
+    private static void readLevels(Pokemon pokemon, WorkerInfo info) {
+        info.levels.clear();
+        for (Suitability skill : info.suitabilities) {
+            info.levels.put(skill, SuitabilityDetector.getSuitabilityLevel(pokemon, skill));
+        }
+    }
+
+    /**
      * The job a worker still has from before a restart, as it would be found now: with the skills
      * it takes (see JobChecks.skillsFor), and as a follow-up if it's one that only comes as one (a
      * pickup). Built from its type alone, nether wart it let go of went back in the pool as any
@@ -346,9 +362,15 @@ public class JobManager {
         JobType type = reservation.getJobType();
         BlockPos pos = reservation.getStationPos();
         Set<Suitability> skills = JobChecks.skillsFor(level, type, pos);
-        return type == JobType.COLLECT_DROPS || type == JobType.TAKE_SEEDS
-                ? JobRecord.followUp(type, pos, level.getGameTime(), null, skills)
-                : JobRecord.of(type, pos, level.getGameTime(), skills);
+        if (type == JobType.COLLECT_DROPS || type == JobType.TAKE_SEEDS) {
+            return JobRecord.followUp(type, pos, level.getGameTime(), null, skills);
+        }
+        // A tree by its size, as the scan does (one already chopped, its replant left, is anyone's)
+        int minLevel = type == JobType.CHOP_TREE
+                ? TreeSize.levelNeeded(
+                        TreeDetector.validateTree(level, pos).getLogPositions().size())
+                : 1;
+        return JobRecord.of(type, pos, level.getGameTime(), skills, minLevel);
     }
 
     /**

@@ -223,6 +223,13 @@ final class JobAssigner {
                 }
             }
 
+            // A transporter that plants keeps its seeds while there's somewhere round it to plant
+            // them; after that they're cargo, so they don't take up its slots for good
+            if (pokemon != null && worker.suitabilities.contains(Suitability.TRANSPORTING)) {
+                WorkerInventory carried = WorkerInventoryManager.getOrCreate(pokemon);
+                carried.setKeepsSeeds(hasSeedsToPlant(worker, carried));
+            }
+
             // A transporter carrying cargo (anything but a planter's seeds) fills up before it
             // delivers: it takes pickups it has room for, nearest first (a free slot takes anything;
             // once every slot is used, only items matching what it carries), and goes to a chest
@@ -359,7 +366,7 @@ final class JobAssigner {
     private static net.minecraft.world.item.ItemStack carriedTroughFood(WorkerInventory inventory, WorkerInfo worker) {
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             net.minecraft.world.item.ItemStack stack = inventory.getItem(i);
-            if (WorkerInventory.isCargo(stack, worker.suitabilities) && TroughFood.accepts(stack)) {
+            if (inventory.carriesAsCargo(stack, worker.suitabilities) && TroughFood.accepts(stack)) {
                 return stack;
             }
         }
@@ -540,7 +547,8 @@ final class JobAssigner {
         for (Collection<JobRecord> group : pool.availableFor(worker.suitabilities)) {
             for (JobRecord job : group) {
                 // Cheap pre-filter so the list (and the sort) stays small; checked again on assignment
-                if (!inWorkRange(worker, job.position())
+                if (!canDoJob(worker, job)
+                        || !inWorkRange(worker, job.position())
                         || isRecentlyUnreachable(worker, job.position())
                         || job.isOutOfReachFor(worker.pokemonUUID)
                         || !canWorkerDo(worker, job)) {
@@ -699,10 +707,10 @@ final class JobAssigner {
 
     /**
      * Whether a worker has every suitability a job needs (e.g. nether trees need Nether as well as
-     * Lumbering).
+     * Lumbering), and the work level it asks for in its type's own (a big tree).
      */
     static boolean canDoJob(WorkerInfo worker, JobRecord job) {
-        return job.canBeDoneWith(worker.suitabilities);
+        return job.canBeDoneWith(worker.suitabilities) && job.canBeDoneAt(worker.levels);
     }
 
     /** {@link JobChecks#canWorkerDo} for a worker being offered a job. One that isn't loaded can't do any. */
@@ -1222,6 +1230,17 @@ final class JobAssigner {
         return -1;
     }
 
+    /** Whether a worker carries seeds that open spots in its range, for a planting skill it has, take. */
+    private boolean hasSeedsToPlant(WorkerInfo worker, WorkerInventory inventory) {
+        for (Suitability skill : PLANTING_SKILLS) {
+            if (worker.suitabilities.contains(skill)
+                    && carriesSeedForAny(inventory, openSpotsNear(worker.position, skill))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether the worker carries a seed one of {@code openSpots} can take. */
     private boolean carriesSeedForAny(WorkerInventory inventory, List<BlockPos> openSpots) {
         for (int i = 0; i < inventory.getContainerSize(); i++) {
@@ -1247,6 +1266,7 @@ final class JobAssigner {
         for (Collection<JobRecord> group : pool.availableFor(worker.suitabilities)) {
             for (JobRecord job : group) {
                 if (job.type() != JobType.GET_SEEDS
+                        && canDoJob(worker, job)
                         && isRecentlyUnreachable(worker, job.position())
                         && inWorkRange(worker, job.position())
                         && canWorkerDo(worker, job)) {

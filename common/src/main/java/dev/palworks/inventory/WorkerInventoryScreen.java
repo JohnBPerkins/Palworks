@@ -43,22 +43,16 @@ public class WorkerInventoryScreen extends AbstractContainerScreen<WorkerInvento
         // Draw hopper texture as background (it handles the player inventory section)
         graphics.blit(TEXTURE, x, y, 0, 0, this.imageWidth, this.imageHeight);
 
-        // The hopper has 5 slots starting at x=44, y=20
-        // We only have 3 slots, so we need to cover the extra slots
-        // Cover slots 4 and 5 (at x=44+3*18=98 and x=44+4*18=116) with the background color
-        // Actually, let's just draw our 3 slot backgrounds over the hopper's 5 slots
-
-        // Draw background to cover the hopper's 5 slot area, then draw our 3 slots
-        // Hopper slot area is at y=20, 18px tall
+        // The hopper's row of 5 slots (x=44, y=20, 18px tall) is painted over, then the slots this
+        // worker uses are drawn where the menu put them (a slot's box starts a pixel before its
+        // item): one a Transporting level, or the one slot of a planter's seed pouch.
         graphics.fill(x + 43, y + 19, x + 133, y + 38, 0xFFC6C6C6); // Cover slot area
 
-        // Draw slot backgrounds for the slots this worker can use (at x=62 to match menu slot
-        // positions): all 3 for Transporting, just the middle one for a planter's seed pouch.
         for (int i = 0; i < WorkerInventory.INVENTORY_SIZE; i++) {
-            if (!this.menu.getCarryMode().usesSlot(i)) {
+            if (!this.menu.usesSlot(i)) {
                 continue;
             }
-            int slotX = x + 61 + i * 18;
+            int slotX = x + WorkerInventoryMenu.slotX(i, this.menu.getCarryMode(), this.menu.getCapacity()) - 1;
             int slotY = y + 19;
 
             // Vanilla-style slot rendering

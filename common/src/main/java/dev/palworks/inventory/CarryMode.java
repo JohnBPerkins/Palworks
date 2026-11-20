@@ -17,11 +17,11 @@ public enum CarryMode {
     NONE,
     /** One slot, seeds and other plantable items only: a planter's supply for new farmland. */
     SEED_POUCH,
-    /** The full inventory: any item, every slot. */
+    /** The full inventory: any item, as many slots as its Transporting level (see {@link #slotsForLevel}). */
     FULL;
 
-    /** The worker inventory slot a seed pouch uses: the middle one, so the GUI shows it centred. */
-    public static final int POUCH_SLOT = 1;
+    /** The worker inventory slot a seed pouch uses. */
+    public static final int POUCH_SLOT = 0;
 
     /**
      * Transporting gets the full inventory (and plants from it if it can also plant). Planting, or
@@ -37,10 +37,15 @@ public enum CarryMode {
         return NONE;
     }
 
-    /** Whether this mode uses a given worker inventory slot. */
-    public boolean usesSlot(int slot) {
+    /** How many slots a transporter of this Transporting level carries: one a level, 1 to 5. */
+    public static int slotsForLevel(int transportingLevel) {
+        return Math.clamp(transportingLevel, 1, WorkerInventory.INVENTORY_SIZE);
+    }
+
+    /** Whether this mode uses a given worker inventory slot, for a transporter that carries {@code capacity}. */
+    public boolean usesSlot(int slot, int capacity) {
         return switch (this) {
-            case FULL -> slot >= 0 && slot < WorkerInventory.INVENTORY_SIZE;
+            case FULL -> slot >= 0 && slot < Math.min(capacity, WorkerInventory.INVENTORY_SIZE);
             case SEED_POUCH -> slot == POUCH_SLOT;
             case NONE -> false;
         };

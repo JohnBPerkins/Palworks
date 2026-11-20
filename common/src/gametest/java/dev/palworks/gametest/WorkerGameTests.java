@@ -349,6 +349,46 @@ public class WorkerGameTests {
                 helper.getBlockState(furnacePos).getValue(AbstractFurnaceBlock.LIT), "the furnace should be lit"));
     }
 
+    @BeforeBatch(batch = "kindler_level_three")
+    public void beforeKindlerLevelThree(ServerLevel level) throws IOException {
+        SuitabilityOverrides.set("cobblemon:charmander", Suitability.KINDLING, 3);
+    }
+
+    @AfterBatch(batch = "kindler_level_three")
+    public void afterKindlerLevelThree(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "kindler_level_three", timeoutTicks = 1600)
+    public void aKindlerAboveLevelOneLightsAFurnaceAndGoesOnToTheNext(GameTestHelper helper) {
+        // Kindling 3: an Ember smelts 4 items, so it lights each and moves on, and both burn at once.
+        // A level 1 kindler stays at its furnace until it's done, so never has two going.
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.STONE);
+        List<BlockPos> furnaces = List.of(new BlockPos(2, 1, 6), new BlockPos(6, 1, 6));
+        for (BlockPos pos : furnaces) {
+            helper.setBlock(
+                    pos, Blocks.FURNACE.defaultBlockState().setValue(AbstractFurnaceBlock.FACING, Direction.NORTH));
+            var furnace = (AbstractFurnaceBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(pos));
+            furnace.setItem(0, new ItemStack(Items.RAW_IRON, 4));
+        }
+        Workers.sendOut(helper, "charmander level=20", START);
+
+        boolean[] bothLit = {false};
+        helper.onEachTick(() -> {
+            if (furnaces.stream().allMatch(pos -> helper.getBlockState(pos).getValue(AbstractFurnaceBlock.LIT))) {
+                bothLit[0] = true;
+            }
+        });
+        helper.succeedWhen(() -> {
+            for (BlockPos pos : furnaces) {
+                var furnace = (AbstractFurnaceBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(pos));
+                helper.assertValueEqual(furnace.getItem(2).getCount(), 4, "iron smelted at " + pos);
+            }
+            helper.assertTrue(bothLit[0], "both furnaces burned at once");
+        });
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "worker_furnace_emptied", timeoutTicks = 800)
     public void kindlerStopsAsSoonAsItsFurnaceIsEmptied(GameTestHelper helper) {
         // Its items taken out mid-smelt: it used to see out the smelt (and start another) for nothing

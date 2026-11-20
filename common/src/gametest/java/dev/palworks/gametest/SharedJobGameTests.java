@@ -5,14 +5,19 @@ import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.suitability.SuitabilityOverrides;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.gametest.framework.AfterBatch;
+import net.minecraft.gametest.framework.BeforeBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -193,6 +198,17 @@ public class SharedJobGameTests {
         });
 
         helper.succeedWhen(() -> helper.assertValueEqual(everLit.size(), furnaces.length, "furnaces lit"));
+    }
+
+    // Four kinds between two of them: 3 slots each (a Pidgey's level is 1, a slot)
+    @BeforeBatch(batch = "shared_pickup")
+    public void beforeSharedPickup(ServerLevel level) throws IOException {
+        PickupGameTests.pidgeysAtTransporting(3);
+    }
+
+    @AfterBatch(batch = "shared_pickup")
+    public void afterSharedPickup(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
     }
 
     @GameTest(template = Templates.EMPTY, batch = "shared_pickup", timeoutTicks = 800)

@@ -51,7 +51,12 @@ public final class Watering {
 
     /** The chance a waterer at this Watering level fertilizes the crop it waters, 0 to 1. */
     public static double fertilizeChance(int wateringLevel) {
-        return Math.min(1.0, wateringLevel * PalworksConfig.current().fertilizeChancePerLevel());
+        return fertilizeChance(wateringLevel, PalworksConfig.current().fertilizeChancePerLevel());
+    }
+
+    /** The same, for a given chance per level: the client's tooltip has the server's, not a config. */
+    public static double fertilizeChance(int wateringLevel, double chancePerLevel) {
+        return Math.min(1.0, wateringLevel * chancePerLevel);
     }
 
     /**

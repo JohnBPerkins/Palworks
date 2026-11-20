@@ -7,7 +7,6 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -20,9 +19,11 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
     private final UUID pokemonUUID;
     // Whether the screen stays open for this player (server side; always true on the client)
     private final Predicate<Player> staysOpenFor;
-    // The worker's CarryMode (ordinal), synced to the client so it shows only the slots the worker
-    // can use (all 3, or the single seed-pouch slot). Starts as NONE on the client until synced.
-    private final DataSlot carryMode = DataSlot.standalone();
+    // What the worker carried when the screen opened, sent to the client with it, so it shows the
+    // slots the worker uses (one a Transporting level, or the single seed-pouch slot) where they
+    // belong. If either changes, the server closes the screen (see ModMenuTypes.menuFor).
+    private final CarryMode carryMode;
+    private final int capacity;
 
     // Slot indices
     private static final int WORKER_SLOTS_START = 0;
@@ -35,30 +36,26 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
     /**
      * Server-side constructor. The screen closes once {@code staysOpenFor} is false.
      */
-    @SuppressWarnings("EnumOrdinal") // the data slot syncs CarryMode by ordinal; see CarryMode.fromOrdinal
     public WorkerInventoryMenu(
             MenuType<?> menuType,
             int containerId,
             Inventory playerInventory,
             Container workerInventory,
             UUID pokemonUUID,
+            CarryMode carryMode,
+            int capacity,
             Predicate<Player> staysOpenFor) {
         super(menuType, containerId);
         this.pokemonUUID = pokemonUUID;
         this.staysOpenFor = staysOpenFor;
+        this.carryMode = carryMode;
+        this.capacity = capacity;
 
         checkContainerSize(workerInventory, WorkerInventory.INVENTORY_SIZE);
 
-        if (workerInventory instanceof WorkerInventory inventory) {
-            carryMode.set(inventory.getMode().ordinal()); // server side; synced to the client
-        }
-        addDataSlot(carryMode);
-
-        // Worker inventory slots (3 slots, centered). A seed pouch uses only the middle one.
-        // To center 3 slots (54px total) in 176px width: start at x=62
-        int workerSlotStartX = 62;
+        // Worker inventory slots, the ones it uses centred in the row (the others are hidden)
         for (int i = 0; i < WorkerInventory.INVENTORY_SIZE; i++) {
-            addSlot(new WorkerSlot(workerInventory, i, workerSlotStartX + i * 18, 20));
+            addSlot(new WorkerSlot(workerInventory, i, slotX(i, carryMode, capacity), 20));
         }
 
         // Player inventory (3 rows of 9)
@@ -77,14 +74,31 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
     /**
      * Client-side constructor (creates empty container that will be synced).
      */
-    public WorkerInventoryMenu(MenuType<?> menuType, int containerId, Inventory playerInventory, UUID pokemonUUID) {
+    public WorkerInventoryMenu(
+            MenuType<?> menuType,
+            int containerId,
+            Inventory playerInventory,
+            UUID pokemonUUID,
+            CarryMode carryMode,
+            int capacity) {
         this(
                 menuType,
                 containerId,
                 playerInventory,
                 new SimpleContainer(WorkerInventory.INVENTORY_SIZE),
                 pokemonUUID,
+                carryMode,
+                capacity,
                 player -> true);
+    }
+
+    /**
+     * Where a worker slot goes across the screen: the ones its mode uses side by side from slot 0,
+     * centred (a lone slot at x=80, the middle of the 176-wide screen).
+     */
+    static int slotX(int slot, CarryMode mode, int capacity) {
+        int shown = mode == CarryMode.SEED_POUCH ? 1 : Math.clamp(capacity, 1, WorkerInventory.INVENTORY_SIZE);
+        return 80 - 9 * (shown - 1) + 18 * slot;
     }
 
     public UUID getPokemonUUID() {
@@ -92,7 +106,16 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
     }
 
     public CarryMode getCarryMode() {
-        return CarryMode.fromOrdinal(carryMode.get());
+        return carryMode;
+    }
+
+    public int getCapacity() {
+        return capacity;
+    }
+
+    /** Whether the worker uses this slot (the rest are hidden). */
+    boolean usesSlot(int slot) {
+        return carryMode.usesSlot(slot, capacity);
     }
 
     /** A worker inventory slot: hidden unless the worker's carry mode uses it, and filtered by it. */
@@ -103,7 +126,7 @@ public final class WorkerInventoryMenu extends AbstractContainerMenu {
 
         @Override
         public boolean isActive() {
-            return getCarryMode().usesSlot(getContainerSlot());
+            return usesSlot(getContainerSlot());
         }
 
         @Override

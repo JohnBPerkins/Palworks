@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.palworks.suitability.Suitability;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -36,6 +37,29 @@ class JobRecordTest {
         assertThrows(
                 UnsupportedOperationException.class,
                 () -> job.requiredSuitabilities().add(Suitability.MINING));
+    }
+
+    @Test
+    void aJobTakesAnyLevelUnlessItAsksForMore() {
+        assertEquals(1, JobRecord.of(JobType.CHOP_TREE, POS, 0L).minLevel());
+        assertEquals(
+                1, JobRecord.followUp(JobType.COLLECT_DROPS, POS, 0L, WORKER).minLevel());
+        assertEquals(
+                3,
+                JobRecord.of(JobType.CHOP_TREE, POS, 0L, EnumSet.of(Suitability.LUMBERING), 3)
+                        .minLevel());
+    }
+
+    @Test
+    void aJobThatAsksForALevelIsOnlyForWorkersOfThatLevelOrMoreInItsOwnSkill() {
+        // A big nether tree: Lumbering and Nether, sized by Lumbering
+        JobRecord bigTree =
+                JobRecord.of(JobType.CHOP_TREE, POS, 0L, EnumSet.of(Suitability.LUMBERING, Suitability.NETHER), 3);
+        assertFalse(bigTree.canBeDoneAt(Map.of(Suitability.LUMBERING, 2, Suitability.NETHER, 5)));
+        assertTrue(bigTree.canBeDoneAt(Map.of(Suitability.LUMBERING, 3, Suitability.NETHER, 1)));
+        assertTrue(bigTree.canBeDoneAt(Map.of(Suitability.LUMBERING, 5)));
+        assertFalse(bigTree.canBeDoneAt(Map.of(Suitability.MINING, 5)));
+        assertTrue(JobRecord.of(JobType.CHOP_TREE, POS, 0L).canBeDoneAt(Map.of(Suitability.LUMBERING, 1)));
     }
 
     @Test

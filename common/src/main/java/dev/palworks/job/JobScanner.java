@@ -9,6 +9,7 @@ import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.tree.TreeDetector;
+import dev.palworks.tree.TreeSize;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -500,7 +501,11 @@ final class JobScanner {
             // from two chunks (or by scans of different heights) is one job, not one per base
             BlockPos chopPos = TreeDetector.chopPosition(level, tree);
             return JobRecord.of(
-                    JobType.CHOP_TREE, chopPos, now, JobChecks.skillsFor(level, JobType.CHOP_TREE, chopPos));
+                    JobType.CHOP_TREE,
+                    chopPos,
+                    now,
+                    JobChecks.skillsFor(level, JobType.CHOP_TREE, chopPos),
+                    TreeSize.levelNeeded(tree.getLogPositions().size()));
         }
 
         // Grown crystals (amethyst, tumblestone, type gems): Mining

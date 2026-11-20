@@ -14,17 +14,25 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * A worker Pokemon's carried items. Always 3 slots of storage, but how many it may use, and for
- * what, depends on its {@link CarryMode}: all 3 for Transporting, one seeds-only slot for planters,
- * none for everyone else. Adding items ({@link #addItem}, the GUI) respects the mode.
+ * A worker Pokemon's carried items. Always 5 slots of storage, but how many it may use, and for
+ * what, depends on its {@link CarryMode} and capacity: one a Transporting level for a transporter,
+ * one seeds-only slot for planters, none for everyone else. Adding items ({@link #addItem}, the
+ * GUI) respects them.
  */
 public class WorkerInventory implements Container {
-    public static final int INVENTORY_SIZE = 3;
+    public static final int INVENTORY_SIZE = 5;
+
+    // A level 3 transporter's, until it's set from the worker's level (WorkerInventoryManager)
+    private static final int DEFAULT_CAPACITY = 3;
 
     private final NonNullList<ItemStack> items;
     private final UUID ownerUUID;
     private Runnable onChanged;
     private CarryMode mode = CarryMode.FULL;
+    private int capacity = DEFAULT_CAPACITY;
+    // Whether a worker that plants keeps the seeds it carries, to plant with (see carriesAsCargo).
+    // Not saved: decided again each time it looks for work (JobAssigner).
+    private boolean keepsSeeds = true;
 
     public WorkerInventory(UUID ownerUUID) {
         this.items = NonNullList.withSize(INVENTORY_SIZE, ItemStack.EMPTY);
@@ -48,6 +56,30 @@ public class WorkerInventory implements Container {
         this.mode = mode;
     }
 
+    /** How many slots a transporter carries (see {@link CarryMode#slotsForLevel}). */
+    public int getCapacity() {
+        return capacity;
+    }
+
+    /** Set from the worker's Transporting level (see WorkerInventoryManager.getOrCreate). */
+    public void setCapacity(int capacity) {
+        this.capacity = capacity;
+    }
+
+    /** Whether this inventory uses a slot: its mode does, at its capacity. */
+    public boolean usesSlot(int slot) {
+        return mode.usesSlot(slot, capacity);
+    }
+
+    /**
+     * Whether a worker that plants keeps its seeds to plant with: while open farmland (or soul sand)
+     * round it takes some of them. Once nothing does, they're cargo, taken to a chest like anything
+     * else, so they don't fill the slots of a transporter that carries few for good.
+     */
+    public void setKeepsSeeds(boolean keepsSeeds) {
+        this.keepsSeeds = keepsSeeds;
+    }
+
     /** Whether this inventory's mode allows the item at all (in some slot). */
     public boolean accepts(ItemStack stack) {
         return accepts(mode, stack);
@@ -64,7 +96,7 @@ public class WorkerInventory implements Container {
 
     @Override
     public boolean canPlaceItem(int slot, ItemStack stack) {
-        return mode.usesSlot(slot) && accepts(stack);
+        return usesSlot(slot) && accepts(stack);
     }
 
     @Override
@@ -151,7 +183,7 @@ public class WorkerInventory implements Container {
 
         // First, try to merge with existing stacks
         for (int i = 0; i < INVENTORY_SIZE && remaining > 0; i++) {
-            if (!mode.usesSlot(i)) {
+            if (!usesSlot(i)) {
                 continue;
             }
             ItemStack slotStack = items.get(i);
@@ -167,7 +199,7 @@ public class WorkerInventory implements Container {
 
         // Then, try to add to empty slots
         for (int i = 0; i < INVENTORY_SIZE && remaining > 0; i++) {
-            if (mode.usesSlot(i) && items.get(i).isEmpty()) {
+            if (usesSlot(i) && items.get(i).isEmpty()) {
                 int toAdd = Math.min(remaining, stack.getMaxStackSize());
                 ItemStack newStack = stack.copy();
                 newStack.setCount(toAdd);
@@ -193,7 +225,7 @@ public class WorkerInventory implements Container {
         }
         int room = 0;
         for (int i = 0; i < INVENTORY_SIZE; i++) {
-            if (!mode.usesSlot(i)) {
+            if (!usesSlot(i)) {
                 continue;
             }
             ItemStack slotStack = items.get(i);
@@ -218,17 +250,25 @@ public class WorkerInventory implements Container {
         return !(plants && dev.palworks.crop.CropAdapter.isSeed(stack.getItem()));
     }
 
-    /** The first carried stack that's cargo (see {@link #isCargo}), or empty if none. */
+    /**
+     * {@link #isCargo}, for this worker: its seeds too, once it no longer keeps them (see
+     * {@link #setKeepsSeeds}).
+     */
+    public boolean carriesAsCargo(ItemStack stack, Set<Suitability> suitabilities) {
+        return isCargo(stack, suitabilities) || (!keepsSeeds && !stack.isEmpty());
+    }
+
+    /** The first carried stack that's cargo (see {@link #carriesAsCargo}), or empty if none. */
     public ItemStack firstCargo(Set<Suitability> suitabilities) {
         for (ItemStack stack : items) {
-            if (isCargo(stack, suitabilities)) {
+            if (carriesAsCargo(stack, suitabilities)) {
                 return stack;
             }
         }
         return ItemStack.EMPTY;
     }
 
-    /** Whether it carries any cargo (see {@link #isCargo}). */
+    /** Whether it carries any cargo (see {@link #carriesAsCargo}). */
     public boolean hasCargo(Set<Suitability> suitabilities) {
         return !firstCargo(suitabilities).isEmpty();
     }
@@ -239,7 +279,7 @@ public class WorkerInventory implements Container {
     public boolean hasSpace() {
         for (int i = 0; i < INVENTORY_SIZE; i++) {
             ItemStack stack = items.get(i);
-            if (mode.usesSlot(i) && (stack.isEmpty() || stack.getCount() < stack.getMaxStackSize())) {
+            if (usesSlot(i) && (stack.isEmpty() || stack.getCount() < stack.getMaxStackSize())) {
                 return true;
             }
         }

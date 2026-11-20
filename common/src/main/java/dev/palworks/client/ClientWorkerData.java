@@ -25,7 +25,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>the workers near the player (WorkerDebugPacket), for the debug overlay
  *       ({@code WorkerDebugRenderer}). Empty unless the player has {@code /palworks debug} on;</li>
  *   <li>the work levels of the player's Pokémon, party and PC (WorkLevelsPacket), for the PC and
- *       summary screens ({@code WorkSkillsOverlay}), by Pokémon UUID;</li>
+ *       summary screens ({@code WorkSkillsOverlay}), by Pokémon UUID, and the server's fertilize
+ *       chance per Watering level with them;</li>
  *   <li>their moods (WorkerMoodPacket), for the same screens, by Pokémon UUID;</li>
  *   <li>which work skills each species can have (DexWorkSkillsPacket), for the Pokédex's work
  *       skill filter ({@code DexWorkSkillFilter}), by species id.</li>
@@ -47,6 +48,7 @@ public final class ClientWorkerData {
     private static final Map<UUID, Status> STATUS = new ConcurrentHashMap<>();
     private static volatile List<WorkerDebugPacket.Entry> debugEntries = List.of();
     private static final Map<UUID, Map<Suitability, Integer>> WORK_LEVELS = new ConcurrentHashMap<>();
+    private static volatile double fertilizeChancePerLevel;
     private static final Map<UUID, WorkerMoodPacket.Shown> MOODS = new ConcurrentHashMap<>();
     private static volatile int strikeUntil;
     private static volatile Map<ResourceLocation, Set<Suitability>> speciesSkills = Map.of();
@@ -101,8 +103,14 @@ public final class ClientWorkerData {
 
     // --- Work levels (PC and summary screens) ---
 
-    public static void putWorkLevels(Map<UUID, Map<Suitability, Integer>> levels) {
+    public static void putWorkLevels(Map<UUID, Map<Suitability, Integer>> levels, double fertilizeChancePerLevel) {
         WORK_LEVELS.putAll(levels);
+        ClientWorkerData.fertilizeChancePerLevel = fertilizeChancePerLevel;
+    }
+
+    /** The chance per Watering level that watering fertilizes a crop (the server's config). */
+    public static double fertilizeChancePerLevel() {
+        return fertilizeChancePerLevel;
     }
 
     /** A Pokémon's level for each job it can do (empty if none), or null if the server hasn't said. */

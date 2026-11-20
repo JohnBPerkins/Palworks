@@ -4,6 +4,7 @@ import dev.palworks.suitability.Suitability;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -22,6 +23,8 @@ public final class JobRecord {
     private final Set<Suitability> required;
     private final Set<Suitability> requiredSuitabilities;
     private final boolean followUp;
+    // The lowest work level, in its type's own skill, that can do it (a big tree: see TreeSize)
+    private final int minLevel;
 
     private long discoveryTime; // Game time it was found (or handed over)
 
@@ -43,13 +46,19 @@ public final class JobRecord {
     private final Set<UUID> outOfReachFor = new HashSet<>();
 
     private JobRecord(
-            JobType type, BlockPos position, long discoveryTime, Set<Suitability> required, boolean followUp) {
+            JobType type,
+            BlockPos position,
+            long discoveryTime,
+            Set<Suitability> required,
+            boolean followUp,
+            int minLevel) {
         this.type = type;
         this.position = position.immutable();
         this.discoveryTime = discoveryTime;
         this.required = EnumSet.copyOf(required);
         this.requiredSuitabilities = Collections.unmodifiableSet(this.required);
         this.followUp = followUp;
+        this.minLevel = minLevel;
     }
 
     /** A job found at {@code position}, needing its type's suitability. */
@@ -59,7 +68,16 @@ public final class JobRecord {
 
     /** A job found at {@code position} that needs other suitabilities than its type's (Nether work). */
     public static JobRecord of(JobType type, BlockPos position, long gameTime, Set<Suitability> required) {
-        return new JobRecord(type, position, gameTime, required, false);
+        return of(type, position, gameTime, required, 1);
+    }
+
+    /**
+     * {@link #of(JobType, BlockPos, long, Set)}, for a job only a worker of {@code minLevel} or more
+     * in its type's skill can do.
+     */
+    public static JobRecord of(
+            JobType type, BlockPos position, long gameTime, Set<Suitability> required, int minLevel) {
+        return new JobRecord(type, position, gameTime, required, false, minLevel);
     }
 
     /**
@@ -74,7 +92,7 @@ public final class JobRecord {
     /** {@link #followUp(JobType, BlockPos, long, UUID)}, needing other suitabilities than its type's. */
     public static JobRecord followUp(
             JobType type, BlockPos position, long gameTime, @Nullable UUID suggestedWorker, Set<Suitability> required) {
-        JobRecord job = new JobRecord(type, position, gameTime, required, true);
+        JobRecord job = new JobRecord(type, position, gameTime, required, true, 1);
         job.reservedBy = suggestedWorker;
         return job;
     }
@@ -103,6 +121,17 @@ public final class JobRecord {
     /** Whether a worker with these suitabilities has every one this job needs. */
     public boolean canBeDoneWith(Set<Suitability> suitabilities) {
         return suitabilities.containsAll(required);
+    }
+
+    /** The lowest work level, in its type's own skill, that can do it: 1 unless the job says more. */
+    public int minLevel() {
+        return minLevel;
+    }
+
+    /** Whether a worker's work levels (by skill) reach what this job asks for in its type's own skill. */
+    public boolean canBeDoneAt(Map<Suitability, Integer> levels) {
+        Suitability skill = type.getRequiredSuitability();
+        return minLevel <= 1 || skill == null || levels.getOrDefault(skill, 0) >= minLevel;
     }
 
     /** 0-10, higher first. */

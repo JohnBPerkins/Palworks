@@ -2,6 +2,7 @@ package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.block.TypeGemClusterBlock;
 import dev.palworks.crystal.CrystalAdapter;
+import dev.palworks.crystal.MiningTool;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
 import java.util.Collections;
@@ -9,12 +10,15 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,8 +26,9 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 /**
- * Mining crystals (see CrystalAdapter): only grown ones, for what breaking them by hand gives,
- * leaving what grows them; a tumblestone put back from its own drops.
+ * Mining crystals (see CrystalAdapter): only grown ones, for what breaking them with the pickaxe
+ * the miner's level stands for gives (see MiningTool), leaving what grows them; a tumblestone put
+ * back from its own drops.
  */
 public class CrystalGameTests {
     private static final BlockPos CRYSTAL = new BlockPos(3, 2, 3);
@@ -54,16 +59,26 @@ public class CrystalGameTests {
         return facing(block(type + "_gem_cluster"), Direction.UP).setValue(stageProperty, stage);
     }
 
-    private static boolean mine(GameTestHelper helper, BlockPos pos) {
-        return CrystalAdapter.harvest(helper.getLevel(), helper.absolutePos(pos), null);
+    /** The pickaxe a miner of this Mining level mines with. */
+    private static ItemStack tool(GameTestHelper helper, int miningLevel) {
+        return MiningTool.forLevel(helper.getLevel().registryAccess(), miningLevel);
     }
 
-    /** What breaking the block at {@code pos} by hand would drop of {@code item}. */
-    private static int byHand(GameTestHelper helper, BlockPos pos, Item item) {
+    /** Mine as a level 1 miner (a wooden pickaxe). */
+    private static boolean mine(GameTestHelper helper, BlockPos pos) {
+        return mine(helper, pos, 1);
+    }
+
+    private static boolean mine(GameTestHelper helper, BlockPos pos, int miningLevel) {
+        return CrystalAdapter.harvest(helper.getLevel(), helper.absolutePos(pos), null, tool(helper, miningLevel));
+    }
+
+    /** What breaking the block at {@code pos} with a level 1 miner's wooden pickaxe drops of {@code item}. */
+    private static int withAWoodenPickaxe(GameTestHelper helper, BlockPos pos, Item item) {
         BlockPos abs = helper.absolutePos(pos);
         int count = 0;
         for (ItemStack drop : Block.getDrops(
-                helper.getLevel().getBlockState(abs), helper.getLevel(), abs, null, null, ItemStack.EMPTY)) {
+                helper.getLevel().getBlockState(abs), helper.getLevel(), abs, null, null, tool(helper, 1))) {
             if (drop.is(item)) {
                 count += drop.getCount();
             }
@@ -75,12 +90,14 @@ public class CrystalGameTests {
     public void anAmethystClusterGivesItsShardsAndItsBuddingAmethystStays(GameTestHelper helper) {
         helper.setBlock(CRYSTAL.below(), Blocks.BUDDING_AMETHYST);
         helper.setBlock(CRYSTAL, facing(Blocks.AMETHYST_CLUSTER, Direction.UP));
-        int shards = byHand(helper, CRYSTAL, Items.AMETHYST_SHARD);
+        int shards = withAWoodenPickaxe(helper, CRYSTAL, Items.AMETHYST_SHARD);
 
         helper.assertTrue(mine(helper, CRYSTAL), IT_MINES);
         helper.assertBlockPresent(Blocks.AIR, CRYSTAL);
         helper.assertBlockPresent(Blocks.BUDDING_AMETHYST, CRYSTAL.below());
-        helper.assertValueEqual(Scenes.itemsOnGround(helper, Items.AMETHYST_SHARD), shards, "shards, as by hand");
+        // 4, as with any pickaxe (2 by hand)
+        helper.assertValueEqual(shards, 4, "shards a wooden pickaxe gets");
+        helper.assertValueEqual(Scenes.itemsOnGround(helper, Items.AMETHYST_SHARD), shards, "shards, as with it");
         helper.succeed();
     }
 
@@ -98,7 +115,8 @@ public class CrystalGameTests {
             helper.setBlock(onWall.west(), Blocks.STONE);
             helper.setBlock(onGround, facing(block(colour + TUMBLESTONE_CLUSTER), Direction.UP));
             helper.setBlock(onWall, facing(block(colour + TUMBLESTONE_CLUSTER), Direction.EAST));
-            int byHand = byHand(helper, onGround, tumblestone) + byHand(helper, onWall, tumblestone);
+            int byHand =
+                    withAWoodenPickaxe(helper, onGround, tumblestone) + withAWoodenPickaxe(helper, onWall, tumblestone);
 
             helper.assertTrue(mine(helper, onGround) && mine(helper, onWall), IT_MINES);
             helper.assertTrue(
@@ -110,7 +128,7 @@ public class CrystalGameTests {
             helper.assertValueEqual(
                     Scenes.itemsOnGround(helper, tumblestone),
                     byHand - 2,
-                    colour + TUMBLESTONE + ": by hand, less the two put back");
+                    colour + TUMBLESTONE + ": as with the pickaxe, less the two put back");
         }
         helper.succeed();
     }
@@ -122,7 +140,7 @@ public class CrystalGameTests {
         helper.setBlock(
                 CRYSTAL,
                 facing(block(TUMBLESTONE_CLUSTER), Direction.UP).setValue(BlockStateProperties.WATERLOGGED, true));
-        int byHand = byHand(helper, CRYSTAL, item(TUMBLESTONE));
+        int byHand = withAWoodenPickaxe(helper, CRYSTAL, item(TUMBLESTONE));
 
         helper.assertTrue(mine(helper, CRYSTAL), IT_MINES);
         helper.assertBlockPresent(Blocks.WATER, CRYSTAL);
@@ -141,9 +159,67 @@ public class CrystalGameTests {
         helper.assertBlockPresent(Blocks.AIR, CRYSTAL);
         helper.assertBlockPresent(block(FIRE_GEM_BLOCK), CRYSTAL.below());
         helper.assertBlockPresent(block(CRYSTAL_CORE), CRYSTAL.below(2));
-        // Its loot: 2-4 gems, by hand
+        // Its loot: 2-4 gems, with no Fortune
         int gems = Scenes.itemsOnGround(helper, item("fire_gem"));
         helper.assertTrue(gems >= 2 && gems <= 4, "2-4 fire gems, got " + gems);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aMinersLevelIsThePickaxeItMinesWith(GameTestHelper helper) {
+        var fortune = helper.getLevel()
+                .registryAccess()
+                .lookupOrThrow(Registries.ENCHANTMENT)
+                .getOrThrow(Enchantments.FORTUNE);
+        Item[] pickaxes = {
+            Items.WOODEN_PICKAXE,
+            Items.DIAMOND_PICKAXE,
+            Items.DIAMOND_PICKAXE,
+            Items.DIAMOND_PICKAXE,
+            Items.DIAMOND_PICKAXE
+        };
+        for (int level = 1; level <= 5; level++) {
+            ItemStack tool = tool(helper, level);
+            helper.assertTrue(tool.is(pickaxes[level - 1]), "level " + level + " mines with " + tool);
+            helper.assertValueEqual(
+                    EnchantmentHelper.getItemEnchantmentLevel(fortune, tool),
+                    Math.max(0, level - 2),
+                    "level " + level + "'s Fortune");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void withFortuneThreeEveryGemClusterGivesAGemMore(GameTestHelper helper) {
+        // A grown gem cluster gives 2-4 gems, and Fortune III always adds one: 3-5 each time
+        helper.setBlock(CRYSTAL.below(2), block(CRYSTAL_CORE));
+        helper.setBlock(CRYSTAL.below(), block(FIRE_GEM_BLOCK));
+        IntegerProperty stage = TypeGemClusterBlock.Companion.getSTAGE();
+        for (int i = 0; i < 12; i++) {
+            helper.setBlock(CRYSTAL, gemCluster(FIRE, Collections.max(stage.getPossibleValues())));
+            int before = Scenes.itemsOnGround(helper, item("fire_gem"));
+            helper.assertTrue(mine(helper, CRYSTAL, 5), IT_MINES);
+            int gems = Scenes.itemsOnGround(helper, item("fire_gem")) - before;
+            helper.assertTrue(gems >= 3 && gems <= 5, "3-5 fire gems at Mining 5, got " + gems);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void withFortuneThreeAmethystGivesMoreShards(GameTestHelper helper) {
+        // Fortune III multiplies a cluster's 4 shards by 1-4 (vanilla's ore formula: 2.2 on
+        // average): 20 clusters at exactly 4 each would be a 1 in 10^8 chance
+        helper.setBlock(CRYSTAL.below(), Blocks.BUDDING_AMETHYST);
+        int shards = 0;
+        for (int i = 0; i < 20; i++) {
+            helper.setBlock(CRYSTAL, facing(Blocks.AMETHYST_CLUSTER, Direction.UP));
+            int before = Scenes.itemsOnGround(helper, Items.AMETHYST_SHARD);
+            helper.assertTrue(mine(helper, CRYSTAL, 5), IT_MINES);
+            int these = Scenes.itemsOnGround(helper, Items.AMETHYST_SHARD) - before;
+            helper.assertTrue(these >= 4 && these <= 16, "4-16 shards a cluster at Mining 5, got " + these);
+            shards += these;
+        }
+        helper.assertTrue(shards > 80, "more than a wooden pickaxe's 80 shards from 20 clusters, got " + shards);
         helper.succeed();
     }
 
@@ -210,13 +286,14 @@ public class CrystalGameTests {
         helper.setBlock(amethyst, facing(Blocks.AMETHYST_CLUSTER, Direction.UP));
         helper.setBlock(tumblestone, facing(block(TUMBLESTONE_CLUSTER), Direction.UP));
         helper.setBlock(bud, facing(Blocks.LARGE_AMETHYST_BUD, Direction.UP));
-        Workers.sendOut(helper, "geodude level=20", START); // Rock/Ground: Mining
+        Workers.sendOut(helper, "geodude level=20", START); // Rock/Ground: Mining 1, a wooden pickaxe
 
         helper.succeedWhen(() -> {
             helper.assertBlockPresent(Blocks.AIR, amethyst);
             helper.assertBlockPresent(block("small_budding_tumblestone"), tumblestone);
             helper.assertBlockPresent(Blocks.LARGE_AMETHYST_BUD, bud);
-            helper.assertTrue(Scenes.itemsOnGround(helper, Items.AMETHYST_SHARD) > 0, "its shards");
+            // As with a pickaxe: 4 (by hand it would be 2)
+            helper.assertValueEqual(Scenes.itemsOnGround(helper, Items.AMETHYST_SHARD), 4, "its shards");
         });
     }
 

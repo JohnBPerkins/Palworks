@@ -1,12 +1,18 @@
 package dev.palworks.client.gui;
 
 import dev.palworks.Palworks;
+import dev.palworks.crop.Watering;
+import dev.palworks.inventory.CarryMode;
+import dev.palworks.station.KindlingHeat;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.tree.TreeSize;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,6 +25,9 @@ import org.jetbrains.annotations.Nullable;
 public final class WorkSkills {
     /** One work skill to show. */
     public record Shown(Suitability job, int level) {}
+
+    /** What a skill's level gives: a translation key, and the numbers that go in it. */
+    public record LevelEffect(String key, List<Object> args) {}
 
     // The icon each shown job has: the party HUD's for its main job, or its own
     private static final Map<Suitability, ResourceLocation> ICONS = new EnumMap<>(Suitability.class);
@@ -34,13 +43,25 @@ public final class WorkSkills {
         ICONS.put(Suitability.NETHER, Palworks.id("textures/gui/work_skill/nether.png"));
     }
 
+    // The skills whose level changes how a worker works (those levelEffect has a line for); the rest show no level,
+    // which would promise a difference there isn't
+    private static final Set<Suitability> LEVELLED = EnumSet.of(
+            Suitability.KINDLING,
+            Suitability.WATERING,
+            Suitability.LUMBERING,
+            Suitability.TRANSPORTING,
+            Suitability.MINING);
+
     private WorkSkills() {}
 
     private static ResourceLocation hudIcon(String job) {
         return Palworks.id("textures/gui/hud/work_" + job + ".png");
     }
 
-    /** The skills to show for these levels: those with work to do, highest level first. */
+    /**
+     * The skills to show for these levels: those with work to do, the levelled ones first, highest
+     * level first, then the rest in job order.
+     */
     public static List<Shown> shown(Map<Suitability, Integer> levels) {
         List<Shown> shown = new ArrayList<>();
         levels.forEach((job, level) -> {
@@ -48,8 +69,15 @@ public final class WorkSkills {
                 shown.add(new Shown(job, level));
             }
         });
-        shown.sort(Comparator.comparingInt(Shown::level).reversed().thenComparing(Shown::job));
+        shown.sort(Comparator.comparing((Shown skill) -> !isLevelled(skill.job()))
+                .thenComparingInt(skill -> isLevelled(skill.job()) ? -skill.level() : 0)
+                .thenComparing(Shown::job));
         return shown;
+    }
+
+    /** Whether a skill's level changes how a worker works, so it's shown. */
+    public static boolean isLevelled(Suitability job) {
+        return LEVELLED.contains(job);
     }
 
     /**
@@ -77,5 +105,34 @@ public final class WorkSkills {
     /** The translation key of what a shown job does ("Waters growing crops..."). */
     public static String descriptionKey(Suitability job) {
         return nameKey(job) + ".description";
+    }
+
+    /**
+     * What this level of a skill gives ("Chops trees of up to 32 logs"), or null for a skill whose
+     * level changes nothing. Watering's comes from the server's fertilize chance per level.
+     */
+    @Nullable
+    public static LevelEffect levelEffect(Suitability job, int level, double fertilizeChancePerLevel) {
+        String key = nameKey(job) + ".level";
+        return switch (job) {
+            case WATERING ->
+                new LevelEffect(key, List.of(percent(Watering.fertilizeChance(level, fertilizeChancePerLevel))));
+            // A level 1 kindler's Ember smelts one item, and it stays to light it again
+            case KINDLING ->
+                KindlingHeat.staysAtItsFurnace(level)
+                        ? new LevelEffect(key + ".one", List.of())
+                        : new LevelEffect(key, List.of(KindlingHeat.itemsPerEmber(level)));
+            case LUMBERING -> new LevelEffect(key, List.of(TreeSize.maxLogs(level)));
+            case TRANSPORTING -> new LevelEffect(key, List.of(CarryMode.slotsForLevel(level)));
+            // Its pickaxe (see MiningTool), one line a level
+            case MINING -> new LevelEffect(key + "." + Math.clamp(level, 1, 5), List.of());
+            default -> null;
+        };
+    }
+
+    /** A chance (0 to 1) as a percentage to a tenth at most: 0.3 is "30", 0.025 is "2.5". */
+    static String percent(double chance) {
+        long tenths = Math.round(chance * 1000);
+        return tenths % 10 == 0 ? Long.toString(tenths / 10) : (tenths / 10) + "." + (tenths % 10);
     }
 }

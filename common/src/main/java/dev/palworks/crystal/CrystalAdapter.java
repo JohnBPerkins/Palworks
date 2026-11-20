@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.level.block.LevelEvent;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
@@ -104,20 +105,27 @@ public final class CrystalAdapter {
     }
 
     /**
-     * Mine the crystal at {@code pos} as {@code miner}, as it's broken by hand: its own loot, and a
-     * tumblestone put back. Returns whether there was a ripe crystal there.
+     * Mine the crystal at {@code pos} as {@code miner}, as a player breaking it with {@code tool}
+     * would (see {@link MiningTool}): its own loot for that tool, and a tumblestone put back.
+     * Returns whether there was a ripe crystal there.
      */
-    public static boolean harvest(Level level, BlockPos pos, @Nullable Entity miner) {
+    public static boolean harvest(Level level, BlockPos pos, @Nullable Entity miner, ItemStack tool) {
         BlockState state = level.getBlockState(pos);
         if (!isRipe(level, pos, state)) {
             return false;
         }
         if (state.getBlock() instanceof TumblestoneBlock
                 && level instanceof ServerLevel serverLevel
-                && replantTumblestone(serverLevel, pos, state, miner)) {
+                && replantTumblestone(serverLevel, pos, state, miner, tool)) {
             return true;
         }
-        level.destroyBlock(pos, true, miner);
+        // As a player's break: the block goes (its particles, sound and game event), then its loot
+        // is rolled with the tool in hand
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        level.destroyBlock(pos, false, miner);
+        if (level instanceof ServerLevel serverLevel) {
+            Block.dropResources(state, serverLevel, pos, blockEntity, miner, tool);
+        }
         return true;
     }
 
@@ -128,14 +136,14 @@ public final class CrystalAdapter {
      * face no longer sturdy, or with no tumblestone of its colour in the loot.
      */
     private static boolean replantTumblestone(
-            ServerLevel level, BlockPos pos, BlockState cluster, @Nullable Entity miner) {
+            ServerLevel level, BlockPos pos, BlockState cluster, @Nullable Entity miner, ItemStack tool) {
         Direction facing = cluster.getValue(DirectionalBlock.FACING);
         BlockPos support = pos.relative(facing.getOpposite());
         if (cluster.getValue(BlockStateProperties.WATERLOGGED)
                 || !level.getBlockState(support).isFaceSturdy(level, support, facing)) {
             return false;
         }
-        List<ItemStack> drops = Block.getDrops(cluster, level, pos, level.getBlockEntity(pos), miner, ItemStack.EMPTY);
+        List<ItemStack> drops = Block.getDrops(cluster, level, pos, level.getBlockEntity(pos), miner, tool);
         Block seedling = takeTumblestoneFor(drops, cluster.getBlock());
         if (seedling == null) {
             return false;

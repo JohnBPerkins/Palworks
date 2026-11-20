@@ -18,17 +18,22 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobType;
 import dev.palworks.job.handler.JobHandlerRegistry;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.suitability.SuitabilityOverrides;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.gametest.framework.AfterBatch;
+import net.minecraft.gametest.framework.BeforeBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -274,6 +279,17 @@ public class HungerGameTests {
             }
         }
         return count;
+    }
+
+    // Two kinds carried: a Pidgey at Transporting 2, two slots
+    @BeforeBatch(batch = "hunger_deliver")
+    public void beforeDeliver(ServerLevel level) throws IOException {
+        PickupGameTests.pidgeysAtTransporting(2);
+    }
+
+    @AfterBatch(batch = "hunger_deliver")
+    public void afterDeliver(ServerLevel level) throws IOException {
+        SuitabilityOverrides.resetAll();
     }
 
     @GameTest(template = Templates.EMPTY, batch = "hunger_deliver", timeoutTicks = 800)

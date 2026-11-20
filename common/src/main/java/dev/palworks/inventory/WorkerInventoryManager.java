@@ -3,6 +3,7 @@ package dev.palworks.inventory;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.architectury.utils.GameInstance;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.PersistentData;
 import java.util.Map;
 import java.util.UUID;
@@ -29,7 +30,9 @@ public class WorkerInventoryManager {
         // Check cache first
         WorkerInventory cached = inventoryCache.get(uuid);
         if (cached != null) {
-            cached.setMode(carryModeFor(pokemon)); // suitabilities can change (e.g. evolution)
+            // Suitabilities and levels can change (e.g. evolution)
+            cached.setMode(carryModeFor(pokemon));
+            cached.setCapacity(capacityFor(pokemon));
             // Saved into the Pokémon it's asked for with now: Cobblemon makes a new Pokemon object
             // for the same Pokémon when its owner logs back in, and one still out (in a pasture,
             // its chunk kept loaded) keeps this inventory, which went on saving into the old one
@@ -49,6 +52,7 @@ public class WorkerInventoryManager {
         }
 
         inventory.setMode(carryModeFor(pokemon));
+        inventory.setCapacity(capacityFor(pokemon));
 
         // Set up auto-save on change
         inventory.setOnChanged(() -> save(pokemon, inventory));
@@ -62,6 +66,12 @@ public class WorkerInventoryManager {
     /** What this Pokemon may carry, from its suitabilities (its species and types as they are now). */
     public static CarryMode carryModeFor(Pokemon pokemon) {
         return CarryMode.forSuitabilities(dev.palworks.suitability.SuitabilityDetector.getSuitabilities(pokemon));
+    }
+
+    /** How many slots this Pokémon carries as a transporter: one a Transporting level. */
+    public static int capacityFor(Pokemon pokemon) {
+        return CarryMode.slotsForLevel(
+                dev.palworks.suitability.SuitabilityDetector.getSuitabilityLevel(pokemon, Suitability.TRANSPORTING));
     }
 
     /**

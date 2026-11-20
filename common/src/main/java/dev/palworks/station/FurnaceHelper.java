@@ -162,8 +162,9 @@ public class FurnaceHelper {
     }
 
     /**
-     * Get the burn duration for a Kindling worker.
-     * Slightly more than 200 ticks to ensure complete smelting.
+     * The burn a level 1 kindler's Ember gives (see KindlingHeat): slightly more than 200 ticks to
+     * ensure complete smelting. A furnace burning no longer than this is one a worker's heat is
+     * still doing good ({@link #canUseHeat}).
      *
      * @return Burn duration in ticks
      */

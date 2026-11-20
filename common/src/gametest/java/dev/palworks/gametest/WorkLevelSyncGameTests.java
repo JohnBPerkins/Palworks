@@ -40,10 +40,13 @@ public class WorkLevelSyncGameTests {
                 MAGIKARP, Map.of()); // can't work
         RegistryFriendlyByteBuf buffer =
                 new RegistryFriendlyByteBuf(Unpooled.buffer(), helper.getLevel().registryAccess());
-        new WorkLevelsPacket(levels).encode(buffer);
-        Map<UUID, Map<Suitability, Integer>> decoded =
-                WorkLevelsPacket.decode(buffer).getLevels();
+        new WorkLevelsPacket(levels, 0.15).encode(buffer);
+        WorkLevelsPacket packet = WorkLevelsPacket.decode(buffer);
+        Map<UUID, Map<Suitability, Integer>> decoded = packet.getLevels();
         helper.assertTrue(decoded.equals(levels), "decoded " + decoded + ", sent " + levels);
+        helper.assertTrue(
+                packet.getFertilizeChancePerLevel() == 0.15,
+                "fertilize chance per level " + packet.getFertilizeChancePerLevel() + ", sent 0.15");
         helper.succeed();
     }
 

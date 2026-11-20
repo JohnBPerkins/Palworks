@@ -26,13 +26,30 @@ class WorkSkillsTest {
     private static final Path ASSETS = Path.of("src/main/resources/assets");
 
     @Test
-    void highestLevelFirstThenInJobOrder() {
+    void levelledSkillsFirstHighestLevelFirstThenTheRestInJobOrder() {
         assertEquals(
                 List.of(
                         new Shown(Suitability.WATERING, 3),
+                        new Shown(Suitability.TRANSPORTING, 3),
+                        new Shown(Suitability.KINDLING, 1),
                         new Shown(Suitability.PLANTING, 1),
-                        new Shown(Suitability.GATHERING, 1)),
-                WorkSkills.shown(Map.of(Suitability.GATHERING, 1, Suitability.WATERING, 3, Suitability.PLANTING, 1)));
+                        new Shown(Suitability.GATHERING, 4)),
+                WorkSkills.shown(Map.of(
+                        Suitability.GATHERING, 4,
+                        Suitability.WATERING, 3,
+                        Suitability.PLANTING, 1,
+                        Suitability.TRANSPORTING, 3,
+                        Suitability.KINDLING, 1)));
+    }
+
+    @Test
+    void onlySkillsWhoseLevelChangesSomethingShowALevel() {
+        for (Suitability job : Suitability.values()) {
+            if (WorkSkills.icon(job) == null) {
+                continue;
+            }
+            assertEquals(WorkSkills.levelEffect(job, 3, 0.1) != null, WorkSkills.isLevelled(job), job.toString());
+        }
     }
 
     @Test
@@ -83,6 +100,51 @@ class WorkSkillsTest {
                 assertTrue(lang.has(WorkSkills.descriptionKey(job)), "no description for " + job);
             }
         }
+    }
+
+    @Test
+    void theSkillsWhoseLevelChangesSomethingSayWhatEachLevelGives() throws IOException {
+        JsonObject lang = JsonParser.parseString(Files.readString(ASSETS.resolve("palworks/lang/en_us.json")))
+                .getAsJsonObject();
+        for (Suitability job : List.of(
+                Suitability.KINDLING,
+                Suitability.WATERING,
+                Suitability.LUMBERING,
+                Suitability.TRANSPORTING,
+                Suitability.MINING)) {
+            for (int level = 1; level <= 5; level++) {
+                WorkSkills.LevelEffect effect = WorkSkills.levelEffect(job, level, 0.1);
+                assertNotNull(effect, job + " at level " + level);
+                assertTrue(lang.has(effect.key()), "no text for " + effect.key());
+            }
+        }
+        assertEquals(
+                List.of(32),
+                WorkSkills.levelEffect(Suitability.LUMBERING, 2, 0.1).args(),
+                "a level 2's trees");
+        assertEquals(
+                List.of(4),
+                WorkSkills.levelEffect(Suitability.TRANSPORTING, 4, 0.1).args(),
+                "a level 4's slots");
+        assertEquals(
+                "palworks.work_skill.mining.level.5",
+                WorkSkills.levelEffect(Suitability.MINING, 5, 0.1).key());
+        assertEquals(
+                "palworks.work_skill.kindling.level.one",
+                WorkSkills.levelEffect(Suitability.KINDLING, 1, 0.1).key());
+        assertEquals(
+                List.of(4), WorkSkills.levelEffect(Suitability.KINDLING, 3, 0.1).args(), "a level 3's items an Ember");
+        // Watering's from the server's chance per level, never past 100%
+        assertEquals(
+                List.of("30"),
+                WorkSkills.levelEffect(Suitability.WATERING, 3, 0.1).args());
+        assertEquals(
+                List.of("12.5"),
+                WorkSkills.levelEffect(Suitability.WATERING, 5, 0.025).args());
+        assertEquals(
+                List.of("100"),
+                WorkSkills.levelEffect(Suitability.WATERING, 5, 0.2).args());
+        assertNull(WorkSkills.levelEffect(Suitability.GATHERING, 3, 0.1), "no level effect yet");
     }
 
     @Test

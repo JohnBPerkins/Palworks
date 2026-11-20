@@ -24,11 +24,19 @@ public final class ModMenuTypes {
     private static final DeferredRegister<MenuType<?>> MENUS =
             DeferredRegister.create(Palworks.MOD_ID, Registries.MENU);
 
-    /** A worker's inventory. Opening it sends the Pokémon's UUID, so the client knows whose it is. */
+    /**
+     * A worker's inventory. Opening it sends the Pokémon's UUID, so the client knows whose it is,
+     * and what it carries (its mode and how many slots), so it lays out the slots it uses.
+     */
     public static final RegistrySupplier<MenuType<WorkerInventoryMenu>> WORKER_INVENTORY = MENUS.register(
             "worker_inventory",
             () -> MenuRegistry.ofExtended((containerId, playerInventory, buf) -> new WorkerInventoryMenu(
-                    ModMenuTypes.WORKER_INVENTORY.get(), containerId, playerInventory, buf.readUUID())));
+                    ModMenuTypes.WORKER_INVENTORY.get(),
+                    containerId,
+                    playerInventory,
+                    buf.readUUID(),
+                    CarryMode.fromOrdinal(buf.readVarInt()),
+                    buf.readVarInt())));
 
     private ModMenuTypes() {}
 
@@ -43,23 +51,36 @@ public final class ModMenuTypes {
 
     /**
      * The server's side of a worker's inventory screen: on the inventory the worker itself uses,
-     * and open only while it stays that (see {@link WorkerInventoryManager#isCarriedBy}) and the
-     * player is near enough, as for a horse's or a chest boat's: the wheel that opens it needs
-     * the worker in reach, and a screen left open as either walks off shouldn't reach across a
-     * base.
+     * and open only while it stays that (see {@link WorkerInventoryManager#isCarriedBy}), carries
+     * what it did when the screen opened (its mode and slots: the client laid them out for that),
+     * and the player is near enough, as for a horse's or a chest boat's: the wheel that opens it
+     * needs the worker in reach, and a screen left open as either walks off shouldn't reach across
+     * a base.
      */
     public static WorkerInventoryMenu menuFor(int containerId, Inventory playerInventory, Pokemon pokemon) {
         WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+        CarryMode mode = inventory.getMode();
+        int capacity = inventory.getCapacity();
         return new WorkerInventoryMenu(
-                WORKER_INVENTORY.get(), containerId, playerInventory, inventory, pokemon.getUuid(), player -> {
+                WORKER_INVENTORY.get(),
+                containerId,
+                playerInventory,
+                inventory,
+                pokemon.getUuid(),
+                mode,
+                capacity,
+                player -> {
                     PokemonEntity entity = pokemon.getEntity();
                     return entity != null
                             && WorkerInventoryManager.isCarriedBy(pokemon, inventory)
+                            && inventory.getMode() == mode
+                            && inventory.getCapacity() == capacity
                             && player.canInteractWithEntity(entity, REACH_MARGIN);
                 });
     }
 
     /** Open a worker's inventory for a player. */
+    @SuppressWarnings("EnumOrdinal") // decoded by fromOrdinal; both ends run the same jar
     public static void openWorkerInventory(ServerPlayer player, Pokemon pokemon) {
         UUID pokemonUUID = pokemon.getUuid();
         String pokemonName = pokemon.getSpecies().getName();
@@ -74,6 +95,11 @@ public final class ModMenuTypes {
                 return menuFor(containerId, playerInventory, pokemon);
             }
         };
-        MenuRegistry.openExtendedMenu(player, provider, buf -> buf.writeUUID(pokemonUUID));
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
+        MenuRegistry.openExtendedMenu(player, provider, buf -> {
+            buf.writeUUID(pokemonUUID);
+            buf.writeVarInt(inventory.getMode().ordinal());
+            buf.writeVarInt(inventory.getCapacity());
+        });
     }
 }

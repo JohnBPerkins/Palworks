@@ -99,7 +99,7 @@ public final class WorkLevelSync {
             }
         }
         if (!changed.isEmpty()) {
-            new WorkLevelsPacket(changed).sendToPlayer(player);
+            new WorkLevelsPacket(changed, PalworksConfig.current().fertilizeChancePerLevel()).sendToPlayer(player);
         }
         syncPartyMoods(player);
     }
@@ -139,7 +139,7 @@ public final class WorkLevelSync {
             levels.put(pokemon.getUuid(), levelsOf(pokemon));
         }
         if (!levels.isEmpty()) {
-            new WorkLevelsPacket(levels).sendToPlayer(player);
+            new WorkLevelsPacket(levels, PalworksConfig.current().fertilizeChancePerLevel()).sendToPlayer(player);
         }
         if (!Mood.enabled()) {
             WorkerMoodPacket.off().sendToPlayer(player);

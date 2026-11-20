@@ -2,7 +2,6 @@ package dev.palworks.inventory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.palworks.suitability.Suitability;
 import java.util.EnumSet;
@@ -41,13 +40,26 @@ class CarryModeTest {
 
     @Test
     void slotsUsedByEachMode() {
-        for (int slot = 0; slot < WorkerInventory.INVENTORY_SIZE; slot++) {
-            assertTrue(CarryMode.FULL.usesSlot(slot));
-            assertEquals(slot == CarryMode.POUCH_SLOT, CarryMode.SEED_POUCH.usesSlot(slot));
-            assertFalse(CarryMode.NONE.usesSlot(slot));
+        for (int capacity = 1; capacity <= WorkerInventory.INVENTORY_SIZE; capacity++) {
+            for (int slot = 0; slot < WorkerInventory.INVENTORY_SIZE; slot++) {
+                assertEquals(
+                        slot < capacity, CarryMode.FULL.usesSlot(slot, capacity), "slot " + slot + " of " + capacity);
+                // A seed pouch is one slot, whatever its capacity
+                assertEquals(slot == CarryMode.POUCH_SLOT, CarryMode.SEED_POUCH.usesSlot(slot, capacity));
+                assertFalse(CarryMode.NONE.usesSlot(slot, capacity));
+            }
+            assertFalse(CarryMode.FULL.usesSlot(-1, capacity));
         }
-        assertFalse(CarryMode.FULL.usesSlot(WorkerInventory.INVENTORY_SIZE));
-        assertFalse(CarryMode.FULL.usesSlot(-1));
+        assertFalse(CarryMode.FULL.usesSlot(WorkerInventory.INVENTORY_SIZE, 9), "never past the storage");
+    }
+
+    @Test
+    void aTransporterCarriesASlotALevel() {
+        for (int level = 1; level <= 5; level++) {
+            assertEquals(level, CarryMode.slotsForLevel(level));
+        }
+        assertEquals(1, CarryMode.slotsForLevel(0));
+        assertEquals(5, CarryMode.slotsForLevel(7));
     }
 
     @Test
