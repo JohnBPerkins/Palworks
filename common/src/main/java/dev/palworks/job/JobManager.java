@@ -326,10 +326,7 @@ public class JobManager {
         }
         // From its species and types as they are now, so an evolution or form change counts at once
         info.suitabilities = SuitabilityDetector.getSuitabilities(pokemon);
-        info.levels.clear();
-        for (Suitability skill : info.suitabilities) {
-            info.levels.put(skill, SuitabilityDetector.getSuitabilityLevel(pokemon, skill));
-        }
+        readLevels(pokemon, info);
         info.currentReservation = stateReservation;
         // A busy worker (in a battle, evolving) gets no new jobs; WorkerAI drops the one it had.
         info.idle = (stateReservation == null) && !WorkerEligibility.isBusy(entity);
@@ -339,6 +336,19 @@ public class JobManager {
         info.lastSeenTick = level.getGameTime();
         if (entity instanceof PokemonEntity pokemonEntity) {
             workers.putEntity(uuid, pokemonEntity);
+        }
+    }
+
+    /**
+     * The worker's level in each of its skills. Its own method, not a loop in registerWorker: there
+     * the loop's iterator shared a local slot with the PokemonEntity below it, and the Architectury
+     * transformer (NeoForge dev runs), recomputing the frames, loads PokemonEntity to merge the two,
+     * which crashes against vanilla's final LivingEntity methods.
+     */
+    private static void readLevels(Pokemon pokemon, WorkerInfo info) {
+        info.levels.clear();
+        for (Suitability skill : info.suitabilities) {
+            info.levels.put(skill, SuitabilityDetector.getSuitabilityLevel(pokemon, skill));
         }
     }
 
