@@ -39,5 +39,6 @@ public final class Templates {
             MoodGameTests.class,
             JobIndexGameTests.class,
             PaceGameTests.class,
-            CrystalGameTests.class);
+            CrystalGameTests.class,
+            TallPlantGameTests.class);
 }

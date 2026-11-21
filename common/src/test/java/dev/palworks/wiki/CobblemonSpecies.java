@@ -21,9 +21,10 @@ import java.util.zip.ZipFile;
 
 /**
  * Cobblemon's species, read from its species data files ({@code data/cobblemon/species/<gen>/<name>.json}
- * in its jar) without a running game, for the wiki's tables. Only implemented species are kept, each
- * with its standard form and its forms that have types or base stats of their own (battle-only forms,
- * such as Megas, are left out, as they never work).
+ * in its jar) without a running game, for the wiki's tables and the reference library's list of every
+ * Pokémon (PokemonList). The wiki keeps only implemented species, each with its standard form and its
+ * forms that have types or base stats of their own ({@link #entries}: battle-only forms, such as Megas,
+ * are left out, as they never work); the list has them all ({@link #all}).
  */
 final class CobblemonSpecies {
     private static final String SPECIES_DIR = "data/cobblemon/species/";
@@ -67,30 +68,51 @@ final class CobblemonSpecies {
         return files;
     }
 
+    /**
+     * One species or form, as {@link #all} lists it: whether it's in the game yet ({@code
+     * implemented}, its species'), whether it exists only in battle (a Mega), and whether it has
+     * types or stats of its own (always, for a species).
+     */
+    record Listed(Entry entry, boolean implemented, boolean battleOnly, boolean ownTypesOrStats) {}
+
+    // By Pokédex number, the standard form first, then forms by name
+    private static final Comparator<Entry> ORDER = Comparator.comparingInt(Entry::dex)
+            .thenComparing(e -> e.form() != null)
+            .thenComparing(Entry::displayName);
+
     /** The implemented species in these files, and their forms with types or stats of their own, by Pokédex number. */
     static List<Entry> entries(Map<String, JsonObject> files) {
-        List<Entry> entries = new ArrayList<>();
+        return all(files).stream()
+                .filter(l -> l.implemented() && !l.battleOnly() && l.ownTypesOrStats())
+                .map(Listed::entry)
+                .toList();
+    }
+
+    /**
+     * Every species in these files and every one of its forms, implemented or not, battle-only or
+     * not: by Pokédex number, each species' standard form first, then its forms by name.
+     */
+    static List<Listed> all(Map<String, JsonObject> files) {
+        List<Listed> all = new ArrayList<>();
         files.forEach((file, species) -> {
-            if (!bool(species, "implemented")) {
-                return;
-            }
+            boolean implemented = bool(species, "implemented");
             int dex = species.get("nationalPokedexNumber").getAsInt();
             String name = species.get("name").getAsString();
             String id = "cobblemon:" + file;
-            entries.add(entry(files, dex, id, name, null, species, null));
+            all.add(new Listed(entry(files, dex, id, name, null, species, null), implemented, false, true));
             if (species.has(FORMS)) {
                 for (JsonElement element : species.getAsJsonArray(FORMS)) {
                     JsonObject form = element.getAsJsonObject();
-                    if (!bool(form, "battleOnly") && (form.has(PRIMARY_TYPE) || form.has(BASE_STATS))) {
-                        entries.add(entry(files, dex, id, name, form.get("name").getAsString(), species, form));
-                    }
+                    all.add(new Listed(
+                            entry(files, dex, id, name, form.get("name").getAsString(), species, form),
+                            implemented,
+                            bool(form, "battleOnly"),
+                            form.has(PRIMARY_TYPE) || form.has(BASE_STATS)));
                 }
             }
         });
-        entries.sort(Comparator.comparingInt(Entry::dex)
-                .thenComparing(e -> e.form() != null)
-                .thenComparing(Entry::displayName));
-        return entries;
+        all.sort(Comparator.comparing(Listed::entry, ORDER));
+        return all;
     }
 
     private static Entry entry(

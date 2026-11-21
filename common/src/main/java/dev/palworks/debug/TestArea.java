@@ -66,6 +66,8 @@ import org.jetbrains.annotations.Nullable;
  *       block registry, so new ones show up by themselves; each one's soil is whichever of a few
  *       candidates it can survive on. Each row of plants has a water channel behind it, so its
  *       farmland stays wet.</li>
+ *   <li>Tall plants, each ready to cut (TallPlants): sugar cane, cactus, bamboo, kelp in a pool
+ *       two deep, weeping vines hanging from a post's arm, twisting vines.</li>
  *   <li>Trees: every vanilla tree and Cobblemon's apricorn and saccharine trees, grown with the
  *       game's own features (so they're natural trees workers will chop), apricorns ripe.</li>
  * </ol>
@@ -91,6 +93,9 @@ public final class TestArea {
     private static final int PLANT_SPACING = 2;
     private static final int PLANTS_PER_ROW = CONTENT_WIDTH / PLANT_SPACING - 1;
     private static final int CROP_ROW_DEPTH = 3;
+    // Tall plants: a row of them, a gap (a cactus beside a sign would break), their signs
+    private static final int TALL_PLANTS_DEPTH = 3;
+    private static final int TALL_PLANT_SPACING = 4;
     // Trees: logs can reach about 4 blocks from the trunk, so a 9 cell keeps neighbours apart; ones
     // with wide branches or a 2x2 trunk get 12. Checked: a tree with a log on its cell's edge is a
     // problem (see growTree).
@@ -164,7 +169,8 @@ public final class TestArea {
         int smeltingZ = WALK + 1;
         int crystalsZ = smeltingZ + SMELTING_DEPTH + WALK;
         int cropsZ = crystalsZ + CRYSTALS_DEPTH + WALK;
-        int smallTreesZ = cropsZ + cropRows * CROP_ROW_DEPTH + WALK;
+        int tallPlantsZ = cropsZ + cropRows * CROP_ROW_DEPTH + WALK;
+        int smallTreesZ = tallPlantsZ + TALL_PLANTS_DEPTH + WALK;
         int bigTreesZ = smallTreesZ + SMALL_TREES.depth(smallTrees.size()) + WALK;
         int depth = bigTreesZ + BIG_TREES.depth(bigTrees.size()) + 1 + WALK;
 
@@ -172,12 +178,16 @@ public final class TestArea {
         clearAndFloor(0, width, 0, smallTreesZ, FARM_CLEAR_HEIGHT);
         clearAndFloor(0, width, smallTreesZ, bigTreesZ, SMALL_TREE_CLEAR_HEIGHT);
         clearAndFloor(0, width, bigTreesZ, depth, TREE_CLEAR_HEIGHT);
-        walkways(width, depth, List.of(crystalsZ - WALK, cropsZ - WALK, smallTreesZ - WALK, bigTreesZ - WALK));
+        walkways(
+                width,
+                depth,
+                List.of(crystalsZ - WALK, cropsZ - WALK, tallPlantsZ - WALK, smallTreesZ - WALK, bigTreesZ - WALK));
 
         smelting(smeltingZ);
         ranch(smeltingZ);
         crystals(crystalsZ);
         crops(cropsZ, crops);
+        tallPlants(tallPlantsZ);
         section("Trees", smallTreesZ, smallTrees, SMALL_TREES);
         section("Big trees", bigTreesZ, bigTrees, BIG_TREES);
 
@@ -681,6 +691,78 @@ public final class TestArea {
         bush.generateSimpleYields();
         bush.setChanged();
         level.sendBlockUpdated(pos, level.getBlockState(pos), level.getBlockState(pos), Block.UPDATE_ALL);
+    }
+
+    // ---- Tall plants ----
+
+    /**
+     * One of each plant Gathering workers cut down to its base (TallPlants), grown past its second
+     * block, so ready to cut. Each sign is two blocks off: a cactus beside a sign would break.
+     */
+    private void tallPlants(int z) {
+        sign(at(1, 0, z - 1), "== Tall plants ==");
+        List<Plant> plants = List.of(
+                new Plant("Sugar cane", pos -> {
+                    set(pos.below(), Blocks.SAND.defaultBlockState());
+                    set(pos.below().east(), Blocks.WATER.defaultBlockState());
+                    column(pos, Direction.UP, Blocks.SUGAR_CANE, Blocks.SUGAR_CANE);
+                }),
+                new Plant("Cactus", pos -> {
+                    set(pos.below(), Blocks.SAND.defaultBlockState());
+                    column(pos, Direction.UP, Blocks.CACTUS, Blocks.CACTUS);
+                }),
+                new Plant("Bamboo", pos -> column(pos, Direction.UP, Blocks.BAMBOO, Blocks.BAMBOO)),
+                // In a pool two deep, its top at the water's top: cut from the bank
+                new Plant("Kelp", pos -> {
+                    // Not sand: the floor's bottom layer, which sand would fall out of where there's
+                    // a gap under the area
+                    set(pos.below(3), Blocks.DIRT.defaultBlockState());
+                    set(pos.below(2), Blocks.KELP_PLANT.defaultBlockState());
+                    set(pos.below(), Blocks.KELP.defaultBlockState());
+                    survives(pos.below(2));
+                    survives(pos.below());
+                }),
+                // From the arm of a post, down to the ground
+                new Plant("Weeping vines", pos -> {
+                    for (int y = 0; y <= 3; y++) {
+                        set(pos.east().above(y), Blocks.NETHERRACK.defaultBlockState());
+                    }
+                    set(pos.above(3), Blocks.NETHERRACK.defaultBlockState());
+                    column(pos.above(2), Direction.DOWN, Blocks.WEEPING_VINES_PLANT, Blocks.WEEPING_VINES);
+                }),
+                new Plant("Twisting vines", pos -> {
+                    set(pos.below(), Blocks.NETHERRACK.defaultBlockState());
+                    column(pos, Direction.UP, Blocks.TWISTING_VINES_PLANT, Blocks.TWISTING_VINES);
+                }));
+        for (int i = 0; i < plants.size(); i++) {
+            BlockPos pos = at(WALK + 2 + i * TALL_PLANT_SPACING, 0, z);
+            Plant plant = plants.get(i);
+            try {
+                plant.placer().accept(pos);
+                plots++;
+            } catch (RuntimeException e) { // NOPMD - one plant failing is reported, not the whole build
+                problems.add(plant.label() + ": " + e.getMessage());
+            }
+            sign(pos.south(2), signLines(plant.label()));
+        }
+    }
+
+    /** Three blocks of a plant from {@code base} the way it grows: two of {@code body}, then {@code tip}. */
+    private void column(BlockPos base, Direction growth, Block body, Block tip) {
+        BlockPos second = base.relative(growth);
+        BlockPos third = second.relative(growth);
+        set(base, body.defaultBlockState());
+        set(second, body.defaultBlockState());
+        set(third, tip.defaultBlockState());
+        survives(base);
+        survives(second);
+        survives(third);
+    }
+
+    private void survives(BlockPos pos) {
+        if (!level.getBlockState(pos).canSurvive(level, pos)) {
+            throw new IllegalStateException("can't stay at " + pos.toShortString());
+        }
     }
 
     // ---- Trees ----

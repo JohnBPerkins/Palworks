@@ -8,11 +8,14 @@ import com.cobblemon.mod.common.block.entity.BerryBlockEntity;
 import dev.palworks.block.TroughBlock;
 import dev.palworks.block.TroughBlockEntity;
 import dev.palworks.block.WorkerBedBlock;
+import dev.palworks.crop.TallPlants;
 import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.debug.TestArea;
+import dev.palworks.job.JobType;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -100,6 +103,32 @@ public class TestAreaGameTests {
         Set<Block> missing = new HashSet<>(expected);
         missing.removeAll(survey.plants());
         helper.assertTrue(missing.isEmpty(), "missing " + when + ": " + missing);
+        helper.assertValueEqual(
+                ripeTallPlants(helper, area),
+                EnumSet.of(
+                        JobType.HARVEST_SUGAR_CANE,
+                        JobType.HARVEST_CACTUS,
+                        JobType.HARVEST_BAMBOO,
+                        JobType.HARVEST_KELP,
+                        JobType.HARVEST_NETHER_VINES),
+                "tall plants ready to cut " + when);
+    }
+
+    /**
+     * The jobs of the tall plants (TallPlants) ready to cut. Kinds, not how many: the crimson fungus
+     * tree has weeping vines of its own.
+     */
+    private static Set<JobType> ripeTallPlants(GameTestHelper helper, TestArea.Result area) {
+        Set<JobType> found = EnumSet.noneOf(JobType.class);
+        // From kelp's pool bottom up
+        for (BlockPos pos : BlockPos.betweenClosed(
+                area.min().below(3), area.max().atY(area.min().getY() + 3))) {
+            JobType job = TallPlants.ripeJobAt(helper.getLevel(), pos);
+            if (job != null) {
+                found.add(job);
+            }
+        }
+        return found;
     }
 
     /** The berry bushes that give nothing when harvested. */

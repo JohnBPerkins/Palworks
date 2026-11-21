@@ -33,6 +33,8 @@ public final class JobHandlerRegistry {
             case DELIVER_ITEMS -> new DeliverItemsHandler();
             case PLANT_SEEDS -> new PlantSeedsHandler();
             case HARVEST_CROPS -> new HarvestCropsHandler();
+            case HARVEST_SUGAR_CANE, HARVEST_CACTUS, HARVEST_BAMBOO, HARVEST_KELP, HARVEST_NETHER_VINES ->
+                new HarvestTallPlantHandler();
             case WATER_CROPS -> new WaterCropsHandler();
             case CHOP_TREE -> new ChopTreeHandler();
             case MINE_CRYSTAL -> new MineCrystalHandler();

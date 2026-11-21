@@ -2,6 +2,7 @@ package dev.palworks.job;
 
 import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
+import dev.palworks.crop.TallPlants;
 import dev.palworks.crop.Watering;
 import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.job.JobPool.JobKey;
@@ -452,6 +453,13 @@ final class JobScanner {
             // chests (see JobChecks.skillsFor)
             return JobRecord.of(
                     JobType.HARVEST_CROPS, pos, now, JobChecks.skillsFor(level, JobType.HARVEST_CROPS, pos));
+        }
+
+        // Sugar cane, cactus, bamboo, kelp and nether vines with a second block grown, each its own
+        // job type (see TallPlants): the job is on that second block, the first one cut
+        JobType tallPlant = TallPlants.ripeJobAt(level, pos);
+        if (tallPlant != null) {
+            return JobRecord.of(tallPlant, pos, now);
         }
 
         // A crop still growing, not watered lately (Watering)

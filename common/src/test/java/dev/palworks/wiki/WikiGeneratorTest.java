@@ -28,7 +28,7 @@ class WikiGeneratorTest {
             "\"baseStats\": {\"hp\": 78, \"attack\": 84, \"defence\": 78, \"special_attack\": 109,"
                     + " \"special_defence\": 85, \"speed\": 100}";
 
-    private static Map<String, JsonObject> files(Map<String, String> texts) {
+    static Map<String, JsonObject> files(Map<String, String> texts) {
         Map<String, JsonObject> files = new HashMap<>();
         texts.forEach(
                 (name, text) -> files.put(name, JsonParser.parseString(text).getAsJsonObject()));
@@ -43,7 +43,7 @@ class WikiGeneratorTest {
     }
 
     /** A Cyndaquil-like line, ending in a Fire species with a Fire/Ghost "Hisui" form. */
-    private static Map<String, JsonObject> typhlosionLine() {
+    static Map<String, JsonObject> typhlosionLine() {
         return files(Map.of(
                 "cyndaquil",
                 "{\"implemented\": true, \"nationalPokedexNumber\": 155, \"name\": \"Cyndaquil\","
