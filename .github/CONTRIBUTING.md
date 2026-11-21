@@ -231,6 +231,8 @@ in-game check: use the dev runs above, or a normal Minecraft instance with the b
     - smelting: a furnace, a blast furnace and a smoker with input but no fuel;
     - crops: one of each vanilla crop, Cobblemon crop, root (hanging from a little arch) and berry
       bush (with berries), with a sign naming it;
+    - tall plants ready to cut: sugar cane, cactus, bamboo, kelp (in a pool), weeping and
+      twisting vines;
     - every vanilla and Cobblemon tree.
 
     Everything is fully grown. Anything it couldn't place is listed in chat.
