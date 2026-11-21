@@ -8,9 +8,11 @@ import com.cobblemon.mod.common.pokemon.activestate.SentOutState;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.palworks.Palworks;
 import dev.palworks.client.ClientWorkerData;
+import dev.palworks.client.gui.WorkSkills;
 import dev.palworks.job.JobType;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
+import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
@@ -57,9 +59,22 @@ public final class WorkStatusHud {
         return Palworks.id("textures/gui/hud/work_" + name + ".png");
     }
 
-    /** The icon for a job, by its id (e.g. {@code work_chop_tree.png}); a generic one for no job. */
+    /**
+     * The icon for a job: its skill's (an axe for chopping a tree), except where a transporter
+     * fetches something or any worker eats or sleeps; a generic one for no job.
+     */
     public static ResourceLocation iconFor(@Nullable JobType job) {
-        return icon(job == null ? "generic" : job.getId());
+        if (job == null) {
+            return icon("generic");
+        }
+        return switch (job) {
+            case COLLECT_DROPS, FETCH_FOOD, EAT_FOOD, SLEEP -> icon(job.getId());
+            case GET_SEEDS, BRING_SEEDS -> icon("seeds");
+            default ->
+                Objects.requireNonNull(
+                        WorkSkills.icon(Objects.requireNonNull(job.getRequiredSuitability(), job.getId())),
+                        job.getId());
+        };
     }
 
     public static void render(GuiGraphics graphics) {

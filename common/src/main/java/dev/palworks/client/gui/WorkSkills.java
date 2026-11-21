@@ -29,18 +29,21 @@ public final class WorkSkills {
     /** What a skill's level gives: a translation key, and the numbers that go in it. */
     public record LevelEffect(String key, List<Object> args) {}
 
-    // The icon each shown job has: the party HUD's for its main job, or its own
+    // The shown skills, each with its icon (textures/gui/work_skill/<id>.png), in job order
     private static final Map<Suitability, ResourceLocation> ICONS = new EnumMap<>(Suitability.class);
 
     static {
-        ICONS.put(Suitability.KINDLING, hudIcon("fuel_furnace"));
-        ICONS.put(Suitability.WATERING, hudIcon("water_crops"));
-        ICONS.put(Suitability.PLANTING, hudIcon("plant_seeds"));
-        ICONS.put(Suitability.GATHERING, hudIcon("harvest_crops"));
-        ICONS.put(Suitability.LUMBERING, hudIcon("chop_tree"));
-        ICONS.put(Suitability.MINING, hudIcon("mine_crystal"));
-        ICONS.put(Suitability.TRANSPORTING, hudIcon("deliver_items"));
-        ICONS.put(Suitability.NETHER, Palworks.id("textures/gui/work_skill/nether.png"));
+        for (Suitability skill : EnumSet.of(
+                Suitability.KINDLING,
+                Suitability.WATERING,
+                Suitability.PLANTING,
+                Suitability.GATHERING,
+                Suitability.LUMBERING,
+                Suitability.MINING,
+                Suitability.TRANSPORTING,
+                Suitability.NETHER)) {
+            ICONS.put(skill, Palworks.id("textures/gui/work_skill/" + skill.getId() + ".png"));
+        }
     }
 
     // The skills whose level changes how a worker works (those levelEffect has a line for); the rest show no level,
@@ -53,10 +56,6 @@ public final class WorkSkills {
             Suitability.MINING);
 
     private WorkSkills() {}
-
-    private static ResourceLocation hudIcon(String job) {
-        return Palworks.id("textures/gui/hud/work_" + job + ".png");
-    }
 
     /**
      * The skills to show for these levels: those with work to do, the levelled ones first, highest
