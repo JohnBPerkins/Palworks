@@ -714,7 +714,9 @@ public final class TestArea {
                 new Plant("Bamboo", pos -> column(pos, Direction.UP, Blocks.BAMBOO, Blocks.BAMBOO)),
                 // In a pool two deep, its top at the water's top: cut from the bank
                 new Plant("Kelp", pos -> {
-                    set(pos.below(3), Blocks.SAND.defaultBlockState());
+                    // Not sand: the floor's bottom layer, which sand would fall out of where there's
+                    // a gap under the area
+                    set(pos.below(3), Blocks.DIRT.defaultBlockState());
                     set(pos.below(2), Blocks.KELP_PLANT.defaultBlockState());
                     set(pos.below(), Blocks.KELP.defaultBlockState());
                     survives(pos.below(2));
