@@ -6,13 +6,10 @@ import com.cobblemon.mod.common.client.storage.ClientParty;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.activestate.SentOutState;
 import com.mojang.blaze3d.systems.RenderSystem;
-import dev.palworks.Palworks;
 import dev.palworks.client.ClientWorkerData;
-import dev.palworks.client.gui.WorkSkills;
-import dev.palworks.job.JobType;
+import dev.palworks.client.gui.WorkIcons;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
-import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
@@ -51,31 +48,7 @@ public final class WorkStatusHud {
     private static final int ICON_SIZE = 8;
     private static final int ICON_TEXTURE_SIZE = 16;
 
-    public static final ResourceLocation OFF_ICON = icon("off");
-
     private WorkStatusHud() {}
-
-    private static ResourceLocation icon(String name) {
-        return Palworks.id("textures/gui/hud/work_" + name + ".png");
-    }
-
-    /**
-     * The icon for a job: its skill's (an axe for chopping a tree), except where a transporter
-     * fetches something or any worker eats or sleeps; a generic one for no job.
-     */
-    public static ResourceLocation iconFor(@Nullable JobType job) {
-        if (job == null) {
-            return icon("generic");
-        }
-        return switch (job) {
-            case COLLECT_DROPS, FETCH_FOOD, EAT_FOOD, SLEEP -> icon(job.getId());
-            case GET_SEEDS, BRING_SEEDS -> icon("seeds");
-            default ->
-                Objects.requireNonNull(
-                        WorkSkills.icon(Objects.requireNonNull(job.getRequiredSuitability(), job.getId())),
-                        job.getId());
-        };
-    }
 
     public static void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -126,16 +99,16 @@ public final class WorkStatusHud {
         float shade = 1F;
         float alpha = 1F;
         switch (activity.phase()) {
-            case OFF -> texture = OFF_ICON;
+            case OFF -> texture = WorkIcons.OFF;
             case WALKING -> {
-                texture = iconFor(activity.job());
+                texture = WorkIcons.forJob(activity.job());
                 alpha = 0.6F;
             }
             case PAUSED -> {
-                texture = iconFor(activity.job());
+                texture = WorkIcons.forJob(activity.job());
                 shade = 0.45F;
             }
-            default -> texture = iconFor(activity.job());
+            default -> texture = WorkIcons.forJob(activity.job());
         }
         RenderSystem.enableBlend();
         graphics.setColor(shade, shade, shade, alpha);

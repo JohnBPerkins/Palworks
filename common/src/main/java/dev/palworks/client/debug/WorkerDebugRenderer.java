@@ -5,7 +5,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.client.ClientWorkerData;
-import dev.palworks.client.hud.WorkStatusHud;
+import dev.palworks.client.gui.WorkIcons;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkerState;
@@ -184,8 +184,8 @@ public final class WorkerDebugRenderer {
     private static ResourceLocation iconOf(WorkActivity activity) {
         return switch (activity.phase()) {
             case IDLE -> null;
-            case OFF -> WorkStatusHud.OFF_ICON;
-            default -> WorkStatusHud.iconFor(activity.job());
+            case OFF -> WorkIcons.OFF;
+            default -> WorkIcons.forJob(activity.job());
         };
     }
 
