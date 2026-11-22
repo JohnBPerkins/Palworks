@@ -9,7 +9,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.architectury.event.events.client.ClientGuiEvent;
 import dev.palworks.client.ClientWorkerData;
-import dev.palworks.client.hud.WorkStatusHud;
 import dev.palworks.net.packets.RequestDexWorkSkillsPacket;
 import dev.palworks.suitability.Suitability;
 import java.lang.ref.WeakReference;
@@ -167,7 +166,7 @@ public final class DexWorkSkillFilter {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             Suitability skill = picked;
-            ResourceLocation icon = skill == null ? WorkStatusHud.iconFor(null) : WorkSkills.icon(skill);
+            ResourceLocation icon = skill == null ? WorkIcons.NO_JOB : WorkSkills.icon(skill);
             if (icon == null) {
                 return;
             }

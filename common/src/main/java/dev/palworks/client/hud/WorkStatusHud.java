@@ -6,9 +6,8 @@ import com.cobblemon.mod.common.client.storage.ClientParty;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.activestate.SentOutState;
 import com.mojang.blaze3d.systems.RenderSystem;
-import dev.palworks.Palworks;
 import dev.palworks.client.ClientWorkerData;
-import dev.palworks.job.JobType;
+import dev.palworks.client.gui.WorkIcons;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -49,18 +48,7 @@ public final class WorkStatusHud {
     private static final int ICON_SIZE = 8;
     private static final int ICON_TEXTURE_SIZE = 16;
 
-    public static final ResourceLocation OFF_ICON = icon("off");
-
     private WorkStatusHud() {}
-
-    private static ResourceLocation icon(String name) {
-        return Palworks.id("textures/gui/hud/work_" + name + ".png");
-    }
-
-    /** The icon for a job, by its id (e.g. {@code work_chop_tree.png}); a generic one for no job. */
-    public static ResourceLocation iconFor(@Nullable JobType job) {
-        return icon(job == null ? "generic" : job.getId());
-    }
 
     public static void render(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -111,16 +99,16 @@ public final class WorkStatusHud {
         float shade = 1F;
         float alpha = 1F;
         switch (activity.phase()) {
-            case OFF -> texture = OFF_ICON;
+            case OFF -> texture = WorkIcons.OFF;
             case WALKING -> {
-                texture = iconFor(activity.job());
+                texture = WorkIcons.forJob(activity.job());
                 alpha = 0.6F;
             }
             case PAUSED -> {
-                texture = iconFor(activity.job());
+                texture = WorkIcons.forJob(activity.job());
                 shade = 0.45F;
             }
-            default -> texture = iconFor(activity.job());
+            default -> texture = WorkIcons.forJob(activity.job());
         }
         RenderSystem.enableBlend();
         graphics.setColor(shade, shade, shade, alpha);

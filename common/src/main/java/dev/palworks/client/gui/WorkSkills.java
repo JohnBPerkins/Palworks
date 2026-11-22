@@ -1,14 +1,13 @@
 package dev.palworks.client.gui;
 
-import dev.palworks.Palworks;
 import dev.palworks.crop.Watering;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.station.KindlingHeat;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.tree.TreeSize;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -29,20 +28,6 @@ public final class WorkSkills {
     /** What a skill's level gives: a translation key, and the numbers that go in it. */
     public record LevelEffect(String key, List<Object> args) {}
 
-    // The icon each shown job has: the party HUD's for its main job, or its own
-    private static final Map<Suitability, ResourceLocation> ICONS = new EnumMap<>(Suitability.class);
-
-    static {
-        ICONS.put(Suitability.KINDLING, hudIcon("fuel_furnace"));
-        ICONS.put(Suitability.WATERING, hudIcon("water_crops"));
-        ICONS.put(Suitability.PLANTING, hudIcon("plant_seeds"));
-        ICONS.put(Suitability.GATHERING, hudIcon("harvest_crops"));
-        ICONS.put(Suitability.LUMBERING, hudIcon("chop_tree"));
-        ICONS.put(Suitability.MINING, hudIcon("mine_crystal"));
-        ICONS.put(Suitability.TRANSPORTING, hudIcon("deliver_items"));
-        ICONS.put(Suitability.NETHER, Palworks.id("textures/gui/work_skill/nether.png"));
-    }
-
     // The skills whose level changes how a worker works (those levelEffect has a line for); the rest show no level,
     // which would promise a difference there isn't
     private static final Set<Suitability> LEVELLED = EnumSet.of(
@@ -54,10 +39,6 @@ public final class WorkSkills {
 
     private WorkSkills() {}
 
-    private static ResourceLocation hudIcon(String job) {
-        return Palworks.id("textures/gui/hud/work_" + job + ".png");
-    }
-
     /**
      * The skills to show for these levels: those with work to do, the levelled ones first, highest
      * level first, then the rest in job order.
@@ -65,7 +46,7 @@ public final class WorkSkills {
     public static List<Shown> shown(Map<Suitability, Integer> levels) {
         List<Shown> shown = new ArrayList<>();
         levels.forEach((job, level) -> {
-            if (ICONS.containsKey(job) && level > 0) {
+            if (icon(job) != null && level > 0) {
                 shown.add(new Shown(job, level));
             }
         });
@@ -86,15 +67,17 @@ public final class WorkSkills {
      */
     @Nullable
     public static Suitability nextFilter(@Nullable Suitability current) {
-        List<Suitability> all = List.copyOf(ICONS.keySet());
+        List<Suitability> all = Arrays.stream(Suitability.values())
+                .filter(skill -> icon(skill) != null)
+                .toList();
         int next = current == null ? 0 : all.indexOf(current) + 1;
         return next < all.size() ? all.get(next) : null;
     }
 
-    /** A shown job's icon (16x16), or null if it isn't shown. */
+    /** A shown job's icon (16x16, from {@link WorkIcons}), or null if it isn't shown. */
     @Nullable
     public static ResourceLocation icon(Suitability job) {
-        return ICONS.get(job);
+        return WorkIcons.forSkill(job);
     }
 
     /** The translation key of a job's name ("Watering"). */
