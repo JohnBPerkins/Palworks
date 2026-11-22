@@ -5,14 +5,14 @@ import com.cobblemon.mod.common.client.gui.PartyOverlay;
 import com.cobblemon.mod.common.client.storage.ClientParty;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.cobblemon.mod.common.pokemon.activestate.SentOutState;
-import com.mojang.blaze3d.systems.RenderSystem;
 import dev.palworks.client.ClientWorkerData;
+import dev.palworks.client.gui.WorkIconDrawer;
 import dev.palworks.client.gui.WorkIcons;
+import dev.palworks.job.JobType;
 import dev.palworks.worker.WorkActivity;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -46,7 +46,6 @@ public final class WorkStatusHud {
     private static final int ICON_Y = 3;
 
     private static final int ICON_SIZE = 8;
-    private static final int ICON_TEXTURE_SIZE = 16;
 
     private WorkStatusHud() {}
 
@@ -95,36 +94,19 @@ public final class WorkStatusHud {
     }
 
     private static void drawIcon(GuiGraphics graphics, WorkActivity activity, int x, int y) {
-        ResourceLocation texture;
-        float shade = 1F;
-        float alpha = 1F;
-        switch (activity.phase()) {
-            case OFF -> texture = WorkIcons.OFF;
-            case WALKING -> {
-                texture = WorkIcons.forJob(activity.job());
-                alpha = 0.6F;
-            }
-            case PAUSED -> {
-                texture = WorkIcons.forJob(activity.job());
-                shade = 0.45F;
-            }
-            default -> texture = WorkIcons.forJob(activity.job());
+        JobType job = activity.job();
+        WorkIcons.Icon icon;
+        if (activity.phase() == WorkActivity.Phase.OFF) {
+            icon = WorkIcons.OFF;
+        } else if (job != null) { // walking, working or paused always have one
+            icon = WorkIcons.forJob(job);
+        } else {
+            return;
         }
-        RenderSystem.enableBlend();
+        float shade = activity.phase() == WorkActivity.Phase.PAUSED ? 0.45F : 1F;
+        float alpha = activity.phase() == WorkActivity.Phase.WALKING ? 0.6F : 1F;
         graphics.setColor(shade, shade, shade, alpha);
-        graphics.blit(
-                texture,
-                x,
-                y,
-                ICON_SIZE,
-                ICON_SIZE,
-                0,
-                0,
-                ICON_TEXTURE_SIZE,
-                ICON_TEXTURE_SIZE,
-                ICON_TEXTURE_SIZE,
-                ICON_TEXTURE_SIZE);
+        WorkIconDrawer.draw(graphics, icon, x, y, ICON_SIZE);
         graphics.setColor(1F, 1F, 1F, 1F);
-        RenderSystem.disableBlend();
     }
 }

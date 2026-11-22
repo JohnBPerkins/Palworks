@@ -5,7 +5,6 @@ import com.cobblemon.mod.common.api.pokedex.entry.PokedexEntry;
 import com.cobblemon.mod.common.api.pokedex.filter.EntryFilter;
 import com.cobblemon.mod.common.client.gui.pokedex.PokedexGUI;
 import com.cobblemon.mod.common.client.gui.pokedex.PokedexGUIConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.architectury.event.events.client.ClientGuiEvent;
 import dev.palworks.client.ClientWorkerData;
@@ -19,7 +18,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -47,7 +45,6 @@ public final class DexWorkSkillFilter {
     private static final int BUTTON_X = 146;
     private static final float BUTTON_Y = 29.5F;
     private static final int ICON_SIZE = 8;
-    private static final int ICON_TEXTURE_SIZE = 16;
     // Cobblemon draws its Pokédex tooltips this far towards the viewer, over the Pokémon in the list
     private static final float TOOLTIP_Z = 1000;
 
@@ -166,21 +163,14 @@ public final class DexWorkSkillFilter {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             Suitability skill = picked;
-            ResourceLocation icon = skill == null ? WorkIcons.NO_JOB : WorkSkills.icon(skill);
+            WorkIcons.Icon icon = skill == null ? WorkIcons.ANY_SKILL : WorkSkills.icon(skill);
             if (icon == null) {
                 return;
             }
-            PoseStack pose = graphics.pose();
-            pose.pushPose();
-            pose.translate(left(dex), top(dex), 0);
-            pose.scale((float) ICON_SIZE / ICON_TEXTURE_SIZE, (float) ICON_SIZE / ICON_TEXTURE_SIZE, 1);
-            RenderSystem.enableBlend();
             // Faded while it filters nothing, unless the mouse is on it
             graphics.setColor(1, 1, 1, skill == null && !overButton(dex, mouseX, mouseY) ? 0.5F : 1);
-            graphics.blit(icon, 0, 0, 0, 0, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE);
+            WorkIconDrawer.draw(graphics, icon, left(dex), top(dex), ICON_SIZE);
             graphics.setColor(1, 1, 1, 1);
-            RenderSystem.disableBlend();
-            pose.popPose();
         }
 
         @Override
