@@ -92,7 +92,7 @@ public final class WorkIcons {
             case MINING -> IRON_PICKAXE;
             case TRANSPORTING -> CHEST;
             case NETHER -> NETHER_WART;
-            case GENERATING_ELECTRICITY, HANDIWORK, MEDICINE_PRODUCTION, COOLING, FARMING -> null;
+            case STONESHAPING, GENERATING_ELECTRICITY, HANDIWORK, MEDICINE_PRODUCTION, COOLING, FARMING -> null;
         };
     }
 

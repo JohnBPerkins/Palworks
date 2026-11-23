@@ -14,6 +14,7 @@ public enum Suitability {
     GATHERING("gathering"), // Harvest crops
     LUMBERING("lumbering"), // Cut down trees
     MINING("mining"), // Mine crystals (ores: not yet)
+    STONESHAPING("stoneshaping"), // Raise boulders out of the ground, for miners
     MEDICINE_PRODUCTION("medicine_production"), // Brewing (no jobs yet)
     COOLING("cooling"), // Cool down containers (no jobs yet)
     TRANSPORTING("transporting"), // Move items into storage
