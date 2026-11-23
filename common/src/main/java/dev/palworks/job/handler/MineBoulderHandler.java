@@ -15,7 +15,8 @@ import net.minecraft.world.item.ItemStack;
 /**
  * Mining one block of a boulder (see {@link Boulders}): broken as with the pickaxe the miner's
  * Mining level stands for (see {@link MiningTool}), so it drops what that pickaxe gets from it:
- * cobblestone from stone, ore with Fortune from level 3. A block a wooden pickaxe gets nothing from
+ * cobblestone from stone, ore with Fortune from level 3, and ice (with Silk Touch: see
+ * {@link MiningTool#forBoulderBlock}) itself. A block a wooden pickaxe gets nothing from
  * is never handed to a level 1 miner (its job's minimum level, set by the scan).
  */
 final class MineBoulderHandler implements JobHandler {
@@ -34,7 +35,7 @@ final class MineBoulderHandler implements JobHandler {
             return;
         }
         int miningLevel = SuitabilityDetector.getSuitabilityLevel(ctx.pokemon(), Suitability.MINING);
-        ItemStack tool = MiningTool.forLevel(level.registryAccess(), miningLevel);
+        ItemStack tool = MiningTool.forBoulderBlock(level.registryAccess(), miningLevel, level.getBlockState(pos));
         // What it drops is the worker's, for transporters to pick up (see TrackedDrops)
         TrackedDrops.breaking(ctx.pokemon().getUuid(), pos, () -> MiningTool.breakWith(level, pos, ctx.entity(), tool));
         ctx.didWork(1);

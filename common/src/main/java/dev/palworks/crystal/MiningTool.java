@@ -10,6 +10,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -44,6 +45,19 @@ public final class MiningTool {
         int fortune = fortune(miningLevel);
         if (fortune > 0) {
             pickaxe.enchant(registries.lookupOrThrow(Registries.ENCHANTMENT).getOrThrow(Enchantments.FORTUNE), fortune);
+        }
+        return pickaxe;
+    }
+
+    /**
+     * The pickaxe for this Mining level ({@link #forLevel}), for breaking this block of a boulder:
+     * with Silk Touch as well for packed and blue ice, which a pickaxe gets nothing from otherwise
+     * (the user's choice, for glacier boulders). The game's own drop for that tool: the ice itself.
+     */
+    public static ItemStack forBoulderBlock(HolderLookup.Provider registries, int miningLevel, BlockState state) {
+        ItemStack pickaxe = forLevel(registries, miningLevel);
+        if (state.is(Blocks.PACKED_ICE) || state.is(Blocks.BLUE_ICE)) {
+            pickaxe.enchant(registries.lookupOrThrow(Registries.ENCHANTMENT).getOrThrow(Enchantments.SILK_TOUCH), 1);
         }
         return pickaxe;
     }

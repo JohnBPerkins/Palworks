@@ -5,8 +5,9 @@
   "species": [],
   "pattern": "shell",
   "stone": {
+    "minecraft:packed_ice": 2,
     "minecraft:calcite": 1,
-    "minecraft:diorite": 1
+    "minecraft:blue_ice": 1
   },
   "ores": {
     "minecraft:iron_ore": 2,
