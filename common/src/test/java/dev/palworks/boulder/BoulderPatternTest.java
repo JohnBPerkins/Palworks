@@ -4,13 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 class BoulderPatternTest {
-    private static final SmoothNoise NOISE = new SmoothNoise(7);
+    private static final String TOP = "top";
+    private static final String BOTTOM = "bottom";
+    private static final Random RANDOM = new Random(3);
 
     private static Map<String, Integer> stone(Object... blocksAndWeights) {
         Map<String, Integer> stone = new LinkedHashMap<>();
@@ -20,79 +22,109 @@ class BoulderPatternTest {
         return stone;
     }
 
-    private static BoulderPattern.Spot at(int x, int y, int z, int depth, boolean openToSky) {
-        return new BoulderPattern.Spot(new BoulderShape.Cell(x, y, z), depth, openToSky, 4, NOISE, 0, 0, 0);
+    /** A block of a boulder 4 high, its noise and speckle rolls fresh each time. */
+    private static BoulderPattern.Spot at(int x, int y, int z, boolean openToSky, double fromMiddle) {
+        return new BoulderPattern.Spot(
+                new BoulderShape.Cell(x, y, z),
+                openToSky,
+                4,
+                fromMiddle,
+                new SmoothNoise(RANDOM.nextLong()),
+                0,
+                0,
+                0,
+                RANDOM.nextDouble(),
+                RANDOM.nextDouble());
+    }
+
+    /** The share of many blocks at this spot (fresh noise each time) the pattern makes {@code block}. */
+    private static double share(
+            BoulderPattern pattern,
+            Map<String, Integer> stone,
+            String block,
+            int y,
+            boolean openToSky,
+            double fromMiddle) {
+        int hits = 0;
+        int tries = 2000;
+        for (int i = 0; i < tries; i++) {
+            hits += block.equals(pattern.pick(stone, at(i % 5, y, i / 5 % 5, openToSky, fromMiddle))) ? 1 : 0;
+        }
+        return (double) hits / tries;
     }
 
     @Test
-    void strataAreLevelBandsAsThickAsTheirWeights() {
+    void someBlocksAreAnyStoneAtRandomWhateverThePattern() {
+        // A graded boulder's top is still sometimes its bottom stone, and the other way round
+        Map<String, Integer> stone = stone(BOTTOM, 1, TOP, 1);
+        double bottomOnTop = share(BoulderPattern.GRADED, stone, BOTTOM, 3, true, 1);
+        assertTrue(bottomOnTop > 0.04 && bottomOnTop < 0.25, "bottom stone on top: " + bottomOnTop);
+    }
+
+    @Test
+    void gradedIsMostlyTheFirstAtTheBottomAndTheLastAtTheTop() {
+        Map<String, Integer> stone = stone(BOTTOM, 1, TOP, 1);
+        assertTrue(share(BoulderPattern.GRADED, stone, BOTTOM, 0, false, 0.5) > 0.75, "at the bottom");
+        assertTrue(share(BoulderPattern.GRADED, stone, TOP, 3, true, 0.5) > 0.75, "at the top");
+    }
+
+    @Test
+    void strataAreMostlyBandsAsThickAsTheirWeights() {
         Map<String, Integer> stone = stone("a", 2, "b", 1);
-        // Untilted: a, a, b, a, a, b... up, the same all the way across
-        for (int x = 0; x < 4; x++) {
-            assertEquals("a", BoulderPattern.STRATA.pick(stone, at(x, 0, 2, 1, false)));
-            assertEquals("a", BoulderPattern.STRATA.pick(stone, at(x, 1, 2, 1, false)));
-            assertEquals("b", BoulderPattern.STRATA.pick(stone, at(x, 2, 2, 1, false)));
-            assertEquals("a", BoulderPattern.STRATA.pick(stone, at(x, 3, 2, 1, false)));
-        }
+        assertTrue(share(BoulderPattern.STRATA, stone, "a", 0, false, 0.5) > 0.5, "a at the bottom");
+        assertTrue(share(BoulderPattern.STRATA, stone, "b", 2, false, 0.5) > 0.4, "b two up");
     }
 
     @Test
-    void aShellIsLayersFromTheOutsideIn() {
-        Map<String, Integer> stone = stone("outer", 1, "middle", 1, "core", 1);
-        assertEquals("outer", BoulderPattern.SHELL.pick(stone, at(0, 0, 0, 1, false)));
-        assertEquals("middle", BoulderPattern.SHELL.pick(stone, at(0, 0, 0, 2, false)));
-        assertEquals("core", BoulderPattern.SHELL.pick(stone, at(0, 0, 0, 3, false)));
-        assertEquals("core", BoulderPattern.SHELL.pick(stone, at(0, 0, 0, 5, false)));
+    void aShellIsMostlyItsOuterStoneOutsideAndInnerStoneInTheMiddle() {
+        Map<String, Integer> stone = stone("outer", 1, "inner", 1);
+        assertTrue(share(BoulderPattern.SHELL, stone, "outer", 1, true, 0.95) > 0.75, "at the edge");
+        assertTrue(share(BoulderPattern.SHELL, stone, "inner", 0, false, 0.1) > 0.75, "in the middle");
     }
 
     @Test
-    void aCapIsOnWhatsOpenToTheSkyOnly() {
+    void aCapIsOnlyEverOnWhatsOpenToTheSky() {
         Map<String, Integer> stone = stone("moss", 1, "cobble", 3, "stone", 2);
-        assertEquals("moss", BoulderPattern.CAPPED.pick(stone, at(1, 2, 1, 1, true)));
-        for (int x = 0; x < 6; x++) {
-            String below = BoulderPattern.CAPPED.pick(stone, at(x, 0, x, 1, false));
-            assertTrue(!"moss".equals(below), below);
-        }
-    }
-
-    @Test
-    void gradedGoesFromTheFirstAtTheBottomToTheLastAtTheTop() {
-        Map<String, Integer> stone = stone("bottom", 1, "top", 1);
-        int bottomLow = 0;
-        int topHigh = 0;
-        for (int x = 0; x < 6; x++) {
-            for (int z = 0; z < 6; z++) {
-                bottomLow += "bottom".equals(BoulderPattern.GRADED.pick(stone, at(x, 0, z, 1, false))) ? 1 : 0;
-                topHigh += "top".equals(BoulderPattern.GRADED.pick(stone, at(x, 3, z, 1, true))) ? 1 : 0;
-            }
-        }
-        assertEquals(36, bottomLow, "the bottom layer");
-        assertEquals(36, topHigh, "the top layer");
+        assertTrue(share(BoulderPattern.CAPPED, stone, "moss", 2, true, 0.5) > 0.75, "on top");
+        assertEquals(0.0, share(BoulderPattern.CAPPED, stone, "moss", 0, false, 0.5), "below");
     }
 
     @Test
     void patchesComeOutNearTheirWeightsAndClump() {
         Map<String, Integer> stone = stone("a", 3, "b", 1);
-        Map<String, Integer> counts = new HashMap<>();
+        SmoothNoise noise = new SmoothNoise(7);
+        Random random = new Random(11);
+        int a = 0;
         int same = 0;
         int pairs = 0;
-        String previous = null;
         for (int x = 0; x < 40; x++) {
+            String previous = null;
             for (int z = 0; z < 40; z++) {
-                String block = BoulderPattern.PATCHES.pick(stone, at(x, 1, z, 1, false));
-                counts.merge(block, 1, Integer::sum);
+                String block = BoulderPattern.PATCHES.pick(
+                        stone,
+                        new BoulderPattern.Spot(
+                                new BoulderShape.Cell(x, 1, z),
+                                false,
+                                4,
+                                0.5,
+                                noise,
+                                0,
+                                0,
+                                0,
+                                random.nextDouble(),
+                                random.nextDouble()));
+                a += "a".equals(block) ? 1 : 0;
                 if (previous != null) {
                     pairs++;
                     same += block.equals(previous) ? 1 : 0;
                 }
                 previous = block;
             }
-            previous = null;
         }
-        double share = counts.getOrDefault("a", 0) / 1600.0;
+        double share = a / 1600.0;
         assertTrue(share > 0.6 && share < 0.9, "a's share " + share);
-        // Neighbours mostly match: patches, not salt and pepper (random would match 62.5% of the time)
-        assertTrue(same > pairs * 0.72, same + " of " + pairs + " neighbours the same");
+        // Neighbours mostly match, speckles and all: patches, not salt and pepper (62.5% if random)
+        assertTrue(same > pairs * 0.68, same + " of " + pairs + " neighbours the same");
     }
 
     @Test

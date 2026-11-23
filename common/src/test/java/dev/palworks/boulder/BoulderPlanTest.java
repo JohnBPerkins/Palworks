@@ -42,45 +42,46 @@ class BoulderPlanTest {
     }
 
     @Test
-    void aBoulderWithOreHasItsLevelsClustersOfIt() {
+    void aBoulderWithOreHasItsLevelsAmountOfItAnywhere() {
+        int onTop = 0;
+        int ore = 0;
         for (int level = 1; level <= 5; level++) {
             BoulderSize size = BoulderSize.forLevel(level);
             Random random = new Random(level);
             for (int i = 0; i < 200; i++) {
                 BoulderPlan plan = BoulderPlan.roll(KIND, level, null, BoulderOreLevels.EMPTY, random, true);
-                long ore = plan.blocks().stream().filter(COAL::equals).count();
+                List<BoulderShape.Cell> cells = plan.shape().cells();
+                int count = 0;
+                for (int c = 0; c < cells.size(); c++) {
+                    if (COAL.equals(plan.blocks().get(c))) {
+                        count++;
+                        BoulderShape.Cell cell = cells.get(c);
+                        onTop += plan.shape().heightAt(cell.x(), cell.z()) == cell.y() + 1 ? 1 : 0;
+                    }
+                }
+                ore += count;
                 assertTrue(
-                        ore >= size.minOre() && ore <= size.maxOre(),
-                        "level " + level + ": " + ore + " ore in "
+                        count >= size.minOre() && count <= size.maxOre(),
+                        "level " + level + ": " + count + " ore in "
                                 + plan.blocks().size());
             }
         }
+        // Anywhere: on its outside as well as in it
+        assertTrue(onTop > ore / 5, onTop + " of " + ore + " ore on top");
     }
 
     @Test
-    void oreIsInsideTheBoulderMoreThanOnItsOutside() {
-        Random random = new Random(9);
-        int ore = 0;
-        int oreOutside = 0;
-        int blocks = 0;
-        int outside = 0;
-        for (int i = 0; i < 300; i++) {
-            BoulderPlan plan = BoulderPlan.roll(KIND, 5, null, BoulderOreLevels.EMPTY, random, true);
-            List<BoulderShape.Cell> cells = plan.shape().cells();
-            Map<BoulderShape.Cell, Integer> depths = BoulderPlan.depths(plan.shape(), cells);
-            for (int c = 0; c < cells.size(); c++) {
-                boolean onOutside = depths.get(cells.get(c)) == 1;
-                blocks++;
-                outside += onOutside ? 1 : 0;
-                if (COAL.equals(plan.blocks().get(c))) {
-                    ore++;
-                    oreOutside += onOutside ? 1 : 0;
-                }
-            }
+    void evenASmallShellBoulderHasBothItsStones() {
+        BoulderKind shell = new BoulderKind(
+                "shell", Set.of(), Set.of(), Map.of("outer", 1, "inner", 1), BoulderPattern.SHELL, Map.of());
+        Random random = new Random(8);
+        int both = 0;
+        for (int i = 0; i < 200; i++) {
+            List<String> blocks = BoulderPlan.roll(shell, 1, null, BoulderOreLevels.EMPTY, random)
+                    .blocks();
+            both += blocks.contains("outer") && blocks.contains("inner") ? 1 : 0;
         }
-        double oreShare = (double) oreOutside / ore;
-        double allShare = (double) outside / blocks;
-        assertTrue(oreShare < allShare * 0.7, oreShare + " of ore on the outside, " + allShare + " of all blocks");
+        assertTrue(both > 170, both + " of 200 level 1 boulders have both");
     }
 
     @Test

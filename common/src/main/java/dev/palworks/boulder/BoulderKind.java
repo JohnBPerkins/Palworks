@@ -13,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
  * {@code data/<namespace>/palworks/boulders/<kind>.json}.
  *
  * <p>Only some boulders have ore (see {@link BoulderSize#ORE_BOULDER_CHANCE}). In one that does,
- * each cluster is one ore, picked by weight among those the worker's level has unlocked (see
+ * each ore block is one of its ores, picked by weight among those the worker's level has unlocked (see
  * {@link BoulderOreLevels}).
  *
  * @param id the kind's name, its file name ("badlands")
@@ -39,7 +39,7 @@ public record BoulderKind(
     }
 
     /**
-     * An ore for one cluster in a boulder raised by a worker of this Unearthing level: by weight,
+     * An ore for one ore block of a boulder raised by a worker of this Unearthing level: by weight,
      * among those its level has unlocked. Null if it has none unlocked yet.
      */
     @Nullable
