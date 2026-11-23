@@ -3,9 +3,11 @@
     "bug"
   ],
   "species": [],
+  "pattern": "strata",
   "stone": {
-    "minecraft:sandstone": 4,
-    "minecraft:bone_block": 2
+    "minecraft:sandstone": 2,
+    "minecraft:bone_block": 1,
+    "minecraft:smooth_sandstone": 1
   },
   "ores": {
     "minecraft:coal_ore": 4,

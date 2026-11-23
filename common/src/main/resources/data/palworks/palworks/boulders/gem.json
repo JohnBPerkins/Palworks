@@ -3,9 +3,10 @@
     "fairy"
   ],
   "species": [],
+  "pattern": "shell",
   "stone": {
-    "minecraft:calcite": 4,
-    "minecraft:diorite": 2
+    "minecraft:calcite": 1,
+    "minecraft:diorite": 1
   },
   "ores": {
     "minecraft:amethyst_block": 2,

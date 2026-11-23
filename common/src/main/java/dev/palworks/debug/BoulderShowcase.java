@@ -24,7 +24,8 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A grid of boulders to look at (the developer command {@code /palworks boulders}): every kind in
- * every style at one Unearthing level, or one kind in every style at every level. Built east and
+ * every style at one Unearthing level (ore as often as in play, one in ten), or one kind in every
+ * style at every level, every one with ore, to see where it goes. Built east and
  * south of a corner on a flat smooth stone floor with the air cleared above it, so the terrain
  * doesn't matter, with a sign heading each row and column. Each build rolls new shapes. The
  * boulders are real ones (with no summoner), so miners can be tried on them.
@@ -58,27 +59,27 @@ public final class BoulderShowcase {
         List<List<BoulderPlan>> plans = new ArrayList<>();
         for (BoulderKind kind : BoulderKinds.current().all()) {
             rows.add(kind.id());
-            plans.add(showcase.everyStyle(kind, unearthingLevel));
+            plans.add(showcase.everyStyle(kind, unearthingLevel, false));
         }
         return showcase.build(rows, plans, "Level " + unearthingLevel);
     }
 
-    /** One kind in every style (a column each), at every level (a row each). */
+    /** One kind in every style (a column each), at every level (a row each), all with ore. */
     public static Result oneKind(ServerLevel level, BlockPos origin, BoulderKind kind) {
         BoulderShowcase showcase = new BoulderShowcase(level, origin);
         List<String> rows = new ArrayList<>();
         List<List<BoulderPlan>> plans = new ArrayList<>();
         for (int unearthingLevel = 1; unearthingLevel <= 5; unearthingLevel++) {
             rows.add("Level " + unearthingLevel);
-            plans.add(showcase.everyStyle(kind, unearthingLevel));
+            plans.add(showcase.everyStyle(kind, unearthingLevel, true));
         }
-        return showcase.build(rows, plans, kind.id());
+        return showcase.build(rows, plans, kind.id() + ", with ore");
     }
 
-    private List<BoulderPlan> everyStyle(BoulderKind kind, int unearthingLevel) {
+    private List<BoulderPlan> everyStyle(BoulderKind kind, int unearthingLevel, boolean withOre) {
         List<BoulderPlan> row = new ArrayList<>();
         for (BoulderStyle style : BoulderStyle.values()) {
-            row.add(BoulderPlan.roll(kind, unearthingLevel, style, BoulderOreLevels.current(), random));
+            row.add(BoulderPlan.roll(kind, unearthingLevel, style, BoulderOreLevels.current(), random, withOre));
         }
         return row;
     }

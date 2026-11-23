@@ -4,26 +4,32 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.random.RandomGenerator;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * What a kind of boulder is made of: its stone, and the ores in it, each with a weight. Which kind an
- * Unearthing worker raises goes by its types (or its species): see {@link BoulderKinds#kindFor}.
- * Loaded from {@code data/<namespace>/palworks/boulders/<kind>.json}.
+ * What a kind of boulder is made of: its stone, laid out in its {@link BoulderPattern}, and the ores
+ * that can be in it, each with a weight. Which kind an Unearthing worker raises goes by its types (or
+ * its species): see {@link BoulderKinds#kindFor}. Loaded from
+ * {@code data/<namespace>/palworks/boulders/<kind>.json}.
  *
- * <p>Each block of a boulder is rolled in two stages: first whether it's ore at all (the
- * {@code oreChance} of the worker's level, see {@link BoulderSize}), then which block, by weight,
- * among only that column: stone against stone, ore against the ores the worker's level has
- * unlocked (see {@link BoulderOreLevels}). So stone 4 and coal 4 at a 10% ore chance is nine stone
- * to one coal: the weights never compete across the two.
+ * <p>Only some boulders have ore (see {@link BoulderSize#ORE_BOULDER_CHANCE}). In one that does,
+ * each cluster is one ore, picked by weight among those the worker's level has unlocked (see
+ * {@link BoulderOreLevels}).
  *
  * @param id the kind's name, its file name ("badlands")
  * @param types the Showdown type ids it's for ("ground"), read as the type a worker has besides Rock
  * @param species the species ids it's for, over their types ("cobblemon:nacli")
- * @param stone block id to weight, in order
+ * @param stone block id to weight, in order (which the pattern may go by)
+ * @param pattern how the stone is laid out
  * @param ores block id to weight, in order
  */
 public record BoulderKind(
-        String id, Set<String> types, Set<String> species, Map<String, Integer> stone, Map<String, Integer> ores) {
+        String id,
+        Set<String> types,
+        Set<String> species,
+        Map<String, Integer> stone,
+        BoulderPattern pattern,
+        Map<String, Integer> ores) {
 
     public BoulderKind {
         types = Set.copyOf(types);
@@ -33,23 +39,18 @@ public record BoulderKind(
     }
 
     /**
-     * The block for one of a boulder's blocks, raised by a worker of this Unearthing level: ore at
-     * {@code oreChance} (one of those its level has unlocked, by weight; stone if it has none
-     * unlocked yet), else stone, by weight.
+     * An ore for one cluster in a boulder raised by a worker of this Unearthing level: by weight,
+     * among those its level has unlocked. Null if it has none unlocked yet.
      */
-    public String pick(int level, double oreChance, BoulderOreLevels oreLevels, RandomGenerator random) {
-        if (random.nextDouble() < oreChance) {
-            Map<String, Integer> unlocked = new LinkedHashMap<>();
-            ores.forEach((ore, weight) -> {
-                if (oreLevels.levelOf(ore) <= level) {
-                    unlocked.put(ore, weight);
-                }
-            });
-            if (!unlocked.isEmpty()) {
-                return weighted(unlocked, random);
+    @Nullable
+    public String pickOre(int level, BoulderOreLevels oreLevels, RandomGenerator random) {
+        Map<String, Integer> unlocked = new LinkedHashMap<>();
+        ores.forEach((ore, weight) -> {
+            if (oreLevels.levelOf(ore) <= level) {
+                unlocked.put(ore, weight);
             }
-        }
-        return weighted(stone, random);
+        });
+        return unlocked.isEmpty() ? null : weighted(unlocked, random);
     }
 
     private static String weighted(Map<String, Integer> weights, RandomGenerator random) {

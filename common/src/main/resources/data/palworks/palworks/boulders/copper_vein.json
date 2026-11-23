@@ -3,6 +3,7 @@
     "electric"
   ],
   "species": [],
+  "pattern": "patches",
   "stone": {
     "minecraft:granite": 3,
     "minecraft:stone": 3

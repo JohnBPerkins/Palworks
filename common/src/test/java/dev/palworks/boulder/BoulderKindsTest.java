@@ -183,30 +183,12 @@ class BoulderKindsTest {
     }
 
     @Test
-    void oreChanceDecidesOreOrStoneAndWeightsOnlyPickWithinEach() {
-        BoulderKind kind = new BoulderKind(
-                "test",
-                java.util.Set.of(),
-                java.util.Set.of(),
-                Map.of("minecraft:stone", 4),
-                Map.of("minecraft:coal_ore", 4));
-        Random random = new Random(1);
-        int coal = 0;
-        int rolls = 20_000;
-        for (int i = 0; i < rolls; i++) {
-            coal += "minecraft:coal_ore".equals(kind.pick(1, 0.1, BoulderOreLevels.EMPTY, random)) ? 1 : 0;
-        }
-        // Stone 4 and coal 4, but only a tenth is ore: about 2000 coal, not 10000
-        assertTrue(coal > 1800 && coal < 2200, coal + " coal");
-    }
-
-    @Test
-    void anOreTheLevelHasntUnlockedIsStoneInstead() throws IOException {
+    void anOreIsPickedOnlyFromThoseTheLevelHasUnlocked() throws IOException {
         BoulderOreLevels levels = shippedOreLevels();
         BoulderKind gem = shippedKinds().get("gem");
         Random random = new Random(2);
         for (int i = 0; i < 2000; i++) {
-            String block = gem.pick(3, 1.0, levels, random); // every block ore, at level 3
+            String block = gem.pickOre(3, levels, random);
             assertTrue(!"minecraft:diamond_ore".equals(block) && !"minecraft:emerald_ore".equals(block), block);
         }
         BoulderKind iron = new BoulderKind(
@@ -214,9 +196,27 @@ class BoulderKindsTest {
                 java.util.Set.of(),
                 java.util.Set.of(),
                 Map.of("minecraft:stone", 1),
+                BoulderPattern.PATCHES,
                 Map.of("minecraft:iron_ore", 1));
-        assertEquals("minecraft:stone", iron.pick(1, 1.0, levels, random), "nothing unlocked at 1: stone");
-        assertEquals("minecraft:iron_ore", iron.pick(2, 1.0, levels, random));
+        assertNull(iron.pickOre(1, levels, random), "nothing unlocked at 1");
+        assertEquals("minecraft:iron_ore", iron.pickOre(2, levels, random));
+    }
+
+    @Test
+    void aKindsPatternIsReadAndPatchesIfNotGiven() throws IOException {
+        List<String> warnings = new ArrayList<>();
+        BoulderKinds kinds = kinds(
+                Map.of(
+                        "palworks:a", "{\"stone\": {\"stone\": 1}, \"pattern\": \"strata\"}",
+                        "palworks:b", "{\"stone\": {\"stone\": 1}}",
+                        "palworks:c", "{\"stone\": {\"stone\": 1}, \"pattern\": \"swirls\"}"),
+                warnings);
+        assertEquals(BoulderPattern.STRATA, kinds.get("a").pattern());
+        assertEquals(BoulderPattern.PATCHES, kinds.get("b").pattern());
+        assertEquals(BoulderPattern.PATCHES, kinds.get("c").pattern());
+        assertEquals(1, warnings.size(), String.join("\n", warnings));
+        assertEquals(BoulderPattern.STRATA, shippedKinds().get("badlands").pattern());
+        assertEquals(BoulderPattern.SHELL, shippedKinds().get("geode").pattern());
     }
 
     private static BoulderKinds shippedKinds() throws IOException {

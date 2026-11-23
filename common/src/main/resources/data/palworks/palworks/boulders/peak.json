@@ -3,9 +3,10 @@
     "flying"
   ],
   "species": [],
+  "pattern": "capped",
   "stone": {
-    "minecraft:stone": 4,
     "minecraft:calcite": 2,
+    "minecraft:stone": 4,
     "minecraft:andesite": 2
   },
   "ores": {

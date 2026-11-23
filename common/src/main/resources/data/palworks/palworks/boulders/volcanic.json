@@ -6,9 +6,10 @@
     "cobblemon:rolycoly",
     "cobblemon:groudon"
   ],
+  "pattern": "graded",
   "stone": {
-    "minecraft:blackstone": 3,
     "minecraft:basalt": 3,
+    "minecraft:blackstone": 3,
     "minecraft:netherrack": 2
   },
   "ores": {

@@ -110,10 +110,10 @@ public final class WorkSkills {
             case TRANSPORTING -> new LevelEffect(key, List.of(CarryMode.slotsForLevel(level)));
             // Its pickaxe (see MiningTool), one line a level
             case MINING -> new LevelEffect(key + "." + Math.clamp(level, 1, 5), List.of());
-            // How big its boulders are, and how much of them is ore (see BoulderSize)
+            // How big its boulders are, and how much ore the one in ten with ore holds (see BoulderSize)
             case UNEARTHING -> {
                 BoulderSize size = BoulderSize.forLevel(level);
-                yield new LevelEffect(key, List.of(size.minBlocks(), size.maxBlocks(), percent(size.oreChance())));
+                yield new LevelEffect(key, List.of(size.minBlocks(), size.maxBlocks(), size.minOre(), size.maxOre()));
             }
             default -> null;
         };

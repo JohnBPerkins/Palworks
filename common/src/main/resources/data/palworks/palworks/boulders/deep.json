@@ -3,6 +3,7 @@
     "dragon"
   ],
   "species": [],
+  "pattern": "graded",
   "stone": {
     "minecraft:deepslate": 4,
     "minecraft:tuff": 2

@@ -3,9 +3,10 @@
     "dark"
   ],
   "species": [],
+  "pattern": "graded",
   "stone": {
-    "minecraft:blackstone": 4,
-    "minecraft:deepslate": 2
+    "minecraft:deepslate": 2,
+    "minecraft:blackstone": 4
   },
   "ores": {
     "minecraft:gilded_blackstone": 3,

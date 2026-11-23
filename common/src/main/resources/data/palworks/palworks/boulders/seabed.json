@@ -3,6 +3,7 @@
     "water"
   ],
   "species": [],
+  "pattern": "patches",
   "stone": {
     "minecraft:prismarine": 3,
     "minecraft:dark_prismarine": 1,

@@ -3,6 +3,7 @@
     "rock"
   ],
   "species": [],
+  "pattern": "patches",
   "stone": {
     "minecraft:stone": 5,
     "minecraft:andesite": 2,

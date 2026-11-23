@@ -3,9 +3,10 @@
     "grass"
   ],
   "species": [],
+  "pattern": "capped",
   "stone": {
-    "minecraft:mossy_cobblestone": 3,
     "minecraft:moss_block": 2,
+    "minecraft:mossy_cobblestone": 3,
     "minecraft:stone": 2
   },
   "ores": {

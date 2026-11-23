@@ -3,9 +3,10 @@
     "ice"
   ],
   "species": [],
+  "pattern": "shell",
   "stone": {
-    "minecraft:calcite": 3,
-    "minecraft:diorite": 3
+    "minecraft:calcite": 1,
+    "minecraft:diorite": 1
   },
   "ores": {
     "minecraft:iron_ore": 2,

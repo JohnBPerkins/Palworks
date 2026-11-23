@@ -1,9 +1,14 @@
 package dev.palworks.boulder;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.random.RandomGenerator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -38,9 +43,10 @@ public record BoulderPlan(String kind, BoulderShape shape, List<String> blocks) 
     }
 
     /**
-     * A boulder of this kind, raised by an Unearthing worker of this level: its size and ore chance
-     * from the level, its style from {@code style} (or picked at random, if null), each block from
-     * the kind (see {@link BoulderKind#pick}).
+     * A boulder of this kind, raised by an Unearthing worker of this level: its size from the level,
+     * its style from {@code style} (or picked at random, if null), its stone laid out in the kind's
+     * pattern, and, about one time in ten ({@link BoulderSize#ORE_BOULDER_CHANCE}), clusters of ore
+     * inside it.
      */
     public static BoulderPlan roll(
             BoulderKind kind,
@@ -48,13 +54,140 @@ public record BoulderPlan(String kind, BoulderShape shape, List<String> blocks) 
             @Nullable BoulderStyle style,
             BoulderOreLevels oreLevels,
             RandomGenerator random) {
+        return roll(kind, level, style, oreLevels, random, false);
+    }
+
+    /**
+     * {@link #roll(BoulderKind, int, BoulderStyle, BoulderOreLevels, RandomGenerator)}, with ore for
+     * certain if {@code alwaysOre} (the showcase, to show where ore goes).
+     */
+    public static BoulderPlan roll(
+            BoulderKind kind,
+            int level,
+            @Nullable BoulderStyle style,
+            BoulderOreLevels oreLevels,
+            RandomGenerator random,
+            boolean alwaysOre) {
         BoulderShape shape = style == null ? BoulderShape.roll(level, random) : BoulderShape.roll(level, style, random);
-        double oreChance = BoulderSize.forLevel(level).oreChance();
-        List<String> blocks = new ArrayList<>(shape.blockCount());
-        for (int i = 0; i < shape.blockCount(); i++) {
-            blocks.add(kind.pick(level, oreChance, oreLevels, random));
+        List<BoulderShape.Cell> cells = shape.cells();
+        Map<BoulderShape.Cell, Integer> depths = depths(shape, cells);
+        SmoothNoise noise = new SmoothNoise(random.nextLong());
+        // Strata lean a little, a different way in each boulder
+        double tiltX = (random.nextDouble() - 0.5) * 0.4;
+        double tiltZ = (random.nextDouble() - 0.5) * 0.4;
+        double shift = random.nextDouble();
+        Map<BoulderShape.Cell, String> blocks = new LinkedHashMap<>();
+        for (BoulderShape.Cell cell : cells) {
+            boolean openToSky = shape.heightAt(cell.x(), cell.z()) == cell.y() + 1;
+            blocks.put(
+                    cell,
+                    kind.pattern()
+                            .pick(
+                                    kind.stone(),
+                                    new BoulderPattern.Spot(
+                                            cell,
+                                            depths.get(cell),
+                                            openToSky,
+                                            shape.height(),
+                                            noise,
+                                            tiltX,
+                                            tiltZ,
+                                            shift)));
         }
-        return new BoulderPlan(kind.id(), shape, blocks);
+        if (alwaysOre || random.nextDouble() < BoulderSize.ORE_BOULDER_CHANCE) {
+            addOre(kind, level, oreLevels, random, depths, blocks);
+        }
+        return new BoulderPlan(kind.id(), shape, new ArrayList<>(blocks.values()));
+    }
+
+    /**
+     * Clusters of ore, each one ore the level has unlocked, grown from a block as deep inside the
+     * boulder as there is, through the blocks round it, the deepest first: found as the boulder is
+     * mined into, not lying on its outside. Nothing if the level has no ore unlocked yet.
+     */
+    private static void addOre(
+            BoulderKind kind,
+            int level,
+            BoulderOreLevels oreLevels,
+            RandomGenerator random,
+            Map<BoulderShape.Cell, Integer> depths,
+            Map<BoulderShape.Cell, String> blocks) {
+        BoulderSize size = BoulderSize.forLevel(level);
+        Set<BoulderShape.Cell> ore = new HashSet<>();
+        int clusters = random.nextInt(size.minClusters(), size.maxClusters() + 1);
+        for (int c = 0; c < clusters; c++) {
+            String block = kind.pickOre(level, oreLevels, random);
+            if (block == null) {
+                return;
+            }
+            int clusterSize = random.nextInt(size.minClusterSize(), size.maxClusterSize() + 1);
+            List<BoulderShape.Cell> cluster = new ArrayList<>();
+            for (int i = 0; i < clusterSize; i++) {
+                // The first from anywhere, the rest beside the cluster so far: the deepest, ties at random
+                Set<BoulderShape.Cell> choices = new HashSet<>();
+                if (cluster.isEmpty()) {
+                    choices.addAll(depths.keySet());
+                } else {
+                    for (BoulderShape.Cell grown : cluster) {
+                        choices.addAll(beside(grown));
+                    }
+                }
+                choices.removeIf(cell -> !depths.containsKey(cell) || ore.contains(cell));
+                if (choices.isEmpty()) {
+                    break;
+                }
+                int deepest = choices.stream().mapToInt(depths::get).max().orElseThrow();
+                List<BoulderShape.Cell> best = choices.stream()
+                        .filter(cell -> depths.get(cell) == deepest)
+                        .sorted(java.util.Comparator.comparingInt(BoulderShape.Cell::y)
+                                .thenComparingInt(BoulderShape.Cell::x)
+                                .thenComparingInt(BoulderShape.Cell::z))
+                        .toList();
+                BoulderShape.Cell next = best.get(random.nextInt(best.size()));
+                cluster.add(next);
+                ore.add(next);
+                blocks.put(next, block);
+            }
+        }
+    }
+
+    /**
+     * How deep inside the boulder each block is: 1 for one with a side open to the air (or the sky),
+     * 2 for one beside those, and so on. The ground under it doesn't count as open.
+     */
+    static Map<BoulderShape.Cell, Integer> depths(BoulderShape shape, List<BoulderShape.Cell> cells) {
+        Set<BoulderShape.Cell> all = new HashSet<>(cells);
+        Map<BoulderShape.Cell, Integer> depths = new HashMap<>();
+        Deque<BoulderShape.Cell> queue = new ArrayDeque<>();
+        for (BoulderShape.Cell cell : cells) {
+            for (BoulderShape.Cell side : beside(cell)) {
+                if (side.y() >= 0 && !all.contains(side)) {
+                    depths.put(cell, 1);
+                    queue.add(cell);
+                    break;
+                }
+            }
+        }
+        while (!queue.isEmpty()) {
+            BoulderShape.Cell cell = queue.poll();
+            for (BoulderShape.Cell side : beside(cell)) {
+                if (all.contains(side) && !depths.containsKey(side)) {
+                    depths.put(side, depths.get(cell) + 1);
+                    queue.add(side);
+                }
+            }
+        }
+        return depths;
+    }
+
+    private static List<BoulderShape.Cell> beside(BoulderShape.Cell cell) {
+        return List.of(
+                new BoulderShape.Cell(cell.x() + 1, cell.y(), cell.z()),
+                new BoulderShape.Cell(cell.x() - 1, cell.y(), cell.z()),
+                new BoulderShape.Cell(cell.x(), cell.y() + 1, cell.z()),
+                new BoulderShape.Cell(cell.x(), cell.y() - 1, cell.z()),
+                new BoulderShape.Cell(cell.x(), cell.y(), cell.z() + 1),
+                new BoulderShape.Cell(cell.x(), cell.y(), cell.z() - 1));
     }
 
     /**

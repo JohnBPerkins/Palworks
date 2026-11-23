@@ -20,8 +20,11 @@ import org.jetbrains.annotations.Nullable;
  * Every kind of boulder (see {@link BoulderKind}), from {@code data/<namespace>/palworks/boulders/<kind>.json}:
  * <pre>
  * { "types": ["ground"], "species": ["cobblemon:groudon"],
- *   "stone": { "minecraft:terracotta": 4 }, "ores": { "minecraft:gold_ore": 4 }, "replace": false }
+ *   "stone": { "minecraft:terracotta": 4 }, "pattern": "strata", "ores": { "minecraft:gold_ore": 4 },
+ *   "replace": false }
  * </pre>
+ * {@code "pattern"} is how the stone is laid out (see {@link BoulderPattern}; patches if not given);
+ * across namespaces, the last file's (by id) that gives one is used.
  * The same kind from several namespaces merges: types and species add up, a block's weight is the
  * highest given, and a weight of 0 takes the block out; {@code "replace": true} uses only the
  * replacing files for that kind. Pure, with no Minecraft types, so it's unit-tested.
@@ -31,6 +34,8 @@ public final class BoulderKinds {
     public static final String FALLBACK = "stone";
 
     private static final String REPLACE = "replace";
+    private static final String PATTERN = "pattern";
+    private static final String IN = " in ";
 
     public static final BoulderKinds EMPTY = new BoulderKinds(Map.of());
 
@@ -121,7 +126,11 @@ public final class BoulderKinds {
             Set<String> species = new HashSet<>();
             Map<String, Integer> stone = new LinkedHashMap<>();
             Map<String, Integer> ores = new LinkedHashMap<>();
+            BoulderPattern pattern = BoulderPattern.PATCHES;
             for (KindFile kindFile : used) {
+                if (kindFile.pattern() != null) {
+                    pattern = kindFile.pattern();
+                }
                 types.addAll(kindFile.types());
                 species.addAll(kindFile.species());
                 kindFile.stone().forEach((block, weight) -> stone.merge(block, weight, BoulderKinds::mergeWeight));
@@ -139,7 +148,7 @@ public final class BoulderKinds {
             for (String one : species) {
                 warnIfTaken(claimed, "species " + one, id, warn);
             }
-            kinds.put(id, new BoulderKind(id, types, species, stone, ores));
+            kinds.put(id, new BoulderKind(id, types, species, stone, pattern, ores));
         });
         return new BoulderKinds(kinds);
     }
@@ -161,6 +170,7 @@ public final class BoulderKinds {
             Set<String> types,
             Set<String> species,
             Map<String, Integer> stone,
+            @Nullable BoulderPattern pattern,
             Map<String, Integer> ores,
             boolean replace) {}
 
@@ -180,14 +190,26 @@ public final class BoulderKinds {
         }
         Map<String, Integer> stone = weights(object, "stone", fileId, isBlock, warn);
         Map<String, Integer> ores = weights(object, "ores", fileId, isBlock, warn);
+        BoulderPattern pattern = null;
+        if (object.get(PATTERN) instanceof com.google.gson.JsonPrimitive name && name.isString()) {
+            pattern = BoulderPattern.fromId(name.getAsString().toLowerCase(Locale.ROOT));
+            if (pattern == null) {
+                warn.accept("Ignoring the pattern \"" + name.getAsString() + "\"" + IN + fileId + ": not one of "
+                        + java.util.Arrays.stream(BoulderPattern.values())
+                                .map(BoulderPattern::id)
+                                .toList());
+            }
+        } else if (object.has(PATTERN)) {
+            warn.accept("Ignoring \"pattern\"" + IN + fileId + ": not a name");
+        }
         JsonElement replaceField = object.get(REPLACE);
         boolean replace = replaceField != null && replaceField.isJsonPrimitive() && replaceField.getAsBoolean();
         for (String key : object.keySet()) {
-            if (!Set.of("types", "species", "stone", "ores", REPLACE).contains(key)) {
-                warn.accept("Ignoring \"" + key + "\" in " + fileId + ": not a field of a boulder kind");
+            if (!Set.of("types", "species", "stone", PATTERN, "ores", REPLACE).contains(key)) {
+                warn.accept("Ignoring \"" + key + "\"" + IN + fileId + ": not a field of a boulder kind");
             }
         }
-        return new KindFile(types, species, stone, ores, replace);
+        return new KindFile(types, species, stone, pattern, ores, replace);
     }
 
     private static List<String> strings(JsonObject object, String field, String fileId, Consumer<String> warn) {
@@ -196,7 +218,7 @@ public final class BoulderKinds {
             return out;
         }
         if (!(object.get(field) instanceof JsonArray array)) {
-            warn.accept("Ignoring \"" + field + "\" in " + fileId + ": not a list");
+            warn.accept("Ignoring \"" + field + "\"" + IN + fileId + ": not a list");
             return out;
         }
         for (JsonElement element : array) {
@@ -216,7 +238,7 @@ public final class BoulderKinds {
             return out;
         }
         if (!(object.get(field) instanceof JsonObject weights)) {
-            warn.accept("Ignoring \"" + field + "\" in " + fileId + ": not an object of block ids to weights");
+            warn.accept("Ignoring \"" + field + "\"" + IN + fileId + ": not an object of block ids to weights");
             return out;
         }
         for (Map.Entry<String, JsonElement> entry : weights.entrySet()) {
