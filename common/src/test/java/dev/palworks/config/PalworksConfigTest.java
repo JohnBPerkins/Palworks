@@ -49,6 +49,15 @@ class PalworksConfigTest {
     }
 
     @Test
+    void workStartsOffUnlessTheFileSaysOn() {
+        List<String> warnings = new ArrayList<>();
+        assertFalse(PalworksConfig.DEFAULTS.workOnByDefault());
+        PalworksConfig on = parse("{\"work_on_by_default\": true}", warnings);
+        assertEquals(PalworksConfig.DEFAULTS.withWorkOnByDefault(true), on);
+        assertEquals(List.of(), warnings);
+    }
+
+    @Test
     void wateringSettingsAreRead() {
         List<String> warnings = new ArrayList<>();
         PalworksConfig config =

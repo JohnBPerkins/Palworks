@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.job.JobType;
 import dev.palworks.reservation.ReservationId;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.HashMap;
@@ -106,6 +107,7 @@ public final class Workers {
         // Fed, so it works at its usual speed: an empty worker is slowed down until it eats (see
         // Hunger), and a new Pokémon starts only half full. Hunger's own tests empty it again.
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
+        switchWorkOn(pokemon);
         Cobblemon.INSTANCE.getStorage().getParty(owner).add(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
         if (entity == null) {
@@ -120,12 +122,22 @@ public final class Workers {
      * either way), and its walking speed and the room it needs go with it, so tests that time or
      * race workers would vary from run to run.
      */
-    private static Pokemon create(String properties) {
+    static Pokemon create(String properties) {
         PokemonProperties parsed = PokemonProperties.Companion.parse(properties);
         if (parsed.getScaleModifier() == null) {
             parsed.setScaleModifier(1.0f);
         }
         return parsed.create();
+    }
+
+    /**
+     * Switch a Pokémon's work on, as its owner does from the interact wheel: a new one's starts off
+     * (work_on_by_default). One with no work skill is left without a worker state, as in game.
+     */
+    private static void switchWorkOn(Pokemon pokemon) {
+        if (WorkerEligibility.canWork(pokemon)) {
+            WorkerStateManager.setEnabled(pokemon, true);
+        }
     }
 
     /**
@@ -138,6 +150,7 @@ public final class Workers {
         BlockPos abs = helper.absolutePos(rel);
         Pokemon pokemon = create(properties);
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
+        switchWorkOn(pokemon);
         Cobblemon.INSTANCE.getStorage().getPC(owner).add(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
         if (entity == null) {

@@ -31,6 +31,7 @@ import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityData;
 import dev.palworks.suitability.SuitabilityDetector;
 import dev.palworks.suitability.SuitabilityOverrides;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.io.IOException;
@@ -558,6 +559,26 @@ public class WorkerGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY)
+    public void aNewPokemonsWorkIsOnOrOffAsTheConfigSays(GameTestHelper helper) {
+        PalworksConfig before = PalworksConfig.current();
+        try {
+            PalworksConfig.setCurrent(PalworksConfig.DEFAULTS);
+            Pokemon off = Workers.create(BULBASAUR);
+            helper.assertFalse(WorkerEligibility.works(off, null), "by default, no work before its first look");
+            helper.assertFalse(WorkerStateManager.getOrCreate(off).isEnabled(), "and its work starts off");
+
+            PalworksConfig.setCurrent(PalworksConfig.DEFAULTS.withWorkOnByDefault(true));
+            Pokemon on = Workers.create(BULBASAUR);
+            helper.assertTrue(WorkerEligibility.works(on, null), "with work_on_by_default it works");
+            helper.assertTrue(WorkerStateManager.getOrCreate(on).isEnabled(), "its work starting on");
+            helper.assertFalse(WorkerStateManager.getOrCreate(off).isEnabled(), "and one seen before stays off");
+        } finally {
+            PalworksConfig.setCurrent(before);
+        }
+        helper.succeed();
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "worker_paused", timeoutTicks = 600)
     public void pausingTheGameDoesntCostAWorkerItsJob(GameTestHelper helper) {
         Workers.isolate(helper);
@@ -977,8 +998,8 @@ public class WorkerGameTests {
         AtomicInteger changes = new AtomicInteger();
         pc.getAnyChangeObservable().subscribe(unit -> changes.incrementAndGet());
 
-        WorkerStateManager.setEnabled(pidgey, false);
-        helper.assertTrue(changes.get() == 1, "switching its work off is a change to save: " + changes.get());
+        WorkerStateManager.setEnabled(pidgey, true); // a new Pokémon's work starts off
+        helper.assertTrue(changes.get() == 1, "switching its work on is a change to save: " + changes.get());
         WorkerStateManager.save(pidgey, state);
         helper.assertTrue(changes.get() == 1, "saving it again, unchanged, isn't: " + changes.get());
         WorkerInventoryManager.getOrCreate(pidgey).setItem(0, new ItemStack(Items.WHEAT, 5));

@@ -85,7 +85,9 @@ public class WorkerState {
     private boolean striking;
 
     public WorkerState() {
-        this.enabled = true; // Owned Pokemon work by default; only an explicit disable turns this off
+        // On here; a new worker's is as the config says (WorkerStateManager.getOrCreate). Only its
+        // owner (or an admin) switches it after that
+        this.enabled = true;
         this.currentReservation = null;
         this.pathFailCount = 0;
         this.lastPathFailTime = 0;

@@ -2,6 +2,7 @@ package dev.palworks.worker;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.config.PalworksConfig;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,7 +26,8 @@ public class WorkerStateManager {
     private static final Map<UUID, WorkerState> CACHE = new ConcurrentHashMap<>();
 
     /**
-     * Get the WorkerState for a Pokemon, creating a new one if it doesn't exist.
+     * Get the WorkerState for a Pokemon, creating a new one if it doesn't exist: its work on or off
+     * as the config's {@code work_on_by_default} says.
      */
     public static WorkerState getOrCreate(Pokemon pokemon) {
         WorkerState cached = CACHE.get(pokemon.getUuid());
@@ -51,6 +53,7 @@ public class WorkerStateManager {
         Palworks.LOGGER.debug(
                 "Creating new WorkerState for {}", pokemon.getSpecies().getName());
         WorkerState state = new WorkerState();
+        state.setEnabled(PalworksConfig.current().workOnByDefault());
         save(pokemon, state); // writes NBT + caches
         return state;
     }
