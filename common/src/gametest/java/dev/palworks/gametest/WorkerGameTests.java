@@ -11,6 +11,7 @@ import com.mojang.brigadier.tree.CommandNode;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.animation.WorkAnimator;
+import dev.palworks.animation.WorkAspects;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.hunger.Hunger;
@@ -255,6 +256,35 @@ public class WorkerGameTests {
             assertWheatRow(helper, 0, HARVESTED);
             helper.assertTrue(playedOut[0], "its harvest animation played out");
             helper.assertTrue(WorkAnimator.playingOutAt(worker) == null, "its last animation is over");
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "worker_turn_aspect", timeoutTicks = 800)
+    public void aWorkerShowsItsWorkAspectWhileItTurnsToItsWork(GameTestHelper helper) {
+        // The client turns a worker's body with it only while it has the work aspect (see
+        // MobBodyTurnMixin), so it must have it whenever it turns at its job: from when it arrives
+        // (its step's ticks start then, as its move waits to settle), not just once the move plays
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        ripeWheatRow(helper);
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+
+        boolean[] turnedAtItsJob = {false};
+        helper.onEachTick(() -> {
+            WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
+            boolean standing = worker.getX() == worker.xo && worker.getZ() == worker.zo;
+            boolean turned = Mth.wrapDegrees(worker.getYRot() - worker.yRotO) != 0.0f;
+            if (!standing || !turned || state.getCurrentReservation() == null) {
+                return;
+            }
+            turnedAtItsJob[0] = true;
+            helper.assertTrue(
+                    worker.getAspects().contains(WorkAspects.WORKING),
+                    "turning to its work it shows " + WorkAspects.WORKING + ", but has " + worker.getAspects());
+        });
+        helper.succeedWhen(() -> {
+            assertWheatRow(helper, 0, HARVESTED);
+            helper.assertTrue(turnedAtItsJob[0], "it turned to a crop where it stood");
         });
     }
 
