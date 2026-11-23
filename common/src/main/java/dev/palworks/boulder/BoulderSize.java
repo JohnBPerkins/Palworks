@@ -9,7 +9,8 @@ package dev.palworks.boulder;
  *
  * @param minBlocks the fewest blocks it's made of
  * @param maxBlocks the most
- * @param footprint the widest it is, either way across the ground (it fits a square this size)
+ * @param footprint how wide its main lumps are, either way across the ground; a ridge or a rock
+ *     cluster can reach a little further (see {@link #widest})
  * @param minHeight the lowest its top is, in blocks
  * @param maxHeight the highest
  * @param minOre the fewest ore blocks in a boulder with ore, each anywhere in it
@@ -18,8 +19,11 @@ package dev.palworks.boulder;
 public record BoulderSize(
         int minBlocks, int maxBlocks, int footprint, int minHeight, int maxHeight, int minOre, int maxOre) {
 
-    /** The highest a boulder ever is: a miner on the ground, or on the boulder, reaches the top. */
-    public static final int MAX_HEIGHT = 4;
+    /**
+     * The highest a boulder ever is. Every column two or more high has one beside it at most a block
+     * lower (see BoulderShape), so a miner climbs it to reach the top.
+     */
+    public static final int MAX_HEIGHT = 6;
 
     /** The chance a boulder has ore in it, whatever its level (the user's choice: one in eight). */
     public static final double ORE_BOULDER_CHANCE = 0.125;
@@ -28,9 +32,14 @@ public record BoulderSize(
         new BoulderSize(5, 8, 3, 2, 3, 1, 2),
         new BoulderSize(10, 15, 4, 2, 3, 2, 3),
         new BoulderSize(17, 24, 4, 2, 4, 2, 6),
-        new BoulderSize(28, 38, 5, 3, 4, 4, 8),
-        new BoulderSize(42, 56, 6, 3, 4, 6, 12),
+        new BoulderSize(28, 38, 5, 3, 5, 4, 8),
+        new BoulderSize(42, 56, 6, 3, 6, 6, 12),
     };
+
+    /** The widest a boulder of this size is, either way: it fits a square this size. */
+    public int widest() {
+        return footprint + 2;
+    }
 
     /** The size for an Unearthing level (1 to 5; anything outside is taken as the nearest). */
     public static BoulderSize forLevel(int level) {

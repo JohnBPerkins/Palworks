@@ -34,8 +34,8 @@ public final class BoulderShowcase {
     /** Where it was built, and how many boulders it has. */
     public record Result(BlockPos min, BlockPos max, int boulders) {}
 
-    // Each cell holds the widest boulder (level 5's footprint), with a gap round it
-    private static final int CELL = BoulderSize.forLevel(5).footprint();
+    // Each cell holds the widest boulder (level 5's), with a gap round it
+    private static final int CELL = BoulderSize.forLevel(5).widest();
     private static final int GAP = 2;
     private static final int PITCH = CELL + GAP;
     // The signs' row and column, before the first cell
