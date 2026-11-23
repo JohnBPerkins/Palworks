@@ -85,14 +85,15 @@ Keep `"replace": false` so your entries are added to the defaults instead of rep
 
 What the boulders [Unearthing](Jobs#raise-boulders) workers raise are made of comes from one
 file per kind of boulder: `data/<namespace>/palworks/boulders/<kind>.json`. For example, the default
-`data/palworks/palworks/boulders/badlands.json`:
+`data/palworks/palworks/boulders/volcanic.json`:
 
 ```json
 {
-  "types": ["ground"],
-  "species": [],
-  "stone": { "minecraft:terracotta": 4, "minecraft:red_sandstone": 2, "minecraft:granite": 2 },
-  "ores": { "minecraft:gold_ore": 4, "minecraft:iron_ore": 3, "minecraft:copper_ore": 2, "minecraft:redstone_ore": 1 }
+  "types": ["fire"],
+  "species": ["cobblemon:rolycoly", "cobblemon:groudon"],
+  "pattern": "graded",
+  "stone": { "minecraft:basalt": 3, "minecraft:blackstone": 3, "minecraft:netherrack": 2 },
+  "ores": { "minecraft:coal_ore": 4, "minecraft:nether_quartz_ore": 3, "minecraft:nether_gold_ore": 3, "minecraft:ancient_debris": 1 }
 }
 ```
 
@@ -101,15 +102,23 @@ file per kind of boulder: `data/<namespace>/palworks/boulders/<kind>.json`. For 
   default `stone` kind is for `rock`.
 - **`species`**: species that raise this kind whatever their types (Groudon raises volcanic
   boulders, the Nacli line salt).
-- **`stone`** and **`ores`**: blocks and their weights. First, each block of a boulder is ore or
-  not, by the worker's level (see [Suitabilities](Suitabilities#work-levels)). Then a block is
-  picked by weight, only among the stone or only among the ores. So `stone 4` and `coal 4` at
-  level 1 is about nine stone to one coal.
+- **`stone`**: its blocks and weights, in order. What the weights and order mean depends on the
+  `pattern`:
+  - `patches` (if no pattern is given): smooth patches, each block's share by weight.
+  - `strata`: level bands, each block in turn, its weight the band's thickness in blocks.
+  - `graded`: from the first block at the bottom to the last at the top, its weight its share of
+    the height.
+  - `shell`: layers from the outside in, one block thick each, the last filling the middle.
+    Weights aren't used.
+  - `capped`: the first block over every top surface, the rest in patches below.
+- **`ores`**: ores and their weights. About one boulder in ten has ore, in small clusters inside it.
+  Each cluster is one ore, picked by weight among the ores the worker's level has unlocked (below).
 
 Files for the same kind from different namespaces merge: types and species add up, a block's
-weight is the highest given, and a weight of `0` takes a block out. `"replace": true` uses only that
-file for the kind. A new file name is a new kind. Every block should drop something for a pickaxe
-without Silk Touch (packed ice, for one, drops nothing).
+weight is the highest given, and a weight of `0` takes a block out. The last file (by namespace)
+that gives a pattern sets it. `"replace": true` uses only that file for the kind. A new file name
+is a new kind. Every block should drop something for a pickaxe without Silk Touch (packed ice, for
+one, drops nothing).
 
 The Unearthing level each ore needs is one table for every kind, in
 `data/<namespace>/palworks/boulder_ores/<name>.json` (the default is `ore_levels.json`):

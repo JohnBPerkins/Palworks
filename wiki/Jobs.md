@@ -209,12 +209,14 @@ A Transporting worker then picks up the drops.
 
 An Unearthing worker stamps the ground and a boulder rises out of it, for Mining workers to break
 up. Each worker keeps one boulder of its own standing, and raises the next once that one is mined
-away. It raises one only when it has no other work to do.
+away. It raises one only when it has no other work to do. It's hungry work: a boulder costs a
+point of fullness for every 20 blocks, and at least one.
 
 What a boulder is made of depends on the worker's type besides Rock. A Geodude (Rock and Ground)
-raises terracotta and gold, an Alolan Geodude (Rock and Electric) copper, and an Aron (Steel) iron.
-How big it is, and how much of it is ore, depend on its [work level](Suitabilities#work-levels).
-See [Boulders](Boulders) for every kind.
+raises banded terracotta, an Alolan Geodude (Rock and Electric) granite with copper, and an Aron
+(Steel) deepslate and stone with iron. About one boulder in ten has ore, in small clusters inside
+it. How big it is, and how much ore the ones with ore have, depend on its
+[work level](Suitabilities#work-levels). See [Boulders](Boulders) for every kind.
 
 A boulder only goes on open, flat ground in the worker's work range, with room round it:
 
