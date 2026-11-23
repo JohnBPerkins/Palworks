@@ -30,24 +30,32 @@ class WorkerStateTest {
 
     @Test
     void newStateIsEnabled() {
-        assertTrue(new WorkerState().isEnabled());
+        assertTrue(new WorkerState().isEnabled(true));
+        assertTrue(new WorkerState().isEnabled(false));
     }
 
     @Test
     void disabledSurvivesSaveAndLoad() {
         WorkerState state = new WorkerState();
-        state.setEnabled(false);
+        state.setEnabled(true, false);
 
         WorkerState loaded = WorkerState.fromNBT(state.serializeNBT());
 
-        assertFalse(loaded.isEnabled(), "a disabled worker must stay disabled after reload");
+        assertFalse(loaded.isEnabled(true), "a disabled worker must stay disabled after reload");
+        assertTrue(loaded.isEnabled(false), "in the party only: its pasture switch is its own");
     }
 
     @Test
     void enabledSurvivesSaveAndLoad() {
-        WorkerState loaded = WorkerState.fromNBT(new WorkerState().serializeNBT());
+        WorkerState state = new WorkerState();
+        state.setEnabled(true, false);
+        state.setEnabled(false, false);
+        state.setEnabled(false, true);
 
-        assertTrue(loaded.isEnabled());
+        WorkerState loaded = WorkerState.fromNBT(state.serializeNBT());
+
+        assertTrue(loaded.isEnabled(false));
+        assertFalse(loaded.isEnabled(true));
     }
 
     @Test
@@ -116,13 +124,6 @@ class WorkerStateTest {
         assertEquals(0, state.getMood());
         state.setMood(250);
         assertEquals(WorkerState.MAX_MOOD, state.getMood());
-    }
-
-    @Test
-    void stateWithoutEnabledKeyLoadsAsEnabled() {
-        assertTrue(
-                WorkerState.fromNBT(new CompoundTag()).isEnabled(),
-                "data saved before the enabled key existed should default to enabled");
     }
 
     // ---- Job progress (steps) ----

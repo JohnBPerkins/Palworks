@@ -42,7 +42,7 @@ public class ToggleWorkerHandler implements ServerNetworkPacketHandler<ToggleWor
             return;
         }
 
-        boolean enabled = !WorkerStateManager.getOrCreate(pokemon).isEnabled();
+        boolean enabled = !WorkerStateManager.isEnabled(pokemon); // where it is: party or pasture
         // (Switched off, it stops walking to the job it gave up: see JobManager.registerWorker)
         WorkerStateManager.setEnabled(pokemon, enabled);
 

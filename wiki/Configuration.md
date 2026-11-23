@@ -7,6 +7,8 @@ settings that aren't per-Pokémon:
 
 ```json
 {
+  "party_work_on_by_default": false,
+  "pasture_work_on_by_default": true,
   "work_range_horizontal": 32,
   "work_range_vertical": 32,
   "owner_range": 24,
@@ -36,6 +38,12 @@ settings that aren't per-Pokémon:
 }
 ```
 
+- **`party_work_on_by_default`**, **`pasture_work_on_by_default`**: whether a Pokémon's work
+  starts switched on in your party, and in a pasture. By default it's off in the party (you switch
+  each one on from its interact wheel) and on in a pasture, so a pastured Pokémon with a work skill
+  goes straight to work. Each Pokémon has a switch for each place (see
+  [Workers](Workers#switching-work-on-and-off)); these set them for Pokémon Palworks hasn't seen
+  yet, so changing them doesn't switch any others.
 - **`work_range_horizontal`** (8 to 64): how many blocks out each way a worker looks for and takes
   jobs. Bigger ranges scan more of the world each tick.
 - **`work_range_vertical`** (4 to 64): how many blocks up and down it does.

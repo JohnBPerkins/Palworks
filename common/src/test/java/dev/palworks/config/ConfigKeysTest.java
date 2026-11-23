@@ -39,7 +39,7 @@ class ConfigKeysTest {
         assertTrue(names.contains(MOOD_ENABLED), names.toString());
         assertTrue(names.contains("mood.strike_until"), names.toString());
         assertFalse(names.contains("hunger"), "objects aren't settings themselves");
-        assertEquals(20, names.size(), names.toString());
+        assertEquals(22, names.size(), names.toString());
     }
 
     @Test

@@ -3,6 +3,7 @@ package dev.palworks.worker;
 import com.cobblemon.mod.common.api.storage.party.PlayerPartyStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.config.PalworksConfig;
 import dev.palworks.job.WorkRange;
 import dev.palworks.suitability.SuitabilityDetector;
 import java.util.UUID;
@@ -44,11 +45,14 @@ public class WorkerEligibility {
 
     /**
      * Whether Palworks runs this Pokémon as a worker now: its work is on and it has work it can do.
-     * {@code state} is its worker state, or null if it has none yet (a new worker starts with its
-     * work on).
+     * Its work is on or off where it is now, in its owner's party or in a pasture (a switch for
+     * each). {@code state} is its worker state, or null if it has none yet (then it's as the
+     * config's {@code party_work_on_by_default} or {@code pasture_work_on_by_default} says).
      */
     public static boolean works(Pokemon pokemon, @Nullable WorkerState state) {
-        return (state == null || state.isEnabled()) && canWork(pokemon);
+        boolean inParty = isFromParty(pokemon);
+        boolean on = state == null ? PalworksConfig.current().workOnByDefault(inParty) : state.isEnabled(inParty);
+        return on && canWork(pokemon);
     }
 
     /**

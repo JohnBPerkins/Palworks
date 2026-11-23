@@ -49,6 +49,17 @@ class PalworksConfigTest {
     }
 
     @Test
+    void workStartsOffInThePartyAndOnInAPastureUnlessTheFileSaysOtherwise() {
+        List<String> warnings = new ArrayList<>();
+        assertFalse(PalworksConfig.DEFAULTS.workOnByDefault(true));
+        assertTrue(PalworksConfig.DEFAULTS.workOnByDefault(false));
+        PalworksConfig swapped =
+                parse("{\"party_work_on_by_default\": true, \"pasture_work_on_by_default\": false}", warnings);
+        assertEquals(PalworksConfig.DEFAULTS.withWorkOnByDefault(true, false), swapped);
+        assertEquals(List.of(), warnings);
+    }
+
+    @Test
     void wateringSettingsAreRead() {
         List<String> warnings = new ArrayList<>();
         PalworksConfig config =

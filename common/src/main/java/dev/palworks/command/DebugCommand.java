@@ -11,6 +11,7 @@ import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
 import dev.palworks.sleep.NonWorkerSleep;
 import dev.palworks.sleep.Sleep;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import net.minecraft.network.chat.Component;
@@ -211,8 +212,7 @@ public class DebugCommand {
             return;
         }
 
-        WorkerState state = WorkerStateManager.getOrCreate(pokemon);
-        if (state.isEnabled()) {
+        if (WorkerStateManager.isEnabled(pokemon)) {
             player.sendSystemMessage(Component.literal(pokemon.getSpecies().getName() + " is already a worker"));
             return;
         }
@@ -231,7 +231,7 @@ public class DebugCommand {
         }
 
         WorkerState state = WorkerStateManager.get(pokemon);
-        if (state == null || !state.isEnabled()) {
+        if (state == null || !state.isEnabled(WorkerEligibility.isFromParty(pokemon))) {
             player.sendSystemMessage(Component.literal(pokemon.getSpecies().getName() + " is not a worker"));
             return;
         }
