@@ -9,7 +9,7 @@ Each worker has a mood, from 0 to 100, separate from its friendship. It starts a
 - **Unhappy (below 50):** a sad face over its head, a warning that it's on its way to a strike. It
   works no slower for it.
 - **On strike (at 0):** it finishes what it's doing, then does no work until its mood is back to
-  30, with an anger mark over its head. It still eats and sleeps, which is how it gets there.
+  30, with an angry red face over its head. It still eats and sleeps, which is how it gets there.
 - **Where to see it:** a face in the bottom-left corner of its portrait on the PC and its summary.
   Hover it for the number and what it means. Its summary's Stats page also has a mood bar under
   Other, beside friendship and fullness.

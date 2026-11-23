@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.palworks.ai.WorkerAI;
 import dev.palworks.client.ClientWorkerData;
 import dev.palworks.client.gui.WorkIcons;
+import dev.palworks.job.JobType;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkerState;
@@ -18,6 +19,7 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -141,18 +143,31 @@ public final class WorkerDebugRenderer {
         pose.scale(LABEL_SCALE, -LABEL_SCALE, LABEL_SCALE);
         Matrix4f matrix = pose.last().pose();
 
-        @Nullable ResourceLocation icon = iconOf(activity);
+        @Nullable WorkIcons.Icon icon = iconOf(activity);
         if (icon != null) {
-            VertexConsumer quad = BUFFERS.getBuffer(RenderType.textSeeThrough(icon));
+            Sprite sprite = spriteOf(icon);
+            VertexConsumer quad = BUFFERS.getBuffer(RenderType.textSeeThrough(sprite.texture()));
             float x0 = -ICON_PX / 2F;
             float x1 = ICON_PX / 2F;
             float y0 = -ICON_PX - 2F;
             float y1 = -2F;
             int light = LightTexture.FULL_BRIGHT;
-            quad.addVertex(matrix, x0, y0, 0).setColor(0xFFFFFFFF).setUv(0, 0).setLight(light);
-            quad.addVertex(matrix, x0, y1, 0).setColor(0xFFFFFFFF).setUv(0, 1).setLight(light);
-            quad.addVertex(matrix, x1, y1, 0).setColor(0xFFFFFFFF).setUv(1, 1).setLight(light);
-            quad.addVertex(matrix, x1, y0, 0).setColor(0xFFFFFFFF).setUv(1, 0).setLight(light);
+            quad.addVertex(matrix, x0, y0, 0)
+                    .setColor(0xFFFFFFFF)
+                    .setUv(sprite.u0(), sprite.v0())
+                    .setLight(light);
+            quad.addVertex(matrix, x0, y1, 0)
+                    .setColor(0xFFFFFFFF)
+                    .setUv(sprite.u0(), sprite.v1())
+                    .setLight(light);
+            quad.addVertex(matrix, x1, y1, 0)
+                    .setColor(0xFFFFFFFF)
+                    .setUv(sprite.u1(), sprite.v1())
+                    .setLight(light);
+            quad.addVertex(matrix, x1, y0, 0)
+                    .setColor(0xFFFFFFFF)
+                    .setUv(sprite.u1(), sprite.v0())
+                    .setLight(light);
         }
 
         // The first line (job and phase) in the phase's colour; the rest grey, or red for warnings
@@ -181,11 +196,36 @@ public final class WorkerDebugRenderer {
     }
 
     @Nullable
-    private static ResourceLocation iconOf(WorkActivity activity) {
-        return switch (activity.phase()) {
-            case IDLE -> null;
-            case OFF -> WorkIcons.OFF;
-            default -> WorkIcons.forJob(activity.job());
+    private static WorkIcons.Icon iconOf(WorkActivity activity) {
+        if (activity.phase() == WorkActivity.Phase.OFF) {
+            return WorkIcons.OFF;
+        }
+        JobType job = activity.job();
+        return activity.phase() == WorkActivity.Phase.IDLE || job == null ? null : WorkIcons.forJob(job);
+    }
+
+    /** Where an icon's picture is: a whole texture, or an item's own sprite on the block atlas. */
+    private record Sprite(ResourceLocation texture, float u0, float v0, float u1, float v1) {}
+
+    // An item drawn in the world is its flat picture, the one its breaking particles use: for most
+    // that's the item, but a chest's is its planks
+    private static Sprite spriteOf(WorkIcons.Icon icon) {
+        return switch (icon) {
+            case WorkIcons.Picture picture -> new Sprite(picture.texture(), 0, 0, 1, 1);
+            case WorkIcons.GuiSprite gui -> { // no job's icon is one drawn over another
+                TextureAtlasSprite sprite =
+                        Minecraft.getInstance().getGuiSprites().getSprite(gui.sprite());
+                yield new Sprite(
+                        sprite.atlasLocation(), sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1());
+            }
+            case WorkIcons.OfItem item -> {
+                TextureAtlasSprite sprite = Minecraft.getInstance()
+                        .getItemRenderer()
+                        .getModel(item.stack(), null, null, 0)
+                        .getParticleIcon();
+                yield new Sprite(
+                        sprite.atlasLocation(), sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1());
+            }
         };
     }
 

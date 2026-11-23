@@ -2,6 +2,7 @@ package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.ai.WorkerAI;
+import dev.palworks.client.gui.WorkIcons;
 import dev.palworks.debug.WorkerDebugSync;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -9,11 +10,13 @@ import dev.palworks.job.JobType;
 import dev.palworks.net.packets.WorkActivityPacket;
 import dev.palworks.net.packets.WorkerDebugPacket;
 import dev.palworks.net.packets.WorkerStatusPacket;
+import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkActivity;
 import dev.palworks.worker.WorkActivitySync;
 import dev.palworks.worker.WorkerStateManager;
 import dev.palworks.worker.WorkerStatus;
 import io.netty.buffer.Unpooled;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +41,26 @@ public class WorkStatusGameTests {
 
     private static RegistryFriendlyByteBuf buffer(GameTestHelper helper) {
         return new RegistryFriendlyByteBuf(Unpooled.buffer(), helper.getLevel().registryAccess());
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void everyItemAWorkIconShowsIsRegistered(GameTestHelper helper) {
+        List<WorkIcons.Icon> icons = new ArrayList<>();
+        for (JobType job : JobType.values()) {
+            icons.add(WorkIcons.forJob(job));
+        }
+        for (Suitability skill : Suitability.values()) {
+            icons.add(WorkIcons.forSkill(skill));
+        }
+        for (WorkerStatus status : WorkerStatus.values()) {
+            icons.add(WorkIcons.forStatus(status));
+        }
+        for (WorkIcons.Icon icon : icons) {
+            if (icon instanceof WorkIcons.OfItem item && item.stack().isEmpty()) {
+                helper.fail("no item " + item.item());
+            }
+        }
+        helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY)

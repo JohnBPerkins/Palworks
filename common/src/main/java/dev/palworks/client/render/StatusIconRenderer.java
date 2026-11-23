@@ -1,9 +1,12 @@
 package dev.palworks.client.render;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
+import com.mojang.blaze3d.platform.Lighting;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import dev.palworks.client.gui.WorkIcons;
 import dev.palworks.config.PalworksClientConfig;
 import dev.palworks.worker.WorkerStatus;
 import dev.palworks.worker.WorkerStatusSync;
@@ -16,11 +19,14 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 /**
  * Shows what's holding a worker's work back (see {@link WorkerStatus}: hungry...) as icons over its
@@ -56,6 +62,10 @@ public final class StatusIconRenderer {
         Vec3 cam = camera.getPosition();
         PoseStack pose = new PoseStack();
         boolean drew = false;
+        // Items are lit as in an inventory: by the way they face the camera (either way round), not
+        // by the world's light directions, which would leave a flat item dim from most angles
+        Vector3f toCamera = new Vector3f(camera.getLookVector());
+        RenderSystem.setShaderLights(toCamera, new Vector3f(toCamera).negate());
         for (PokemonEntity entity : level.getEntitiesOfClass(PokemonEntity.class, new AABB(cam, cam).inflate(RANGE))) {
             List<WorkerStatus> statuses = statusesOf(entity.getAspects());
             if (statuses.isEmpty() || entity.isInvisible()) {
@@ -67,12 +77,18 @@ public final class StatusIconRenderer {
             pose.mulPose(camera.rotation());
             pose.scale(SCALE, -SCALE, SCALE); // GUI pixels, y down
             boolean pausing = entity.getAspects().contains(WorkerStatusSync.PAUSING);
-            drawIcons(minecraft, pose.last().pose(), statuses, pausing ? pulse(level, partialTick) : 1F);
+            drawIcons(minecraft, level, pose, statuses, pausing ? pulse(level, partialTick) : 1F);
             pose.popPose();
             drew = true;
         }
         if (drew) {
             BUFFERS.endBatch();
+        }
+        // The world's light directions back, as GameRenderer sets them
+        if (level.effects().constantAmbientLight()) {
+            Lighting.setupNetherLevel();
+        } else {
+            Lighting.setupLevel();
         }
     }
 
@@ -100,44 +116,69 @@ public final class StatusIconRenderer {
      * Side by side, centred over its head. The ones slowing it (hungry, Tired) at {@code pulse}
      * times their size, from their bottom middle.
      */
-    private static void drawIcons(Minecraft minecraft, Matrix4f matrix, List<WorkerStatus> statuses, float pulse) {
+    private static void drawIcons(
+            Minecraft minecraft, ClientLevel level, PoseStack pose, List<WorkerStatus> statuses, float pulse) {
         float width = statuses.size() * ICON_PX + (statuses.size() - 1) * GAP_PX;
         float x = -width / 2F;
+        Matrix4f matrix = pose.last().pose();
         for (WorkerStatus status : statuses) {
             float size = status.slows() ? ICON_PX * pulse : ICON_PX;
             float left = x + (ICON_PX - size) / 2F;
-            // The outline, then the icon over it
-            ResourceLocation background = status.background();
-            if (background != null) {
-                drawSprite(minecraft, matrix, background, left, size);
+            switch (WorkIcons.forStatus(status)) {
+                case WorkIcons.GuiSprite sprite -> {
+                    if (sprite.under() != null) {
+                        drawSprite(minecraft, matrix, sprite.under(), left, size);
+                    }
+                    drawSprite(minecraft, matrix, sprite.sprite(), left, size);
+                }
+                case WorkIcons.Picture picture -> drawQuad(matrix, picture.texture(), 0, 0, 1, 1, left, size);
+                case WorkIcons.OfItem item -> {
+                    // As GuiGraphics#renderItem: the model's 1x1 square scaled up, y up
+                    pose.pushPose();
+                    pose.translate(left + size / 2F, -size / 2F, 0);
+                    pose.scale(size, -size, size);
+                    minecraft
+                            .getItemRenderer()
+                            .renderStatic(
+                                    item.stack(),
+                                    ItemDisplayContext.GUI,
+                                    LightTexture.FULL_BRIGHT,
+                                    OverlayTexture.NO_OVERLAY,
+                                    pose,
+                                    BUFFERS,
+                                    level,
+                                    0);
+                    pose.popPose();
+                }
             }
-            drawSprite(minecraft, matrix, status.sprite(), left, size);
             x += ICON_PX + GAP_PX;
         }
     }
 
     private static void drawSprite(Minecraft minecraft, Matrix4f matrix, ResourceLocation id, float x, float size) {
         TextureAtlasSprite sprite = minecraft.getGuiSprites().getSprite(id);
-        VertexConsumer quad = BUFFERS.getBuffer(RenderType.text(sprite.atlasLocation()));
+        drawQuad(
+                matrix,
+                sprite.atlasLocation(),
+                sprite.getU0(),
+                sprite.getV0(),
+                sprite.getU1(),
+                sprite.getV1(),
+                x,
+                size);
+    }
+
+    /** A {@code size} square, its bottom-left corner at x, 0, showing the texture from u0, v0 to u1, v1. */
+    private static void drawQuad(
+            Matrix4f matrix, ResourceLocation texture, float u0, float v0, float u1, float v1, float x, float size) {
+        VertexConsumer quad = BUFFERS.getBuffer(RenderType.text(texture));
         float x1 = x + size;
         float y0 = -size;
         float y1 = 0F;
         int light = LightTexture.FULL_BRIGHT;
-        quad.addVertex(matrix, x, y0, 0)
-                .setColor(0xFFFFFFFF)
-                .setUv(sprite.getU0(), sprite.getV0())
-                .setLight(light);
-        quad.addVertex(matrix, x, y1, 0)
-                .setColor(0xFFFFFFFF)
-                .setUv(sprite.getU0(), sprite.getV1())
-                .setLight(light);
-        quad.addVertex(matrix, x1, y1, 0)
-                .setColor(0xFFFFFFFF)
-                .setUv(sprite.getU1(), sprite.getV1())
-                .setLight(light);
-        quad.addVertex(matrix, x1, y0, 0)
-                .setColor(0xFFFFFFFF)
-                .setUv(sprite.getU1(), sprite.getV0())
-                .setLight(light);
+        quad.addVertex(matrix, x, y0, 0).setColor(0xFFFFFFFF).setUv(u0, v0).setLight(light);
+        quad.addVertex(matrix, x, y1, 0).setColor(0xFFFFFFFF).setUv(u0, v1).setLight(light);
+        quad.addVertex(matrix, x1, y1, 0).setColor(0xFFFFFFFF).setUv(u1, v1).setLight(light);
+        quad.addVertex(matrix, x1, y0, 0).setColor(0xFFFFFFFF).setUv(u1, v0).setLight(light);
     }
 }
