@@ -113,6 +113,20 @@ class BoulderKindsTest {
         assertEquals(
                 "iron_vein",
                 kinds.kindFor("cobblemon:nosepass", List.of("rock")).id());
+        assertEquals(
+                "meteor",
+                kinds.kindFor("cobblemon:minior", List.of("rock", "flying")).id());
+        assertEquals(
+                "meteor",
+                kinds.kindFor("cobblemon:solrock", List.of("rock", "psychic")).id());
+        assertEquals(
+                "ruins", kinds.kindFor("cobblemon:regirock", List.of("rock")).id());
+        assertEquals(
+                "coal_seam",
+                kinds.kindFor("cobblemon:coalossal", List.of("rock", "fire")).id());
+        assertEquals(
+                "volcanic",
+                kinds.kindFor("cobblemon:magcargo", List.of("fire", "rock")).id());
         // A type no kind is for falls back to stone
         assertEquals("stone", kinds.kindFor("x:y", List.of("normal")).id());
         assertNull(BoulderKinds.EMPTY.kindFor("x:y", List.of("rock")));
@@ -143,7 +157,7 @@ class BoulderKindsTest {
             ids.add(kind.id());
         }
         assertEquals(types.size(), ids.size(), "one kind per type");
-        assertEquals(16, kinds.all().size());
+        assertEquals(19, kinds.all().size());
     }
 
     @Test

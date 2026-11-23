@@ -1,0 +1,17 @@
+{
+  "types": [],
+  "species": [
+    "cobblemon:rolycoly",
+    "cobblemon:carkol",
+    "cobblemon:coalossal"
+  ],
+  "pattern": "strata",
+  "stone": {
+    "minecraft:stone": 2,
+    "minecraft:tuff": 1
+  },
+  "ores": {
+    "minecraft:coal_ore": 6,
+    "minecraft:coal_block": 1
+  }
+}

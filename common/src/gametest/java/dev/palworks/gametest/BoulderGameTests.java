@@ -322,9 +322,24 @@ public class BoulderGameTests {
     }
 
     @GameTest(template = Templates.EMPTY)
+    public void iceInABoulderIsMinedAsWithSilkTouch(GameTestHelper helper) {
+        Scenes.floor(helper, Blocks.STONE);
+        ServerLevel level = level(helper);
+        BlockPos at = helper.absolutePos(CORNER);
+        for (Block ice : List.of(Blocks.PACKED_ICE, Blocks.BLUE_ICE)) {
+            helper.setBlock(CORNER, ice);
+            // Even a level 1 miner's wooden pickaxe, which by hand gets nothing from it
+            MiningTool.breakWith(
+                    level, at, null, MiningTool.forBoulderBlock(level.registryAccess(), 1, ice.defaultBlockState()));
+            helper.assertBlockPresent(Blocks.AIR, CORNER);
+            helper.assertValueEqual(Scenes.itemsOnGround(helper, ice.asItem()), 1, ice + " dropped");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
     public void everyBlockOfEveryKindDropsSomethingForADiamondPickaxe(GameTestHelper helper) {
         ServerLevel level = level(helper);
-        ItemStack pickaxe = MiningTool.forLevel(level.registryAccess(), 2);
         BlockPos pos = helper.absolutePos(CORNER);
         List<String> nothing = new ArrayList<>();
         Set<String> blocks = new HashSet<>(BoulderOreLevels.current().all().keySet());
@@ -334,13 +349,15 @@ public class BoulderGameTests {
         }
         for (String id : blocks) {
             Block block = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(id));
+            // As a level 2 miner breaks it (ice with Silk Touch)
+            ItemStack pickaxe = MiningTool.forBoulderBlock(level.registryAccess(), 2, block.defaultBlockState());
             List<ItemStack> drops = Block.getDrops(block.defaultBlockState(), level, pos, null, null, pickaxe);
             if (drops.stream().allMatch(ItemStack::isEmpty)) {
                 nothing.add(id);
             }
         }
         helper.assertTrue(nothing.isEmpty(), "drop nothing: " + nothing);
-        helper.assertValueEqual(BoulderKinds.current().all().size(), 16, "kinds loaded");
+        helper.assertValueEqual(BoulderKinds.current().all().size(), 19, "kinds loaded");
         helper.succeed();
     }
 

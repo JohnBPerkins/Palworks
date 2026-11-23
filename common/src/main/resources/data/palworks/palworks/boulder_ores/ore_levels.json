@@ -22,5 +22,6 @@
   "minecraft:deepslate_emerald_ore": 4,
   "minecraft:raw_iron_block": 4,
   "minecraft:raw_copper_block": 4,
-  "minecraft:ancient_debris": 5
+  "minecraft:ancient_debris": 5,
+  "minecraft:coal_block": 3
 }

@@ -1,0 +1,19 @@
+{
+  "types": [],
+  "species": [
+    "cobblemon:minior",
+    "cobblemon:lunatone",
+    "cobblemon:solrock"
+  ],
+  "pattern": "shell",
+  "stone": {
+    "minecraft:blackstone": 2,
+    "minecraft:obsidian": 1,
+    "minecraft:end_stone": 3
+  },
+  "ores": {
+    "minecraft:iron_ore": 3,
+    "minecraft:gold_ore": 2,
+    "minecraft:diamond_ore": 1
+  }
+}

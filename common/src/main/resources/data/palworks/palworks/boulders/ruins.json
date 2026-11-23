@@ -1,0 +1,18 @@
+{
+  "types": [],
+  "species": [
+    "cobblemon:regirock",
+    "cobblemon:stonjourner"
+  ],
+  "pattern": "patches",
+  "stone": {
+    "minecraft:stone_bricks": 4,
+    "minecraft:mossy_stone_bricks": 2,
+    "minecraft:cracked_stone_bricks": 2,
+    "minecraft:chiseled_stone_bricks": 1
+  },
+  "ores": {
+    "minecraft:gold_ore": 2,
+    "minecraft:emerald_ore": 1
+  }
+}
