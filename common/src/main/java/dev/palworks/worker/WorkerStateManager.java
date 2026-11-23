@@ -26,8 +26,9 @@ public class WorkerStateManager {
     private static final Map<UUID, WorkerState> CACHE = new ConcurrentHashMap<>();
 
     /**
-     * Get the WorkerState for a Pokemon, creating a new one if it doesn't exist: its work on or off
-     * as the config's {@code work_on_by_default} says.
+     * Get the WorkerState for a Pokemon, creating a new one if it doesn't exist: its work in the
+     * party and in a pasture on or off as the config's {@code party_work_on_by_default} and
+     * {@code pasture_work_on_by_default} say.
      */
     public static WorkerState getOrCreate(Pokemon pokemon) {
         WorkerState cached = CACHE.get(pokemon.getUuid());
@@ -53,7 +54,9 @@ public class WorkerStateManager {
         Palworks.LOGGER.debug(
                 "Creating new WorkerState for {}", pokemon.getSpecies().getName());
         WorkerState state = new WorkerState();
-        state.setEnabled(PalworksConfig.current().workOnByDefault());
+        PalworksConfig config = PalworksConfig.current();
+        state.setEnabled(true, config.partyWorkOnByDefault());
+        state.setEnabled(false, config.pastureWorkOnByDefault());
         save(pokemon, state); // writes NBT + caches
         return state;
     }
@@ -86,14 +89,20 @@ public class WorkerStateManager {
         PersistentData.put(pokemon, WORKER_STATE_KEY, state.serializeNBT());
     }
 
+    /** Whether a Pokemon's work is on where it is now: in its owner's party, or in a pasture. */
+    public static boolean isEnabled(Pokemon pokemon) {
+        return getOrCreate(pokemon).isEnabled(WorkerEligibility.isFromParty(pokemon));
+    }
+
     /**
-     * Turn a Pokemon's work on or off and save it. Turning it off drops its current job (with any
-     * progress); JobManager then frees the job for other workers on its next registration pass.
-     * Used by both {@code /palworks worker enable|disable} and the interact wheel toggle.
+     * Turn a Pokemon's work on or off where it is now (its party switch, or its pasture one) and
+     * save it. Turning it off drops its current job (with any progress); JobManager then frees the
+     * job for other workers on its next registration pass. Used by both
+     * {@code /palworks worker enable|disable} and the interact wheel toggle.
      */
     public static void setEnabled(Pokemon pokemon, boolean enabled) {
         WorkerState state = getOrCreate(pokemon);
-        state.setEnabled(enabled);
+        state.setEnabled(WorkerEligibility.isFromParty(pokemon), enabled);
         if (!enabled) {
             state.clearReservation();
         }

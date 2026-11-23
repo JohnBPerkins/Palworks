@@ -19,7 +19,11 @@ public class WorkerState {
     /** The best mood a worker can be in, which a new one starts at. */
     public static final double MAX_MOOD = 100;
 
-    private boolean enabled;
+    // Whether its work is switched on in its owner's party, and in a pasture: a switch for each, so
+    // one kept off in the party can still work once it's pastured. Its owner flips the one for where
+    // it is (WorkerStateManager.setEnabled)
+    private boolean partyEnabled;
+    private boolean pastureEnabled;
     private ReservationId currentReservation;
 
     // Path failure tracking for stuck detection
@@ -85,9 +89,10 @@ public class WorkerState {
     private boolean striking;
 
     public WorkerState() {
-        // On here; a new worker's is as the config says (WorkerStateManager.getOrCreate). Only its
-        // owner (or an admin) switches it after that
-        this.enabled = true;
+        // On here; a new worker's are as the config says (WorkerStateManager.getOrCreate). Only its
+        // owner (or an admin) switches them after that
+        this.partyEnabled = true;
+        this.pastureEnabled = true;
         this.currentReservation = null;
         this.pathFailCount = 0;
         this.lastPathFailTime = 0;
@@ -96,13 +101,17 @@ public class WorkerState {
         this.jobData = new CompoundTag();
     }
 
-    // Enabled state
-    public boolean isEnabled() {
-        return enabled;
+    /** Whether its work is switched on in its owner's party ({@code inParty}), or in a pasture. */
+    public boolean isEnabled(boolean inParty) {
+        return inParty ? partyEnabled : pastureEnabled;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+    public void setEnabled(boolean inParty, boolean enabled) {
+        if (inParty) {
+            partyEnabled = enabled;
+        } else {
+            pastureEnabled = enabled;
+        }
     }
 
     // Reservation
@@ -418,7 +427,8 @@ public class WorkerState {
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
 
-        tag.putBoolean("enabled", enabled);
+        tag.putBoolean("partyEnabled", partyEnabled);
+        tag.putBoolean("pastureEnabled", pastureEnabled);
         tag.putInt("jobStep", jobStep);
         tag.put("jobData", jobData.copy());
 
@@ -468,8 +478,9 @@ public class WorkerState {
     }
 
     public void deserializeNBT(CompoundTag tag) {
-        // Missing key: never toggled, so enabled (the default).
-        enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
+        // Always written; missing, on
+        partyEnabled = !tag.contains("partyEnabled") || tag.getBoolean("partyEnabled");
+        pastureEnabled = !tag.contains("pastureEnabled") || tag.getBoolean("pastureEnabled");
 
         pathFailCount = tag.getInt("pathFailCount");
         lastPathFailTime = tag.getLong("lastPathFailTime");

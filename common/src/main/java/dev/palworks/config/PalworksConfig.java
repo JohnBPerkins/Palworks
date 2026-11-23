@@ -29,9 +29,11 @@ import org.jetbrains.annotations.Nullable;
  * ignored with a warning and the defaults are used. Read when the server starts; admins can also
  * change each setting in game ({@code /palworks config}, see {@link ConfigKeys}), which writes the file.
  *
- * @param workOnByDefault whether a Pokémon's work is switched on when Palworks first sees it (a
- *     Pokémon with a work skill, out in the world), until its owner switches it. Changing it leaves
- *     every Pokémon already seen as it is
+ * @param partyWorkOnByDefault whether a Pokémon's work in its owner's party starts switched on.
+ *     Each Pokémon has a switch for the party and one for a pasture, set from these two when
+ *     Palworks first sees it (a Pokémon with a work skill, out in the world); its owner flips the
+ *     one for where it is. Changing them leaves every Pokémon already seen as it is
+ * @param pastureWorkOnByDefault whether a pastured Pokémon's work starts switched on
  * @param workRangeHorizontal how far (blocks, each way) round itself a worker looks for and takes
  *     jobs
  * @param workRangeVertical how far up and down it does
@@ -47,7 +49,8 @@ import org.jetbrains.annotations.Nullable;
  * @param mood how workers' mood goes down and back up (the {@code mood} object in the file)
  */
 public record PalworksConfig(
-        boolean workOnByDefault,
+        boolean partyWorkOnByDefault,
+        boolean pastureWorkOnByDefault,
         int workRangeHorizontal,
         int workRangeVertical,
         int ownerRange,
@@ -58,7 +61,7 @@ public record PalworksConfig(
         SleepConfig sleep,
         MoodConfig mood) {
     public static final PalworksConfig DEFAULTS = new PalworksConfig(
-            false, 32, 32, 24, 3.0, 0.1, 60, HungerConfig.DEFAULTS, SleepConfig.DEFAULTS, MoodConfig.DEFAULTS);
+            false, true, 32, 32, 24, 3.0, 0.1, 60, HungerConfig.DEFAULTS, SleepConfig.DEFAULTS, MoodConfig.DEFAULTS);
 
     /** These settings, with the default for the rest. */
     public PalworksConfig(
@@ -69,7 +72,8 @@ public record PalworksConfig(
             double fertilizeChancePerLevel,
             int wateringCooldownSeconds) {
         this(
-                DEFAULTS.workOnByDefault(),
+                DEFAULTS.partyWorkOnByDefault(),
+                DEFAULTS.pastureWorkOnByDefault(),
                 workRangeHorizontal,
                 workRangeVertical,
                 ownerRange,
@@ -81,10 +85,13 @@ public record PalworksConfig(
                 MoodConfig.DEFAULTS);
     }
 
-    /** These settings, with work switched on or off for a Pokémon Palworks hasn't seen before. */
-    public PalworksConfig withWorkOnByDefault(boolean workOnByDefault) {
+    /**
+     * These settings, with a new Pokémon's work in the party and in a pasture switched on or off.
+     */
+    public PalworksConfig withWorkOnByDefault(boolean partyWorkOnByDefault, boolean pastureWorkOnByDefault) {
         return new PalworksConfig(
-                workOnByDefault,
+                partyWorkOnByDefault,
+                pastureWorkOnByDefault,
                 workRangeHorizontal,
                 workRangeVertical,
                 ownerRange,
@@ -99,7 +106,8 @@ public record PalworksConfig(
     /** These settings with other hunger settings. */
     public PalworksConfig withHunger(HungerConfig hunger) {
         return new PalworksConfig(
-                workOnByDefault,
+                partyWorkOnByDefault,
+                pastureWorkOnByDefault,
                 workRangeHorizontal,
                 workRangeVertical,
                 ownerRange,
@@ -114,7 +122,8 @@ public record PalworksConfig(
     /** These settings with other sleep settings. */
     public PalworksConfig withSleep(SleepConfig sleep) {
         return new PalworksConfig(
-                workOnByDefault,
+                partyWorkOnByDefault,
+                pastureWorkOnByDefault,
                 workRangeHorizontal,
                 workRangeVertical,
                 ownerRange,
@@ -129,7 +138,8 @@ public record PalworksConfig(
     /** These settings with other mood settings. */
     public PalworksConfig withMood(MoodConfig mood) {
         return new PalworksConfig(
-                workOnByDefault,
+                partyWorkOnByDefault,
+                pastureWorkOnByDefault,
                 workRangeHorizontal,
                 workRangeVertical,
                 ownerRange,
@@ -241,8 +251,10 @@ public record PalworksConfig(
     }
 
     public static final Codec<PalworksConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-                    field(Codec.BOOL, "work_on_by_default", DEFAULTS.workOnByDefault())
-                            .forGetter(PalworksConfig::workOnByDefault),
+                    field(Codec.BOOL, "party_work_on_by_default", DEFAULTS.partyWorkOnByDefault())
+                            .forGetter(PalworksConfig::partyWorkOnByDefault),
+                    field(Codec.BOOL, "pasture_work_on_by_default", DEFAULTS.pastureWorkOnByDefault())
+                            .forGetter(PalworksConfig::pastureWorkOnByDefault),
                     field(wholeRange(8, 64), "work_range_horizontal", DEFAULTS.workRangeHorizontal())
                             .forGetter(PalworksConfig::workRangeHorizontal),
                     field(wholeRange(4, 64), "work_range_vertical", DEFAULTS.workRangeVertical())
@@ -305,6 +317,11 @@ public record PalworksConfig(
     // The file read by load, which save writes: none until then (in tests, and in-game tests)
     @Nullable
     private static volatile Path loadedFrom;
+
+    /** Whether a new Pokémon's work starts on, in its owner's party or in a pasture. */
+    public boolean workOnByDefault(boolean inParty) {
+        return inParty ? partyWorkOnByDefault : pastureWorkOnByDefault;
+    }
 
     /** The settings in use: the defaults until {@link #load} has run. */
     public static PalworksConfig current() {

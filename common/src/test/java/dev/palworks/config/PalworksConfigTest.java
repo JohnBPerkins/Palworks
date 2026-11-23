@@ -49,11 +49,13 @@ class PalworksConfigTest {
     }
 
     @Test
-    void workStartsOffUnlessTheFileSaysOn() {
+    void workStartsOffInThePartyAndOnInAPastureUnlessTheFileSaysOtherwise() {
         List<String> warnings = new ArrayList<>();
-        assertFalse(PalworksConfig.DEFAULTS.workOnByDefault());
-        PalworksConfig on = parse("{\"work_on_by_default\": true}", warnings);
-        assertEquals(PalworksConfig.DEFAULTS.withWorkOnByDefault(true), on);
+        assertFalse(PalworksConfig.DEFAULTS.workOnByDefault(true));
+        assertTrue(PalworksConfig.DEFAULTS.workOnByDefault(false));
+        PalworksConfig swapped =
+                parse("{\"party_work_on_by_default\": true, \"pasture_work_on_by_default\": false}", warnings);
+        assertEquals(PalworksConfig.DEFAULTS.withWorkOnByDefault(true, false), swapped);
         assertEquals(List.of(), warnings);
     }
 

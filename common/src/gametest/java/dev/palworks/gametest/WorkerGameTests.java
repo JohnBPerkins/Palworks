@@ -549,9 +549,7 @@ public class WorkerGameTests {
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         ripeWheatRow(helper);
         PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
-        WorkerState state = WorkerStateManager.getOrCreate(worker.getPokemon());
-        state.setEnabled(false);
-        WorkerStateManager.save(worker.getPokemon(), state);
+        WorkerStateManager.setEnabled(worker.getPokemon(), false);
 
         helper.runAfterDelay(200, () -> {
             assertWheatRow(helper, 7, "left ripe by a disabled worker");
@@ -560,22 +558,52 @@ public class WorkerGameTests {
     }
 
     @GameTest(template = Templates.EMPTY)
-    public void aNewPokemonsWorkIsOnOrOffAsTheConfigSays(GameTestHelper helper) {
+    public void aNewPokemonsWorkStartsOffInThePartyAndOnInAPastureAsTheConfigSays(GameTestHelper helper) {
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
         PalworksConfig before = PalworksConfig.current();
         try {
             PalworksConfig.setCurrent(PalworksConfig.DEFAULTS);
-            Pokemon off = Workers.create(BULBASAUR);
-            helper.assertFalse(WorkerEligibility.works(off, null), "by default, no work before its first look");
-            helper.assertFalse(WorkerStateManager.getOrCreate(off).isEnabled(), "and its work starts off");
+            Pokemon inParty = Workers.create(BULBASAUR);
+            Cobblemon.INSTANCE.getStorage().getParty(owner).add(inParty);
+            Pokemon pastured = Workers.create(BULBASAUR);
+            Cobblemon.INSTANCE.getStorage().getPC(owner).add(pastured);
+            helper.assertFalse(WorkerEligibility.works(inParty, null), "by default, none in the party");
+            helper.assertFalse(WorkerStateManager.isEnabled(inParty), "its work starting off");
+            helper.assertTrue(WorkerEligibility.works(pastured, null), "and a pastured one works");
+            helper.assertTrue(WorkerStateManager.isEnabled(pastured), "its work starting on");
 
-            PalworksConfig.setCurrent(PalworksConfig.DEFAULTS.withWorkOnByDefault(true));
-            Pokemon on = Workers.create(BULBASAUR);
-            helper.assertTrue(WorkerEligibility.works(on, null), "with work_on_by_default it works");
-            helper.assertTrue(WorkerStateManager.getOrCreate(on).isEnabled(), "its work starting on");
-            helper.assertFalse(WorkerStateManager.getOrCreate(off).isEnabled(), "and one seen before stays off");
+            PalworksConfig.setCurrent(PalworksConfig.DEFAULTS.withWorkOnByDefault(true, false));
+            Pokemon swapped = Workers.create(BULBASAUR);
+            Cobblemon.INSTANCE.getStorage().getParty(owner).add(swapped);
+            helper.assertTrue(WorkerStateManager.isEnabled(swapped), "with the settings swapped, on in the party");
+            helper.assertFalse(WorkerStateManager.getOrCreate(swapped).isEnabled(false), "and off in a pasture");
+            helper.assertFalse(WorkerStateManager.isEnabled(inParty), "one seen before stays as it was");
         } finally {
             PalworksConfig.setCurrent(before);
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aPokemonsWorkHasASwitchForThePartyAndOneForAPasture(GameTestHelper helper) {
+        ServerPlayer owner = Workers.owner(helper, new BlockPos(1, 1, 1));
+        var party = Cobblemon.INSTANCE.getStorage().getParty(owner);
+        PCStore pc = Cobblemon.INSTANCE.getStorage().getPC(owner);
+        Pokemon pokemon = Workers.create(BULBASAUR); // off in the party, on in a pasture (the defaults)
+        party.add(pokemon);
+        WorkerStateManager.setEnabled(pokemon, true);
+        helper.assertTrue(WorkerStateManager.isEnabled(pokemon), "switched on in the party");
+
+        party.remove(pokemon);
+        pc.add(pokemon);
+        WorkerStateManager.setEnabled(pokemon, false);
+        helper.assertFalse(WorkerEligibility.works(pokemon, WorkerStateManager.get(pokemon)), "switched off pastured");
+
+        pc.remove(pokemon);
+        party.add(pokemon);
+        helper.assertTrue(
+                WorkerEligibility.works(pokemon, WorkerStateManager.get(pokemon)), "and still on back in the party");
+        WorkerStateManager.unload(pokemon.getUuid());
         helper.succeed();
     }
 
@@ -998,8 +1026,8 @@ public class WorkerGameTests {
         AtomicInteger changes = new AtomicInteger();
         pc.getAnyChangeObservable().subscribe(unit -> changes.incrementAndGet());
 
-        WorkerStateManager.setEnabled(pidgey, true); // a new Pokémon's work starts off
-        helper.assertTrue(changes.get() == 1, "switching its work on is a change to save: " + changes.get());
+        WorkerStateManager.setEnabled(pidgey, false);
+        helper.assertTrue(changes.get() == 1, "switching its work off is a change to save: " + changes.get());
         WorkerStateManager.save(pidgey, state);
         helper.assertTrue(changes.get() == 1, "saving it again, unchanged, isn't: " + changes.get());
         WorkerInventoryManager.getOrCreate(pidgey).setItem(0, new ItemStack(Items.WHEAT, 5));

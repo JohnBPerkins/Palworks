@@ -107,8 +107,8 @@ public final class Workers {
         // Fed, so it works at its usual speed: an empty worker is slowed down until it eats (see
         // Hunger), and a new Pokémon starts only half full. Hunger's own tests empty it again.
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
-        switchWorkOn(pokemon);
         Cobblemon.INSTANCE.getStorage().getParty(owner).add(pokemon);
+        switchWorkOn(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
         if (entity == null) {
             helper.fail("Cobblemon didn't send out " + properties);
@@ -131,8 +131,9 @@ public final class Workers {
     }
 
     /**
-     * Switch a Pokémon's work on, as its owner does from the interact wheel: a new one's starts off
-     * (work_on_by_default). One with no work skill is left without a worker state, as in game.
+     * Switch a Pokémon's work on where it is (party or PC), as its owner does from the interact
+     * wheel: a new one's starts off in a party (party_work_on_by_default), and a test shouldn't
+     * depend on the defaults. One with no work skill is left without a worker state, as in game.
      */
     private static void switchWorkOn(Pokemon pokemon) {
         if (WorkerEligibility.canWork(pokemon)) {
@@ -150,8 +151,8 @@ public final class Workers {
         BlockPos abs = helper.absolutePos(rel);
         Pokemon pokemon = create(properties);
         pokemon.setCurrentFullness(pokemon.getMaxFullness());
-        switchWorkOn(pokemon);
         Cobblemon.INSTANCE.getStorage().getPC(owner).add(pokemon);
+        switchWorkOn(pokemon);
         PokemonEntity entity = pokemon.sendOut(helper.getLevel(), Vec3.atBottomCenterOf(abs), null, e -> Unit.INSTANCE);
         if (entity == null) {
             helper.fail("Cobblemon didn't send out " + properties);

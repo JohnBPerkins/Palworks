@@ -87,7 +87,7 @@ public final class WorkerDebugSync {
                 continue; // hasn't ticked as a worker yet
             }
             ReservationId reservation = state.getCurrentReservation();
-            WorkActivity activity = WorkActivitySync.activityOf(entity, state);
+            WorkActivity activity = WorkActivitySync.activityOf(pokemon, entity, state);
             Path path = entity.getNavigation().getPath();
             boolean walking = path != null && !path.isDone();
 

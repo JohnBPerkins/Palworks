@@ -45,11 +45,13 @@ public class WorkerEligibility {
 
     /**
      * Whether Palworks runs this Pokémon as a worker now: its work is on and it has work it can do.
-     * {@code state} is its worker state, or null if it has none yet (a new worker's work is on or
-     * off as the config's {@code work_on_by_default} says).
+     * Its work is on or off where it is now, in its owner's party or in a pasture (a switch for
+     * each). {@code state} is its worker state, or null if it has none yet (then it's as the
+     * config's {@code party_work_on_by_default} or {@code pasture_work_on_by_default} says).
      */
     public static boolean works(Pokemon pokemon, @Nullable WorkerState state) {
-        boolean on = state == null ? PalworksConfig.current().workOnByDefault() : state.isEnabled();
+        boolean inParty = isFromParty(pokemon);
+        boolean on = state == null ? PalworksConfig.current().workOnByDefault(inParty) : state.isEnabled(inParty);
         return on && canWork(pokemon);
     }
 
