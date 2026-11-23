@@ -38,7 +38,7 @@ public abstract class PokemonEntityInteractMixin {
         if (SuitabilityDetector.getSuitabilities(pokemon).isEmpty()) {
             return;
         }
-        boolean enabled = WorkerStateManager.getOrCreate(pokemon).isEnabled();
+        boolean enabled = WorkerStateManager.isEnabled(pokemon);
         new WorkerStatusPacket(
                         ((PokemonEntity) (Object) this).getUUID(),
                         enabled,

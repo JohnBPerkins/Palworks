@@ -3,6 +3,7 @@ package dev.palworks.debug;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.worker.WorkerEligibility;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.ArrayList;
@@ -40,7 +41,7 @@ public class DebugInfo {
 
         public WorkerDebugInfo(Pokemon pokemon, WorkerState state, @Nullable Mob entity) {
             this.speciesName = pokemon.getSpecies().getName();
-            this.enabled = state.isEnabled();
+            this.enabled = state.isEnabled(WorkerEligibility.isFromParty(pokemon));
             ReservationId reservation = state.getCurrentReservation();
             if (reservation != null) {
                 BlockPos pos = reservation.getStationPos();

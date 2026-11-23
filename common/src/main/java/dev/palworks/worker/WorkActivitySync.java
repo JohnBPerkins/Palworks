@@ -23,9 +23,9 @@ public final class WorkActivitySync {
     private WorkActivitySync() {}
 
     /** What this worker is doing now. */
-    public static WorkActivity activityOf(Mob entity, WorkerState state) {
+    public static WorkActivity activityOf(Pokemon pokemon, Mob entity, WorkerState state) {
         return WorkActivity.of(
-                state.isEnabled(),
+                state.isEnabled(WorkerEligibility.isFromParty(pokemon)),
                 state.getCurrentReservation() == null
                         ? null
                         : state.getCurrentReservation().getJobType(),
@@ -35,7 +35,7 @@ public final class WorkActivitySync {
 
     /** Tell its owner what this worker is doing, if that's changed. Returns what it's doing. */
     public static WorkActivity update(Pokemon pokemon, Mob entity, WorkerState state, long gameTime) {
-        WorkActivity activity = activityOf(entity, state);
+        WorkActivity activity = activityOf(pokemon, entity, state);
 
         UUID uuid = pokemon.getUuid();
         Sent last = LAST_SENT.get(uuid);

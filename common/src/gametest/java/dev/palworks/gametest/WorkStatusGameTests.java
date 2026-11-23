@@ -177,7 +177,8 @@ public class WorkStatusGameTests {
         WorkerStateManager.setEnabled(bulbasaur.getPokemon(), false);
 
         helper.succeedWhen(() -> helper.assertValueEqual(
-                WorkActivitySync.activityOf(bulbasaur, WorkerStateManager.getOrCreate(bulbasaur.getPokemon())),
+                WorkActivitySync.activityOf(
+                        bulbasaur.getPokemon(), bulbasaur, WorkerStateManager.getOrCreate(bulbasaur.getPokemon())),
                 WorkActivity.OFF,
                 "activity"));
     }
