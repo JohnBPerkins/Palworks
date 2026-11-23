@@ -41,7 +41,9 @@ public final class StatusIconRenderer {
     private static final double RANGE = 32;
     // As a name tag: a GUI pixel is this many blocks
     private static final float SCALE = 0.025F;
-    private static final float ICON_PX = 9F;
+    // Every icon is drawn a GUI pixel per pixel of its texture, as the HUD draws hotbar items and
+    // the hunger bar, so all their pixels are one size: an item 16 across, a hunger shank 9
+    private static final float ITEM_PX = 16F;
     private static final float GAP_PX = 1F;
     // How far over the top of its hitbox the icons sit, in blocks
     private static final double ABOVE = 0.35;
@@ -113,18 +115,24 @@ public final class StatusIconRenderer {
     }
 
     /**
-     * Side by side, centred over its head. The ones slowing it (hungry, Tired) at {@code pulse}
-     * times their size, from their bottom middle.
+     * Side by side, centred over its head, bottoms level. The ones slowing it (hungry, Tired) at
+     * {@code pulse} times their size, from their bottom middle.
      */
     private static void drawIcons(
             Minecraft minecraft, ClientLevel level, PoseStack pose, List<WorkerStatus> statuses, float pulse) {
-        float width = statuses.size() * ICON_PX + (statuses.size() - 1) * GAP_PX;
+        List<WorkIcons.Icon> icons = statuses.stream().map(WorkIcons::forStatus).toList();
+        float width = (icons.size() - 1) * GAP_PX;
+        for (WorkIcons.Icon icon : icons) {
+            width += sizeOf(minecraft, icon);
+        }
         float x = -width / 2F;
         Matrix4f matrix = pose.last().pose();
-        for (WorkerStatus status : statuses) {
-            float size = status.slows() ? ICON_PX * pulse : ICON_PX;
-            float left = x + (ICON_PX - size) / 2F;
-            switch (WorkIcons.forStatus(status)) {
+        for (int i = 0; i < icons.size(); i++) {
+            WorkIcons.Icon icon = icons.get(i);
+            float natural = sizeOf(minecraft, icon);
+            float size = statuses.get(i).slows() ? natural * pulse : natural;
+            float left = x + (natural - size) / 2F;
+            switch (icon) {
                 case WorkIcons.GuiSprite sprite -> {
                     if (sprite.under() != null) {
                         drawSprite(minecraft, matrix, sprite.under(), left, size);
@@ -151,8 +159,22 @@ public final class StatusIconRenderer {
                     pose.popPose();
                 }
             }
-            x += ICON_PX + GAP_PX;
+            x += natural + GAP_PX;
         }
+    }
+
+    /**
+     * An icon's size in GUI pixels: its texture's, in pixels. Items and pictures are 16 (pictures
+     * are kept 16x16: WorkIconsTest); a sprite is as wide as it is.
+     */
+    private static float sizeOf(Minecraft minecraft, WorkIcons.Icon icon) {
+        return icon instanceof WorkIcons.GuiSprite sprite
+                ? minecraft
+                        .getGuiSprites()
+                        .getSprite(sprite.sprite())
+                        .contents()
+                        .width()
+                : ITEM_PX;
     }
 
     private static void drawSprite(Minecraft minecraft, Matrix4f matrix, ResourceLocation id, float x, float size) {
