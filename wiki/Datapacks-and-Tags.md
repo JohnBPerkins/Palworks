@@ -108,11 +108,13 @@ file per kind of boulder: `data/<namespace>/palworks/boulders/<kind>.json`. For 
   - `strata`: level bands, each block in turn, its weight the band's thickness in blocks.
   - `graded`: from the first block at the bottom to the last at the top, its weight its share of
     the height.
-  - `shell`: layers from the outside in, one block thick each, the last filling the middle.
-    Weights aren't used.
+  - `shell`: layers from the outside in, by how far each block is from the middle, each block's
+    weight its share of the way in.
   - `capped`: the first block over every top surface, the rest in patches below.
-- **`ores`**: ores and their weights. About one boulder in ten has ore, in small clusters inside it.
-  Each cluster is one ore, picked by weight among the ores the worker's level has unlocked (below).
+- **`ores`**: ores and their weights. About one boulder in ten has ore, each ore block anywhere in
+  it, picked by weight among the ores the worker's level has unlocked (below).
+
+Whatever the pattern, about one block in five is any of the stone at random, by weight.
 
 Files for the same kind from different namespaces merge: types and species add up, a block's
 weight is the highest given, and a weight of `0` takes a block out. The last file (by namespace)

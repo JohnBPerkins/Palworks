@@ -38,7 +38,11 @@ The patterns:
 - **Patches**: each stone in smooth patches, in proportion to its weight.
 - **Strata**: level bands, each stone in turn, slightly tilted, like the bands in a badlands hill.
 - **Graded**: from the first stone at the bottom to the last at the top, blending where they meet.
-- **Shell**: layers from the outside in, like a geode.
+- **Shell**: layers from the outside in, like a geode, by how far each block is from the middle, so
+  even a small boulder has both.
+
+Whatever the pattern, about one block in five is any of the kind's stone at random, and the edges
+between bands and layers waver, so no boulder looks ruled.
 - **Capped**: one block over every top surface (moss, or calcite like snow), the rest in patches
   below.
 
@@ -58,17 +62,17 @@ A higher [Unearthing level](Suitabilities#work-levels) raises a bigger boulder:
 
 ## Ore
 
-Most boulders are only stone. About **one in ten** has ore, at every level. A boulder with ore has a
-few small clusters of it, as ore comes in the ground, grown from deep inside: you find it as you mine
-in. Each cluster is one ore, picked from the kind's ores the level has unlocked:
+Most boulders are only stone. About **one in ten** has ore, at every level. In a boulder with ore,
+each ore block is anywhere in it at random, outside or in, and each is one of the kind's ores the
+level has unlocked:
 
-| Level | Clusters | Ore in a cluster | Ore in all |
-|---|---|---|---|
-| 1 | 1 | 1 to 2 | 1 to 2 |
-| 2 | 1 | 2 to 3 | 2 to 3 |
-| 3 | 1 to 2 | 2 to 3 | 2 to 6 |
-| 4 | 2 | 2 to 4 | 4 to 8 |
-| 5 | 2 to 3 | 3 to 4 | 6 to 12 |
+| Level | Ore blocks in a boulder with ore |
+|---|---|
+| 1 | 1 to 2 |
+| 2 | 2 to 3 |
+| 3 | 2 to 6 |
+| 4 | 4 to 8 |
+| 5 | 6 to 12 |
 
 ## Ores by level
 
