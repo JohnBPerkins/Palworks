@@ -93,7 +93,7 @@ lifts, it makes its sound, and a trapped chest gives off its redstone signal.
   wheat seeds. It covers furnaces, crops and their seeds, logs and saplings, crystals, nether wart
   and soul sand, and the chests and troughs transporters fill.
 - **Over its head:** what's holding its work back: a half hunger shank when it's out of food, a "z"
-  when it's Tired, a sad face when it's unhappy, an anger mark when it's on strike, a brick wall
+  when it's Tired, a sad face when it's unhappy, an angry red face when it's on strike, a barrier
   when it's idle because it can't get to any of the work there is, a chest when it's carrying items
   and has no chest with room it can get to, and a moon while it's asleep, if its species has no
   sleep animation to show it. Each player can turn these off (`show_status_icons`, see

@@ -212,6 +212,12 @@ public final class WorkerDebugRenderer {
     private static Sprite spriteOf(WorkIcons.Icon icon) {
         return switch (icon) {
             case WorkIcons.Picture picture -> new Sprite(picture.texture(), 0, 0, 1, 1);
+            case WorkIcons.GuiSprite gui -> { // no job's icon is one drawn over another
+                TextureAtlasSprite sprite =
+                        Minecraft.getInstance().getGuiSprites().getSprite(gui.sprite());
+                yield new Sprite(
+                        sprite.atlasLocation(), sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1());
+            }
             case WorkIcons.OfItem item -> {
                 TextureAtlasSprite sprite = Minecraft.getInstance()
                         .getItemRenderer()

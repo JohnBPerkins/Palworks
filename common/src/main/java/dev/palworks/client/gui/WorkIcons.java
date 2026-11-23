@@ -3,18 +3,20 @@ package dev.palworks.client.gui;
 import dev.palworks.Palworks;
 import dev.palworks.job.JobType;
 import dev.palworks.suitability.Suitability;
+import dev.palworks.worker.WorkerStatus;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The icon each work skill and each job shows, all in one place: an item, drawn as in an inventory
- * (the game's own, or ours, so it follows resource packs), or one of Palworks' pictures,
- * {@code textures/gui/icon/<name>.png} (16x16, named for what it shows), where no item fits. Any
- * number of skills and jobs can share one: giving a job its own is a constant and a one-line change
- * in {@link #forJob}. Skills show on the PC, summary and Pokédex filter; jobs on the party HUD and
- * the debug overlay. No client-only imports, so it's unit-tested.
+ * The icon each work skill, each job and each status shows, all in one place: an item, drawn as in
+ * an inventory (the game's own, or ours, so it follows resource packs), one of Palworks' pictures,
+ * {@code textures/gui/icon/<name>.png} (16x16, named for what it shows), or a mood face, where no
+ * item fits, or a sprite from the game's GUI atlas. Any number can share one: giving a job its own
+ * is a constant and a one-line change in {@link #forJob}. Skills show on the PC, summary and
+ * Pokédex filter; jobs on the party HUD and the debug overlay; statuses over a Pokémon's head. No
+ * client-only imports, so it's unit-tested.
  */
 public final class WorkIcons {
     /** A work icon. */
@@ -22,6 +24,13 @@ public final class WorkIcons {
 
     /** One of Palworks' pictures. */
     public record Picture(ResourceLocation texture) implements Icon {}
+
+    /**
+     * A sprite from the game's GUI atlas ({@code textures/gui/sprites/}), drawn over another one, or
+     * over nothing.
+     */
+    public record GuiSprite(
+            ResourceLocation sprite, @Nullable ResourceLocation under) implements Icon {}
 
     /** An item, by its id. */
     public record OfItem(ResourceLocation item) implements Icon {
@@ -39,6 +48,7 @@ public final class WorkIcons {
 
     private static final Icon APPLE = item("apple");
     private static final Icon BAMBOO = item("bamboo");
+    private static final Icon BARRIER = item("barrier");
     private static final Icon CACTUS = item("cactus");
     private static final Icon CHEST = item("chest");
     private static final Icon FIRE_CHARGE = item("fire_charge");
@@ -56,6 +66,15 @@ public final class WorkIcons {
     private static final Icon MOON = picture("moon");
     private static final Icon PICK_UP = picture("pick_up");
     private static final Icon WATER_DROP = picture("water_drop");
+
+    private static final Icon UNHAPPY_FACE = moodFace("unhappy");
+    private static final Icon STRIKING_FACE = moodFace("striking");
+
+    // A half hunger shank over the empty outline, as on the hunger bar
+    private static final Icon HALF_SHANK = new GuiSprite(
+            ResourceLocation.withDefaultNamespace("hud/food_half"),
+            ResourceLocation.withDefaultNamespace("hud/food_empty"));
+    private static final Icon SLEEPY_Z = new GuiSprite(Palworks.id("status/tired"), null);
 
     private WorkIcons() {}
 
@@ -101,8 +120,26 @@ public final class WorkIcons {
         };
     }
 
+    /** What a Pokémon shows over its head for a status. */
+    public static Icon forStatus(WorkerStatus status) {
+        return switch (status) {
+            case HUNGRY -> HALF_SHANK;
+            case TIRED -> SLEEPY_Z;
+            case UNHAPPY -> UNHAPPY_FACE;
+            case STRIKING -> STRIKING_FACE;
+            case CANT_REACH -> BARRIER;
+            case CANT_DELIVER -> CHEST;
+            case ASLEEP -> MOON;
+        };
+    }
+
     private static Picture picture(String name) {
         return new Picture(Palworks.id("textures/gui/icon/" + name + ".png"));
+    }
+
+    // The face the summary's mood bar shows (see WorkSkillsOverlay)
+    private static Picture moodFace(String name) {
+        return new Picture(Palworks.id("textures/gui/mood/" + name + ".png"));
     }
 
     private static Icon item(String minecraftItem) {

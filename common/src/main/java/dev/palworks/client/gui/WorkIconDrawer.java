@@ -23,6 +23,14 @@ public final class WorkIconDrawer {
                 graphics.blit(picture.texture(), 0, 0, 0, 0, TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
                 RenderSystem.disableBlend();
             }
+            case WorkIcons.GuiSprite sprite -> {
+                RenderSystem.enableBlend();
+                if (sprite.under() != null) {
+                    graphics.blitSprite(sprite.under(), 0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+                }
+                graphics.blitSprite(sprite.sprite(), 0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+                RenderSystem.disableBlend();
+            }
             case WorkIcons.OfItem item -> graphics.renderItem(item.stack(), 0, 0);
         }
         pose.popPose();

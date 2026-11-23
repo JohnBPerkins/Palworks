@@ -52,6 +52,9 @@ public class WorkStatusGameTests {
         for (Suitability skill : Suitability.values()) {
             icons.add(WorkIcons.forSkill(skill));
         }
+        for (WorkerStatus status : WorkerStatus.values()) {
+            icons.add(WorkIcons.forStatus(status));
+        }
         for (WorkIcons.Icon icon : icons) {
             if (icon instanceof WorkIcons.OfItem item && item.stack().isEmpty()) {
                 helper.fail("no item " + item.item());
