@@ -7,6 +7,7 @@ settings that aren't per-Pokémon:
 
 ```json
 {
+  "work_on_by_default": false,
   "work_range_horizontal": 32,
   "work_range_vertical": 32,
   "owner_range": 24,
@@ -36,6 +37,10 @@ settings that aren't per-Pokémon:
 }
 ```
 
+- **`work_on_by_default`**: `true` and a Pokémon's work starts switched on, so every Pokémon
+  of yours with a work skill goes to work as soon as it's out. At `false` it starts off, and you
+  switch each one on from its interact wheel (see [Workers](Workers#switching-work-on-and-off)).
+  It's for Pokémon Palworks hasn't seen yet: changing it doesn't switch any others.
 - **`work_range_horizontal`** (8 to 64): how many blocks out each way a worker looks for and takes
   jobs. Bigger ranges scan more of the world each tick.
 - **`work_range_vertical`** (4 to 64): how many blocks up and down it does.

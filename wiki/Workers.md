@@ -11,7 +11,8 @@ A Pokémon works when all of these are true:
   in your PC or in their ball aren't in the world.
 - **It has at least one [work skill](Suitabilities)**. One with none is never a
   worker, and Palworks leaves it alone.
-- **Its work is switched on.** It is unless you switch it off.
+- **Its work is switched on.** It starts off: you switch it on (below), unless the server's
+  `work_on_by_default` [setting](Configuration) has it start on.
 
 What a worker can do depends on its [work skills](Suitabilities).
 
