@@ -13,7 +13,7 @@ public enum Suitability {
     HANDIWORK("handiwork"), // Crafting (no jobs yet)
     GATHERING("gathering"), // Harvest crops
     LUMBERING("lumbering"), // Cut down trees
-    MINING("mining"), // Mine crystals (ores: not yet)
+    MINING("mining"), // Mine boulders and crystals
     STONESHAPING("stoneshaping"), // Raise boulders out of the ground, for miners
     MEDICINE_PRODUCTION("medicine_production"), // Brewing (no jobs yet)
     COOLING("cooling"), // Cool down containers (no jobs yet)

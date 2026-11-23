@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.block.TroughBlock;
 import dev.palworks.block.TroughBlockEntity;
 import dev.palworks.block.WorkerBedBlock;
+import dev.palworks.boulder.Boulders;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.crop.TallPlants;
@@ -59,7 +60,9 @@ public final class JobChecks {
      * chest, a furnace or an ore. A chunk section made only of these and air can't hold a job, so
      * the chunk scan skips it whole (see JobScanner), which is most of the world: solid ground below,
      * open sky above. Only add a block here if no job can involve it; JobGameTests checks every one
-     * against the scan's own checks.
+     * against the scan's own checks. A boulder's blocks (stone, clay, netherrack...) are the one
+     * exception: those are known by where they are, not what they are, and the scan finds them
+     * apart (see Boulders.blocksIn).
      */
     private static final Set<Block> NEVER_WORK = Set.of(
             Blocks.STONE,
@@ -112,6 +115,9 @@ public final class JobChecks {
             case WATER_CROPS -> Watering.needsWater(level, pos);
             case CHOP_TREE -> TreeDetector.isTreeBlock(level.getBlockState(pos));
             case MINE_CRYSTAL -> CrystalAdapter.isRipe(level, pos, level.getBlockState(pos));
+            case MINE_BOULDER ->
+                level instanceof ServerLevel serverLevel
+                        && Boulders.get(serverLevel).isMinable(pos, level.getBlockState(pos));
             case GET_SEEDS ->
                 isChest(level.getBlockState(pos))
                         && (hasPlantableSeeds(level, pos) || ChestHelper.hasItem(level, pos, Items.NETHER_WART));
@@ -354,7 +360,9 @@ public final class JobChecks {
         if (CrystalAdapter.isCrystal(state)) {
             skills.addAll(JobType.MINE_CRYSTAL.requiredSuitabilities());
         }
-        return skills; // not ores: mining them isn't scanned for yet (JobScanner.MINING_JOBS_ENABLED)
+        // Not stone or ore: those are only work in a boulder Stoneshaping raised (see Boulders), never as
+        // a kind of block
+        return skills;
     }
 
     /**

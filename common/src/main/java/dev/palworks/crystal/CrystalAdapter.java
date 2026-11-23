@@ -23,7 +23,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.level.block.LevelEvent;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
@@ -119,13 +118,7 @@ public final class CrystalAdapter {
                 && replantTumblestone(serverLevel, pos, state, miner, tool)) {
             return true;
         }
-        // As a player's break: the block goes (its particles, sound and game event), then its loot
-        // is rolled with the tool in hand
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        level.destroyBlock(pos, false, miner);
-        if (level instanceof ServerLevel serverLevel) {
-            Block.dropResources(state, serverLevel, pos, blockEntity, miner, tool);
-        }
+        MiningTool.breakWith(level, pos, miner, tool);
         return true;
     }
 

@@ -65,9 +65,7 @@ class WorkSkillsTest {
         // Every suitability some job needs, and Nether work (needed by nether wart and stems' jobs)
         Set<Suitability> worked = EnumSet.of(Suitability.NETHER);
         for (JobType job : JobType.values()) {
-            if (job != JobType.MINE_RESOURCE) { // not scanned for yet
-                worked.addAll(job.requiredSuitabilities()); // none for eating
-            }
+            worked.addAll(job.requiredSuitabilities()); // none for eating
         }
         for (Suitability job : Suitability.values()) {
             WorkIcons.Icon icon = WorkSkills.icon(job); // that it exists: WorkIconsTest, WorkStatusGameTests

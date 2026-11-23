@@ -21,7 +21,4 @@ public final class JobBlockTags {
      * block entity ({@code AbstractFurnaceBlockEntity}); any other block in the tag is ignored.
      */
     public static final TagKey<Block> FURNACES = TagKey.create(Registries.BLOCK, Palworks.id("furnaces"));
-
-    /** Blocks a MINING worker will break for {@link JobType#MINE_RESOURCE}. */
-    public static final TagKey<Block> ORES = TagKey.create(Registries.BLOCK, Palworks.id("ores"));
 }

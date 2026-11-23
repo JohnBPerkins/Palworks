@@ -100,14 +100,15 @@ public final class WorkPositions {
         // Non-directional (crops, ore, brewing stand, ...; trees are handled above): the nearest
         // ring, from `distance` out, that has a tile the worker fits on; in that ring, the tile
         // nearest the worker. Rings are square (cardinal and diagonal tiles), and each tile is also
-        // tried one block up and down so slopes work (and, for a crystal, two down: see
+        // tried one block up and down so slopes work (and, for a crystal or a boulder, two down: see
         // CRYSTAL_STEPS). A worker eating from a trough stands square to one of its sides if it can,
         // so its head is over the food, not at a corner. Only tiles it can see its target from
         // count (see seesFrom), so its animation doesn't go through a wall or the ground.
         Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
         Double aimY = JobHandlerRegistry.aimFor(jobType, entity);
         boolean squareOn = jobType == JobType.EAT_FOOD;
-        int[] heights = jobType == JobType.MINE_CRYSTAL ? CRYSTAL_STEPS : SLOPE_STEPS;
+        int[] heights =
+                jobType == JobType.MINE_CRYSTAL || jobType == JobType.MINE_BOULDER ? CRYSTAL_STEPS : SLOPE_STEPS;
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
@@ -607,7 +608,8 @@ public final class WorkPositions {
      * Heights tried for each tile round a crystal: as {@link #SLOPE_STEPS}, then two down, as far
      * below its work as a worker reaches ({@link #WORK_HEIGHT_REACH}). Crystals grow on top of
      * other crystals' blocks (a gem formation) and hang from ceilings, out of reach of the ground
-     * tiles one down.
+     * tiles one down. A boulder's top layers are mined from its lower blocks the same way, standing
+     * on them (see Boulders.isMinable).
      */
     private static final int[] CRYSTAL_STEPS = {0, 1, -1, -2};
 

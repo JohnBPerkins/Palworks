@@ -111,7 +111,7 @@ public final class WorkIcons {
             case WATER_CROPS -> WATER_DROP;
             case CHOP_TREE -> IRON_AXE;
             case MINE_CRYSTAL -> IRON_PICKAXE;
-            case MINE_RESOURCE -> IRON_PICKAXE;
+            case MINE_BOULDER -> IRON_PICKAXE;
             case COLLECT_DROPS -> PICK_UP;
             case DELIVER_ITEMS -> CHEST;
             case FETCH_FOOD -> OAK_TROUGH;
