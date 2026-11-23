@@ -12,8 +12,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The icon each work skill, each job and each status shows, all in one place: an item, drawn as in
  * an inventory (the game's own, or ours, so it follows resource packs), one of Palworks' pictures,
- * {@code textures/gui/icon/<name>.png} (16x16, named for what it shows), or a mood face, where no
- * item fits, or a sprite from the game's GUI atlas. Any number can share one: giving a job its own
+ * {@code textures/gui/icon/<name>.png} (16x16, named for what it shows), where no item fits, or a
+ * sprite from the game's GUI atlas (over heads, 9x9 like vanilla's hunger shank). Any number can share one: giving a job its own
  * is a constant and a one-line change in {@link #forJob}. Skills show on the PC, summary and
  * Pokédex filter; jobs on the party HUD and the debug overlay; statuses over a Pokémon's head. No
  * client-only imports, so it's unit-tested.
@@ -67,14 +67,16 @@ public final class WorkIcons {
     private static final Icon PICK_UP = picture("pick_up");
     private static final Icon WATER_DROP = picture("water_drop");
 
-    private static final Icon UNHAPPY_FACE = moodFace("unhappy");
-    private static final Icon STRIKING_FACE = moodFace("striking");
-
     // A half hunger shank over the empty outline, as on the hunger bar
     private static final Icon HALF_SHANK = new GuiSprite(
             ResourceLocation.withDefaultNamespace("hud/food_half"),
             ResourceLocation.withDefaultNamespace("hud/food_empty"));
-    private static final Icon SLEEPY_Z = new GuiSprite(Palworks.id("status/tired"), null);
+    // Over heads, 9x9 as vanilla's HUD sprites (the shank) are: the mood faces and the moon again,
+    // small, so their pixels are the shank's size
+    private static final Icon SLEEPY_Z = statusSprite("tired");
+    private static final Icon SMALL_UNHAPPY_FACE = statusSprite("unhappy");
+    private static final Icon SMALL_STRIKING_FACE = statusSprite("striking");
+    private static final Icon SMALL_MOON = statusSprite("asleep");
 
     private WorkIcons() {}
 
@@ -125,11 +127,11 @@ public final class WorkIcons {
         return switch (status) {
             case HUNGRY -> HALF_SHANK;
             case TIRED -> SLEEPY_Z;
-            case UNHAPPY -> UNHAPPY_FACE;
-            case STRIKING -> STRIKING_FACE;
+            case UNHAPPY -> SMALL_UNHAPPY_FACE;
+            case STRIKING -> SMALL_STRIKING_FACE;
             case CANT_REACH -> BARRIER;
             case CANT_DELIVER -> CHEST;
-            case ASLEEP -> MOON;
+            case ASLEEP -> SMALL_MOON;
         };
     }
 
@@ -137,9 +139,8 @@ public final class WorkIcons {
         return new Picture(Palworks.id("textures/gui/icon/" + name + ".png"));
     }
 
-    // The face the summary's mood bar shows (see WorkSkillsOverlay)
-    private static Picture moodFace(String name) {
-        return new Picture(Palworks.id("textures/gui/mood/" + name + ".png"));
+    private static GuiSprite statusSprite(String name) {
+        return new GuiSprite(Palworks.id("status/" + name), null);
     }
 
     private static Icon item(String minecraftItem) {
