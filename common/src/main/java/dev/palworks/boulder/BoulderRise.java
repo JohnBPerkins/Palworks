@@ -49,6 +49,15 @@ public final class BoulderRise {
 
     private static final Map<UUID, Rise> RISING = new HashMap<>();
 
+    // How long a finished rise's displays stay over the real blocks that took their place: a client
+    // draws a changed block only once it has rebuilt that part of the world, a frame or more later,
+    // and with the displays gone first the boulder blinked out meanwhile
+    public static final int LINGER_TICKS = 5;
+
+    private record Lingering(ServerLevel level, List<Entity> displays, long until) {}
+
+    private static final List<Lingering> LINGERING = new ArrayList<>();
+
     private BoulderRise() {}
 
     private static final class Rise {
@@ -91,24 +100,27 @@ public final class BoulderRise {
     }
 
     /**
-     * The worker's boulder is up: its displays go and the real blocks take their place, if the spots
-     * are still empty; anything standing there is lifted on top. The blocks placed: none if it had
-     * none rising, or something was put in the way meanwhile.
+     * The worker's boulder is up: the real blocks take the displays' place, if the spots are still
+     * empty, and the displays go {@link #LINGER_TICKS} later; anything standing there is lifted on
+     * top. The blocks placed: none if it had none rising, or something was put in the way meanwhile.
      */
     public static Map<BlockPos, BlockState> finish(UUID worker) {
         Rise rise = RISING.remove(worker);
         if (rise == null) {
             return Map.of();
         }
-        discard(rise);
         Map<BlockPos, BlockState> blocks = rise.plan.blocksAt(rise.corner);
         for (BlockPos pos : blocks.keySet()) {
             if (!rise.level.getBlockState(pos).isAir()) {
+                discard(rise);
                 return Map.of();
             }
         }
         liftOut(rise);
-        return Boulders.get(rise.level).place(rise.level, rise.corner, rise.plan, worker);
+        Map<BlockPos, BlockState> placed = Boulders.get(rise.level).place(rise.level, rise.corner, rise.plan, worker);
+        LINGERING.add(new Lingering(rise.level, List.copyOf(rise.displays), rise.level.getGameTime() + LINGER_TICKS));
+        rise.displays.clear();
+        return placed;
     }
 
     /** Stop the worker's rise, if it has one: its displays go, nothing's placed. */
@@ -122,6 +134,13 @@ public final class BoulderRise {
     /** Each tick, for each level: dust and grinding while boulders rise, and their displays moved up. */
     public static void tick(ServerLevel level) {
         long now = level.getGameTime();
+        LINGERING.removeIf(lingering -> {
+            if (!lingering.level().equals(level) || now < lingering.until()) {
+                return false;
+            }
+            lingering.displays().forEach(Entity::discard);
+            return true;
+        });
         RISING.entrySet().removeIf(entry -> {
             Rise rise = entry.getValue();
             if (!rise.level.equals(level)) {
@@ -152,6 +171,8 @@ public final class BoulderRise {
     public static void clearAll() {
         RISING.values().forEach(BoulderRise::discard);
         RISING.clear();
+        LINGERING.forEach(lingering -> lingering.displays().forEach(Entity::discard));
+        LINGERING.clear();
     }
 
     /**
@@ -184,6 +205,10 @@ public final class BoulderRise {
         brightness.putInt("block", level.getBrightness(LightLayer.BLOCK, pos));
         brightness.putInt("sky", level.getBrightness(LightLayer.SKY, pos));
         tag.put("brightness", brightness);
+        // Its size for culling: with none (the default), a client could skip drawing it whenever its
+        // corner alone was out of view
+        tag.putFloat("width", 1.0f);
+        tag.putFloat("height", 1.0f);
         Entity display = EntityType.loadEntityRecursive(tag, level, entity -> {
             entity.moveTo(pos.getX(), pos.getY() - depth, pos.getZ(), 0, 0);
             return entity;

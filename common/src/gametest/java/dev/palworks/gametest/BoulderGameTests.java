@@ -114,6 +114,7 @@ public class BoulderGameTests {
             worker = Workers.sendOut(helper, "geodude level=20", START);
         }
         UUID summoner = worker.getPokemon().getUuid();
+        int fed = worker.getPokemon().getCurrentFullness();
         BoulderKind badlands = BoulderKinds.current().get("badlands");
         Set<String> allowed = new HashSet<>(badlands.stone().keySet());
         allowed.addAll(badlands.ores().keySet());
@@ -134,7 +135,10 @@ public class BoulderGameTests {
             for (BlockPos plant : plants) {
                 helper.assertFalse(helper.getBlockState(plant).isAir(), "the plant at " + plant + " was broken");
             }
-            helper.assertValueEqual(risingDisplays(helper), 0, "displays left");
+            // Hungry work: at least a point of fullness for a boulder
+            helper.assertTrue(
+                    worker.getPokemon().getCurrentFullness() <= fed - 1,
+                    "fullness " + worker.getPokemon().getCurrentFullness() + " of " + fed);
         });
     }
 
@@ -191,12 +195,16 @@ public class BoulderGameTests {
         helper.runAfterDelay(BoulderRise.RISE_TICKS + 3, () -> {
             Map<BlockPos, BlockState> placed = BoulderRise.finish(summoner);
             helper.assertValueEqual(placed.size(), 3, "blocks placed");
-            helper.assertValueEqual(risingDisplays(helper), 0, "displays left");
             helper.assertBlockPresent(Blocks.STONE, CORNER);
             helper.assertBlockPresent(Blocks.IRON_ORE, CORNER.east());
             helper.assertBlockPresent(Blocks.STONE, CORNER.above());
             helper.assertTrue(Boulders.get(level).hasStanding(summoner), "its summoner's");
-            helper.succeed();
+            // The displays stay over the new blocks a moment, so clients never see a gap
+            helper.assertValueEqual(risingDisplays(helper), 3, "displays over the blocks");
+            helper.runAfterDelay(BoulderRise.LINGER_TICKS + 1, () -> {
+                helper.assertValueEqual(risingDisplays(helper), 0, "displays left");
+                helper.succeed();
+            });
         });
     }
 

@@ -22,8 +22,12 @@ import org.jetbrains.annotations.Nullable;
  * replaced.
  */
 final class SummonBoulderHandler implements JobHandler {
-    // Hunger and mood cost: a unit for every so many blocks raised
+    // Mood cost: a unit for every so many blocks raised, as other work
     private static final int BLOCKS_PER_UNIT = 10;
+    // Raising a boulder is hungry work: a unit of food for each block, and at least as many as a
+    // point of fullness is worth with the default work_per_fullness (20): a point for a small
+    // boulder, about two and a half for the biggest
+    private static final int LEAST_FOOD_UNITS = 20;
 
     private final List<Step> steps = List.of(
             Step.animated("summon", 20, WorkAnimations.SUMMON_BOULDER, this::summon)
@@ -56,7 +60,9 @@ final class SummonBoulderHandler implements JobHandler {
         if (placed.isEmpty()) {
             return false;
         }
-        ctx.didWork(Math.max(1, (placed.size() + BLOCKS_PER_UNIT - 1) / BLOCKS_PER_UNIT));
+        int units = Math.max(1, (placed.size() + BLOCKS_PER_UNIT - 1) / BLOCKS_PER_UNIT);
+        ctx.didWork(units);
+        ctx.usedFood(Math.max(LEAST_FOOD_UNITS, placed.size()) - units);
         Palworks.LOGGER.debug("{} raised a boulder of {} blocks at {}", ctx.name(), placed.size(), ctx.pos());
         return true;
     }
