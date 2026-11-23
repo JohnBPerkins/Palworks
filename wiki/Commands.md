@@ -34,7 +34,7 @@ be read, the server logs a warning, uses the rest, and keeps a copy of your file
 | `/palworks suitability list` | Every species changed, and how. |
 
 The work skills are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
-`gathering`, `lumbering`, `mining`, `medicine_production`, `cooling`, `transporting`, `nether` and
+`gathering`, `lumbering`, `mining`, `stoneshaping`, `medicine_production`, `cooling`, `transporting`, `nether` and
 `farming`.
 
 ## Settings

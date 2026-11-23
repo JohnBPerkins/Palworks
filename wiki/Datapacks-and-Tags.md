@@ -32,7 +32,7 @@ the same type or species a level, the higher one wins, and a species' `0` wins o
 change a default, put a file at the same path as ours in your datapack.
 
 The work skills are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
-`gathering`, `lumbering`, `mining`, `medicine_production`, `cooling`, `transporting`, `nether` and
+`gathering`, `lumbering`, `mining`, `stoneshaping`, `medicine_production`, `cooling`, `transporting`, `nether` and
 `farming`. The defaults are in
 [`common/src/main/resources/data/palworks/palworks/suitability`](https://github.com/JohnBPerkins/Palworks/tree/main/common/src/main/resources/data/palworks/palworks/suitability),
 and the [work skill pages](Suitabilities#every-work-skill) list who they give each skill to.
@@ -66,29 +66,60 @@ The blocks [Kindling](Jobs#light-furnaces) workers light: by default the furnace
 smoker. A modded block needs a furnace block entity to work (one without still says Kindling in its
 tooltip).
 
-## `#palworks:ores`
+To add furnaces from another mod, create this file in your datapack:
 
-The blocks [Mining](Jobs#mine-ores) workers will go to once they mine ores (for now they only
-[mine crystals](Jobs#mine-crystals), which need no tag). By default it holds
-every vanilla ore: coal, iron, copper, gold, diamond, emerald, lapis and redstone (stone and
-deepslate versions), plus nether gold ore and nether quartz ore.
-
-To add ores from another mod, create this file in your datapack:
-
-`data/palworks/tags/block/ores.json`
+`data/palworks/tags/block/furnaces.json`
 
 ```json
 {
   "replace": false,
   "values": [
-    "examplemod:tin_ore",
-    "examplemod:deepslate_tin_ore"
+    "examplemod:copper_furnace"
   ]
 }
 ```
 
-Keep `"replace": false` so your entries are added to the defaults instead of replacing them. The
-furnaces tag works the same way.
+Keep `"replace": false` so your entries are added to the defaults instead of replacing them.
+
+## Boulders
+
+What the boulders [Stoneshaping](Jobs#raise-boulders) workers raise are made of comes from one
+file per kind of boulder: `data/<namespace>/palworks/boulders/<kind>.json`. For example, the default
+`data/palworks/palworks/boulders/badlands.json`:
+
+```json
+{
+  "types": ["ground"],
+  "species": [],
+  "stone": { "minecraft:terracotta": 4, "minecraft:red_sandstone": 2, "minecraft:granite": 2 },
+  "ores": { "minecraft:gold_ore": 4, "minecraft:iron_ore": 3, "minecraft:copper_ore": 2, "minecraft:redstone_ore": 1 }
+}
+```
+
+- **`types`**: the kind is for Pokémon with this type besides Rock (a Rock and Ground Pokémon
+  raises badlands boulders). A Pokémon with no other type uses the kind for its own type: the
+  default `stone` kind is for `rock`.
+- **`species`**: species that raise this kind whatever their types (Groudon raises volcanic
+  boulders, the Nacli line salt).
+- **`stone`** and **`ores`**: blocks and their weights. First, each block of a boulder is ore or
+  not, by the worker's level (see [Suitabilities](Suitabilities#work-levels)). Then a block is
+  picked by weight, only among the stone or only among the ores. So `stone 4` and `coal 4` at
+  level 1 is about nine stone to one coal.
+
+Files for the same kind from different namespaces merge: types and species add up, a block's
+weight is the highest given, and a weight of `0` takes a block out. `"replace": true` uses only that
+file for the kind. A new file name is a new kind. Every block should drop something for a pickaxe
+without Silk Touch (packed ice, for one, drops nothing).
+
+The Stoneshaping level each ore needs is one table for every kind, in
+`data/<namespace>/palworks/boulder_ores/<name>.json` (the default is `ore_levels.json`):
+
+```json
+{ "minecraft:gold_ore": 3, "minecraft:diamond_ore": 4, "examplemod:tin_ore": 2 }
+```
+
+An ore that isn't listed needs level 1. The same block in several files takes the highest level.
+See [Boulders](Boulders) for the default kinds and levels.
 
 ## Logs: `#minecraft:logs`
 
