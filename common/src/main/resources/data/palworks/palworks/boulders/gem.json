@@ -2,7 +2,7 @@
   "types": [
     "fairy"
   ],
-  "species": [],
+  "species": ["cobblemon:glimmet", "cobblemon:glimmora"],
   "pattern": "shell",
   "stone": {
     "minecraft:calcite": 1,
