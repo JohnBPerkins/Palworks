@@ -111,7 +111,7 @@ file per kind of boulder: `data/<namespace>/palworks/boulders/<kind>.json`. For 
   - `shell`: layers from the outside in, by how far each block is from the middle, each block's
     weight its share of the way in.
   - `capped`: the first block over every top surface, the rest in patches below.
-- **`ores`**: ores and their weights. About one boulder in ten has ore, each ore block anywhere in
+- **`ores`**: ores and their weights. About one boulder in eight has ore, each ore block anywhere in
   it, picked by weight among the ores the worker's level has unlocked (below).
 
 Whatever the pattern, about one block in five is any of the stone at random, by weight.

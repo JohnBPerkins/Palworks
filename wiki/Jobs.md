@@ -214,7 +214,7 @@ point of fullness for every 20 blocks, and at least one.
 
 What a boulder is made of depends on the worker's type besides Rock. A Geodude (Rock and Ground)
 raises banded terracotta, an Alolan Geodude (Rock and Electric) granite with copper, and an Aron
-(Steel) deepslate and stone with iron. About one boulder in ten has ore, here and there in
+(Steel) deepslate and stone with iron. About one boulder in eight has ore, here and there in
 it. How big it is, and how much ore the ones with ore have, depend on its
 [work level](Suitabilities#work-levels). See [Boulders](Boulders) for every kind.
 

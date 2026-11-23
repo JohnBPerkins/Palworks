@@ -62,7 +62,7 @@ A higher [Unearthing level](Suitabilities#work-levels) raises a bigger boulder:
 
 ## Ore
 
-Most boulders are only stone. About **one in ten** has ore, at every level. In a boulder with ore,
+Most boulders are only stone. About **one in eight** has ore, at every level. In a boulder with ore,
 each ore block is anywhere in it at random, outside or in, and each is one of the kind's ores the
 level has unlocked:
 

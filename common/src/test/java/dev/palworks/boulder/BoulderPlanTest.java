@@ -27,7 +27,7 @@ class BoulderPlanTest {
     }
 
     @Test
-    void aboutOneBoulderInTenHasOre() {
+    void aboutOneBoulderInEightHasOre() {
         Random random = new Random(5);
         int withOre = 0;
         int rolls = 2000;
@@ -38,7 +38,7 @@ class BoulderPlanTest {
                     ? 1
                     : 0;
         }
-        assertTrue(withOre > 150 && withOre < 250, withOre + " of " + rolls + " with ore");
+        assertTrue(withOre > 200 && withOre < 300, withOre + " of " + rolls + " with ore");
     }
 
     @Test

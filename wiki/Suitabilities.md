@@ -85,7 +85,7 @@ What a level changes, so far:
 | **Transporting**: inventory slots | 1 | 2 | 3 | 4 | 5 |
 | **Mining**: mines as with | a wooden pickaxe | a diamond pickaxe | a diamond pickaxe with Fortune I | Fortune II | Fortune III |
 | **Unearthing**: blocks in a boulder | 5-8 | 10-15 | 17-24 | 28-38 | 42-56 |
-| **Unearthing**: ore in the one boulder in ten with ore | 1-2 | 2-3 | 2-6 | 4-8 | 6-12 |
+| **Unearthing**: ore in the one boulder in eight with ore | 1-2 | 2-3 | 2-6 | 4-8 | 6-12 |
 | **Watering**: crops it fertilizes | 10% | 20% | 30% | 40% | 50% |
 
 - **Kindling:** a level 1 kindler stays at its furnace and relights it for each item. From level 2

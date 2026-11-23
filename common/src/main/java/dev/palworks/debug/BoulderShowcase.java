@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A grid of boulders to look at (the developer command {@code /palworks boulders}): every kind in
- * every style at one Unearthing level (ore as often as in play, one in ten), or one kind in every
+ * every style at one Unearthing level (ore as often as in play, one in eight), or one kind in every
  * style at every level, every one with ore, to see where it goes. Built east and
  * south of a corner on a flat smooth stone floor with the air cleared above it, so the terrain
  * doesn't matter, with a sign heading each row and column. Each build rolls new shapes. The

@@ -3,7 +3,7 @@ package dev.palworks.boulder;
 /**
  * How big a boulder an Unearthing worker of a level raises, and how much ore one with ore holds:
  * more blocks, a wider footprint, and more ore the higher its level. Only about one
- * boulder in ten ({@link #ORE_BOULDER_CHANCE}, at every level) has ore at all; the rest are stone.
+ * boulder in eight ({@link #ORE_BOULDER_CHANCE}, at every level) has ore at all; the rest are stone.
  * What the blocks are comes from its kind (see {@link BoulderKind}); its shape is rolled anew each
  * time (see {@link BoulderShape}).
  *
@@ -21,8 +21,8 @@ public record BoulderSize(
     /** The highest a boulder ever is: a miner on the ground, or on the boulder, reaches the top. */
     public static final int MAX_HEIGHT = 4;
 
-    /** The chance a boulder has ore in it, whatever its level (the user's choice: about one in ten). */
-    public static final double ORE_BOULDER_CHANCE = 0.1;
+    /** The chance a boulder has ore in it, whatever its level (the user's choice: one in eight). */
+    public static final double ORE_BOULDER_CHANCE = 0.125;
 
     private static final BoulderSize[] BY_LEVEL = {
         new BoulderSize(5, 8, 3, 2, 3, 1, 2),

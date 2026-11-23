@@ -40,7 +40,7 @@ public record BoulderPlan(String kind, BoulderShape shape, List<String> blocks) 
     /**
      * A boulder of this kind, raised by an Unearthing worker of this level: its size from the level,
      * its style from {@code style} (or picked at random, if null), its stone laid out in the kind's
-     * pattern, and, about one time in ten ({@link BoulderSize#ORE_BOULDER_CHANCE}), ore here and
+     * pattern, and, about one time in eight ({@link BoulderSize#ORE_BOULDER_CHANCE}), ore here and
      * there in it.
      */
     public static BoulderPlan roll(
