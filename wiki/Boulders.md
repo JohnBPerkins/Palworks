@@ -28,9 +28,9 @@ looks like real rock rather than a random mix.
 | Geode | Psychic (none in Cobblemon yet: Lunatone and Solrock raise meteors) | smooth basalt outside, calcite inside | shell | amethyst block |
 | Mossy | Grass (Lileep) | mossy cobblestone and stone, capped with moss | capped | copper, iron |
 | Deep | Dragon (Tyrunt) | deepslate, tuff | graded, deepslate at the bottom | deepslate coal, redstone, gold and diamond |
-| Dripstone | Poison (Glimmet) | tuff, stone, dripstone block | graded, tuff at the bottom | copper, redstone, lapis |
+| Dripstone | Poison (none in Cobblemon yet: Glimmet and Glimmora raise gem boulders) | tuff, stone, dripstone block | graded, tuff at the bottom | copper, redstone, lapis |
 | Blackstone | Dark (Tyranitar) | deepslate, blackstone | graded, deepslate at the bottom | gilded blackstone, nether gold, deepslate diamond |
-| Gem | Fairy (Carbink) | calcite outside, diorite inside | shell | amethyst block, lapis, diamond, emerald |
+| Gem | Fairy (Carbink), Glimmet, Glimmora | calcite outside, diorite inside | shell | amethyst block, lapis, diamond, emerald |
 | Salt | the Nacli line | calcite, diorite, quartz block | strata | nether quartz |
 | Meteor | Minior, Lunatone, Solrock | blackstone outside, then obsidian, end stone inside | shell | iron, gold, diamond |
 | Ruins | Regirock, Stonjourner | stone bricks, mossy, cracked and chiseled stone bricks | patches | gold, emerald |
@@ -57,11 +57,11 @@ A higher [Unearthing level](Suitabilities#work-levels) raises a bigger boulder:
 
 | Level | Blocks | Widest | Height |
 |---|---|---|---|
-| 1 | 5 to 8 | 3 blocks | 2 to 3 |
-| 2 | 10 to 15 | 4 blocks | 2 to 3 |
-| 3 | 17 to 24 | 4 blocks | 2 to 4 |
-| 4 | 28 to 38 | 5 blocks | 3 to 4 |
-| 5 | 42 to 56 | 6 blocks | 3 to 4 |
+| 1 | 5 to 8 | 5 blocks | 2 to 3 |
+| 2 | 10 to 15 | 6 blocks | 2 to 3 |
+| 3 | 17 to 24 | 6 blocks | 2 to 4 |
+| 4 | 28 to 38 | 7 blocks | 3 to 5 |
+| 5 | 42 to 56 | 8 blocks | 3 to 6 |
 
 ## Ore
 
@@ -100,14 +100,18 @@ as it needs a diamond pickaxe.
 ## Shapes
 
 Every boulder's shape is different. Each is built from rounded lumps, the way vanilla's mossy
-forest rocks are, in one of five styles rolled at random:
+forest rocks are, in one of eight styles rolled at random:
 
-- **Dome**: one round lump
-- **Peak**: a smaller, taller lump on a broad base, off the middle
-- **Slab**: one wide lump, flat on top
+- **Dome**: one round or oval lump
+- **Peak**: a small, tall lump on a broad base, off the middle: the tallest boulders
+- **Slab**: one wide lump, flat on top, round or long
 - **Lopsided**: three lumps in a row, each lower than the last, so it leans
 - **Twin**: two lumps of different sizes with a low saddle between
+- **Ridge**: long and narrow, with a spine along it
+- **Rock cluster**: three to five small rocks of different sizes, with gaps between
+- **Split rock**: one big rock cracked in two
 
 Their sizes, positions and turn are random, and their surface has a smooth roughness, so it's lumpy
-rather than jagged. Miners take a boulder from the top, so nothing is left floating, and nothing is
-out of reach.
+rather than jagged. Every column two or more blocks high has one beside it at most a block lower,
+so its sides step up and a miner can climb to the top. Miners take a boulder from the top, so
+nothing is left floating.
