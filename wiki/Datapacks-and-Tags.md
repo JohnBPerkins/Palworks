@@ -119,8 +119,8 @@ Whatever the pattern, about one block in five is any of the stone at random, by 
 Files for the same kind from different namespaces merge: types and species add up, a block's
 weight is the highest given, and a weight of `0` takes a block out. The last file (by namespace)
 that gives a pattern sets it. `"replace": true` uses only that file for the kind. A new file name
-is a new kind. Every block should drop something for a pickaxe without Silk Touch (packed ice, for
-one, drops nothing).
+is a new kind. Every block should drop something for a pickaxe without Silk Touch: only packed and
+blue ice are mined with it.
 
 The Unearthing level each ore needs is one table for every kind, in
 `data/<namespace>/palworks/boulder_ores/<name>.json` (the default is `ore_levels.json`):

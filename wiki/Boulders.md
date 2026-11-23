@@ -18,20 +18,23 @@ looks like real rock rather than a random mix.
 |---|---|---|---|---|
 | Stone | Rock types with no other type | stone, andesite, diorite, granite, tuff | patches | coal, copper, iron, lapis, redstone, gold, diamond |
 | Badlands | Ground (Geodude, Onix, Rhyhorn, Larvitar) | terracotta, orange, yellow and brown terracotta, red sandstone | strata | gold, iron, copper, redstone |
-| Volcanic | Fire (Magcargo, Carkol, Hisuian Arcanine), Rolycoly, Groudon | basalt, blackstone, netherrack | graded, basalt at the bottom | coal, nether quartz, nether gold, ancient debris |
+| Volcanic | Fire (Magcargo, Hisuian Growlithe and Arcanine), Groudon | basalt, blackstone, netherrack | graded, basalt at the bottom | coal, nether quartz, nether gold, ancient debris |
 | Seabed | Water (Omanyte, Kabuto, Corsola, Binacle, Drednaw) | prismarine, dark prismarine, clay, stone | patches | copper, lapis, sea lantern |
-| Peak | Flying (Aerodactyl, Archen, Minior) | stone and andesite, capped with calcite | capped | coal, iron, emerald |
+| Peak | Flying (Aerodactyl, Archen) | stone and andesite, capped with calcite | capped | coal, iron, emerald |
 | Fossil bed | Bug (Shuckle, Anorith, Dwebble, Kleavor) | sandstone, bone block, smooth sandstone | strata | coal, gold, diamond |
 | Iron vein | Steel (Aron, Shieldon, Probopass), Nosepass | deepslate, tuff, stone | graded, deepslate at the bottom | coal, iron, gold, raw iron block |
 | Copper vein | Electric (Alolan Geodude) | granite, stone | patches | copper, redstone, raw copper block |
-| Glacier | Ice (Amaura, Hisuian Avalugg) | calcite outside, diorite inside | shell | iron, lapis, diamond |
-| Geode | Psychic (Lunatone, Solrock) | smooth basalt outside, calcite inside | shell | amethyst block |
+| Glacier | Ice (Amaura, Hisuian Avalugg) | packed ice outside, then calcite, blue ice inside | shell | iron, lapis, diamond |
+| Geode | Psychic (none in Cobblemon yet: Lunatone and Solrock raise meteors) | smooth basalt outside, calcite inside | shell | amethyst block |
 | Mossy | Grass (Lileep) | mossy cobblestone and stone, capped with moss | capped | copper, iron |
 | Deep | Dragon (Tyrunt) | deepslate, tuff | graded, deepslate at the bottom | deepslate coal, redstone, gold and diamond |
 | Dripstone | Poison (Glimmet) | tuff, stone, dripstone block | graded, tuff at the bottom | copper, redstone, lapis |
 | Blackstone | Dark (Tyranitar) | deepslate, blackstone | graded, deepslate at the bottom | gilded blackstone, nether gold, deepslate diamond |
 | Gem | Fairy (Carbink) | calcite outside, diorite inside | shell | amethyst block, lapis, diamond, emerald |
 | Salt | the Nacli line | calcite, diorite, quartz block | strata | nether quartz |
+| Meteor | Minior, Lunatone, Solrock | blackstone outside, then obsidian, end stone inside | shell | iron, gold, diamond |
+| Ruins | Regirock, Stonjourner | stone bricks, mossy, cracked and chiseled stone bricks | patches | gold, emerald |
+| Coal seam | the Rolycoly line | stone, tuff | strata | coal, coal block |
 
 The patterns:
 
@@ -83,12 +86,16 @@ lower level.
 |---|---|
 | 1 | coal, copper, nether quartz, amethyst block |
 | 2 | iron, nether gold, gilded blackstone, sea lantern |
-| 3 | gold, lapis, redstone |
+| 3 | gold, lapis, redstone, coal block |
 | 4 | diamond, emerald, raw iron block, raw copper block |
 | 5 | ancient debris |
 
 Nether gold ore and gilded blackstone come at level 2, as they only drop gold nuggets. A boulder
 whose kind has no ore unlocked at the worker's level is stone.
+
+Packed and blue ice in a glacier boulder are mined as with Silk Touch, so they drop themselves: a
+pickaxe gets nothing from them otherwise. Obsidian in a meteor needs a miner of level 2 or more,
+as it needs a diamond pickaxe.
 
 ## Shapes
 

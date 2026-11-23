@@ -238,7 +238,8 @@ your party ground near you.
 Miners break boulders down a block at a time, from the top. Natural stone and ore in the world are
 never mined: only boulders, and [crystals](#mine-crystals). Each block drops what it would for a
 player with the pickaxe the miner's [work level](Suitabilities#work-levels) stands for: stone gives
-cobblestone, and ore gives more with Fortune from level 3.
+cobblestone, and ore gives more with Fortune from level 3. Packed and blue ice are mined as with
+Silk Touch, so they drop themselves.
 
 A level 1 miner mines with a wooden pickaxe, which gets nothing from iron, copper, lapis, gold,
 redstone, diamond or emerald ore. It leaves those for a miner of level 2 or more, so with only
