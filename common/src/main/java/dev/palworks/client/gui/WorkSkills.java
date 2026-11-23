@@ -12,7 +12,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -74,9 +73,9 @@ public final class WorkSkills {
         return next < all.size() ? all.get(next) : null;
     }
 
-    /** A shown job's icon (16x16, from {@link WorkIcons}), or null if it isn't shown. */
+    /** A shown job's icon (from {@link WorkIcons}), or null if it isn't shown. */
     @Nullable
-    public static ResourceLocation icon(Suitability job) {
+    public static WorkIcons.Icon icon(Suitability job) {
         return WorkIcons.forSkill(job);
     }
 

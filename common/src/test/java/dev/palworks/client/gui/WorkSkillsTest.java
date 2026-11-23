@@ -18,7 +18,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
 /** Which work skills the PC and summary screens show, in what order, with what icon and name. */
@@ -62,7 +61,7 @@ class WorkSkillsTest {
     }
 
     @Test
-    void everyJobsWorkHasAnIconThatExists() {
+    void everyJobsWorkHasAnIcon() {
         // Every suitability some job needs, and Nether work (needed by nether wart and stems' jobs)
         Set<Suitability> worked = EnumSet.of(Suitability.NETHER);
         for (JobType job : JobType.values()) {
@@ -71,11 +70,9 @@ class WorkSkillsTest {
             }
         }
         for (Suitability job : Suitability.values()) {
-            ResourceLocation icon = WorkSkills.icon(job);
+            WorkIcons.Icon icon = WorkSkills.icon(job); // that it exists: WorkIconsTest, WorkStatusGameTests
             if (worked.contains(job)) {
                 assertNotNull(icon, job + " is worked, so it's shown");
-                Path file = ASSETS.resolve(icon.getNamespace()).resolve(icon.getPath());
-                assertTrue(Files.isRegularFile(file), "missing texture " + file);
             } else {
                 assertNull(icon, job + " has no work yet, so it isn't shown");
             }

@@ -142,7 +142,7 @@ public final class WorkSkillsOverlay {
         for (int i = 0; i < rows; i++) {
             WorkSkills.Shown skill = shown.get(i);
             float rowY = y + i * ROW_HEIGHT;
-            drawIcon(graphics, WorkSkills.icon(skill.job()), x, rowY);
+            WorkIconDrawer.draw(graphics, Objects.requireNonNull(WorkSkills.icon(skill.job())), x, rowY, ICON_SIZE);
             if (WorkSkills.isLevelled(skill.job())) {
                 drawText(graphics, font, String.valueOf(skill.level()), x + ICON_SIZE + 1.5F, rowY + TEXT_DROP, WHITE);
             }
