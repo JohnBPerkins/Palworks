@@ -5,7 +5,10 @@ a furnace, Razor Leaf to harvest, Leech Seed to plant, Water Gun to water, Scrat
 Pound to mine. Each
 animation has a **stance**, which sets where the worker stands. A contact move like Scratch is played right up
 against the block; ranged moves are played from a little way back. Bigger Pokémon stand further
-back, measured from the edge of their hitbox.
+back, measured from the edge of their hitbox. Except at a furnace or chest, or chopping a tree, a
+worker also stands where it can see the spot its move aims at (or the top of the block), so the
+move doesn't go through leaves, a wall or the ground. An apricorn on the outside of a tree, for
+example, is picked from outside the tree, not from underneath it.
 
 **Poser animations.** While a Pokémon is working, it has the aspect `palworks-working`, plus one for
 the job: `palworks-harvest-crops`, `palworks-chop-tree`, `palworks-fuel-furnace`, and so on. A

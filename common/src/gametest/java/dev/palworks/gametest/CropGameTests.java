@@ -2,11 +2,15 @@ package dev.palworks.gametest;
 
 import static dev.palworks.gametest.Scenes.abs;
 
+import dev.palworks.ai.WorkPositions;
 import dev.palworks.crop.CropAdapter;
+import dev.palworks.job.JobType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.AttachedStemBlock;
@@ -180,6 +184,26 @@ public class CropGameTests {
         helper.assertTrue(
                 seedsDropped >= 250 && seedsDropped <= 440,
                 "about 1.71 seeds per harvest (one fewer than by hand), got " + seedsDropped + " from " + harvests);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aCropIsHarvestedFromWhereItCanBeSeen(GameTestHelper helper) {
+        // A wall between the crop and the worker's side of it: the nearest tile, against the wall,
+        // can't see the crop, so the harvest would go through the wall
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        crop(helper, Blocks.FARMLAND, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+        for (int z = 0; z < 8; z++) {
+            helper.setBlock(4, 1, z, Blocks.COBBLESTONE);
+            helper.setBlock(4, 2, z, Blocks.COBBLESTONE);
+        }
+        Mob mob = helper.spawnWithNoFreeWill(EntityType.PIG, new BlockPos(6, 1, 3));
+
+        BlockPos stand =
+                WorkPositions.standingPosFor(helper.getLevel(), helper.absolutePos(CROP), JobType.HARVEST_CROPS, mob);
+        helper.assertTrue(stand != null, "somewhere to stand");
+        BlockPos rel = stand.subtract(helper.absolutePos(BlockPos.ZERO));
+        helper.assertTrue(rel.getX() < 4, "on the crop's side of the wall, got " + rel);
         helper.succeed();
     }
 

@@ -17,9 +17,12 @@ import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -70,7 +73,7 @@ public final class WorkPositions {
         int distance = stance.ringFor(entity);
 
         if (CropAdapter.isHangingFruit(level.getBlockState(targetPos))) {
-            return hangingFruitStand(level, targetPos, entity, distance);
+            return hangingFruitStand(level, targetPos, entity, distance, JobHandlerRegistry.aimFor(jobType, entity));
         }
 
         Direction facing = stationFacing(level, targetPos);
@@ -99,8 +102,10 @@ public final class WorkPositions {
         // nearest the worker. Rings are square (cardinal and diagonal tiles), and each tile is also
         // tried one block up and down so slopes work (and, for a crystal, two down: see
         // CRYSTAL_STEPS). A worker eating from a trough stands square to one of its sides if it can,
-        // so its head is over the food, not at a corner.
+        // so its head is over the food, not at a corner. Only tiles it can see its target from
+        // count (see seesFrom), so its animation doesn't go through a wall or the ground.
         Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
+        Double aimY = JobHandlerRegistry.aimFor(jobType, entity);
         boolean squareOn = jobType == JobType.EAT_FOOD;
         int[] heights = jobType == JobType.MINE_CRYSTAL ? CRYSTAL_STEPS : SLOPE_STEPS;
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
@@ -117,12 +122,18 @@ public final class WorkPositions {
                 // Ties keep ring order (a fixed direction order), so the choice doesn't flip
                 // between equally near tiles as the worker walks (this is recomputed each tick)
                 double distSq = entity.distanceToSqr(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
-                if (distSq < bestDistSq - 1e-6) {
+                boolean square = candidate.getX() == targetPos.getX() || candidate.getZ() == targetPos.getZ();
+                boolean nearer = distSq < bestDistSq - 1e-6;
+                boolean squareNearer = squareOn && square && distSq < bestSquareDistSq - 1e-6;
+                // Sight last: it's a ray through the level, so only for a tile that would win
+                if ((!nearer && !squareNearer) || !seesFrom(level, entity, spot, targetPos, aimY)) {
+                    continue;
+                }
+                if (nearer) {
                     best = spot;
                     bestDistSq = distSq;
                 }
-                boolean square = candidate.getX() == targetPos.getX() || candidate.getZ() == targetPos.getZ();
-                if (squareOn && square && distSq < bestSquareDistSq - 1e-6) {
+                if (squareNearer) {
                     bestSquare = spot;
                     bestSquareDistSq = distSq;
                 }
@@ -152,10 +163,13 @@ public final class WorkPositions {
      * a ring or more out, like any crop. Each tile is tried from {@link #HANGING_FRUIT_REACH_DOWN}
      * below the fruit up to one above, and the lowest spot the worker fits on is the one: the fruit
      * is usually above head height, so a spot level with it is in the air, or up on the leaves.
-     * Never on top of leaves (the canopy an apricorn hangs in): workers can't get up there.
+     * Never on top of leaves (the canopy an apricorn hangs in): workers can't get up there. And
+     * only where it can see the fruit: the nearest tile is often under the canopy, and picked from
+     * there its animation went up through the leaves.
      */
     @Nullable
-    private static BlockPos hangingFruitStand(Level level, BlockPos fruit, Mob entity, int distance) {
+    private static BlockPos hangingFruitStand(
+            Level level, BlockPos fruit, Mob entity, int distance, @Nullable Double aimY) {
         Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
@@ -167,7 +181,7 @@ public final class WorkPositions {
                     continue;
                 }
                 double distSq = distSqTo(entity, spot);
-                if (distSq < bestDistSq - 1e-6) {
+                if (distSq < bestDistSq - 1e-6 && seesFrom(level, entity, spot, fruit, aimY)) {
                     best = spot;
                     bestDistSq = distSq;
                 }
@@ -177,6 +191,46 @@ public final class WorkPositions {
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a worker standing on {@code spot} could see the point its animation aims at in
+     * {@code target}: {@link #canSee} from where its eyes would be there. Always, for a job that
+     * plays no animation ({@code aimY} null): there's nothing to go through anything.
+     */
+    private static boolean seesFrom(Level level, Mob entity, BlockPos spot, BlockPos target, @Nullable Double aimY) {
+        if (aimY == null) {
+            return true;
+        }
+        Vec3 eyes = new Vec3(spot.getX() + 0.5, spot.getY() + entity.getEyeHeight(), spot.getZ() + 0.5);
+        return canSee(level, entity, eyes, target, aimY);
+    }
+
+    /** How far inside a target block's top its top is looked at, in blocks. */
+    private static final double TOP_INSET = 0.05;
+
+    /**
+     * Whether {@code target} is in sight from {@code eyes}, for a work animation aiming at it: a
+     * straight line reaches where the animation aims (its middle across, {@code aimY} up: see
+     * WorkAnimator), or the middle of its top, without going through another block, so the move's
+     * effect doesn't go through one either. Its top as well, for what's worked from above it: kelp
+     * at a pool's surface is in view from the shore, but its middle is just below the shore's edge.
+     * Blocks are what an entity collides with (leaves, a wall, the ground), so a crop or tall
+     * grass in between doesn't hide it, and the line may end on the target itself (an apricorn, a
+     * crystal).
+     */
+    public static boolean canSee(Level level, Mob entity, Vec3 eyes, BlockPos target, double aimY) {
+        double x = target.getX() + 0.5;
+        double z = target.getZ() + 0.5;
+        return lineReaches(level, entity, eyes, new Vec3(x, target.getY() + aimY, z), target)
+                || lineReaches(level, entity, eyes, new Vec3(x, target.getY() + 1 - TOP_INSET, z), target);
+    }
+
+    /** Whether the line from {@code from} to {@code to} goes through no block but {@code target}. */
+    private static boolean lineReaches(Level level, Mob entity, Vec3 from, Vec3 to, BlockPos target) {
+        BlockHitResult hit =
+                level.clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity));
+        return hit.getType() == HitResult.Type.MISS || hit.getBlockPos().equals(target);
     }
 
     // ============================================================
@@ -300,7 +354,9 @@ public final class WorkPositions {
      * Whether the worker is in its stance for this job, where it is: close enough to its target
      * (the edge of its body no further from it than the stance allows, see
      * {@link WorkStance#maxGap}), in front of it if it's a station, and about level with it (below
-     * a hanging fruit). For a tree the target is the whole trunk.
+     * a hanging fruit). For a tree the target is the whole trunk. Anything but a tree or a station,
+     * where its job plays an animation, it has to be able to see from where it is (see
+     * {@link #canSee}), as from its stand tile.
      */
     public static boolean inStance(Level level, Mob entity, BlockPos targetPos, JobType jobType, WorkStance stance) {
         if (jobType == JobType.COLLECT_DROPS) {
@@ -316,6 +372,7 @@ public final class WorkPositions {
         }
         double dy = entity.getY() - targetPos.getY();
         List<BlockPos> target;
+        Double aimY = null;
         if (jobType == JobType.CHOP_TREE) {
             if (Math.abs(entity.blockPosition().getY() - targetPos.getY()) > TREE_HEIGHT_REACH) {
                 return false;
@@ -332,8 +389,12 @@ public final class WorkPositions {
                 return false;
             }
             target = List.of(targetPos);
+            if (facing == null) {
+                aimY = JobHandlerRegistry.aimFor(jobType, entity);
+            }
         }
-        return stance.reaches(entity.getBbWidth() / 2.0, gapTo(entity, target));
+        return stance.reaches(entity.getBbWidth() / 2.0, gapTo(entity, target))
+                && (aimY == null || canSee(level, entity, entity.getEyePosition(), targetPos, aimY));
     }
 
     /**

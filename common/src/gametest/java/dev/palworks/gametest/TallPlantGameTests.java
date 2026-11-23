@@ -145,11 +145,12 @@ public class TallPlantGameTests {
 
     @GameTest(template = Templates.EMPTY, timeoutTicks = 600)
     public void aGathererCutsKelpFromBesideItsPool(GameTestHelper helper) {
-        // From the floor two blocks off, over the pool's wall: where it would stand on a shore
+        // From the shore two blocks off: the kelp's top is in sight, its middle just below the
+        // shore's edge
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
-        kelpPool(helper);
-        Workers.sendOut(helper, BULBASAUR, START);
+        kelpShore(helper);
+        Workers.sendOut(helper, BULBASAUR, START.above(2));
         helper.succeedWhen(() -> {
             helper.assertBlockPresent(Blocks.WATER, BASE.above());
             helper.assertBlockPresent(Blocks.KELP, BASE);
@@ -175,6 +176,20 @@ public class TallPlantGameTests {
             helper.setBlock(BASE.atY(y).south(), Blocks.STONE);
             helper.setBlock(BASE.atY(y).east(), Blocks.STONE);
             helper.setBlock(BASE.atY(y).west(), Blocks.STONE);
+        }
+        helper.setBlock(BASE.below(), Blocks.STONE);
+        column(helper, BASE, Blocks.KELP_PLANT, Blocks.KELP);
+    }
+
+    /** Kelp two blocks high in a one-block hole in the ground, its top level with the shore's. */
+    private static void kelpShore(GameTestHelper helper) {
+        for (int x = 0; x < 8; x++) {
+            for (int z = 0; z < 8; z++) {
+                if (x != BASE.getX() || z != BASE.getZ()) {
+                    helper.setBlock(x, 1, z, Blocks.DIRT);
+                    helper.setBlock(x, 2, z, Blocks.GRASS_BLOCK);
+                }
+            }
         }
         helper.setBlock(BASE.below(), Blocks.STONE);
         column(helper, BASE, Blocks.KELP_PLANT, Blocks.KELP);
