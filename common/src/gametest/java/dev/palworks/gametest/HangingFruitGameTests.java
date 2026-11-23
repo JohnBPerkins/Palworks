@@ -14,6 +14,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -24,6 +25,7 @@ import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Fruit hanging off the side of a block: cocoa pods on jungle logs, Cobblemon's apricorns on
@@ -116,6 +118,40 @@ public class HangingFruitGameTests {
             helper.assertTrue(WorkPositions.fits(level, stand, mob), "a spot it fits on for " + fruit);
         }
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void anApricornIsPickedFromWhereItCanBeSeen(GameTestHelper helper) {
+        // A canopy at head height with an apricorn on its outside, and the worker under it. The
+        // nearest tile was under the canopy too, and the harvest went up through the leaves.
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        for (int x = 1; x <= 7; x++) {
+            for (int z = 2; z <= 7; z++) {
+                helper.setBlock(x, 2, z, LEAVES);
+                helper.setBlock(x, 3, z, LEAVES);
+            }
+        }
+        BlockPos apricorn = new BlockPos(4, 2, 1);
+        helper.setBlock(apricorn, ripeApricorn(Direction.SOUTH));
+        Mob mob = helper.spawnWithNoFreeWill(EntityType.PIG, new BlockPos(4, 1, 5));
+        var level = helper.getLevel();
+        BlockPos at = helper.absolutePos(apricorn);
+        BlockPos underneath = helper.absolutePos(new BlockPos(4, 1, 3));
+        helper.assertFalse(
+                WorkPositions.canSee(level, mob, eyesOn(underneath, mob), at, 0.5),
+                "the leaves hide it from under the canopy");
+
+        BlockPos stand = WorkPositions.standingPosFor(level, at, JobType.HARVEST_CROPS, mob);
+        helper.assertTrue(stand != null, "somewhere to stand");
+        helper.assertTrue(
+                WorkPositions.canSee(level, mob, eyesOn(stand, mob), at, 0.5),
+                "it can see the apricorn from " + stand.subtract(helper.absolutePos(BlockPos.ZERO)));
+        helper.assertFalse(level.getBlockState(stand.above()).is(BlockTags.LEAVES), "not under the canopy");
+        helper.succeed();
+    }
+
+    private static Vec3 eyesOn(BlockPos tile, Mob mob) {
+        return new Vec3(tile.getX() + 0.5, tile.getY() + mob.getEyeHeight(), tile.getZ() + 0.5);
     }
 
     // ---- Real workers ----

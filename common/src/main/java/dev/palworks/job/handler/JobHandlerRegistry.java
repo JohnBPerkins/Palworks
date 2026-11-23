@@ -2,6 +2,7 @@ package dev.palworks.job.handler;
 
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.ai.WorkStance;
+import dev.palworks.animation.WorkAnimation;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.job.JobType;
 import java.util.EnumMap;
@@ -83,5 +84,22 @@ public final class JobHandlerRegistry {
      */
     public static WorkStance stanceFor(JobType job, Mob worker) {
         return forJob(job).stance(WorkAnimations.speciesOf(worker));
+    }
+
+    /**
+     * How high in the job's block its animation aims, as this worker's species plays it (the
+     * first animated step's: see {@link WorkAnimation#aimY}), or null if the job plays none.
+     * {@link WorkPositions} has the worker stand where it can see that point.
+     */
+    @Nullable
+    public static Double aimFor(JobType job, Mob worker) {
+        String species = WorkAnimations.speciesOf(worker);
+        for (Step step : forJob(job).steps()) {
+            WorkAnimation animation = step.animationFor(species);
+            if (animation != null) {
+                return animation.aimY();
+            }
+        }
+        return null;
     }
 }
