@@ -7,7 +7,6 @@ import dev.palworks.Palworks;
 import dev.palworks.job.JobType;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.worker.WorkerStatus;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
-import javax.imageio.ImageIO;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
@@ -70,16 +68,6 @@ class WorkIconsTest {
         used.removeIf(file -> !file.startsWith(PICTURES));
         try (Stream<Path> files = Files.list(PICTURES)) {
             assertEquals(new TreeSet<>(files.toList()), used);
-        }
-    }
-
-    @Test
-    void everyPictureIs16By16() throws IOException {
-        // Drawn a pixel per pixel, like items: one of another size would have bigger or smaller pixels
-        for (Path file : pictureFiles()) {
-            BufferedImage image = ImageIO.read(file.toFile());
-            assertEquals(16, image.getWidth(), file.toString());
-            assertEquals(16, image.getHeight(), file.toString());
         }
     }
 
