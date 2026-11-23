@@ -13,17 +13,14 @@ import java.util.random.RandomGenerator;
  * (it's one piece). Rolled at random for a level (its {@link BoulderSize}) and a {@link BoulderStyle},
  * so no two are alike. Pure, with no Minecraft types, so it's unit-tested.
  *
- * <p>How it's rolled: each style is a height profile over a square the level's footprint wide (a
- * dome's rounded top, a peak's point, a slab's plateau...), roughened by noise on every column and
- * turned and mirrored at random. The highest column is set to the boulder's height; then blocks
- * come off the lowest-lying parts of the profile, the outskirts first, until it's the size rolled.
+ * <p>How it's rolled: each style is one or more overlapping rounded lumps (ellipsoids, as vanilla's
+ * mossy forest rocks are made), placed, sized and turned at random over a square the level's
+ * footprint wide, and roughened by smooth noise. The highest column is set to the boulder's height;
+ * then blocks come off the lowest-lying parts, the outskirts first, until it's the size rolled.
  */
 public final class BoulderShape {
     /** One block of a boulder, from its bottom corner (0, 0, 0); y is up from the ground. */
     public record Cell(int x, int y, int z) {}
-
-    // How rough each column is: added to its profile, from minus to plus half of this
-    private static final double NOISE = 0.3;
 
     private final BoulderStyle style;
     private final int width; // along x
@@ -49,8 +46,17 @@ public final class BoulderShape {
         int grid = size.footprint();
         int target = random.nextInt(size.minBlocks(), size.maxBlocks() + 1);
         int height = heightFor(style, size, random);
-        double[] profile = profile(style, grid, random);
-        int[] heights = fit(profile, grid, height, target);
+        List<Blob> blobs = blobs(style, random);
+        SmoothNoise noise = new SmoothNoise(random.nextLong());
+        // Its lumps spread wider until it holds as many blocks as it's to have (a small twin's two
+        // lumps can cover too little of the ground)
+        int[] heights = new int[0];
+        for (double spread = 1; spread < MAX_SPREAD; spread *= 1.15) {
+            heights = fit(profile(blobs, noise, grid, spread), grid, height, target);
+            if (Arrays.stream(heights).sum() >= target) {
+                break;
+            }
+        }
         return trimmed(style, grid, heights);
     }
 
@@ -136,65 +142,157 @@ public final class BoulderShape {
     }
 
     /**
-     * How high each column of a {@code grid}-wide square would like to be, as a share of the
-     * boulder's height (0 to about 1): the style's profile, with noise.
+     * One rounded lump of a boulder, on a square from -1 to 1 each way: an ellipse on the ground
+     * (half-widths {@code ru}, {@code rv}, turned by {@code angle}) rising to {@code top} (a share of
+     * the boulder's height) in its middle. {@code flatness} 1 is a dome; higher is flatter on top.
      */
-    private static double[] profile(BoulderStyle style, int grid, RandomGenerator random) {
-        // Each style's own variety, rolled once for the whole boulder
-        double stretchX = 0.9 + random.nextDouble() * 0.3;
-        double stretchZ = 0.9 + random.nextDouble() * 0.3;
-        double peakX = (random.nextDouble() - 0.5) * 0.6;
-        double peakZ = (random.nextDouble() - 0.5) * 0.6;
-        double lean = random.nextDouble() * Math.PI * 2;
-        double twinAngle = random.nextDouble() * Math.PI * 2;
-        // Turned a quarter some number of times, and mirrored or not: the same profile, read
-        // round another way
-        int quarters = random.nextInt(4);
-        boolean mirror = random.nextBoolean();
+    private record Blob(double cu, double cv, double ru, double rv, double angle, double top, double flatness) {
+        double heightAt(double u, double v, double spread) {
+            double du = u - cu;
+            double dv = v - cv;
+            double cos = Math.cos(angle);
+            double sin = Math.sin(angle);
+            double a = (du * cos + dv * sin) / (ru * spread);
+            double b = (-du * sin + dv * cos) / (rv * spread);
+            double d = a * a + b * b;
+            return d >= 1 ? 0 : top * Math.sqrt(1 - Math.pow(d, flatness));
+        }
+    }
+
+    /**
+     * How high each column of a {@code grid}-wide square would like to be, as a share of the
+     * boulder's height (0 to about 1): its style's lumps (one or several overlapping ellipsoids, as
+     * vanilla's mossy forest rocks are made), whichever is highest at each column, roughened by
+     * smooth noise so its edges and top are lumpy rather than jagged.
+     */
+    private static double[] profile(List<Blob> blobs, SmoothNoise noise, int grid, double spread) {
+        double noiseScale = Math.max(1.5, grid / 2.0);
         double[] profile = new double[grid * grid];
         for (int x = 0; x < grid; x++) {
             for (int z = 0; z < grid; z++) {
                 // From -1 to 1 across the square, at the middle of the column
                 double u = (x + 0.5) / grid * 2 - 1;
                 double v = (z + 0.5) / grid * 2 - 1;
-                for (int q = 0; q < quarters; q++) {
-                    double turned = u;
-                    u = -v;
-                    v = turned;
+                double f = 0;
+                for (Blob blob : blobs) {
+                    f = Math.max(f, blob.heightAt(u, v, spread));
                 }
-                if (mirror) {
-                    u = -u;
+                if (f > 0) {
+                    f = Math.max(0.01, f + (noise.at(x, z, noiseScale) - 0.5) * ROUGHNESS);
                 }
-                double f = switch (style) {
-                    case DOME -> 1 - (u * u / (stretchX * stretchX) + v * v / (stretchZ * stretchZ)) * 0.8;
-                    case PEAK -> Math.pow(Math.max(0, 1 - Math.hypot(u - peakX, v - peakZ) / 1.3), 1.6);
-                    case SLAB -> slab(Math.hypot(u / stretchX, v / stretchZ), random);
-                    case LOPSIDED -> {
-                        double along = (u * Math.cos(lean) + v * Math.sin(lean) + 1) / 2; // 0 to 1
-                        yield (1 - (u * u + v * v) * 0.45) * (0.3 + 0.7 * along);
-                    }
-                    case TWIN -> twin(u, v, twinAngle);
-                };
-                profile[x * grid + z] = Math.max(0, f + (random.nextDouble() - 0.5) * NOISE);
+                profile[x * grid + z] = f;
             }
         }
         return profile;
     }
 
-    /** A plateau to most of the way out, then falling away, its edge broken here and there. */
-    private static double slab(double distance, RandomGenerator random) {
-        double f = distance < 0.8 ? 1 : Math.max(0, 1 - (distance - 0.8) / 0.6);
-        // Only right at the edge, or it's a hole in the middle
-        return distance > 0.9 && random.nextDouble() < 0.35 ? f * 0.5 : f;
+    // The most its lumps are spread to hold enough blocks: about the whole square, for any style
+    private static final double MAX_SPREAD = 3;
+
+    // How much the smooth noise raises or lowers a column, as a share of the boulder's height
+    private static final double ROUGHNESS = 0.35;
+
+    /** A style's lumps, each placed, sized and turned at random. */
+    private static List<Blob> blobs(BoulderStyle style, RandomGenerator random) {
+        double angle = random.nextDouble() * Math.PI;
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        return switch (style) {
+            // One rounded lump
+            case DOME ->
+                List.of(new Blob(
+                        jitter(random, 0.15),
+                        jitter(random, 0.15),
+                        between(random, 0.8, 1.05),
+                        between(random, 0.8, 1.05),
+                        angle,
+                        1,
+                        1));
+            // A broad base with a smaller, taller lump on it, off the middle
+            case PEAK ->
+                List.of(
+                        new Blob(
+                                jitter(random, 0.1),
+                                jitter(random, 0.1),
+                                between(random, 0.75, 0.95),
+                                between(random, 0.75, 0.95),
+                                angle,
+                                0.5,
+                                1),
+                        new Blob(
+                                jitter(random, 0.3),
+                                jitter(random, 0.3),
+                                between(random, 0.35, 0.5),
+                                between(random, 0.35, 0.5),
+                                angle,
+                                1,
+                                1));
+            // Wide and flat on top
+            case SLAB ->
+                List.of(new Blob(
+                        jitter(random, 0.1),
+                        jitter(random, 0.1),
+                        between(random, 0.9, 1.1),
+                        between(random, 0.85, 1.05),
+                        angle,
+                        1,
+                        3));
+            // Three lumps in a row, each lower than the one before: it leans away from the first
+            case LOPSIDED ->
+                List.of(
+                        new Blob(
+                                -0.45 * cos,
+                                -0.45 * sin,
+                                between(random, 0.5, 0.6),
+                                between(random, 0.5, 0.6),
+                                angle,
+                                1,
+                                1),
+                        new Blob(
+                                jitter(random, 0.1),
+                                jitter(random, 0.1),
+                                between(random, 0.5, 0.6),
+                                between(random, 0.45, 0.55),
+                                angle,
+                                0.7,
+                                1),
+                        new Blob(
+                                0.45 * cos,
+                                0.45 * sin,
+                                between(random, 0.4, 0.5),
+                                between(random, 0.4, 0.5),
+                                angle,
+                                0.45,
+                                1));
+            // A big lump and a smaller one either side, a low saddle between
+            case TWIN ->
+                List.of(
+                        new Blob(
+                                -0.45 * cos,
+                                -0.45 * sin,
+                                between(random, 0.5, 0.6),
+                                between(random, 0.5, 0.6),
+                                angle,
+                                1,
+                                1),
+                        new Blob(
+                                0.5 * cos,
+                                0.5 * sin,
+                                between(random, 0.4, 0.5),
+                                between(random, 0.4, 0.5),
+                                angle,
+                                0.75,
+                                1),
+                        new Blob(0, 0, 0.45, 0.35, angle, 0.35, 1));
+        };
     }
 
-    /** Two rounded lumps either side of the middle, along {@code angle}: one big, one smaller. */
-    private static double twin(double u, double v, double angle) {
-        double along = u * Math.cos(angle) + v * Math.sin(angle);
-        double across = -u * Math.sin(angle) + v * Math.cos(angle);
-        double big = 1 - Math.hypot(along + 0.4, across) / 0.95;
-        double small = 0.7 * (1 - Math.hypot(along - 0.5, across) / 0.75);
-        return Math.max(big, small);
+    private static double jitter(RandomGenerator random, double most) {
+        return (random.nextDouble() * 2 - 1) * most;
+    }
+
+    private static double between(RandomGenerator random, double low, double high) {
+        return low + random.nextDouble() * (high - low);
     }
 
     /**
@@ -244,7 +342,7 @@ public final class BoulderShape {
 
     /**
      * The column to take a block off next: the one lowest in the profile, but not the top column,
-     * and not one whose going would split the boulder in two.
+     * and not one whose going would leave a hole or split the boulder in two.
      */
     private static int lowestRemovable(int[] heights, double[] profile, int grid, int top) {
         int best = -1;
@@ -252,12 +350,27 @@ public final class BoulderShape {
             if (i == top || heights[i] == 0 || (best >= 0 && profile[i] >= profile[best])) {
                 continue;
             }
-            if (heights[i] == 1 && !staysJoinedWithout(heights, grid, i, top)) {
+            // A column goes altogether only from the edge, so there's never a hole in the middle
+            if (heights[i] == 1 && (!onEdge(heights, grid, i) || !staysJoinedWithout(heights, grid, i, top))) {
                 continue;
             }
             best = i;
         }
         return best;
+    }
+
+    /** Whether a column is on the boulder's outline: at the square's edge, or beside an empty column. */
+    private static boolean onEdge(int[] heights, int grid, int i) {
+        int x = i / grid;
+        int z = i % grid;
+        return x == 0
+                || z == 0
+                || x == grid - 1
+                || z == grid - 1
+                || heights[i - grid] == 0
+                || heights[i + grid] == 0
+                || heights[i - 1] == 0
+                || heights[i + 1] == 0;
     }
 
     /** Whether every column still standing is joined to {@code top} once {@code gone} is gone. */

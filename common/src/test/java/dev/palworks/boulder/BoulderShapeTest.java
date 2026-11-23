@@ -63,6 +63,48 @@ class BoulderShapeTest {
     }
 
     @Test
+    void aBoulderHasNoHoles() {
+        // Every empty column inside its outline is joined to the outside by empty columns
+        for (int level = 1; level <= 5; level++) {
+            for (BoulderStyle style : BoulderStyle.values()) {
+                for (int seed = 0; seed < SEEDS; seed++) {
+                    BoulderShape shape = BoulderShape.roll(level, style, new Random(seed));
+                    int w = shape.width() + 2;
+                    int d = shape.depth() + 2;
+                    boolean[] outside = new boolean[w * d];
+                    Deque<int[]> queue = new ArrayDeque<>();
+                    queue.add(new int[] {0, 0});
+                    outside[0] = true;
+                    while (!queue.isEmpty()) {
+                        int[] at = queue.poll();
+                        int[][] sides = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+                        for (int[] side : sides) {
+                            int x = at[0] + side[0];
+                            int z = at[1] + side[1];
+                            if (x >= 0
+                                    && z >= 0
+                                    && x < w
+                                    && z < d
+                                    && !outside[x * d + z]
+                                    && shape.heightAt(x - 1, z - 1) == 0) {
+                                outside[x * d + z] = true;
+                                queue.add(new int[] {x, z});
+                            }
+                        }
+                    }
+                    for (int x = 0; x < shape.width(); x++) {
+                        for (int z = 0; z < shape.depth(); z++) {
+                            assertTrue(
+                                    shape.heightAt(x, z) > 0 || outside[(x + 1) * d + z + 1],
+                                    "level " + level + " " + style + " seed " + seed + ": a hole at " + x + ", " + z);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     void stylesLookDifferent() {
         // Averaged over many: a peak is the tallest for its width, a slab the lowest
         double peak = tallness(BoulderStyle.PEAK);
