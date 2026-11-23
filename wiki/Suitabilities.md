@@ -42,7 +42,7 @@ for its species.
 | Transporting | Pick up drops, deliver them to chests and troughs, restock troughs | Working |
 | Nether Work | Plant and harvest nether wart; chop crimson and warped trees (with Lumbering) | Working |
 | Mining | Mine boulders, amethyst, tumblestone and type gems | Working |
-| Stoneshaping | Raise boulders for miners | Working |
+| Unearthing | Raise boulders for miners | Working |
 | Handiwork | Crafting | Not yet |
 | Medicine Production | Brewing | Not yet |
 | Generating Electricity | Powering devices | Not yet |
@@ -84,8 +84,8 @@ What a level changes, so far:
 | **Lumbering**: the biggest tree it chops | 12 logs | 32 logs | 64 logs | 128 logs | 256 logs |
 | **Transporting**: inventory slots | 1 | 2 | 3 | 4 | 5 |
 | **Mining**: mines as with | a wooden pickaxe | a diamond pickaxe | a diamond pickaxe with Fortune I | Fortune II | Fortune III |
-| **Stoneshaping**: blocks in a boulder | 5-8 | 10-15 | 17-24 | 28-38 | 42-56 |
-| **Stoneshaping**: of them ore | 10% | 15% | 20% | 25% | 30% |
+| **Unearthing**: blocks in a boulder | 5-8 | 10-15 | 17-24 | 28-38 | 42-56 |
+| **Unearthing**: of them ore | 10% | 15% | 20% | 25% | 30% |
 | **Watering**: crops it fertilizes | 10% | 20% | 30% | 40% | 50% |
 
 - **Kindling:** a level 1 kindler stays at its furnace and relights it for each item. From level 2
@@ -99,7 +99,7 @@ What a level changes, so far:
   levels 1 and 2 mine crystals the same. Fortune gives more amethyst and tumblestone, and type gem
   clusters a gem more a third, two thirds or all of the time. In a boulder, a level 1 miner's wooden
   pickaxe gets nothing from most ores, so it leaves them for a better miner.
-- **Stoneshaping:** a higher level raises bigger boulders with more ore in them, and unlocks rarer
+- **Unearthing:** a higher level raises bigger boulders with more ore in them, and unlocks rarer
   ores: gold, lapis and redstone at level 3, diamond and emerald at 4, ancient debris at 5 (see
   [Boulders](Boulders#ores-by-level)).
 - **Watering:** 10% a level is the default; the `fertilize_chance_per_level`

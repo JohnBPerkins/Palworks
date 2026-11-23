@@ -1,7 +1,7 @@
 package dev.palworks.boulder;
 
 /**
- * How big a boulder a Stoneshaping worker of a level raises, and how much of it is ore: more
+ * How big a boulder an Unearthing worker of a level raises, and how much of it is ore: more
  * blocks, a wider footprint, and a bigger share of ore the higher its level. What the blocks are
  * comes from its kind (see {@link BoulderKind}); its shape is rolled anew each time (see
  * {@link BoulderShape}).
@@ -26,7 +26,7 @@ public record BoulderSize(int minBlocks, int maxBlocks, int footprint, int minHe
         new BoulderSize(42, 56, 6, 3, 4, 0.30),
     };
 
-    /** The size for a Stoneshaping level (1 to 5; anything outside is taken as the nearest). */
+    /** The size for an Unearthing level (1 to 5; anything outside is taken as the nearest). */
     public static BoulderSize forLevel(int level) {
         return BY_LEVEL[Math.clamp(level, 1, BY_LEVEL.length) - 1];
     }

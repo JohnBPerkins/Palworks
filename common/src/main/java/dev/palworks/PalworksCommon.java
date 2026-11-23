@@ -49,7 +49,7 @@ public final class PalworksCommon {
         // How much fullness each trough food gives (data/<namespace>/palworks/trough_food)
         ReloadListenerRegistry.register(
                 PackType.SERVER_DATA, new TroughFoodReloadListener(), TroughFoodReloadListener.ID);
-        // What boulders are made of (data/<namespace>/palworks/boulders) and the Stoneshaping level
+        // What boulders are made of (data/<namespace>/palworks/boulders) and the Unearthing level
         // each ore takes (data/<namespace>/palworks/boulder_ores)
         ReloadListenerRegistry.register(
                 PackType.SERVER_DATA, new BoulderKindReloadListener(), BoulderKindReloadListener.ID);

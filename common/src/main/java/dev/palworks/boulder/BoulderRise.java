@@ -24,7 +24,7 @@ import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A boulder rising out of the ground as a Stoneshaping worker raises it: its blocks, as block
+ * A boulder rising out of the ground as an Unearthing worker raises it: its blocks, as block
  * display entities (vanilla's, so clients need nothing of ours), start below the ground under where
  * they'll stand and slide up into place over {@link #RISE_TICKS}, the ground under them hiding
  * what's still below it, with the ground's dust thrown up round the edge and a low grinding. Then

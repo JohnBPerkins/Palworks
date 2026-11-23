@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The boulders standing in a dimension: which blocks are a boulder's (for miners to break; nothing
- * else in the world is mined), and who raised each one (a Stoneshaping worker raises the next once
+ * else in the world is mined), and who raised each one (an Unearthing worker raises the next once
  * its last is gone). Saved with the level, one per dimension. A block stops being a boulder's as
  * soon as it's anything else (mined, broken by a player, blown up, pushed by a piston: see
  * {@link #onBlockChanged}), and a boulder with no blocks left is gone.

@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A Stoneshaping worker raising a boulder (see dev.palworks.boulder): it stamps the ground (a ground
+ * An Unearthing worker raising a boulder (see dev.palworks.boulder): it stamps the ground (a ground
  * move, Bulldoze by default) and the boulder rises out of it where the job's site is (see
  * {@link BoulderRise}), then stands there as real blocks for miners. The boulder was rolled, and its
  * site found to fit it, as the job was handed out (JobAssigner): both are in the job's data, so a

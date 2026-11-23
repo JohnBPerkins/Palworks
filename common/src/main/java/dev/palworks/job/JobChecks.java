@@ -360,7 +360,7 @@ public final class JobChecks {
         if (CrystalAdapter.isCrystal(state)) {
             skills.addAll(JobType.MINE_CRYSTAL.requiredSuitabilities());
         }
-        // Not stone or ore: those are only work in a boulder Stoneshaping raised (see Boulders), never as
+        // Not stone or ore: those are only work in a boulder Unearthing raised (see Boulders), never as
         // a kind of block
         return skills;
     }

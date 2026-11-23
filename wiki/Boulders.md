@@ -1,11 +1,11 @@
 # Boulders
 
 [Mining](Jobs#mine-boulders) workers don't dig into your world. They break up boulders, which
-[Stoneshaping](Jobs#raise-boulders) workers (Rock types, and Groudon) raise out of open ground. A
+[Unearthing](Jobs#raise-boulders) workers (Rock types, and Groudon) raise out of open ground. A
 boulder is ordinary blocks, stone and ore, so it drops what those blocks drop, and you can mine it
 yourself too.
 
-Each Stoneshaping worker keeps one boulder standing. Once its boulder is mined away, it raises
+Each Unearthing worker keeps one boulder standing. Once its boulder is mined away, it raises
 another.
 
 ## Kinds
@@ -37,7 +37,7 @@ Datapacks can change these and add more (see [Datapacks and Tags](Datapacks-and-
 
 ## Size and ore
 
-A higher [Stoneshaping level](Suitabilities#work-levels) raises a bigger boulder, with more of it
+A higher [Unearthing level](Suitabilities#work-levels) raises a bigger boulder, with more of it
 ore:
 
 | Level | Blocks | Widest | Height | Ore |

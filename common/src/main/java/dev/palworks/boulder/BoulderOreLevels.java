@@ -9,7 +9,7 @@ import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
- * The Stoneshaping level that unlocks each ore in boulders: one table for every kind of boulder, so
+ * The Unearthing level that unlocks each ore in boulders: one table for every kind of boulder, so
  * gold takes the same level in a badlands boulder as in a plain stone one (a kind that's rich in
  * gold has it weighted higher instead: see {@link BoulderKind}). An ore that isn't listed is
  * unlocked from level 1. Loaded from {@code data/<namespace>/palworks/boulder_ores/<name>.json},

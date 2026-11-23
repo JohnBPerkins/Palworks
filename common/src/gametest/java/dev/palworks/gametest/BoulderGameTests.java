@@ -37,7 +37,7 @@ import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Boulders (see dev.palworks.boulder): raised by Stoneshaping workers only on open, flat ground,
+ * Boulders (see dev.palworks.boulder): raised by Unearthing workers only on open, flat ground,
  * never over anything; rising as displays that leave nothing behind; mined from the top down for
  * what the miner's pickaxe gets, a level 1 miner leaving what its wooden one gets nothing from.
  */
@@ -105,7 +105,7 @@ public class BoulderGameTests {
                 }
             }
         }
-        // Geodude: Rock/Ground, Stoneshaping 1, so a small badlands boulder
+        // Geodude: Rock/Ground, Unearthing 1, so a small badlands boulder
         PokemonEntity worker;
         if (pastured) {
             worker = Workers.sendOutPastured(helper, "geodude level=20", START);

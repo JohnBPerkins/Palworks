@@ -91,7 +91,7 @@ public final class WorkIcons {
             case GATHERING -> WHEAT;
             case LUMBERING -> IRON_AXE;
             case MINING -> IRON_PICKAXE;
-            case STONESHAPING -> COBBLESTONE;
+            case UNEARTHING -> COBBLESTONE;
             case TRANSPORTING -> CHEST;
             case NETHER -> NETHER_WART;
             case GENERATING_ELECTRICITY, HANDIWORK, MEDICINE_PRODUCTION, COOLING, FARMING -> null;

@@ -32,7 +32,7 @@ the same type or species a level, the higher one wins, and a species' `0` wins o
 change a default, put a file at the same path as ours in your datapack.
 
 The work skills are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
-`gathering`, `lumbering`, `mining`, `stoneshaping`, `medicine_production`, `cooling`, `transporting`, `nether` and
+`gathering`, `lumbering`, `mining`, `unearthing`, `medicine_production`, `cooling`, `transporting`, `nether` and
 `farming`. The defaults are in
 [`common/src/main/resources/data/palworks/palworks/suitability`](https://github.com/JohnBPerkins/Palworks/tree/main/common/src/main/resources/data/palworks/palworks/suitability),
 and the [work skill pages](Suitabilities#every-work-skill) list who they give each skill to.
@@ -83,7 +83,7 @@ Keep `"replace": false` so your entries are added to the defaults instead of rep
 
 ## Boulders
 
-What the boulders [Stoneshaping](Jobs#raise-boulders) workers raise are made of comes from one
+What the boulders [Unearthing](Jobs#raise-boulders) workers raise are made of comes from one
 file per kind of boulder: `data/<namespace>/palworks/boulders/<kind>.json`. For example, the default
 `data/palworks/palworks/boulders/badlands.json`:
 
@@ -111,7 +111,7 @@ weight is the highest given, and a weight of `0` takes a block out. `"replace": 
 file for the kind. A new file name is a new kind. Every block should drop something for a pickaxe
 without Silk Touch (packed ice, for one, drops nothing).
 
-The Stoneshaping level each ore needs is one table for every kind, in
+The Unearthing level each ore needs is one table for every kind, in
 `data/<namespace>/palworks/boulder_ores/<name>.json` (the default is `ore_levels.json`):
 
 ```json

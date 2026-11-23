@@ -104,7 +104,7 @@ final class JobAssigner {
     // workers that have waited longest (Turns.longestWaiting).
     private final Map<UUID, Long> lastConsidered = new ConcurrentHashMap<>();
 
-    // When each Stoneshaping worker may next look for somewhere to raise a boulder (game time): the
+    // When each Unearthing worker may next look for somewhere to raise a boulder (game time): the
     // look reads a few hundred blocks, so it isn't made every time it's idle
     private final Map<UUID, Long> nextSiteSearch = new ConcurrentHashMap<>();
     private static final int SITE_SEARCH_TICKS = 200;
@@ -297,8 +297,8 @@ final class JobAssigner {
                 }
             }
 
-            // Best pool jobs first; the first one it can actually reach wins. With none, a
-            // Stoneshaping worker raises a boulder, if it hasn't one standing
+            // Best pool jobs first; the first one it can actually reach wins. With none, an
+            // Unearthing worker raises a boulder, if it hasn't one standing
             JobRecord assigned = assignFirstReachable(worker, poolCandidates(worker));
             if (assigned == null && pokemon != null) {
                 assigned = assignFirstReachable(worker, summonCandidates(worker, pokemon, now));
@@ -1348,13 +1348,13 @@ final class JobAssigner {
     }
 
     /**
-     * A SUMMON_BOULDER job for a Stoneshaping worker with no boulder of its own still standing (or
+     * A SUMMON_BOULDER job for an Unearthing worker with no boulder of its own still standing (or
      * rising): a boulder rolled for it (its kind by its species and types, its size by its level),
      * and a site in its work range that fits it, both in the job's data (see BoulderPlan.toJobData).
      * Nothing if it hasn't the skill, isn't due a look yet, or no site was found.
      */
     private List<JobRecord> summonCandidates(WorkerInfo worker, Pokemon pokemon, long now) {
-        if (!worker.suitabilities.contains(Suitability.STONESHAPING)
+        if (!worker.suitabilities.contains(Suitability.UNEARTHING)
                 || now < nextSiteSearch.getOrDefault(worker.pokemonUUID, Long.MIN_VALUE)
                 || BoulderRise.isRising(worker.pokemonUUID)
                 || Boulders.get(level).hasStanding(worker.pokemonUUID)) {
@@ -1368,8 +1368,8 @@ final class JobAssigner {
         if (kind == null) {
             return List.of();
         }
-        int stoneshaping = worker.levels.getOrDefault(Suitability.STONESHAPING, 1);
-        BoulderPlan plan = BoulderPlan.roll(kind, stoneshaping, null, BoulderOreLevels.current(), siteRandom);
+        int unearthing = worker.levels.getOrDefault(Suitability.UNEARTHING, 1);
+        BoulderPlan plan = BoulderPlan.roll(kind, unearthing, null, BoulderOreLevels.current(), siteRandom);
         BlockPos corner = BoulderSites.find(
                 level,
                 plan.shape(),

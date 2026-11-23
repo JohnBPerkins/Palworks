@@ -35,7 +35,7 @@ public final class WorkerTicking {
             JobManager.getInstance(level).tick(level);
             // Chopped trees' leaves that are done decaying stop counting as the worker's
             DecayingCanopies.get(level).tick(level);
-            // Boulders rising out of the ground (Stoneshaping): their dust, sound and movement
+            // Boulders rising out of the ground (Unearthing): their dust, sound and movement
             BoulderRise.tick(level);
         }
         TrackedDrops.resetAfterTick();

@@ -6,8 +6,8 @@ import java.util.Set;
 import java.util.random.RandomGenerator;
 
 /**
- * What a kind of boulder is made of: its stone, and the ores in it, each with a weight. Which kind a
- * Stoneshaping worker raises goes by its types (or its species): see {@link BoulderKinds#kindFor}.
+ * What a kind of boulder is made of: its stone, and the ores in it, each with a weight. Which kind an
+ * Unearthing worker raises goes by its types (or its species): see {@link BoulderKinds#kindFor}.
  * Loaded from {@code data/<namespace>/palworks/boulders/<kind>.json}.
  *
  * <p>Each block of a boulder is rolled in two stages: first whether it's ore at all (the
@@ -33,7 +33,7 @@ public record BoulderKind(
     }
 
     /**
-     * The block for one of a boulder's blocks, raised by a worker of this Stoneshaping level: ore at
+     * The block for one of a boulder's blocks, raised by a worker of this Unearthing level: ore at
      * {@code oreChance} (one of those its level has unlocked, by weight; stone if it has none
      * unlocked yet), else stone, by weight.
      */

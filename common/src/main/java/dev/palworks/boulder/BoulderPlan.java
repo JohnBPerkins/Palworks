@@ -38,7 +38,7 @@ public record BoulderPlan(String kind, BoulderShape shape, List<String> blocks) 
     }
 
     /**
-     * A boulder of this kind, raised by a Stoneshaping worker of this level: its size and ore chance
+     * A boulder of this kind, raised by an Unearthing worker of this level: its size and ore chance
      * from the level, its style from {@code style} (or picked at random, if null), each block from
      * the kind (see {@link BoulderKind#pick}).
      */

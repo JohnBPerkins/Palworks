@@ -36,7 +36,7 @@ public final class WorkSkills {
             Suitability.LUMBERING,
             Suitability.TRANSPORTING,
             Suitability.MINING,
-            Suitability.STONESHAPING);
+            Suitability.UNEARTHING);
 
     private WorkSkills() {}
 
@@ -111,7 +111,7 @@ public final class WorkSkills {
             // Its pickaxe (see MiningTool), one line a level
             case MINING -> new LevelEffect(key + "." + Math.clamp(level, 1, 5), List.of());
             // How big its boulders are, and how much of them is ore (see BoulderSize)
-            case STONESHAPING -> {
+            case UNEARTHING -> {
                 BoulderSize size = BoulderSize.forLevel(level);
                 yield new LevelEffect(key, List.of(size.minBlocks(), size.maxBlocks(), percent(size.oreChance())));
             }

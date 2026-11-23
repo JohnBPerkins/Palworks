@@ -16,7 +16,7 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | [Deliver items](#deliver-items) | Transporting | Working |
 | [Restock troughs](#restock-troughs) | Transporting | Working |
 | [Mine crystals](#mine-crystals) | Mining | Working |
-| [Raise boulders](#raise-boulders) | Stoneshaping | Working |
+| [Raise boulders](#raise-boulders) | Unearthing | Working |
 | [Mine boulders](#mine-boulders) | Mining | Working |
 
 Crafting (Handiwork), brewing (Medicine Production), and work for Generating Electricity, Cooling
@@ -204,10 +204,10 @@ A Transporting worker then picks up the drops.
 
 ## Raise boulders
 
-**Who:** Stoneshaping (Rock types, and Groudon)
+**Who:** Unearthing (Rock types, and Groudon)
 **Blocks:** none: it needs open, flat ground
 
-A Stoneshaping worker stamps the ground and a boulder rises out of it, for Mining workers to break
+An Unearthing worker stamps the ground and a boulder rises out of it, for Mining workers to break
 up. Each worker keeps one boulder of its own standing, and raises the next once that one is mined
 away. It raises one only when it has no other work to do.
 
@@ -231,7 +231,7 @@ your party ground near you.
 ## Mine boulders
 
 **Who:** Mining (Ground, Rock and Fighting types)
-**Blocks:** the blocks of boulders that [Stoneshaping](#raise-boulders) workers raised
+**Blocks:** the blocks of boulders that [Unearthing](#raise-boulders) workers raised
 
 Miners break boulders down a block at a time, from the top. Natural stone and ore in the world are
 never mined: only boulders, and [crystals](#mine-crystals). Each block drops what it would for a
@@ -258,7 +258,7 @@ is. From most to least important:
 7. Chop trees
 8. Water crops
 
-A Stoneshaping worker raises a boulder only when none of these is left for it.
+An Unearthing worker raises a boulder only when none of these is left for it.
 
 Eating at a [trough](Hunger) when hungry and going to [bed](Sleep) at bedtime come before any work.
 While there's a ripe crop to harvest, Planting workers don't plant.

@@ -11,8 +11,8 @@ import static dev.palworks.suitability.Suitability.MEDICINE_PRODUCTION;
 import static dev.palworks.suitability.Suitability.MINING;
 import static dev.palworks.suitability.Suitability.NETHER;
 import static dev.palworks.suitability.Suitability.PLANTING;
-import static dev.palworks.suitability.Suitability.STONESHAPING;
 import static dev.palworks.suitability.Suitability.TRANSPORTING;
+import static dev.palworks.suitability.Suitability.UNEARTHING;
 import static dev.palworks.suitability.Suitability.WATERING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -309,8 +309,8 @@ class SuitabilityDataTest {
         assertEquals(Map.of(COOLING, 1), levels(data, List.of("ice"), "x:y"));
         // Fighting mines too since crystal mining (Rock Smash is a Fighting move)
         assertEquals(Map.of(LUMBERING, 1, MINING, 1), levels(data, List.of("fighting"), "x:y"));
-        // Rock types raise boulders (Stoneshaping) as well as mining them
-        assertEquals(Map.of(MINING, 1, STONESHAPING, 1), levels(data, List.of("rock"), "x:y"));
+        // Rock types raise boulders (Unearthing) as well as mining them
+        assertEquals(Map.of(MINING, 1, UNEARTHING, 1), levels(data, List.of("rock"), "x:y"));
         assertEquals(Map.of(MINING, 1), levels(data, List.of("ground"), "x:y"));
         assertEquals(Map.of(TRANSPORTING, 1), levels(data, List.of("flying"), "x:y"));
         assertEquals(Map.of(MEDICINE_PRODUCTION, 1), levels(data, List.of("psychic"), "x:y"));
@@ -320,10 +320,10 @@ class SuitabilityDataTest {
         for (String none : List.of("poison", "bug", "dragon", "dark", "fairy", "steel")) {
             assertEquals(Map.of(), levels(data, List.of(none), "x:y"), none);
         }
-        // Rock/Ground: both types give Mining, at the same level; Rock gives Stoneshaping
-        assertEquals(Map.of(MINING, 1, STONESHAPING, 1), levels(data, List.of("rock", "ground"), "cobblemon:geodude"));
+        // Rock/Ground: both types give Mining, at the same level; Rock gives Unearthing
+        assertEquals(Map.of(MINING, 1, UNEARTHING, 1), levels(data, List.of("rock", "ground"), "cobblemon:geodude"));
         // Groudon is the one species entry: it shapes the land, Ground type or not
-        assertEquals(Map.of(MINING, 5, STONESHAPING, 5), levels(data, List.of("ground"), "cobblemon:groudon", 670));
+        assertEquals(Map.of(MINING, 5, UNEARTHING, 5), levels(data, List.of("ground"), "cobblemon:groudon", 670));
     }
 
     /** A Pokémon's levels from its own form alone: its types and base stat total. */
@@ -351,7 +351,7 @@ class SuitabilityDataTest {
                 Map.of(LUMBERING, 3, TRANSPORTING, 3),
                 levels(data, List.of("bug", "flying"), "cobblemon:scyther", 500));
         assertEquals(
-                Map.of(LUMBERING, 3, MINING, 3, STONESHAPING, 3),
+                Map.of(LUMBERING, 3, MINING, 3, UNEARTHING, 3),
                 levels(data, List.of("bug", "rock"), "cobblemon:kleavor", 500));
         assertEquals(Map.of(LUMBERING, 4), levels(data, List.of("dark", "steel"), "cobblemon:kingambit", 550));
         assertEquals(
