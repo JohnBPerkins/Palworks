@@ -1,0 +1,15 @@
+{
+  "types": [
+    "bug"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:sandstone": 4,
+    "minecraft:bone_block": 2
+  },
+  "ores": {
+    "minecraft:coal_ore": 4,
+    "minecraft:gold_ore": 1,
+    "minecraft:diamond_ore": 1
+  }
+}

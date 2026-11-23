@@ -1,0 +1,22 @@
+{
+  "types": [
+    "rock"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:stone": 5,
+    "minecraft:andesite": 2,
+    "minecraft:diorite": 2,
+    "minecraft:granite": 2,
+    "minecraft:tuff": 1
+  },
+  "ores": {
+    "minecraft:coal_ore": 4,
+    "minecraft:copper_ore": 3,
+    "minecraft:iron_ore": 3,
+    "minecraft:lapis_ore": 1,
+    "minecraft:redstone_ore": 1,
+    "minecraft:gold_ore": 1,
+    "minecraft:diamond_ore": 1
+  }
+}

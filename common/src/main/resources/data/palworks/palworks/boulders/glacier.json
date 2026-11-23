@@ -1,0 +1,15 @@
+{
+  "types": [
+    "ice"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:calcite": 3,
+    "minecraft:diorite": 3
+  },
+  "ores": {
+    "minecraft:iron_ore": 2,
+    "minecraft:lapis_ore": 3,
+    "minecraft:diamond_ore": 1
+  }
+}

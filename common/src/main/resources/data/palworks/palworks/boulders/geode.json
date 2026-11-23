@@ -1,0 +1,13 @@
+{
+  "types": [
+    "psychic"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:calcite": 3,
+    "minecraft:smooth_basalt": 2
+  },
+  "ores": {
+    "minecraft:amethyst_block": 1
+  }
+}

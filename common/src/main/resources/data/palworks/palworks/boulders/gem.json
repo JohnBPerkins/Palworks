@@ -1,0 +1,16 @@
+{
+  "types": [
+    "fairy"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:calcite": 4,
+    "minecraft:diorite": 2
+  },
+  "ores": {
+    "minecraft:amethyst_block": 2,
+    "minecraft:lapis_ore": 2,
+    "minecraft:diamond_ore": 2,
+    "minecraft:emerald_ore": 2
+  }
+}

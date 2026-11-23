@@ -1,0 +1,15 @@
+{
+  "types": [
+    "electric"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:granite": 3,
+    "minecraft:stone": 3
+  },
+  "ores": {
+    "minecraft:copper_ore": 5,
+    "minecraft:redstone_ore": 2,
+    "minecraft:raw_copper_block": 1
+  }
+}

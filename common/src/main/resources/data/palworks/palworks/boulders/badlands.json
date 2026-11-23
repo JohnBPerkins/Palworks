@@ -1,0 +1,17 @@
+{
+  "types": [
+    "ground"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:terracotta": 4,
+    "minecraft:red_sandstone": 2,
+    "minecraft:granite": 2
+  },
+  "ores": {
+    "minecraft:gold_ore": 4,
+    "minecraft:iron_ore": 3,
+    "minecraft:copper_ore": 2,
+    "minecraft:redstone_ore": 1
+  }
+}

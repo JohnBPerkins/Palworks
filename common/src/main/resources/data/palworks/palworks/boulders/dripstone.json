@@ -1,0 +1,16 @@
+{
+  "types": [
+    "poison"
+  ],
+  "species": [],
+  "stone": {
+    "minecraft:dripstone_block": 3,
+    "minecraft:tuff": 2,
+    "minecraft:stone": 2
+  },
+  "ores": {
+    "minecraft:copper_ore": 2,
+    "minecraft:redstone_ore": 3,
+    "minecraft:lapis_ore": 1
+  }
+}

@@ -11,6 +11,8 @@ import dev.palworks.animation.WorkAnimationReloadListener;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.ModBlocks;
 import dev.palworks.block.TroughBlock;
+import dev.palworks.boulder.BoulderKindReloadListener;
+import dev.palworks.boulder.BoulderOreLevelsReloadListener;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.hunger.StartingFullness;
@@ -46,6 +48,12 @@ public final class PalworksCommon {
         // How much fullness each trough food gives (data/<namespace>/palworks/trough_food)
         ReloadListenerRegistry.register(
                 PackType.SERVER_DATA, new TroughFoodReloadListener(), TroughFoodReloadListener.ID);
+        // What boulders are made of (data/<namespace>/palworks/boulders) and the Stoneshaping level
+        // each ore takes (data/<namespace>/palworks/boulder_ores)
+        ReloadListenerRegistry.register(
+                PackType.SERVER_DATA, new BoulderKindReloadListener(), BoulderKindReloadListener.ID);
+        ReloadListenerRegistry.register(
+                PackType.SERVER_DATA, new BoulderOreLevelsReloadListener(), BoulderOreLevelsReloadListener.ID);
 
         CommandRegistrationEvent.EVENT.register(
                 (dispatcher, registryAccess, selection) -> dispatcher.register(PalworksCommands.build()));
