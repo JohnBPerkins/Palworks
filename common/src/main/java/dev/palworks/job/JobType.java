@@ -46,6 +46,11 @@ public enum JobType {
     // only blocks a miner breaks; nothing in the world itself is mined
     MINE_BOULDER(Suitability.MINING, 7),
 
+    // Stoneshaping: raise a boulder for miners on open ground, one standing at a time for each
+    // worker (see dev.palworks.boulder). Made for the worker as it's handed out (JobAssigner), with
+    // the boulder rolled and a site found for it; after its other work, like watering
+    SUMMON_BOULDER(Suitability.STONESHAPING, 4),
+
     // Transporting
     COLLECT_DROPS(Suitability.TRANSPORTING, 9), // Pick up dropped items from the ground
     DELIVER_ITEMS(Suitability.TRANSPORTING, 10), // Deliver carried items to a chest: before anything else

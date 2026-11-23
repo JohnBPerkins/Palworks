@@ -1,5 +1,6 @@
 package dev.palworks.client.gui;
 
+import dev.palworks.boulder.BoulderSize;
 import dev.palworks.crop.Watering;
 import dev.palworks.inventory.CarryMode;
 import dev.palworks.station.KindlingHeat;
@@ -34,7 +35,8 @@ public final class WorkSkills {
             Suitability.WATERING,
             Suitability.LUMBERING,
             Suitability.TRANSPORTING,
-            Suitability.MINING);
+            Suitability.MINING,
+            Suitability.STONESHAPING);
 
     private WorkSkills() {}
 
@@ -108,6 +110,11 @@ public final class WorkSkills {
             case TRANSPORTING -> new LevelEffect(key, List.of(CarryMode.slotsForLevel(level)));
             // Its pickaxe (see MiningTool), one line a level
             case MINING -> new LevelEffect(key + "." + Math.clamp(level, 1, 5), List.of());
+            // How big its boulders are, and how much of them is ore (see BoulderSize)
+            case STONESHAPING -> {
+                BoulderSize size = BoulderSize.forLevel(level);
+                yield new LevelEffect(key, List.of(size.minBlocks(), size.maxBlocks(), percent(size.oreChance())));
+            }
             default -> null;
         };
     }

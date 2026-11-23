@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.architectury.platform.Platform;
 import dev.palworks.ai.WorkerAI;
+import dev.palworks.boulder.BoulderRise;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.drops.DecayingCanopies;
 import dev.palworks.drops.TrackedDrops;
@@ -34,6 +35,8 @@ public final class WorkerTicking {
             JobManager.getInstance(level).tick(level);
             // Chopped trees' leaves that are done decaying stop counting as the worker's
             DecayingCanopies.get(level).tick(level);
+            // Boulders rising out of the ground (Stoneshaping): their dust, sound and movement
+            BoulderRise.tick(level);
         }
         TrackedDrops.resetAfterTick();
     }
@@ -67,6 +70,7 @@ public final class WorkerTicking {
     /** Clear per-dimension state on shutdown so it doesn't leak across world reloads. */
     public static void onServerStopped() {
         JobManager.clearAll();
+        BoulderRise.clearAll();
         WorkerInventoryManager.clearCache();
         WorkerStateManager.clearCache();
     }

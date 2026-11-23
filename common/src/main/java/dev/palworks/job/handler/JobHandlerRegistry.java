@@ -40,6 +40,7 @@ public final class JobHandlerRegistry {
             case CHOP_TREE -> new ChopTreeHandler();
             case MINE_CRYSTAL -> new MineCrystalHandler();
             case MINE_BOULDER -> new MineBoulderHandler();
+            case SUMMON_BOULDER -> new SummonBoulderHandler();
             case EAT_FOOD -> new EatFoodHandler();
             case FETCH_FOOD -> new FetchFoodHandler();
             case BRING_SEEDS -> new BringSeedsHandler();

@@ -51,6 +51,7 @@ public final class WorkIcons {
     private static final Icon BARRIER = item("barrier");
     private static final Icon CACTUS = item("cactus");
     private static final Icon CHEST = item("chest");
+    private static final Icon COBBLESTONE = item("cobblestone");
     private static final Icon FIRE_CHARGE = item("fire_charge");
     private static final Icon IRON_AXE = item("iron_axe");
     private static final Icon IRON_PICKAXE = item("iron_pickaxe");
@@ -90,9 +91,10 @@ public final class WorkIcons {
             case GATHERING -> WHEAT;
             case LUMBERING -> IRON_AXE;
             case MINING -> IRON_PICKAXE;
+            case STONESHAPING -> COBBLESTONE;
             case TRANSPORTING -> CHEST;
             case NETHER -> NETHER_WART;
-            case STONESHAPING, GENERATING_ELECTRICITY, HANDIWORK, MEDICINE_PRODUCTION, COOLING, FARMING -> null;
+            case GENERATING_ELECTRICITY, HANDIWORK, MEDICINE_PRODUCTION, COOLING, FARMING -> null;
         };
     }
 
@@ -112,6 +114,7 @@ public final class WorkIcons {
             case CHOP_TREE -> IRON_AXE;
             case MINE_CRYSTAL -> IRON_PICKAXE;
             case MINE_BOULDER -> IRON_PICKAXE;
+            case SUMMON_BOULDER -> COBBLESTONE;
             case COLLECT_DROPS -> PICK_UP;
             case DELIVER_ITEMS -> CHEST;
             case FETCH_FOOD -> OAK_TROUGH;

@@ -9,6 +9,13 @@ import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.ai.path.WorkerPathfinder;
 import dev.palworks.ai.path.WorkerPathfinder.Reach;
 import dev.palworks.block.WorkerBedBlock;
+import dev.palworks.boulder.BoulderKind;
+import dev.palworks.boulder.BoulderKinds;
+import dev.palworks.boulder.BoulderOreLevels;
+import dev.palworks.boulder.BoulderPlan;
+import dev.palworks.boulder.BoulderRise;
+import dev.palworks.boulder.BoulderSites;
+import dev.palworks.boulder.Boulders;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.Hunger;
@@ -96,6 +103,15 @@ final class JobAssigner {
     // When each worker was last considered for a job (game time): each tick's batch is the idle
     // workers that have waited longest (Turns.longestWaiting).
     private final Map<UUID, Long> lastConsidered = new ConcurrentHashMap<>();
+
+    // When each Stoneshaping worker may next look for somewhere to raise a boulder (game time): the
+    // look reads a few hundred blocks, so it isn't made every time it's idle
+    private final Map<UUID, Long> nextSiteSearch = new ConcurrentHashMap<>();
+    private static final int SITE_SEARCH_TICKS = 200;
+    private static final int SITE_TRIES = 24;
+    // Another worker raising a boulder this near (its job's spot) keeps a site away, so two don't overlap
+    private static final int SITE_SPACING = 2 * (6 + 2 * BoulderSites.MARGIN);
+    private final java.util.Random siteRandom = new java.util.Random();
 
     JobAssigner(
             ServerLevel level,
@@ -281,8 +297,12 @@ final class JobAssigner {
                 }
             }
 
-            // Best pool jobs first; the first one it can actually reach wins
+            // Best pool jobs first; the first one it can actually reach wins. With none, a
+            // Stoneshaping worker raises a boulder, if it hasn't one standing
             JobRecord assigned = assignFirstReachable(worker, poolCandidates(worker));
+            if (assigned == null && pokemon != null) {
+                assigned = assignFirstReachable(worker, summonCandidates(worker, pokemon, now));
+            }
             if (assigned != null) {
                 assignedCount++;
                 if (assigned.type() == JobType.GET_SEEDS && pokemon != null) {
@@ -1324,6 +1344,63 @@ final class JobAssigner {
     void forget(UUID workerUUID) {
         forgetUnreachable(workerUUID);
         lastConsidered.remove(workerUUID);
+        nextSiteSearch.remove(workerUUID);
+    }
+
+    /**
+     * A SUMMON_BOULDER job for a Stoneshaping worker with no boulder of its own still standing (or
+     * rising): a boulder rolled for it (its kind by its species and types, its size by its level),
+     * and a site in its work range that fits it, both in the job's data (see BoulderPlan.toJobData).
+     * Nothing if it hasn't the skill, isn't due a look yet, or no site was found.
+     */
+    private List<JobRecord> summonCandidates(WorkerInfo worker, Pokemon pokemon, long now) {
+        if (!worker.suitabilities.contains(Suitability.STONESHAPING)
+                || now < nextSiteSearch.getOrDefault(worker.pokemonUUID, Long.MIN_VALUE)
+                || BoulderRise.isRising(worker.pokemonUUID)
+                || Boulders.get(level).hasStanding(worker.pokemonUUID)) {
+            return List.of();
+        }
+        nextSiteSearch.put(worker.pokemonUUID, now + SITE_SEARCH_TICKS);
+        List<String> types = new ArrayList<>();
+        pokemon.getTypes().forEach(type -> types.add(type.getShowdownId()));
+        BoulderKind kind = BoulderKinds.current()
+                .kindFor(pokemon.getSpecies().getResourceIdentifier().toString(), types);
+        if (kind == null) {
+            return List.of();
+        }
+        int stoneshaping = worker.levels.getOrDefault(Suitability.STONESHAPING, 1);
+        BoulderPlan plan = BoulderPlan.roll(kind, stoneshaping, null, BoulderOreLevels.current(), siteRandom);
+        BlockPos corner = BoulderSites.find(
+                level,
+                plan.shape(),
+                worker.position,
+                WorkRange.horizontal(),
+                pos -> inWorkRange(worker, pos) && !nearAnotherSummon(worker, pos),
+                siteRandom,
+                SITE_TRIES);
+        if (corner == null) {
+            return List.of();
+        }
+        BlockPos middle =
+                corner.offset(plan.shape().width() / 2, 0, plan.shape().depth() / 2);
+        JobRecord job = JobRecord.of(JobType.SUMMON_BOULDER, middle, now);
+        job.saveProgress(0, plan.toJobData(corner));
+        return List.of(job);
+    }
+
+    /** Whether another worker is raising a boulder near {@code pos}, so one here could overlap it. */
+    private boolean nearAnotherSummon(WorkerInfo worker, BlockPos pos) {
+        for (WorkerInfo other : workers.all()) {
+            ReservationId job = other.currentReservation;
+            if (!other.pokemonUUID.equals(worker.pokemonUUID)
+                    && job != null
+                    && job.getJobType() == JobType.SUMMON_BOULDER
+                    && Math.abs(job.getStationPos().getX() - pos.getX()) <= SITE_SPACING
+                    && Math.abs(job.getStationPos().getZ() - pos.getZ()) <= SITE_SPACING) {
+                return true;
+            }
+        }
+        return false;
     }
 
     void forgetUnreachable(UUID workerUUID) {

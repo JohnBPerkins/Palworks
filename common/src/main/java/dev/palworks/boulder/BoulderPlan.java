@@ -10,6 +10,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntArrayTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
@@ -75,7 +76,30 @@ public record BoulderPlan(String kind, BoulderShape shape, List<String> blocks) 
         return placed;
     }
 
-    /** It as job data. */
+    /**
+     * The data of the job that raises it at a site, its footprint's corner at {@code corner} (see
+     * {@link #fromJobData}, {@link #cornerIn}).
+     */
+    public CompoundTag toJobData(BlockPos corner) {
+        CompoundTag data = new CompoundTag();
+        data.put("boulder", save());
+        data.put("corner", NbtUtils.writeBlockPos(corner));
+        return data;
+    }
+
+    /** The boulder in a summoning job's data ({@link #toJobData}), or null if there's none. */
+    @Nullable
+    public static BoulderPlan fromJobData(CompoundTag data) {
+        return load(data.getCompound("boulder"));
+    }
+
+    /** Where the boulder in a summoning job's data goes: its footprint's corner, or null. */
+    @Nullable
+    public static BlockPos cornerIn(CompoundTag data) {
+        return NbtUtils.readBlockPos(data, "corner").orElse(null);
+    }
+
+    /** It as data, to save. */
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
         tag.putString("kind", kind);
