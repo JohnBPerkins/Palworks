@@ -40,9 +40,9 @@ public final class WorkStatusHud {
     private static final int SLOT_HEIGHT = 30;
     private static final int SLOT_SPACING = 4;
     private static final int SELECTED_OFFSET_X = 6;
-    // Cobblemon's state icon fills x 8-20, y 3-11.5 of the card: the work icon sits just left of
-    // it, level with it
-    private static final int ICON_X = 0;
+    // Cobblemon's state icon fills x 8-20, y 3-11.5 of the card: the work icon sits left of it, level
+    // with it, with a gap (an item fills its whole square), its left edge past the screen's
+    private static final int ICON_X = -2;
     private static final int ICON_Y = 3;
 
     private static final int ICON_SIZE = 8;
