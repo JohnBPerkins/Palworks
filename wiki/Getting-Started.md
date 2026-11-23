@@ -38,8 +38,8 @@ The quickest way to see Palworks working is a furnace run by a Fire-type Pokémo
 2. Send out a **Fire-type** Pokémon you own, such as Charmander, near the furnace: within 32 blocks
    of it, and within 24 blocks of you (a party Pokémon only works near its owner).
 3. **Switch its work on**: shift-right-click it and pick the bottom slot of the interact wheel
-   (a red cross turns to a green check). A Pokémon's work starts off, so none of yours goes to
-   work until you say so (the `work_on_by_default` [setting](Configuration) changes that).
+   (a red cross turns to a green check). A Pokémon's work starts off in your party, so none goes
+   to work until you say so. In a pasture it starts on.
 4. The Pokémon walks to the furnace, uses Ember on it, and lights it. It keeps relighting the
    furnace until everything in the input slot is smelted.
 
@@ -65,7 +65,8 @@ Without step 4, nobody brings the Grass type seeds from the chest, and nobody pi
 harvest, so it stays on the ground. You can still give it seeds by throwing them next to it.
 
 For a farm that runs while you're away, put the workers in a Cobblemon **pasture**, with a
-[trough](Hunger) of berries to eat from and [beds](Sleep) to sleep in.
+[trough](Hunger) of berries to eat from and [beds](Sleep) to sleep in. Pastured Pokémon work
+unless you switch them off.
 
 See [Jobs](Jobs) for every job and [Suitabilities](Suitabilities) to find out what your Pokémon can
 do.

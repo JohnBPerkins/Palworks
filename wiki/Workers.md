@@ -11,8 +11,8 @@ A Pokémon works when all of these are true:
   in your PC or in their ball aren't in the world.
 - **It has at least one [work skill](Suitabilities)**. One with none is never a
   worker, and Palworks leaves it alone.
-- **Its work is switched on.** It starts off: you switch it on (below), unless the server's
-  `work_on_by_default` [setting](Configuration) has it start on.
+- **Its work is switched on.** In your party it starts off, so you switch it on (below); in a
+  pasture it starts on. The server's [settings](Configuration) can change either.
 
 What a worker can do depends on its [work skills](Suitabilities).
 
@@ -21,6 +21,10 @@ What a worker can do depends on its [work skills](Suitabilities).
 Shift-right-click your Pokémon and use the **bottom slot of the interact wheel**: a green check
 means its work is on, a red cross that it's off. With its work off, it's a normal Cobblemon Pokémon
 again: no jobs, and Palworks' [hunger](Hunger), [sleep](Sleep) and [mood](Mood) leave it alone.
+
+A Pokémon has a switch for your party and another for a pasture, and the wheel flips the one for
+where it is. So one you keep off in your party still works once you put it in a pasture, and one
+you switched off in a pasture stays off there.
 Admins can also use `/palworks worker enable` and `disable` (see [Commands](Commands)).
 
 ## How workers find jobs
