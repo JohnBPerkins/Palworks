@@ -16,11 +16,8 @@ import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.Nullable;
@@ -32,20 +29,15 @@ import org.jetbrains.annotations.Nullable;
  * soon as it's anything else (mined, broken by a player, blown up, pushed by a piston: see
  * {@link #onBlockChanged}), and a boulder with no blocks left is gone.
  *
- * <p>Miners work a boulder only as high as one on the ground reaches: its bottom three layers
- * ({@link #REACH}). In each column the block worked is the highest of those (see
- * {@link #isMinable}): a short column's top, so they're taken from the top down; in a taller one,
- * its third block, and what's above it then drops a block ({@link #settleAbove}), as a stack would,
- * so nothing is left hanging. A tall column comes down a block at a time until its top is in
- * reach, and no miner ever needs to climb the boulder. Used on the server thread only.
+ * <p>Miners take a boulder from the top down: a block is work only with no block of the boulder on
+ * it, and only in the top two layers it has left ({@link #isMinable}), so a tall column's top is
+ * never left standing out of reach after the blocks round it are gone. Used on the server thread
+ * only.
  */
 public final class Boulders extends SavedData {
     private static final String NAME = "palworks_boulders";
-    /** How many of a boulder's layers, from the bottom, a miner on the ground reaches. */
-    public static final int REACH = 3;
-
-    // While blocks are being moved down (see settleAbove): their changes aren't anything leaving
-    private boolean settling;
+    // A block is mined only this many layers down from the boulder's top, at most
+    private static final int LAYERS_WORKED = 2;
 
     private final Map<UUID, Boulder> standing = new LinkedHashMap<>();
     private final Map<BlockPos, UUID> byPos = new HashMap<>();
@@ -60,15 +52,12 @@ public final class Boulders extends SavedData {
         final UUID summoner;
 
         final String kind;
-        // The height of its bottom layer, on the ground
-        final int floor;
         final Map<BlockPos, Block> blocks = new LinkedHashMap<>();
 
-        Boulder(UUID id, @Nullable UUID summoner, String kind, int floor) {
+        Boulder(UUID id, @Nullable UUID summoner, String kind) {
             this.id = id;
             this.summoner = summoner;
             this.kind = kind;
-            this.floor = floor;
         }
 
         @Nullable
@@ -84,6 +73,15 @@ public final class Boulders extends SavedData {
         public Set<BlockPos> positions() {
             return java.util.Collections.unmodifiableSet(blocks.keySet());
         }
+
+        /** The height of its highest block left. */
+        int top() {
+            int top = Integer.MIN_VALUE;
+            for (BlockPos pos : blocks.keySet()) {
+                top = Math.max(top, pos.getY());
+            }
+            return top;
+        }
     }
 
     /** This dimension's, loaded from its save the first time. */
@@ -97,8 +95,7 @@ public final class Boulders extends SavedData {
      * {@code summoner} (null for one a command placed).
      */
     public void add(@Nullable UUID summoner, String kind, Map<BlockPos, BlockState> placed) {
-        int floor = placed.keySet().stream().mapToInt(BlockPos::getY).min().orElse(0);
-        Boulder boulder = new Boulder(UUID.randomUUID(), summoner, kind, floor);
+        Boulder boulder = new Boulder(UUID.randomUUID(), summoner, kind);
         placed.forEach((pos, state) -> {
             BlockPos at = pos.immutable();
             UUID earlier = byPos.get(at);
@@ -151,55 +148,15 @@ public final class Boulders extends SavedData {
     }
 
     /**
-     * Whether the block at {@code pos} is a boulder's to mine now: still the block placed there, in
-     * the bottom {@link #REACH} layers, and the highest of its column there. A short column's top;
-     * a tall one's third block, with what's above it dropping once it's mined.
+     * Whether the block at {@code pos} is a boulder's to mine now: still the block placed there,
+     * nothing of the boulder on top of it, and in the top {@link #LAYERS_WORKED} layers it has left.
      */
     public boolean isMinable(BlockPos pos, BlockState state) {
         Boulder boulder = boulderAt(pos);
-        if (boulder == null || !state.is(boulder.blocks.get(pos))) {
-            return false;
-        }
-        int layer = pos.getY() - boulder.floor;
-        if (layer >= REACH) {
-            return false;
-        }
-        for (int up = 1; layer + up < REACH; up++) {
-            if (boulder.blocks.containsKey(pos.above(up))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * A boulder's block at {@code mined} is gone: the blocks of its column above it (if any) drop a
-     * block, as a stack would, so nothing's left hanging. Call it once the block's broken.
-     */
-    public void settleAbove(ServerLevel level, BlockPos mined) {
-        Boulder boulder = boulderAt(mined.above());
-        if (boulder == null) {
-            return;
-        }
-        List<BlockPos> above = new ArrayList<>();
-        for (BlockPos pos = mined.above(); boulder.blocks.containsKey(pos); pos = pos.above()) {
-            above.add(pos);
-        }
-        settling = true;
-        try {
-            BlockPos into = mined.immutable();
-            for (BlockPos from : above) {
-                level.setBlock(into, level.getBlockState(from), Block.UPDATE_ALL);
-                boulder.blocks.put(into, boulder.blocks.get(from));
-                track(into, boulder.id);
-                into = from;
-            }
-            level.setBlock(into, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
-            forget(boulder.id, into);
-        } finally {
-            settling = false;
-        }
-        level.playSound(null, mined, SoundEvents.STONE_PLACE, SoundSource.BLOCKS, 1.0f, 0.6f);
+        return boulder != null
+                && state.is(boulder.blocks.get(pos))
+                && !boulder.blocks.containsKey(pos.above())
+                && pos.getY() > boulder.top() - LAYERS_WORKED;
     }
 
     /** The boulder blocks in a chunk, between {@code minY} (inclusive) and {@code maxY} (exclusive). */
@@ -215,17 +172,23 @@ public final class Boulders extends SavedData {
 
     /**
      * A block changed: if it was a boulder's and isn't the block placed there any more, it isn't the
-     * boulder's now. Called on every block change on the server, so a map lookup for any other block.
+     * boulder's now. Returns the boulder's blocks left to look at again if that changed which are
+     * work (its top went down a layer), else nothing. Called on every block change on the server, so
+     * a map lookup for any other block.
      */
-    public void onBlockChanged(BlockPos pos, BlockState now) {
+    public List<BlockPos> onBlockChanged(BlockPos pos, BlockState now) {
         UUID id = byPos.get(pos);
-        if (id == null || settling) {
-            return;
+        if (id == null) {
+            return List.of();
         }
         Boulder boulder = standing.get(id);
-        if (boulder != null && !now.is(boulder.blocks.get(pos))) {
-            forget(id, pos);
+        if (boulder == null || now.is(boulder.blocks.get(pos))) {
+            return List.of();
         }
+        int topBefore = boulder.top();
+        forget(id, pos);
+        Boulder left = standing.get(id);
+        return left != null && left.top() != topBefore ? List.copyOf(left.blocks.keySet()) : List.of();
     }
 
     private void track(BlockPos pos, UUID id) {
@@ -263,7 +226,6 @@ public final class Boulders extends SavedData {
                 entry.putUUID("summoner", boulder.summoner);
             }
             entry.putString("kind", boulder.kind);
-            entry.putInt("floor", boulder.floor);
             ListTag blocks = new ListTag();
             boulder.blocks.forEach((pos, block) -> {
                 CompoundTag one = new CompoundTag();
@@ -287,8 +249,7 @@ public final class Boulders extends SavedData {
             Boulder boulder = new Boulder(
                     entry.getUUID("id"),
                     entry.hasUUID("summoner") ? entry.getUUID("summoner") : null,
-                    entry.getString("kind"),
-                    entry.getInt("floor"));
+                    entry.getString("kind"));
             for (Tag b : entry.getList("blocks", Tag.TAG_COMPOUND)) {
                 CompoundTag one = (CompoundTag) b;
                 BlockPos pos = NbtUtils.readBlockPos(one, "pos").orElse(null);

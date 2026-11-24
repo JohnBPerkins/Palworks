@@ -113,11 +113,5 @@ forest rocks are, in one of eight styles rolled at random:
 
 Their sizes, positions and turn are random, and their surface has a smooth roughness, so it's lumpy
 rather than jagged. Every column two or more blocks high has one beside it at most a block lower,
-so its sides step up.
-
-## How it's mined
-
-Miners only work as high as they reach from the ground: a boulder's bottom three layers. A column
-three or fewer blocks high is mined from its top down. In a taller one, the miner takes the third
-block, and everything above it drops a block, as a stack would. The column comes down a block at a
-time until its top is in reach, so miners never need to climb, and nothing is left floating.
+so its sides step up and a miner can climb to the top. Miners take a boulder from the top, so
+nothing is left floating.

@@ -119,15 +119,17 @@ public class JobManager {
         // whether or not there are workers here now. Only on the server thread: the level's saved
         // data isn't to be touched from others (a mod's change there is still never mined, as a
         // boulder block is only work while it's the block placed: Boulders.isMinable)
-        if (level.getServer().isSameThread()) {
-            Boulders.get(level).onBlockChanged(pos, newState);
-        }
+        List<BlockPos> boulderLeft =
+                level.getServer().isSameThread() ? Boulders.get(level).onBlockChanged(pos, newState) : List.of();
         JobManager manager = byLevel.get(level);
         if (manager == null) {
             return;
         }
-        // The jobs it gives, if its chunk has been scanned, are looked at again next tick
+        // The jobs it gives, if its chunk has been scanned, are looked at again next tick, and, if
+        // it was the last of a boulder's top layer, the rest of that boulder too (a layer further
+        // down is work now)
         manager.scanner.onBlockChanged(pos);
+        boulderLeft.forEach(manager.scanner::onBlockChanged);
         if (!manager.assigner.hasUnreachable()) {
             return;
         }

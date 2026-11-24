@@ -235,9 +235,7 @@ your party ground near you.
 **Who:** Mining (Ground, Rock and Fighting types)
 **Blocks:** the blocks of boulders that [Unearthing](#raise-boulders) workers raised
 
-Miners break boulders down a block at a time, as high as they reach from the ground: a short
-column from the top, a tall one from its third block, the rest of it dropping down a block each
-time (see [Boulders](Boulders#how-its-mined)). Natural stone and ore in the world are
+Miners break boulders down a block at a time, from the top. Natural stone and ore in the world are
 never mined: only boulders, and [crystals](#mine-crystals). Each block drops what it would for a
 player with the pickaxe the miner's [work level](Suitabilities#work-levels) stands for: stone gives
 cobblestone, and ore gives more with Fortune from level 3. Packed and blue ice are mined as with
