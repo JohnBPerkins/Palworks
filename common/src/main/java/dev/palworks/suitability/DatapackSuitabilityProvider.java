@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Suitabilities from the datapack files ({@link SuitabilityData}), by the Pokémon's current form
@@ -36,11 +37,8 @@ public class DatapackSuitabilityProvider implements SuitabilityProvider {
     }
 
     private Levels levels(Pokemon pokemon) {
-        List<ElementalType> types = new ArrayList<>(2);
-        for (ElementalType type : pokemon.getTypes()) {
-            types.add(type);
-        }
-        Key key = new Key(pokemon.getForm(), types);
+        // Its two types read one by one: getTypes() makes a list of them each time it's asked
+        Key key = new Key(pokemon.getForm(), pokemon.getPrimaryType(), pokemon.getSecondaryType());
 
         SuitabilityData data = SuitabilityData.current();
         Cache current = cache;
@@ -48,16 +46,14 @@ public class DatapackSuitabilityProvider implements SuitabilityProvider {
             current = new Cache(data);
             cache = current;
         }
-        return current.levels().computeIfAbsent(key, k -> compute(data, k));
+        Levels known = current.levels().get(key);
+        return known != null ? known : current.levels().computeIfAbsent(key, k -> compute(data, k));
     }
 
     /** The job levels of a Pokémon of this form, with the form's own types (for commands, which have no Pokémon). */
     public static Map<Suitability, Integer> levels(FormData form) {
-        List<ElementalType> types = new ArrayList<>(2);
-        for (ElementalType type : form.getTypes()) {
-            types.add(type);
-        }
-        return compute(SuitabilityData.current(), new Key(form, types)).levels();
+        Key key = new Key(form, form.getPrimaryType(), form.getSecondaryType());
+        return compute(SuitabilityData.current(), key).levels();
     }
 
     private static Levels compute(SuitabilityData data, Key key) {
@@ -71,7 +67,9 @@ public class DatapackSuitabilityProvider implements SuitabilityProvider {
     /** The Pokémon's evolution line: its own form (with its types as they are), then those it evolved from. */
     private static List<SuitabilityData.Form> line(Key key) {
         List<SuitabilityData.Form> line = new ArrayList<>();
-        line.add(new SuitabilityData.Form(showdownIds(key.types()), baseStatTotal(key.form())));
+        List<ElementalType> types =
+                key.secondary() == null ? List.of(key.primary()) : List.of(key.primary(), key.secondary());
+        line.add(new SuitabilityData.Form(showdownIds(types), baseStatTotal(key.form())));
         PreEvolution before = key.form().getPreEvolution();
         while (before != null && line.size() < MAX_LINE_LENGTH) {
             FormData form = before.getForm();
@@ -102,20 +100,23 @@ public class DatapackSuitabilityProvider implements SuitabilityProvider {
 
     /**
      * What a Pokémon's levels depend on: its form (its species, base stats and the forms it evolved
-     * from) and its types (its form's, or changed ones). The form is compared by identity: its own
-     * equals builds a string each time, and this is looked up several times a tick per worker. A
+     * from) and its types (its form's, or changed ones), in the order Cobblemon lists them. The
+     * form is compared by identity: its own equals builds a string each time, and this is looked up
+     * several times a tick per worker. So are the types (Cobblemon has one object for each). A
      * species reload makes new forms, so their levels are worked out again, from their new stats.
      */
-    private record Key(FormData form, List<ElementalType> types) {
+    private record Key(
+            FormData form, ElementalType primary, @Nullable ElementalType secondary) {
         @Override
         @SuppressWarnings("ReferenceEquality") // identity on purpose, see above
         public boolean equals(Object other) {
-            return other instanceof Key key && key.form == form && key.types.equals(types);
+            return other instanceof Key key && key.form == form && key.primary == primary && key.secondary == secondary;
         }
 
         @Override
         public int hashCode() {
-            return 31 * System.identityHashCode(form) + types.hashCode();
+            return 31 * (31 * System.identityHashCode(form) + System.identityHashCode(primary))
+                    + System.identityHashCode(secondary);
         }
     }
 
