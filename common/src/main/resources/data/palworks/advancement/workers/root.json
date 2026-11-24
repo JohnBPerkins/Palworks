@@ -10,7 +10,7 @@
       "translate": "advancements.palworks.root.description"
     },
     "frame": "task",
-    "background": "minecraft:textures/block/coarse_dirt.png",
+    "background": "minecraft:textures/block/packed_mud.png",
     "show_toast": false,
     "announce_to_chat": false
   },

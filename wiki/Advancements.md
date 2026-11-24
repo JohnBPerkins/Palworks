@@ -12,25 +12,25 @@ Nearly all of them come round again.
 |---|---|---|
 | Palworks | Put a Pokémon to work | root |
 | Day One | Have a worker finish a job | task |
-| Fired Up | Have a Kindling worker light a furnace, blast furnace or smoker | task |
-| Brewmaster | Have a Kindling worker light a brewing stand | task |
-| Rain Dance | Have a Watering worker water a crop | task |
-| Sow and Tell | Have a Planting worker plant a seed | task |
-| Reap What You Sow | Have a Gathering worker harvest a ripe crop | task |
+| Fired Up | Have a worker light a furnace, blast furnace or smoker | task |
+| Brewmaster | Have a worker light a brewing stand | task |
+| Rain Dance | Have a worker water a crop | task |
+| Sow and Tell | Have a worker plant a seed | task |
+| Reap What You Sow | Have a worker harvest a ripe crop | task |
 | Tall Order | Have a worker cut sugar cane, cactus, bamboo or kelp | task |
-| Wart and All | Have a Nether worker harvest nether wart | task |
-| Timber! | Have a Lumbering worker fell a tree | task |
-| Special Delivery | Have a Transporting worker deliver what it carries | task |
-| Room Service | Have a Transporting worker restock a trough | task |
-| Rock Collector | Have a Mining worker mine a crystal | task |
-| Ground Breaking | Have an Unearthing worker raise a boulder | task |
+| Wart and All | Have a worker harvest nether wart | task |
+| Timber! | Have a worker fell a tree | task |
+| Special Delivery | Have a worker deliver what it carries | task |
+| Room Service | Have a worker restock a trough | task |
+| Rock Collector | Have a worker mine a crystal | task |
+| Ground Breaking | Have a worker raise a boulder | task |
 
 ## Mining
 
 | Advancement | How to get it | Frame |
 |---|---|---|
-| Rough Diamonds | Have a miner mine diamond ore from a [boulder](Boulders) | goal |
-| Gem Collection | Have your miners mine a gem cluster of every type | challenge |
+| Rough Diamonds | Have a worker mine diamond ore from a [boulder](Boulders) | goal |
+| Gem Collection | Have your workers mine a gem cluster of every type | challenge |
 
 Diamond ore comes in boulders raised at Unearthing level 4 or more.
 
@@ -38,10 +38,7 @@ Diamond ore comes in boulders raised at Unearthing level 4 or more.
 
 | Advancement | How to get it | Frame |
 |---|---|---|
-| Bonfire | Have a level 5 kindler light a furnace, so one Ember smelts 16 items | goal |
-| Old Growth | Have a lumberjack fell a tree of 128 logs or more | goal |
-| Overachiever | Have a level 5 worker finish a job | goal |
-| Legendary Labour | Have a legendary or mythical Pokémon finish a job | challenge |
+| Old Growth | Have a worker fell a tree of 128 logs or more | goal |
 | Jack of All Trades | Have your workers do a job of every work skill that has jobs | challenge |
 | Small Business | Have 5 Pokémon working at once | task |
 | Workforce | Have 15 Pokémon working at once | goal |
@@ -54,10 +51,10 @@ See [work levels](Suitabilities#work-levels) for what a worker's level is.
 |---|---|---|
 | Chow Time | Have a worker eat from a [trough](Hunger) | task |
 | Sweet Dreams | Have a worker sleep in a [bed](Sleep) | task |
-| Power Nap | Have a Tired worker nap in a bed in the day | task |
+| Power Nap | Have a worker nap in a bed in the day | task |
 | Rude Awakening | Wake a sleeping worker by hitting it (hidden until you do) | task |
 | Walkout | Work a worker so hard it goes [on strike](Mood) | task |
-| Back on the Clock | Have a striking worker cheer up and go back to work | task |
+| Back on the Clock | Have a worker on strike cheer up and go back to work | task |
 
 Rude Awakening goes to whoever hit the worker, not its owner.
 

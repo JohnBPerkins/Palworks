@@ -1,5 +1,5 @@
 {
-  "parent": "palworks:workers/root",
+  "parent": "palworks:workers/day_one",
   "display": {
     "icon": {
       "id": "palworks:straw_bed"
