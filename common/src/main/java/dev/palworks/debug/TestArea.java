@@ -24,6 +24,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -872,6 +873,11 @@ public final class TestArea {
         if (!fits) {
             throw new IllegalStateException(
                     "no seed of " + TREE_SEEDS + " grew one that fits its " + w + "x" + d + " plot");
+        }
+        if (tree.floor().defaultBlockState().is(BlockTags.NYLIUM)) {
+            // A huge fungus only grows on nylium, but nylium under a stem turns to netherrack in time,
+            // which no fungus can be replanted on. Soul soil, which a fungus grows on too, never changes.
+            layTreeFloor(cell, top, Blocks.SOUL_SOIL);
         }
         for (BlockPos pos : BlockPos.betweenClosed(
                 cell.offset(-CANOPY_MARGIN, 0, -CANOPY_MARGIN), top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN))) {
