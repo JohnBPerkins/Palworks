@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.Cobblemon;
 import com.cobblemon.mod.common.api.pokemon.PokemonProperties;
 import com.cobblemon.mod.common.api.pokemon.PokemonSpecies;
 import com.cobblemon.mod.common.api.storage.pc.PCStore;
+import com.cobblemon.mod.common.entity.generic.GenericBedrockEntity;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.google.gson.JsonParser;
@@ -79,6 +80,8 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Real Cobblemon Pokémon doing real jobs, end to end: finding the job, walking there, doing it.
@@ -88,6 +91,7 @@ import net.minecraft.world.level.pathfinder.Path;
 public class WorkerGameTests {
     // A Grass type (Planting, Gathering) and a Fighting type (Lumbering)
     private static final String BULBASAUR = "bulbasaur level=20";
+    private static final String GASTLY = "gastly level=20"; // Ghost/Poison: Nether
     private static final String MACHOP = "machop level=20";
     // A Flying type (Transporting): planters can't take seeds out of chests, a transporter brings them
     private static final String PIDGEY = "pidgey level=20";
@@ -229,6 +233,26 @@ public class WorkerGameTests {
         BlockPos abs = helper.absolutePos(rel);
         LevelChunk chunk = helper.getLevel().getChunkAt(abs);
         return chunk.getSection(chunk.getSectionIndex(abs.getY()));
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aMoveAimsRightAtItsAimPointInTheBlock(GameTestHelper helper) {
+        // Moves aim at the marker's locators if it has them: its model must have none of theirs, or
+        // they land off to the side (Night Shade's beam did, half a block)
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, GASTLY, START);
+        BlockPos block = helper.absolutePos(new BlockPos(3, 1, 5));
+        WorkAnimator.play(worker, WorkAnimations.NETHER_HARVEST, block);
+
+        List<GenericBedrockEntity> markers =
+                helper.getLevel().getEntitiesOfClass(GenericBedrockEntity.class, new AABB(block).inflate(1));
+        helper.assertValueEqual(markers.size(), 1, "markers");
+        GenericBedrockEntity marker = markers.get(0);
+        helper.assertValueEqual(
+                marker.getCategory(), ResourceLocation.fromNamespaceAndPath("cobblemon", "evolution"), "its model");
+        helper.assertValueEqual(
+                marker.position(), Vec3.atCenterOf(block), "where it is: the block's centre, Night Shade's aim");
+        helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY, batch = "worker_play_out", timeoutTicks = 800)
@@ -876,7 +900,7 @@ public class WorkerGameTests {
     public void ghostTypesHarvestNetherWart(GameTestHelper helper) {
         Workers.isolate(helper);
         ripeWart(helper);
-        PokemonEntity gastly = Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether
+        PokemonEntity gastly = Workers.sendOut(helper, GASTLY, START); // Ghost/Poison: Nether
 
         // Nether work's move, Night Shade (the harvest's second step), not the crops' Razor Leaf
         List<Step> steps = JobHandlerRegistry.forJob(JobType.HARVEST_CROPS).steps();
@@ -921,7 +945,7 @@ public class WorkerGameTests {
     public void aGhostTypeFetchesNetherWartFromAChestWithSeedsInItToo(GameTestHelper helper) {
         // A chest with seeds and wart used to be a seed chest for planters only
         soulSandAndChest(helper, new ItemStack(Items.WHEAT_SEEDS, 8), new ItemStack(Items.NETHER_WART, 8));
-        Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether only
+        Workers.sendOut(helper, GASTLY, START); // Ghost/Poison: Nether only
         Workers.sendOut(helper, PIDGEY, TRANSPORTER); // brings it the wart
 
         helper.succeedWhen(() -> assertWartPlanted(helper));
@@ -1295,7 +1319,7 @@ public class WorkerGameTests {
         // A Grass type, which harvests whatever Gathering can; and a Ghost type that has ripe nether
         // wart as its job the way it has after a restart: saved with it, and not in the (new) pool
         Workers.sendOut(helper, "ivysaur level=20", START);
-        PokemonEntity gastly = Workers.sendOut(helper, "gastly level=20", new BlockPos(1, 1, 1));
+        PokemonEntity gastly = Workers.sendOut(helper, GASTLY, new BlockPos(1, 1, 1));
 
         helper.startSequence()
                 .thenIdle(20)

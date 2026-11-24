@@ -68,6 +68,12 @@ public final class WorkAnimator {
 
     private static final Map<UUID, Playing> PLAYING = new ConcurrentHashMap<>();
 
+    /**
+     * The marker's model: Cobblemon's evolution effect's, whose only locators (clouds, sparkles) are
+     * at its origin and whose one pose plays no animation.
+     */
+    static final ResourceLocation MARKER_MODEL = ResourceLocation.fromNamespaceAndPath("cobblemon", "evolution");
+
     private WorkAnimator() {}
 
     /**
@@ -92,6 +98,10 @@ public final class WorkAnimator {
             marker.setSavesToWorld(false);
             marker.setNoGravity(true);
             marker.setScale(0.01f); // effectively invisible: only a position for the effect to aim at
+            // A model with no locators a move aims at, so every move aims at the marker itself. The
+            // default (Cobblemon's Substitute doll) has them at full size whatever the marker's scale:
+            // "middle" half a block up, "target" half a block up and half a block to one side.
+            marker.setCategory(MARKER_MODEL);
             marker.moveTo(target.getX() + 0.5, target.getY() + animation.aimY(), target.getZ() + 0.5, 0.0f, 0.0f);
             level.addFreshEntity(marker);
 
