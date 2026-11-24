@@ -224,29 +224,25 @@ public final class BoulderRise {
         rise.displays.clear();
     }
 
-    /** The ground's dust thrown up round the edge of where it's rising. */
+    /**
+     * The ground's dust thrown up right round what's rising: round each piece of it, in the gaps
+     * between a cluster's rocks and along a split rock's crack too.
+     */
     private static void dust(Rise rise) {
-        BoulderShape shape = rise.plan.shape();
-        for (int x = -1; x <= shape.width(); x++) {
-            for (int z = -1; z <= shape.depth(); z++) {
-                boolean edge = x == -1 || z == -1 || x == shape.width() || z == shape.depth();
-                if (!edge) {
-                    continue;
-                }
-                BlockPos ground = rise.corner.offset(x, -1, z);
-                BlockState state = rise.level.getBlockState(ground);
-                if (!state.isAir()) {
-                    rise.level.sendParticles(
-                            new BlockParticleOption(ParticleTypes.BLOCK, state),
-                            ground.getX() + 0.5,
-                            ground.getY() + 1.05,
-                            ground.getZ() + 0.5,
-                            2,
-                            0.3,
-                            0.1,
-                            0.3,
-                            0.1);
-                }
+        for (BoulderShape.Cell beside : rise.plan.shape().outline()) {
+            BlockPos ground = rise.corner.offset(beside.x(), -1, beside.z());
+            BlockState state = rise.level.getBlockState(ground);
+            if (!state.isAir()) {
+                rise.level.sendParticles(
+                        new BlockParticleOption(ParticleTypes.BLOCK, state),
+                        ground.getX() + 0.5,
+                        ground.getY() + 1.05,
+                        ground.getZ() + 0.5,
+                        2,
+                        0.3,
+                        0.1,
+                        0.3,
+                        0.1);
             }
         }
     }

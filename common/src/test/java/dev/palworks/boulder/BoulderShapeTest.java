@@ -196,6 +196,24 @@ class BoulderShapeTest {
     }
 
     @Test
+    void itsOutlineIsTheGroundRightRoundEachPiece() {
+        // Two 1-block rocks with a one-block gap: the ring round each, and the gap between them
+        BoulderShape apart = BoulderShape.of(BoulderStyle.CLUSTER, new int[] {1}, new int[] {0}, new int[] {1});
+        Set<BoulderShape.Cell> outline = new HashSet<>(apart.outline());
+        assertTrue(outline.contains(new BoulderShape.Cell(1, 0, 0)), "the gap");
+        assertTrue(outline.contains(new BoulderShape.Cell(-1, 0, 0)), "outside the first");
+        assertTrue(outline.contains(new BoulderShape.Cell(3, 0, 1)), "across the second's corner");
+        assertTrue(!outline.contains(new BoulderShape.Cell(0, 0, 0)), "not under a rock");
+        assertEquals(13, outline.size(), "two rings of 8, sharing the 3 between them");
+        // A 2 by 2 block: the 12 round it
+        assertEquals(
+                12,
+                BoulderShape.of(BoulderStyle.DOME, new int[] {1, 1}, new int[] {1, 1})
+                        .outline()
+                        .size());
+    }
+
+    @Test
     void stylesLookDifferent() {
         // Averaged over many: a peak is the tallest for its width, a slab the lowest
         double peak = tallness(BoulderStyle.PEAK);

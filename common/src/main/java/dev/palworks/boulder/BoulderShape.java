@@ -152,6 +152,35 @@ public final class BoulderShape {
         return copy;
     }
 
+    /**
+     * The ground right beside it, not under it: every empty column touching one of its columns
+     * (across corners too), round its outside and in the gaps between a cluster's rocks or a split
+     * rock's halves. As cells at height 0; they can be outside its box (x or z -1, or its width).
+     */
+    public List<Cell> outline() {
+        List<Cell> outline = new ArrayList<>();
+        for (int x = -1; x <= width; x++) {
+            for (int z = -1; z <= depth; z++) {
+                if (heightAt(x, z) == 0 && touches(x, z)) {
+                    outline.add(new Cell(x, 0, z));
+                }
+            }
+        }
+        return outline;
+    }
+
+    /** Whether any of the eight columns round this one stand. */
+    private boolean touches(int x, int z) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if ((dx != 0 || dz != 0) && heightAt(x + dx, z + dz) > 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** Its blocks, the bottom layer first. */
     public List<Cell> cells() {
         List<Cell> cells = new ArrayList<>(blockCount());
