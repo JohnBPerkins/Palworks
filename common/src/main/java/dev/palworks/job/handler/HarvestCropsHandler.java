@@ -35,7 +35,6 @@ final class HarvestCropsHandler implements JobHandler {
                 () -> dev.palworks.crop.CropAdapter.harvestCrop(ctx.level(), harvestPos));
         if (harvested) {
             ctx.didWork(1);
-            Palworks.LOGGER.debug("{} harvested crop at {}", ctx.name(), harvestPos);
         } else {
             Palworks.LOGGER.debug("{} failed to harvest crop at {}", ctx.name(), harvestPos);
         }

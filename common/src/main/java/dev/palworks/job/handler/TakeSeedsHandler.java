@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.job.JobChecks;
@@ -50,6 +49,5 @@ final class TakeSeedsHandler implements JobHandler {
         if (ctx.level() instanceof ServerLevel serverLevel) {
             JobManager.getInstance(serverLevel).onSeedsTaken(ctx.pokemon().getUuid());
         }
-        Palworks.LOGGER.debug("{} took {} seeds left for it at {}", ctx.name(), taken, ctx.pos());
     }
 }

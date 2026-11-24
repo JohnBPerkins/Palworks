@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.crystal.MiningTool;
@@ -33,7 +32,6 @@ final class MineCrystalHandler implements JobHandler {
                 ctx.pokemon().getUuid(), pos, () -> CrystalAdapter.harvest(ctx.level(), pos, ctx.entity(), tool));
         if (mined) {
             ctx.didWork(1, crystal, 1);
-            Palworks.LOGGER.debug("{} mined the crystal at {}", ctx.name(), pos);
         }
     }
 }

@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.station.KindlingHeat;
@@ -45,17 +44,12 @@ final class FuelFurnaceHandler implements JobHandler {
         int burnDuration = KindlingHeat.burnTicks(kindlingLevel(ctx));
         FurnaceHelper.igniteFurnace(ctx.level(), ctx.pos(), burnDuration);
         ctx.didWork(1);
-        Palworks.LOGGER.debug("{} ignited furnace at {} for {} ticks", ctx.name(), ctx.pos(), burnDuration);
     }
 
     @Override
     public boolean repeatAfterComplete(JobContext ctx) {
         // Keep going only if it stays to relight, and the furnace still has more than the item
         // being smelted
-        if (staysAtItsFurnace(ctx) && FurnaceHelper.hasQueuedItems(ctx.level(), ctx.pos())) {
-            Palworks.LOGGER.debug("{} continuing - furnace still has items to smelt", ctx.name());
-            return true;
-        }
-        return false;
+        return staysAtItsFurnace(ctx) && FurnaceHelper.hasQueuedItems(ctx.level(), ctx.pos());
     }
 }

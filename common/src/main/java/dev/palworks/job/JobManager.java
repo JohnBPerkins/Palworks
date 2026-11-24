@@ -497,9 +497,6 @@ public class JobManager {
         BlockPos jobPos = completedReservation.getStationPos();
         UUID workerUUID = pokemon.getUuid();
 
-        Palworks.LOGGER.debug(
-                "{} completed {} job at {}", pokemon.getSpecies().getName(), completedReservation.getJobType(), jobPos);
-
         // Handle consecutive jobs for harvesting
         if (completedReservation.getJobType() == JobType.HARVEST_CROPS) {
             // No replant job: harvesting resets the crop in place (paid for with one of its seeds),
@@ -601,8 +598,6 @@ public class JobManager {
      */
     public void onTreeChopped(Pokemon pokemon, BlockPos basePos, Level level) {
         if (!(level instanceof ServerLevel serverLevel)) return;
-
-        Palworks.LOGGER.debug("{} chopped tree at base {}", pokemon.getSpecies().getName(), basePos);
 
         DebugManager.broadcastActivity(
                 serverLevel,

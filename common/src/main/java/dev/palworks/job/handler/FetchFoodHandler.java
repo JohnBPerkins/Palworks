@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
@@ -48,11 +47,5 @@ final class FetchFoodHandler implements JobHandler {
         int leftover = inventory.addItem(taken);
         ChestHelper.returnLeftover(ctx.level(), ctx.pos(), taken, leftover);
         ctx.didWork(1);
-        Palworks.LOGGER.debug(
-                "{} fetched {} {} from the chest at {} for a trough",
-                ctx.name(),
-                taken.getCount() - leftover,
-                food,
-                ctx.pos());
     }
 }

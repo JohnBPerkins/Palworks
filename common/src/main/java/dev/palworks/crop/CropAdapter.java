@@ -502,9 +502,6 @@ public class CropAdapter {
                 }
 
                 level.setBlock(pos, asReplanted(state.setValue(ageProperty, 0)), 3);
-
-                dev.palworks.Palworks.LOGGER.debug(
-                        "Harvested crop at {}: was age {}, dropped {}, reset to age 0", pos, currentAge, drops);
                 return true;
             }
         }

@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimation;
 import dev.palworks.crop.TallPlants;
 import dev.palworks.drops.TrackedDrops;
@@ -32,7 +31,6 @@ final class HarvestTallPlantHandler implements JobHandler {
                 ctx.pokemon().getUuid(), pos, () -> TallPlants.harvest(ctx.level(), pos, ctx.entity()) > 0);
         if (cut) {
             ctx.didWork(1);
-            Palworks.LOGGER.debug("{} harvested a plant at {}", ctx.name(), pos);
         }
     }
 }

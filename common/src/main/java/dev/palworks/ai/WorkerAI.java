@@ -14,7 +14,6 @@ import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
-import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
@@ -384,17 +383,6 @@ public class WorkerAI {
     private static boolean workAtJob(
             Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         BlockPos targetPos = reservation.getStationPos();
-        // Only log on first tick of work
-        if (Palworks.LOGGER.isDebugEnabled() && !state.isWorking()) {
-            WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
-            String inventoryInfo = inventory.isEmpty() ? "empty" : inventory.getTotalItemCount() + " items";
-            Palworks.LOGGER.debug(
-                    "{} arrived at {} job, starting work (inventory: {})",
-                    pokemon.getSpecies().getName(),
-                    reservation.getJobType(),
-                    inventoryInfo);
-        }
-
         // Keep worker stationary while working (for animations). Only horizontally: zeroing its
         // vertical motion too stops gravity registering it as on the ground, and ground
         // navigation won't plan a path for a mob that isn't on the ground.

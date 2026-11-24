@@ -42,12 +42,6 @@ final class PlantSeedsHandler implements JobHandler {
             seedStack.shrink(1);
             inventory.setChanged();
             ctx.didWork(1);
-            Palworks.LOGGER.debug(
-                    "{} planted {} at {} ({} items remaining)",
-                    ctx.name(),
-                    seed.toString(),
-                    plantPos,
-                    inventory.getTotalItemCount());
         } else {
             Palworks.LOGGER.debug("{} failed to plant {} at {}", ctx.name(), seed.toString(), plantPos);
         }
