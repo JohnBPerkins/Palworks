@@ -14,8 +14,8 @@ import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.tree.TreeSize;
-import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -250,8 +250,9 @@ final class JobScanner {
      * Get chunks near active workers, each mapped to the [minY, maxY) band to scan.
      * The band is bounded to a vertical window around the contributing worker(s) so the
      * scan can cover every layer (no Y gaps) without sweeping the entire build height.
-     * The last tick's, while every worker and home is in the same chunk at the same height as then
-     * ({@link #scanCentres}): this is asked every tick, and it's a few dozen chunks per worker.
+     * The last tick's, while the places the workers and their homes are at (each a chunk and a
+     * height, see {@link #scanCentres}) are the same as then: this is asked every tick, and it's a
+     * few dozen chunks per place.
      */
     private Map<ChunkPos, int[]> getChunkScanRangesNearWorkers(ServerLevel level, Collection<WorkerInfo> workers) {
         int chunkRadius = WorkRange.chunkRadius();
@@ -264,13 +265,17 @@ final class JobScanner {
         int worldMinY = level.getMinBuildHeight();
         int worldMaxY = level.getMaxBuildHeight();
 
-        for (WorkerInfo worker : workers) {
-            addScanRange(ranges, worker.position, chunkRadius, verticalRadius, worldMinY, worldMaxY);
-            // Round its home too (its pasture block), where its troughs and beds are, so
-            // they're still known however far it's wandered for work
-            if (worker.home != null) {
-                addScanRange(ranges, worker.home, chunkRadius, verticalRadius, worldMinY, worldMaxY);
-            }
+        for (int i = 1; i < centres.length; i++) {
+            long centre = centres[i];
+            addScanRange(
+                    ranges,
+                    BlockPos.getX(centre),
+                    BlockPos.getY(centre),
+                    BlockPos.getZ(centre),
+                    chunkRadius,
+                    verticalRadius,
+                    worldMinY,
+                    worldMaxY);
         }
 
         scanRangesFrom = centres;
@@ -279,37 +284,46 @@ final class JobScanner {
     }
 
     /**
-     * All that {@link #getChunkScanRangesNearWorkers} goes by, as numbers to compare: the two
-     * ranges set, then each worker's chunk and height and its home's (its own again if it has no
-     * home, which covers the same). The same numbers give the same chunks and bands.
+     * All that {@link #getChunkScanRangesNearWorkers} goes by, as numbers: the two ranges set, then
+     * each place to scan round, once: a worker's chunk and height (x and z are the chunk's), and
+     * its home's (its pasture block: where its troughs and beds are, so they're still known however
+     * far it's wandered for work). Many workers share a place, and every other worker there adds
+     * nothing. In the order first come to, which is the order the chunks get listed in.
      */
     static long[] scanCentres(Collection<WorkerInfo> workers, int chunkRadius, int verticalRadius) {
-        LongList centres = new LongArrayList(2 * workers.size() + 1);
-        centres.add(((long) chunkRadius << 32) | (verticalRadius & 0xFFFFFFFFL));
+        LongSet places = new LongLinkedOpenHashSet();
         for (WorkerInfo worker : workers) {
-            long at = scanCentre(worker.position);
-            centres.add(at);
-            centres.add(worker.home != null ? scanCentre(worker.home) : at);
+            places.add(scanCentre(worker.position));
+            if (worker.home != null) {
+                places.add(scanCentre(worker.home));
+            }
         }
-        return centres.toLongArray();
+        long[] centres = new long[places.size() + 1];
+        centres[0] = ((long) chunkRadius << 32) | (verticalRadius & 0xFFFFFFFFL);
+        int next = 1;
+        for (long place : places) {
+            centres[next] = place;
+            next++;
+        }
+        return centres;
     }
 
     private static long scanCentre(BlockPos pos) {
         return BlockPos.asLong(pos.getX() >> 4, pos.getY(), pos.getZ() >> 4);
     }
 
-    /** Add the chunks within {@code chunkRadius} of {@code center} to scan, in a band round its height. */
+    /** Add the chunks within {@code chunkRadius} of a chunk to scan, in a band round the height {@code y}. */
     private static void addScanRange(
             Map<ChunkPos, int[]> ranges,
-            BlockPos center,
+            int baseChunkX,
+            int y,
+            int baseChunkZ,
             int chunkRadius,
             int verticalRadius,
             int worldMinY,
             int worldMaxY) {
-        int loY = Math.max(worldMinY, center.getY() - verticalRadius);
-        int hiY = Math.min(worldMaxY, center.getY() + verticalRadius + 1); // exclusive
-        int baseChunkX = center.getX() >> 4;
-        int baseChunkZ = center.getZ() >> 4;
+        int loY = Math.max(worldMinY, y - verticalRadius);
+        int hiY = Math.min(worldMaxY, y + verticalRadius + 1); // exclusive
         for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
                 ChunkPos chunk = new ChunkPos(baseChunkX + dx, baseChunkZ + dz);

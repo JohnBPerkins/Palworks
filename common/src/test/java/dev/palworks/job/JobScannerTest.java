@@ -79,7 +79,7 @@ class JobScannerTest {
 
     /**
      * The chunks to scan are worked out again only when what they come from changes: a worker (or
-     * its home) in another chunk or at another height, a worker more or less, or the ranges set.
+     * its home) in a chunk or at a height no other is at, or the ranges set.
      */
     @Test
     void whatTheChunksToScanComeFromChangesWithAWorkersChunkAndHeightOnly() {
@@ -107,7 +107,11 @@ class JobScannerTest {
 
         assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 3, 8)), "a wider range");
         assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 2, 9)), "a taller range");
-        WorkerInfo another = new WorkerInfo(UUID.randomUUID(), new BlockPos(3, 64, 5));
-        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker, another), 2, 8)), "another worker");
+        WorkerInfo another = new WorkerInfo(UUID.randomUUID(), new BlockPos(9, 64, 9)); // in the same chunk
+        assertArrayEquals(before, JobScanner.scanCentres(List.of(worker, another), 2, 8));
+        another.position = new BlockPos(40, 64, 9);
+        assertFalse(
+                Arrays.equals(before, JobScanner.scanCentres(List.of(worker, another), 2, 8)),
+                "another worker, somewhere else");
     }
 }
