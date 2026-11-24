@@ -38,6 +38,7 @@ public final class Templates {
             SleepGameTests.class,
             MoodGameTests.class,
             JobIndexGameTests.class,
+            AdvancementGameTests.class,
             PaceGameTests.class,
             CrystalGameTests.class,
             TallPlantGameTests.class,
