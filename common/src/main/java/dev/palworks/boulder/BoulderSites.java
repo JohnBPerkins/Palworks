@@ -1,5 +1,7 @@
 package dev.palworks.boulder;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
 import java.util.random.RandomGenerator;
 import net.minecraft.core.BlockPos;
@@ -66,33 +68,127 @@ public final class BoulderSites {
     }
 
     /**
-     * A site for a boulder of this shape, round {@code around} (up to {@code radius} blocks off), at
-     * most {@code tries} spots tried at random: the corner of its footprint, just above the ground
-     * (where its lowest blocks go). Only where {@code allowed} has the footprint's corners and
-     * middle (the worker's work range). Null if none of the spots tried will do.
+     * Sites for a boulder of this shape round {@code around}, its footprint's middle up to
+     * {@code radius} blocks off: the corners of their footprints, just above the ground (where its
+     * lowest blocks go), at most {@code most}, nearest first (give or take a few blocks, so a worker's
+     * boulders aren't always in the same place). Only where {@code allowed} has the footprint's
+     * corners and middle (the worker's work range). Every spot is looked at, not a few at random:
+     * the ground round {@code around} is read once, then each spot is checked against it.
      */
-    @Nullable
-    public static BlockPos find(
+    public static List<BlockPos> find(
             ServerLevel level,
             BoulderShape shape,
             BlockPos around,
             int radius,
             Predicate<BlockPos> allowed,
             RandomGenerator random,
-            int tries) {
-        for (int i = 0; i < tries; i++) {
-            int x = around.getX() + random.nextInt(-radius, radius + 1) - shape.width() / 2;
-            int z = around.getZ() + random.nextInt(-radius, radius + 1) - shape.depth() / 2;
-            Integer ground = groundNear(level, x, around.getY(), z);
-            if (ground == null) {
-                continue;
-            }
-            BlockPos corner = new BlockPos(x, ground + 1, z);
-            if (inside(corner, shape, allowed) && isOpen(level, corner, shape)) {
-                return corner;
+            int most) {
+        int w = shape.width();
+        int d = shape.depth();
+        int need = shape.height() + 1;
+        // The ground of every column any site could use: corners from radius off the middle, and
+        // the margin round them
+        int minX = around.getX() - radius - w / 2 - MARGIN;
+        int minZ = around.getZ() - radius - d / 2 - MARGIN;
+        int sizeX = 2 * radius + w + 2 * MARGIN + 1;
+        int sizeZ = 2 * radius + d + 2 * MARGIN + 1;
+        Ground ground = Ground.read(level, minX, minZ, sizeX, sizeZ, around.getY(), need);
+        // Every corner, nearest first by its middle (each a little nudged at random)
+        List<double[]> corners = new ArrayList<>();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                corners.add(new double[] {dx, dz, Math.hypot(dx, dz) + random.nextDouble() * NUDGE});
             }
         }
-        return null;
+        corners.sort(java.util.Comparator.comparingDouble(corner -> corner[2]));
+        List<BlockPos> sites = new ArrayList<>();
+        for (double[] corner : corners) {
+            int x = around.getX() + (int) corner[0] - w / 2;
+            int z = around.getZ() + (int) corner[1] - d / 2;
+            int y = ground.heightAt(x - minX, z - minZ);
+            if (y == Integer.MIN_VALUE) {
+                continue;
+            }
+            boolean fitsHere = fits(w, d, (cx, cz) -> ground.column(x + cx - minX, z + cz - minZ, y));
+            BlockPos site = new BlockPos(x, y + 1, z);
+            if (fitsHere && inside(site, shape, allowed) && isOpen(level, site, shape)) {
+                sites.add(site);
+                if (sites.size() >= most) {
+                    break;
+                }
+            }
+        }
+        return sites;
+    }
+
+    // How far, in blocks, a spot's distance is nudged at random when sites are put nearest first
+    private static final double NUDGE = 4;
+
+    /**
+     * The ground of a rectangle of columns, read once for a search: each column's ground height
+     * (the highest flat, solid block with room on it, near the search's height) and how many
+     * blocks above it are air, and how many have nothing solid, up to the {@code need} a site needs.
+     */
+    private static final class Ground {
+        private final int sizeZ;
+        private final int need;
+        private final int[] heights;
+        private final int[] air;
+        private final int[] clear;
+
+        private Ground(int sizeX, int sizeZ, int need) {
+            this.sizeZ = sizeZ;
+            this.need = need;
+            this.heights = new int[sizeX * sizeZ];
+            this.air = new int[heights.length];
+            this.clear = new int[heights.length];
+        }
+
+        static Ground read(ServerLevel level, int minX, int minZ, int sizeX, int sizeZ, int y, int need) {
+            Ground ground = new Ground(sizeX, sizeZ, need);
+            int[] heights = ground.heights;
+            int[] air = ground.air;
+            int[] clear = ground.clear;
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            for (int x = 0; x < sizeX; x++) {
+                for (int z = 0; z < sizeZ; z++) {
+                    int i = x * sizeZ + z;
+                    Integer found = groundNear(level, minX + x, y, minZ + z);
+                    heights[i] = found == null ? Integer.MIN_VALUE : found;
+                    if (found == null) {
+                        continue;
+                    }
+                    boolean allAir = true;
+                    for (int up = 1; up <= need; up++) {
+                        BlockState state = level.getBlockState(pos.set(minX + x, found + up, minZ + z));
+                        if (!state.getCollisionShape(level, pos).isEmpty()
+                                || !state.getFluidState().isEmpty()) {
+                            break;
+                        }
+                        allAir &= state.isAir();
+                        clear[i] = up;
+                        air[i] = allAir ? up : air[i];
+                    }
+                }
+            }
+            return ground;
+        }
+
+        int heightAt(int x, int z) {
+            return heights[x * sizeZ + z];
+        }
+
+        /** A column of the site, its ground at {@code y}, with room for {@code need} above. */
+        Column column(int x, int z, int y) {
+            int i = x * sizeZ + z;
+            if (heights[i] != y) {
+                return Column.BLOCKED;
+            }
+            if (air[i] >= need) {
+                return Column.OPEN;
+            }
+            return clear[i] >= need ? Column.CLEAR : Column.BLOCKED;
+        }
     }
 
     /**
@@ -127,13 +223,19 @@ public final class BoulderSites {
                 && allowed.test(corner.offset(shape.width() / 2, 0, shape.depth() / 2));
     }
 
-    /** The height of the ground in this column near {@code y}: the highest solid, flat block with air on it. */
+    /**
+     * The height of the ground in this column near {@code y}: the highest solid, flat block with
+     * nothing solid on it (a plant is all right).
+     */
     @Nullable
     private static Integer groundNear(ServerLevel level, int x, int y, int z) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int ground = y + GROUND_SEARCH_UP; ground >= y - GROUND_SEARCH_DOWN; ground--) {
             pos.set(x, ground, z);
-            if (isGround(level, pos) && level.getBlockState(pos.above()).isAir()) {
+            BlockState above = level.getBlockState(pos.above());
+            if (isGround(level, pos)
+                    && above.getCollisionShape(level, pos.above()).isEmpty()
+                    && above.getFluidState().isEmpty()) {
                 return ground;
             }
         }

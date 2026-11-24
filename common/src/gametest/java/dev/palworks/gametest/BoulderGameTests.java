@@ -173,6 +173,30 @@ public class BoulderGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = Templates.EMPTY)
+    public void theOneOpenPatchAmongFlowersIsFound(GameTestHelper helper) {
+        // Flowers everywhere but a 2 by 2 patch: every spot is looked at, so it's found
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        for (int x = 0; x < 8; x++) {
+            for (int z = 0; z < 8; z++) {
+                boolean patch = x >= 3 && x <= 4 && z >= 3 && z <= 4;
+                helper.setBlock(new BlockPos(x, 1, z), patch ? Blocks.AIR : Blocks.POPPY);
+            }
+        }
+        BoulderShape shape = BoulderShape.of(BoulderStyle.DOME, new int[] {1, 1}, new int[] {1, 1});
+        AABB bounds = helper.getBounds();
+        List<BlockPos> sites = BoulderSites.find(
+                level(helper),
+                shape,
+                helper.absolutePos(new BlockPos(1, 1, 1)),
+                6,
+                pos -> bounds.contains(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5),
+                new Random(1),
+                3);
+        helper.assertValueEqual(sites, List.of(helper.absolutePos(CORNER)), "the patch, and only it");
+        helper.succeed();
+    }
+
     private static void assertClosedWith(
             GameTestHelper helper, BoulderShape shape, BlockPos at, BlockState state, String what) {
         BlockState was = helper.getBlockState(at);

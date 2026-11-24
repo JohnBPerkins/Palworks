@@ -65,11 +65,11 @@ public final class WorkAnimations {
 
     /**
      * Raising a boulder: a ground move, its shockwave at the middle of where the boulder rises (the
-     * floor dust lands at 0.65s). From further off than other work, out past the biggest boulder's
-     * footprint, so the worker isn't standing where it rises.
+     * floor dust lands at 0.65s). From further off than other work: ring 5 or more from the middle,
+     * past the widest boulder (8 across: 4 each way), so the worker never stands where it rises.
      */
     public static final WorkAnimation SUMMON_BOULDER =
-            WorkAnimation.move("summon_boulder", "bulldoze", 13, 0.0, new WorkStance(1.5, 4, 6, 2.0));
+            WorkAnimation.move("summon_boulder", "bulldoze", 13, 0.0, new WorkStance(1.5, 5, 7, 2.0));
 
     /** All of them. */
     public static final List<WorkAnimation> ALL =

@@ -15,6 +15,7 @@ import dev.palworks.boulder.BoulderOreLevels;
 import dev.palworks.boulder.BoulderPlan;
 import dev.palworks.boulder.BoulderRise;
 import dev.palworks.boulder.BoulderSites;
+import dev.palworks.boulder.BoulderSize;
 import dev.palworks.boulder.Boulders;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.debug.DebugManager;
@@ -108,9 +109,11 @@ final class JobAssigner {
     // look reads a few hundred blocks, so it isn't made every time it's idle
     private final Map<UUID, Long> nextSiteSearch = new ConcurrentHashMap<>();
     private static final int SITE_SEARCH_TICKS = 200;
-    private static final int SITE_TRIES = 24;
+    // How far round the worker sites are looked for, and how many are offered it at once
+    private static final int SITE_SEARCH_RADIUS = 20;
+    private static final int SITES_OFFERED = 3;
     // Another worker raising a boulder this near (its job's spot) keeps a site away, so two don't overlap
-    private static final int SITE_SPACING = 2 * (6 + 2 * BoulderSites.MARGIN);
+    private static final int SITE_SPACING = 2 * (BoulderSize.forLevel(5).widest() + 2 * BoulderSites.MARGIN);
     private final java.util.Random siteRandom = new java.util.Random();
 
     JobAssigner(
@@ -1370,22 +1373,24 @@ final class JobAssigner {
         }
         int unearthing = worker.levels.getOrDefault(Suitability.UNEARTHING, 1);
         BoulderPlan plan = BoulderPlan.roll(kind, unearthing, null, BoulderOreLevels.current(), siteRandom);
-        BlockPos corner = BoulderSites.find(
+        // A few sites, nearest first, so one it can't walk to isn't the end of the look
+        List<BlockPos> corners = BoulderSites.find(
                 level,
                 plan.shape(),
                 worker.position,
-                WorkRange.horizontal(),
+                Math.min(WorkRange.horizontal(), SITE_SEARCH_RADIUS),
                 pos -> inWorkRange(worker, pos) && !nearAnotherSummon(worker, pos),
                 siteRandom,
-                SITE_TRIES);
-        if (corner == null) {
-            return List.of();
+                SITES_OFFERED);
+        List<JobRecord> jobs = new ArrayList<>(corners.size());
+        for (BlockPos corner : corners) {
+            BlockPos middle =
+                    corner.offset(plan.shape().width() / 2, 0, plan.shape().depth() / 2);
+            JobRecord job = JobRecord.of(JobType.SUMMON_BOULDER, middle, now);
+            job.saveProgress(0, plan.toJobData(corner));
+            jobs.add(job);
         }
-        BlockPos middle =
-                corner.offset(plan.shape().width() / 2, 0, plan.shape().depth() / 2);
-        JobRecord job = JobRecord.of(JobType.SUMMON_BOULDER, middle, now);
-        job.saveProgress(0, plan.toJobData(corner));
-        return List.of(job);
+        return jobs;
     }
 
     /** Whether another worker is raising a boulder near {@code pos}, so one here could overlap it. */
