@@ -36,7 +36,8 @@ import org.jetbrains.annotations.Nullable;
  * it's there yet.
  *
  * <p>Stateless: callers (JobManager at assignment, WorkerAI each tick) recompute the same position
- * from the world + the entity, so nothing is persisted.
+ * from the world + the entity, so nothing is persisted. WorkerAI asks through {@link StandMemo},
+ * which only works it out again when something it depends on has changed.
  */
 public final class WorkPositions {
     private WorkPositions() {}
@@ -637,6 +638,19 @@ public final class WorkPositions {
 
     /** How many rings beyond the reach distance to look for a place to stand. */
     private static final int EXTRA_RINGS = 3;
+
+    /**
+     * How far from a job's block, across (the larger of x and z), the furthest block
+     * {@link #standingPosFor} may look at for this worker is: a change further off can't change
+     * where it stands (see {@link StandMemo}). The furthest is a tree's: its trunk is up to a block
+     * from the job's, a ring beyond its stance's is tried, the way in through leaves from there is
+     * up to {@link #EXTRA_RINGS} more, and the worker's body on that tile half its width more.
+     * Other jobs stop at {@link #EXTRA_RINGS} beyond the stance's ring, and a body's half-width.
+     * And one more to be sure.
+     */
+    static int standReach(Mob entity, WorkStance stance) {
+        return stance.ringFor(entity) + EXTRA_RINGS + 3 + (int) Math.ceil(entity.getBbWidth() / 2.0);
+    }
     /** Heights tried for each tile: level first, then one up and one down (slopes). */
     private static final int[] SLOPE_STEPS = {0, 1, -1};
     /**

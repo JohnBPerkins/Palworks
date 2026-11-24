@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.advancement.WorkerAdvancements;
+import dev.palworks.ai.StandMemo;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
@@ -106,7 +107,8 @@ public class JobManager {
     /**
      * Called for every block change on the server (see the ServerLevel mixins). A watered crop that's
      * broken or replaced by another block loses its watering cooldown (growing, a change of age,
-     * keeps it). The scanner looks at the block again (see JobScanner#onBlockChanged). If the
+     * keeps it). Workers standing by it have where they stand worked out again (see StandMemo). The
+     * scanner looks at the block again (see JobScanner#onBlockChanged). If the
      * block's collision changed (something became passable or blocked: a gate or door toggled, a block
      * broken or placed), workers nearby forget which jobs they couldn't reach, so they re-check
      * on their next assignment. Must stay cheap: returns early unless some worker has failures.
@@ -116,6 +118,8 @@ public class JobManager {
         if (oldState.getBlock() != newState.getBlock()) {
             Watering.forget(level, pos);
         }
+        // Where the workers by it stand is worked out again (it's remembered while nothing changes)
+        StandMemo.onBlockChanged(level, pos);
         // A boulder's block that's gone (mined, broken, blown up) isn't the boulder's any more,
         // whether or not there are workers here now. Only on the server thread: the level's saved
         // data isn't to be touched from others (a mod's change there is still never mined, as a

@@ -285,7 +285,7 @@ public class WorkerAI {
         // sized to this mon: the exact tile (e.g. in front of a furnace's face)
         JobType jobType = reservation.getJobType();
         WorkStance stance = JobHandlerRegistry.stanceFor(jobType, entity);
-        BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, jobType, entity, stance);
+        BlockPos standPos = StandMemo.standingPosFor(level, targetPos, jobType, entity, stance);
         if (standPos == null) {
             // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by),
             // or not one it can do any more: drop it for that, not as unreachable, which would
