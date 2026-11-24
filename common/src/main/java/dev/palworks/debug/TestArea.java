@@ -28,6 +28,8 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.level.block.AttachedStemBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -39,6 +41,7 @@ import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.StandingSignBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
@@ -53,8 +56,10 @@ import org.jetbrains.annotations.Nullable;
  * Builds a flat test area for trying workers out ({@code /palworks testarea}), from {@code origin}
  * (its north-west corner, at the height plants stand) east and south:
  * <ol>
- *   <li>Smelting: a furnace, a blast furnace and a smoker, each with something to smelt but no
- *       fuel, and a chest for the output. Beside it, a ranch: a healing machine, a pasture and a
+ *   <li>Kindling: a furnace, a blast furnace and a smoker, each with something to smelt but no
+ *       fuel, two brewing stands with water bottles and no blaze powder (one with Medicinal Leeks
+ *       for Cobblemon's Medicinal Brew, one with nether wart for vanilla's awkward potion), and a
+ *       chest for the output. Beside it, a ranch: a healing machine, a pasture and a
  *       PC (owned by whoever built the area), a straw bed, and a trough with berries in it.</li>
  *   <li>Crystals, fully grown, each on what grows it back: amethyst clusters on budding amethyst,
  *       a tumblestone cluster of each colour on a magma block (the heat it needs), and fire gem
@@ -315,10 +320,13 @@ public final class TestArea {
 
     // ---- Smelting ----
 
-    /** A furnace, a blast furnace and a smoker facing south, each with 32 of an input and no fuel, and a chest. */
+    /**
+     * A furnace, a blast furnace and a smoker facing south, each with 32 of an input and no fuel, two
+     * brewing stands with no blaze powder, and a chest.
+     */
     private void smelting(int z) {
-        sign(at(1, 0, z - 1), "== Smelting ==");
-        for (int x = WALK + 1; x <= WALK + 9; x++) {
+        sign(at(1, 0, z - 1), "== Kindling ==");
+        for (int x = WALK + 1; x <= WALK + 13; x++) {
             for (int dz = 0; dz < SMELTING_DEPTH; dz++) {
                 set(x, -1, z + dz, Blocks.SMOOTH_STONE);
             }
@@ -326,10 +334,28 @@ public final class TestArea {
         station(at(WALK + 2, 0, z), Blocks.FURNACE, Items.RAW_IRON, "Furnace");
         station(at(WALK + 4, 0, z), Blocks.BLAST_FURNACE, Items.RAW_GOLD, "Blast furnace");
         station(at(WALK + 6, 0, z), Blocks.SMOKER, Items.BEEF, "Smoker");
+        brewingStand(at(WALK + 8, 0, z), BuiltInRegistries.ITEM.get(cobblemonId("medicinal_leek")), "Medicine");
+        brewingStand(at(WALK + 10, 0, z), Items.NETHER_WART, "Potion");
         set(
-                at(WALK + 8, 0, z),
+                at(WALK + 12, 0, z),
                 Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH));
-        sign(at(WALK + 8, 0, z + 1), "Output");
+        sign(at(WALK + 12, 0, z + 1), "Output");
+    }
+
+    /** A brewing stand with three water bottles and 16 of an ingredient, and no blaze powder. */
+    private void brewingStand(BlockPos pos, Item ingredient, String label) {
+        set(pos, Blocks.BREWING_STAND.defaultBlockState());
+        if (level.getBlockEntity(pos) instanceof BrewingStandBlockEntity stand) {
+            for (int slot = 0; slot < 3; slot++) {
+                stand.setItem(slot, PotionContents.createItemStack(Items.POTION, Potions.WATER));
+            }
+            stand.setItem(3, new ItemStack(ingredient, 16)); // slot 3 = ingredient; slot 4 (blaze powder) left empty
+            stand.setChanged();
+        } else {
+            problems.add(label + ": no block entity at " + pos.toShortString());
+        }
+        sign(pos.south(), label, "(no fuel)");
+        plots++;
     }
 
     private void station(BlockPos pos, Block station, Item input, String label) {
@@ -346,19 +372,19 @@ public final class TestArea {
 
     // ---- Ranch ----
 
-    /** A healing machine, a pasture, a PC, a straw bed and a trough of berries, east of the smelting. */
+    /** A healing machine, a pasture, a PC, a straw bed and a trough of berries, east of the kindling row. */
     private void ranch(int z) {
-        sign(at(WALK + 11, 0, z - 1), "== Ranch ==");
-        facingNorth(at(WALK + 12, 0, z), cobblemonBlock("healing_machine"), "Healer");
-        facingNorth(at(WALK + 15, 0, z), cobblemonBlock("pasture"), "Pasture");
-        facingNorth(at(WALK + 18, 0, z), cobblemonBlock("pc"), "PC");
+        sign(at(WALK + 15, 0, z - 1), "== Ranch ==");
+        facingNorth(at(WALK + 16, 0, z), cobblemonBlock("healing_machine"), "Healer");
+        facingNorth(at(WALK + 19, 0, z), cobblemonBlock("pasture"), "Pasture");
+        facingNorth(at(WALK + 22, 0, z), cobblemonBlock("pc"), "PC");
 
-        BlockPos bed = at(WALK + 21, 0, z);
+        BlockPos bed = at(WALK + 25, 0, z);
         set(bed, ModBlocks.STRAW_BED.get().defaultBlockState());
         sign(bed.south(), "Bed");
         plots++;
 
-        BlockPos trough = at(WALK + 24, 0, z);
+        BlockPos trough = at(WALK + 28, 0, z);
         set(trough, ModBlocks.trough("oak").get().defaultBlockState());
         if (level.getBlockEntity(trough) instanceof TroughBlockEntity feed) {
             feed.addFood(new ItemStack(BuiltInRegistries.ITEM.get(cobblemonId("oran_berry")), 16));

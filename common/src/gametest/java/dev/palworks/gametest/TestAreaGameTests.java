@@ -12,6 +12,7 @@ import dev.palworks.crop.TallPlants;
 import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.debug.TestArea;
 import dev.palworks.job.JobType;
+import dev.palworks.station.BrewingStandHelper;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +34,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
@@ -55,12 +57,20 @@ public class TestAreaGameTests {
         return true;
     }
 
-    private record Survey(int stations, int stationsReady, Set<Block> plants, Set<String> notGrown) {}
+    private record Survey(
+            int stations,
+            int stationsReady,
+            int brewingStands,
+            int brewingReady,
+            Set<Block> plants,
+            Set<String> notGrown) {}
 
     private static Survey survey(GameTestHelper helper, TestArea.Result area) {
         var level = helper.getLevel();
         int stations = 0;
         int ready = 0;
+        int brewingStands = 0;
+        int brewingReady = 0;
         Set<Block> plants = new HashSet<>();
         Set<String> notGrown = new HashSet<>();
         for (BlockPos pos :
@@ -71,6 +81,12 @@ public class TestAreaGameTests {
                 stations++;
                 if (!furnace.getItem(0).isEmpty() && furnace.getItem(1).isEmpty()) {
                     ready++;
+                }
+            }
+            if (level.getBlockEntity(pos) instanceof BrewingStandBlockEntity) {
+                brewingStands++;
+                if (BrewingStandHelper.needsCharge(level, pos)) {
+                    brewingReady++;
                 }
             }
             boolean plant = block instanceof CropBlock
@@ -92,13 +108,15 @@ public class TestAreaGameTests {
                 }
             }
         }
-        return new Survey(stations, ready, plants, notGrown);
+        return new Survey(stations, ready, brewingStands, brewingReady, plants, notGrown);
     }
 
     private static void check(GameTestHelper helper, TestArea.Result area, Set<Block> expected, String when) {
         Survey survey = survey(helper, area);
         helper.assertValueEqual(survey.stations(), 3, "smelting stations (one of each) " + when);
         helper.assertValueEqual(survey.stationsReady(), 3, "stations with input and no fuel " + when);
+        helper.assertValueEqual(survey.brewingStands(), 2, "brewing stands (medicine and a potion) " + when);
+        helper.assertValueEqual(survey.brewingReady(), 2, "brewing stands waiting to be lit " + when);
         helper.assertTrue(survey.notGrown().isEmpty(), "not fully grown " + when + ": " + survey.notGrown());
         Set<Block> missing = new HashSet<>(expected);
         missing.removeAll(survey.plants());
