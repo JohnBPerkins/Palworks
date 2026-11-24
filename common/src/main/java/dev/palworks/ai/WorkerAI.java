@@ -596,13 +596,6 @@ public class WorkerAI {
             Level level,
             WorkerState state,
             ReservationId reservation) {
-        Palworks.LOGGER.debug(
-                "{}'s {} job at {} {} (step {}) - stopping",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                reservation.getStationPos(),
-                reason == StepRunner.Outcome.GONE ? "is gone" : "isn't one it can do any more",
-                state.getJobStep());
         if (level instanceof ServerLevel serverLevel) {
             JobManager jobs = JobManager.getInstance(serverLevel);
             if (reason == StepRunner.Outcome.GONE) {
