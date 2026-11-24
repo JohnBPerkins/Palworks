@@ -133,7 +133,7 @@ loom {
 }
 
 // Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers of many species,
-// with spark measuring tick times, in two scenarios: `dense` (one packed farm) and `spread` (40 small
+// with every tick timed and spark profiling, in two scenarios: `dense` (one packed farm) and `spread` (40 small
 // bases far apart). Its own source set and mod (palworks_stress, never published, src/stress), so it
 // runs only that (by its template namespace): the in-game test mod is loaded too, for its helpers,
 // but none of its tests run. `./gradlew :neoforge:runStressTest` runs both scenarios
@@ -154,8 +154,6 @@ sourceSets {
 
 dependencies {
     stressCompileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.21"
-    // spark's API, bundled in its jar, to read tick times (spark itself is in dev runs, above)
-    stressCompileOnly("maven.modrinth:spark:1.10.124-neoforge-1.21.1") { transitive = false }
 }
 
 loom {

@@ -1,20 +1,20 @@
 package dev.palworks.stress;
 
+import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.platform.Platform;
 import dev.palworks.Palworks;
 import dev.palworks.gametest.Scenes;
 import dev.palworks.gametest.Workers;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import me.lucko.spark.api.Spark;
-import me.lucko.spark.api.SparkProvider;
-import me.lucko.spark.api.statistic.StatisticWindow;
-import me.lucko.spark.api.statistic.misc.DoubleAverageInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -34,7 +34,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * The stress test: 200 workers of many species and sizes, with their work coming back as fast as
- * they do it, and the server's tick times measured with spark. Two scenarios, each its own run
+ * they do it, and every server tick timed. Two scenarios, each its own run
  * ({@code -Dpalworks.stress.scenario}; {@code ./gradlew :fabric:runStressTest} runs both, one after
  * the other), never with the in-game tests, so nothing else adds to the load:
  * <ul>
@@ -47,8 +47,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * as a real farm would: anything worked out per species or per body size gets no easy ride.
  *
  * <p>After {@link #WARMUP_TICKS} to settle (workers sent out, the first scans done), it measures for
- * a minute of real time, with spark profiling, then writes spark's milliseconds per tick (MSPT) for
- * that minute, and how much work got done, to the JSON file in {@code -Dpalworks.stress.report}.
+ * a minute of real time, with spark profiling, then writes the milliseconds per tick (MSPT) of that
+ * minute's ticks (see {@link TickTimes}), and how much work got done, to the JSON file in
+ * {@code -Dpalworks.stress.report}.
  * A GameTest server doesn't wait between ticks (it runs them back to back), so the minute is
  * thousands of ticks, and its "TPS" is how many it can manage: headroom, not the 20 a real server
  * aims for. MSPT, the time each tick takes, means the same either way.
@@ -63,7 +64,7 @@ public class StressGameTests {
     static final String SPREAD = "spread";
 
     private static final int WARMUP_TICKS = 600; // 30 s
-    private static final long MEASURE_NANOS = 60_000_000_000L; // a minute: spark's one-minute window
+    private static final long MEASURE_NANOS = 60_000_000_000L; // a minute
     private static final int REGROW_INTERVAL = 100; // how often harvested, chopped or emptied work comes back
     // How often the work done is counted. Done work stays done until it's regrown, so counting just
     // before each regrow (this divides REGROW_INTERVAL) misses none, and costs less than every tick.
@@ -154,6 +155,27 @@ public class StressGameTests {
                 next++;
             }
             return taken;
+        }
+    }
+
+    /**
+     * Times server ticks while it's {@code on}: each from its start to its end, the test's own step
+     * and any autosave included, as spark's MSPT is. Spark's own figures aren't used: its one-minute
+     * window is its last 1200 ticks, a minute at 20 TPS, but about six seconds of a server that
+     * doesn't wait between ticks.
+     */
+    private static final class TickTimes {
+        private final LongList nanos = new LongArrayList();
+        private boolean on;
+        private long started;
+
+        TickTimes() {
+            TickEvent.SERVER_PRE.register(server -> started = on ? System.nanoTime() : 0);
+            TickEvent.SERVER_POST.register(server -> {
+                if (started != 0) {
+                    nanos.add(System.nanoTime() - started);
+                }
+            });
         }
     }
 
@@ -330,8 +352,7 @@ public class StressGameTests {
         List<BlockPos> trees = farm.trees();
         int[] harvests = {0};
         int[] chops = {0};
-        int[] ticks = {0};
-        boolean[] measuring = {false};
+        TickTimes times = new TickTimes();
         long[] measureStart = {0};
         long[] stopping = {0};
         boolean[] wasRipe = new boolean[crops.size()];
@@ -342,14 +363,14 @@ public class StressGameTests {
             if (time % COUNT_INTERVAL == 0) {
                 for (int i = 0; i < crops.size(); i++) {
                     boolean ripe = helper.getBlockState(crops.get(i)).equals(WHEAT.getStateForAge(7));
-                    if (measuring[0] && wasRipe[i] && !ripe) {
+                    if (times.on && wasRipe[i] && !ripe) {
                         harvests[0]++;
                     }
                     wasRipe[i] = ripe;
                 }
                 for (int i = 0; i < trees.size(); i++) {
                     boolean trunk = helper.getBlockState(trees.get(i)).is(Blocks.OAK_LOG);
-                    if (measuring[0] && hadTrunk[i] && !trunk) {
+                    if (times.on && hadTrunk[i] && !trunk) {
                         chops[0]++;
                     }
                     hadTrunk[i] = trunk;
@@ -358,15 +379,16 @@ public class StressGameTests {
             if (time % REGROW_INTERVAL == 0) {
                 regrow(helper, farm);
             }
-            if (measuring[0]) {
-                ticks[0]++;
-                if (System.nanoTime() - measureStart[0] >= MEASURE_NANOS) {
-                    measuring[0] = false;
-                    report(helper, farm, ticks[0], harvests[0], chops[0]);
+            if (times.on) {
+                long measured = System.nanoTime() - measureStart[0];
+                if (measured >= MEASURE_NANOS) {
+                    times.on = false;
+                    int ticks = times.nanos.size();
+                    report(farm, times.nanos.toLongArray(), measured, harvests[0], chops[0]);
                     if (harvests[0] < MIN_HARVESTS) {
                         // Failed from the test's own schedule, next tick: thrown from here, a step
                         // of a sequence (see eachTick), it would only say "not yet"
-                        String barelyWorked = "the workers barely worked (" + harvests[0] + " harvests in " + ticks[0]
+                        String barelyWorked = "the workers barely worked (" + harvests[0] + " harvests in " + ticks
                                 + " ticks), so the timings mean nothing";
                         helper.runAfterDelay(1, () -> helper.fail(barelyWorked));
                         return;
@@ -385,7 +407,7 @@ public class StressGameTests {
         });
 
         helper.runAfterDelay(WARMUP_TICKS, () -> {
-            measuring[0] = true;
+            times.on = true;
             measureStart[0] = System.nanoTime();
             command(helper, "spark profiler start");
         });
@@ -458,13 +480,17 @@ public class StressGameTests {
         server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command);
     }
 
-    /** Write spark's timings for the measured minute, and the work done, to the report file. */
-    private static void report(GameTestHelper helper, Farm farm, int ticks, int harvests, int chops) {
-        Spark spark = SparkProvider.get();
-        DoubleAverageInfo mspt =
-                spark.mspt() == null ? null : spark.mspt().poll(StatisticWindow.MillisPerTick.MINUTES_1);
-        helper.assertTrue(mspt != null, "spark has no tick times on this loader");
-        double tps = spark.tps().poll(StatisticWindow.TicksPerSecond.MINUTES_1);
+    /**
+     * Write the measured ticks' times ({@code tickNanos}, over {@code measuredNanos} of real time),
+     * and the work done, to the report file.
+     */
+    private static void report(Farm farm, long[] tickNanos, long measuredNanos, int harvests, int chops) {
+        int ticks = tickNanos.length;
+        if (ticks == 0) {
+            // Not an assertion: thrown from a step of a sequence (see eachTick), that only says "not yet"
+            throw new IllegalStateException("no server tick was timed on this loader");
+        }
+        Arrays.sort(tickNanos);
         String json = String.format(
                 Locale.ROOT,
                 "{%n  \"scenario\": \"%s\",%n  \"version\": %d,%n  \"loader\": \"%s\",%n  \"workers\": %d,%n"
@@ -476,11 +502,11 @@ public class StressGameTests {
                 Platform.isFabric() ? "fabric" : "neoforge",
                 farm.workers(),
                 ticks,
-                mspt.mean(),
-                mspt.median(),
-                mspt.percentile95th(),
-                mspt.max(),
-                tps,
+                Arrays.stream(tickNanos).average().orElseThrow() / 1e6,
+                millisAt(tickNanos, 0.5),
+                millisAt(tickNanos, 0.95),
+                tickNanos[ticks - 1] / 1e6,
+                ticks / (measuredNanos / 1e9),
                 harvests,
                 chops);
         Palworks.LOGGER.info("Stress test results:\n{}", json);
@@ -494,5 +520,10 @@ public class StressGameTests {
                 throw new IllegalStateException("couldn't write the stress report to " + path, e);
             }
         }
+    }
+
+    /** The time, in milliseconds, that this share of the (sorted) tick times are no longer than. */
+    private static double millisAt(long[] sortedNanos, double share) {
+        return sortedNanos[(int) Math.ceil(share * sortedNanos.length) - 1] / 1e6;
     }
 }

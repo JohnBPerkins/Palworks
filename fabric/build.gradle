@@ -123,7 +123,7 @@ loom.runs.matching { it.name == "gameTest" }.configureEach {
 }
 
 // Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers of many species,
-// with spark measuring tick times, in two scenarios: `dense` (one packed farm) and `spread` (40 small
+// with every tick timed and spark profiling, in two scenarios: `dense` (one packed farm) and `spread` (40 small
 // bases far apart). Its own source set and mod (palworks_stress, never published), so it runs alone,
 // without the in-game tests: Fabric's GameTest API runs every test its mods register. It reuses the
 // in-game tests' helpers (Workers, Scenes), compiled in but not registered.
@@ -140,12 +140,6 @@ sourceSets {
         compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
         runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
     }
-}
-
-dependencies {
-    // spark's API, bundled in its jar, to read tick times (spark itself is in dev runs, above).
-    // The API classes don't touch Minecraft, so the unremapped jar compiles against them as is.
-    stressCompileOnly("maven.modrinth:spark:1.10.109-fabric") { transitive = false }
 }
 
 loom {

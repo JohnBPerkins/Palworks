@@ -201,8 +201,8 @@ jobs:
             ${{ matrix.loader }}/build/test-results/gametest/
           retention-days: 14
 
-  # Stress test: 200 workers in two scenarios (one packed farm, and 40 bases spread out), timed
-  # with spark (see StressGameTests). On a PR it runs main's version first, then this change's, on
+  # Stress test: 200 workers in two scenarios (one packed farm, and 40 bases spread out), every
+  # tick timed (see StressGameTests). On a PR it runs main's version first, then this change's, on
   # the same runner, and fails if either scenario's ticks are more than 20% slower
   # (.github/scripts/compare_stress.py). Shared runners vary in speed from run to run, so it's
   # compared with main rather than held to a fixed budget.

@@ -159,9 +159,9 @@ Torterra at 2.25) and walkers and flyers, so nothing worked out per species or b
 easy ride.
 
 Each scenario runs in its own server (`runStressDense`, `runStressSpread`; `runStressTest` runs
-both). After 30 seconds to settle, it measures for a minute with
-[spark](https://spark.lucko.me/docs): spark's milliseconds per tick (MSPT: mean, median, 95th
-percentile, max) go to `<loader>/build/stress/<scenario>.json`, and spark's profile of that minute
+both). After 30 seconds to settle, it measures for a minute, timing every server tick and
+profiling with [spark](https://spark.lucko.me/docs): the milliseconds per tick (MSPT: mean, median,
+95th percentile, max) go to `<loader>/build/stress/<scenario>.json`, and spark's profile of that minute
 to `<loader>/build/run/stress/<scenario>/config/spark/` (open it at https://spark.lucko.me). The
 run never uploads anything: it points spark's upload address at a port nothing listens on. The test
 only fails if the workers barely worked, since then the timings would mean nothing.
