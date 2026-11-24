@@ -100,15 +100,15 @@ public final class WorkPositions {
         // Non-directional (crops, ore, brewing stand, ...; trees are handled above): the nearest
         // ring, from `distance` out, that has a tile the worker fits on; in that ring, the tile
         // nearest the worker. Rings are square (cardinal and diagonal tiles), and each tile is also
-        // tried one block up and down so slopes work (and, for a crystal or a boulder, two down: see
-        // CRYSTAL_STEPS). A worker eating from a trough stands square to one of its sides if it can,
+        // tried one block up and down so slopes work (and, for a crystal, two down: see
+        // CRYSTAL_STEPS; for a boulder, as far down as the worker reaches: see boulderReach). A worker eating from a
+        // trough stands square to one of its sides if it can,
         // so its head is over the food, not at a corner. Only tiles it can see its target from
         // count (see seesFrom), so its animation doesn't go through a wall or the ground.
         Predicate<BlockPos> fitsThere = WorkerPathfinder.fitsOn(entity);
         Double aimY = JobHandlerRegistry.aimFor(jobType, entity);
         boolean squareOn = jobType == JobType.EAT_FOOD;
-        int[] heights =
-                jobType == JobType.MINE_CRYSTAL || jobType == JobType.MINE_BOULDER ? CRYSTAL_STEPS : SLOPE_STEPS;
+        int[] heights = stepsFor(jobType, entity);
         for (int d = distance; d <= distance + EXTRA_RINGS; d++) {
             BlockPos best = null;
             double bestDistSq = Double.MAX_VALUE;
@@ -381,7 +381,9 @@ public final class WorkPositions {
             target = trunkColumns(level, targetPos);
         } else {
             boolean hanging = CropAdapter.isHangingFruit(level.getBlockState(targetPos));
-            double below = hanging ? HANGING_FRUIT_REACH_DOWN + 1.0 : WORK_HEIGHT_REACH;
+            double below = hanging
+                    ? HANGING_FRUIT_REACH_DOWN + 1.0
+                    : jobType == JobType.MINE_BOULDER ? boulderReach(entity) : WORK_HEIGHT_REACH;
             if (dy < -below || dy > WORK_HEIGHT_REACH) {
                 return false;
             }
@@ -422,6 +424,39 @@ public final class WorkPositions {
     private static final int TREE_HEIGHT_REACH = 1;
     /** How far above or below its work a worker can do it from: a block either way, give or take. */
     private static final double WORK_HEIGHT_REACH = 2.0;
+    /**
+     * How far below a boulder's block a miner can stand and still mine it: its own height and two
+     * more, and never less than other work. A big miner (a Tyranitar, about 3 high, so 5) can't
+     * stand on a boulder's one-block steps, but reaches a tall boulder's top from the ground; a small
+     * one climbs the steps.
+     */
+    static double boulderReach(Mob entity) {
+        return Math.max(WORK_HEIGHT_REACH, entity.getBbHeight() + 2.0);
+    }
+
+    /** The heights each tile is tried at for this job: see {@link #SLOPE_STEPS} and the ones after it. */
+    private static int[] stepsFor(JobType jobType, Mob entity) {
+        if (jobType == JobType.MINE_CRYSTAL) {
+            return CRYSTAL_STEPS;
+        }
+        return jobType == JobType.MINE_BOULDER ? boulderSteps(entity) : SLOPE_STEPS;
+    }
+
+    /**
+     * Heights tried for each tile round a boulder's block: as {@link #CRYSTAL_STEPS}, then on down
+     * as far as the miner reaches ({@link #boulderReach}).
+     */
+    private static int[] boulderSteps(Mob entity) {
+        int down = (int) Math.floor(boulderReach(entity));
+        int[] steps = new int[down + 2];
+        steps[0] = 0;
+        steps[1] = 1;
+        for (int i = 1; i <= down; i++) {
+            steps[i + 1] = -i;
+        }
+        return steps;
+    }
+
     /** How far to one side of a station's middle a worker in front of it may be, in blocks. */
     private static final double STATION_SIDE_REACH = 1.5;
 
