@@ -21,4 +21,11 @@ public final class JobBlockTags {
      * block entity ({@code AbstractFurnaceBlockEntity}); any other block in the tag is ignored.
      */
     public static final TagKey<Block> FURNACES = TagKey.create(Registries.BLOCK, Palworks.id("furnaces"));
+
+    /**
+     * Brewing stands a KINDLING worker lights for {@link JobType#FUEL_BREWING_STAND}. Each must have
+     * a brewing stand block entity ({@code BrewingStandBlockEntity}); any other block in the tag is
+     * ignored.
+     */
+    public static final TagKey<Block> BREWING_STANDS = TagKey.create(Registries.BLOCK, Palworks.id("brewing_stands"));
 }

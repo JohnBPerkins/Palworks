@@ -5,6 +5,11 @@ accessWidener	v2	named
 accessible	field	net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity	litTime	I
 accessible	field	net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity	litDuration	I
 
+# A brewing stand's charges and brew time, so Kindling workers can light one in place of blaze
+# powder. (Used by dev.palworks.station.BrewingStandHelper.)
+accessible	field	net/minecraft/world/level/block/entity/BrewingStandBlockEntity	fuel	I
+accessible	field	net/minecraft/world/level/block/entity/BrewingStandBlockEntity	brewTime	I
+
 # A navigation's target, cleared while a worker walks one of Palworks' own paths so vanilla's
 # recomputing doesn't swap it for one of Cobblemon's. (Used by dev.palworks.ai.path.WorkerNavigator.)
 accessible	field	net/minecraft/world/entity/ai/navigation/PathNavigation	targetPos	Lnet/minecraft/core/BlockPos;

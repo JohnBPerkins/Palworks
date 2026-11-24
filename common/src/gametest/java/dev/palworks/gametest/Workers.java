@@ -20,6 +20,9 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.scores.PlayerTeam;
+import net.minecraft.world.scores.Scoreboard;
+import net.minecraft.world.scores.Team;
 
 /** Real Cobblemon Pokémon for worker tests: owned by a (mock) player and sent out into the test. */
 public final class Workers {
@@ -88,13 +91,32 @@ public final class Workers {
         return sendOut(helper, owner(helper, rel), properties, rel);
     }
 
-    /** A mock player standing at a spot in the test, to own Pokémon sent out there. */
+    /**
+     * A mock player standing at a spot in the test, to own Pokémon sent out there. Nothing is pushed
+     * against it (it's on a team that never collides): it stands on the tile its Pokémon is sent out
+     * on and never moves, and a Pokémon whose path started on that tile was held off its first step
+     * by the push, half a block away, for as long as the test ran
+     * (SleepGameTests.oneWithNoBedFreeLooksAgainInAWhileNotEveryTick, about 1 run in 100).
+     */
     @SuppressWarnings("removal") // makeMockServerPlayerInLevel: vanilla's only mock player in 1.21.1
     public static ServerPlayer owner(GameTestHelper helper, BlockPos rel) {
         ServerPlayer owner = helper.makeMockServerPlayerInLevel();
         BlockPos abs = helper.absolutePos(rel);
         owner.moveTo(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5);
+        Scoreboard scoreboard = helper.getLevel().getScoreboard();
+        scoreboard.addPlayerToTeam(owner.getScoreboardName(), ownersTeam(scoreboard));
         return owner;
+    }
+
+    private static final String OWNERS_TEAM = "palworks_test_owners";
+
+    private static PlayerTeam ownersTeam(Scoreboard scoreboard) {
+        PlayerTeam team = scoreboard.getPlayerTeam(OWNERS_TEAM);
+        if (team == null) {
+            team = scoreboard.addPlayerTeam(OWNERS_TEAM);
+            team.setCollisionRule(Team.CollisionRule.NEVER);
+        }
+        return team;
     }
 
     /**

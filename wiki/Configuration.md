@@ -59,7 +59,7 @@ settings that aren't per-Pokémon:
 - **`hunger`**: how workers get hungry and eat (see [Hunger](Hunger)).
   - **`enabled`**: `false` turns hunger off: Palworks leaves fullness entirely to Cobblemon.
   - **`work_per_fullness`** (1 to 500): how many units of work use up one point of fullness. A
-    unit is a crop harvested, a seed planted, a crop watered, a furnace lit, a crystal mined, a
+    unit is a crop harvested, a seed planted, a crop watered, a furnace or brewing stand lit, a crystal mined, a
     trip to pick up or deliver, or every 8 logs of a tree (at most 5 a tree).
   - **`idle_drain_per_day`** (0 to 1): the share of its max fullness a worker loses over a Minecraft
     day while its work is on. Despite the name, that's whether it's idle or busy: work uses up

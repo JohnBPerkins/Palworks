@@ -15,6 +15,8 @@ public enum JobType {
 
     // Kindling
     FUEL_FURNACE(Suitability.KINDLING, 7),
+    // A brewing stand lit in place of blaze powder: vanilla potions and Cobblemon medicine alike
+    FUEL_BREWING_STAND(Suitability.KINDLING, 7),
 
     // Planting
     PLANT_SEEDS(Suitability.PLANTING, 5),

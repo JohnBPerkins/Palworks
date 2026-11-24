@@ -81,6 +81,13 @@ To add furnaces from another mod, create this file in your datapack:
 
 Keep `"replace": false` so your entries are added to the defaults instead of replacing them.
 
+## `#palworks:brewing_stands`
+
+The blocks [Kindling](Jobs#light-brewing-stands) workers light in place of blaze powder: by default
+the brewing stand. A modded block needs a brewing stand block entity to work (one without still
+says Kindling in its tooltip). Add to it as to the furnaces tag, in
+`data/palworks/tags/block/brewing_stands.json`.
+
 ## Boulders
 
 What the boulders [Unearthing](Jobs#raise-boulders) workers raise are made of comes from one

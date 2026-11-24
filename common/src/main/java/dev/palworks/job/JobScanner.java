@@ -9,6 +9,7 @@ import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.crystal.MiningTool;
 import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
+import dev.palworks.station.BrewingStandHelper;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.tree.TreeDetector;
@@ -149,9 +150,10 @@ final class JobScanner {
     }
 
     /**
-     * A block entity's contents changed (JobManager#onContainerChanged): if it's a chest or furnace
-     * an index knows (seeds put in or taken out, a furnace loaded or burnt out), it's looked at again
-     * next tick. Called very often (every hopper move, every furnace that's burning), so a map lookup
+     * A block entity's contents changed (JobManager#onContainerChanged): if it's a chest, furnace or
+     * brewing stand an index knows (seeds put in or taken out, a furnace loaded or burnt out, a brew
+     * done), it's looked at again next tick. Called very often (every hopper move, every furnace
+     * that's burning, every brewing stand that's brewing), so a map lookup
      * and a set lookup for anything else.
      */
     void onContainerChanged(BlockPos pos) {
@@ -450,6 +452,10 @@ final class JobScanner {
         if (state.is(JobBlockTags.FURNACES) && FurnaceHelper.needsFuel(level, pos)) {
             return JobRecord.of(JobType.FUEL_FURNACE, pos, now);
         }
+        // Brewing stands that need lighting (Kindling too: in place of blaze powder)
+        if (state.is(JobBlockTags.BREWING_STANDS) && BrewingStandHelper.needsCharge(level, pos)) {
+            return JobRecord.of(JobType.FUEL_BREWING_STAND, pos, now);
+        }
 
         // Pumpkins and melons: a stem that has grown its fruit is "attached" to it. The harvest job
         // goes on the fruit (the stem itself is never harvested).
@@ -552,7 +558,7 @@ final class JobScanner {
         return chunkCaches.containsKey(new ChunkPos(pos));
     }
 
-    /** Whether the block at {@code pos} is in its chunk's index as a chest, trough, bed or furnace. */
+    /** Whether the block at {@code pos} is in its chunk's index as a chest, trough, bed, furnace or brewing stand. */
     boolean isKnownPlace(BlockPos pos) {
         ChunkIndex index = chunkCaches.get(new ChunkPos(pos));
         return index != null && index.isPlace(pos);
@@ -683,6 +689,7 @@ final class JobScanner {
         private final Set<BlockPos> troughs = new LinkedHashSet<>(); // where workers eat
         private final Set<BlockPos> beds = new LinkedHashSet<>(); // where pastured workers sleep
         private final Set<BlockPos> furnaces = new LinkedHashSet<>(); // what kindlers light
+        private final Set<BlockPos> brewingStands = new LinkedHashSet<>(); // what kindlers light too
         private boolean dirty;
 
         ChunkIndex(long scanTime, int minY, int maxY) {
@@ -745,6 +752,8 @@ final class JobScanner {
                 beds.add(pos);
             } else if (state.is(JobBlockTags.FURNACES)) {
                 furnaces.add(pos);
+            } else if (state.is(JobBlockTags.BREWING_STANDS)) {
+                brewingStands.add(pos);
             }
         }
 
@@ -754,16 +763,21 @@ final class JobScanner {
             troughs.remove(pos);
             beds.remove(pos);
             furnaces.remove(pos);
+            brewingStands.remove(pos);
         }
 
-        /** Whether the block at {@code pos} is a chest, trough, bed or furnace. */
+        /** Whether the block at {@code pos} is a chest, trough, bed, furnace or brewing stand. */
         boolean isPlace(BlockPos pos) {
-            return chests.contains(pos) || troughs.contains(pos) || beds.contains(pos) || furnaces.contains(pos);
+            return chests.contains(pos)
+                    || troughs.contains(pos)
+                    || beds.contains(pos)
+                    || furnaces.contains(pos)
+                    || brewingStands.contains(pos);
         }
 
-        /** Whether the block at {@code pos} is a chest or furnace, whose contents make its job. */
+        /** Whether the block at {@code pos} is a chest, furnace or brewing stand, whose contents make its job. */
         boolean holdsWork(BlockPos pos) {
-            return chests.contains(pos) || furnaces.contains(pos);
+            return chests.contains(pos) || furnaces.contains(pos) || brewingStands.contains(pos);
         }
 
         /** Chests seen in the scan. */

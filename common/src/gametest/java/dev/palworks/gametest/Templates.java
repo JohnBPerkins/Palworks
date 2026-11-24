@@ -41,5 +41,6 @@ public final class Templates {
             PaceGameTests.class,
             CrystalGameTests.class,
             TallPlantGameTests.class,
-            BoulderGameTests.class);
+            BoulderGameTests.class,
+            BrewingGameTests.class);
 }

@@ -103,7 +103,7 @@ public final class WorkSkills {
                 new LevelEffect(key, List.of(percent(Watering.fertilizeChance(level, fertilizeChancePerLevel))));
             // A level 1 kindler's Ember smelts one item, and it stays to light it again
             case KINDLING ->
-                KindlingHeat.staysAtItsFurnace(level)
+                KindlingHeat.staysToRelight(level)
                         ? new LevelEffect(key + ".one", List.of())
                         : new LevelEffect(key, List.of(KindlingHeat.itemsPerEmber(level)));
             case LUMBERING -> new LevelEffect(key, List.of(TreeSize.maxLogs(level)));
