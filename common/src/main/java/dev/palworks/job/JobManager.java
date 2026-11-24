@@ -309,10 +309,6 @@ public class JobManager {
         ReservationId stateReservation = state.getCurrentReservation();
         if (info.currentReservation != null && stateReservation == null) {
             pool.release(JobKey.of(info.currentReservation), level.getGameTime());
-            Palworks.LOGGER.debug(
-                    "{} dropped its reservation; released job at {} back to the pool",
-                    pokemon.getSpecies().getName(),
-                    info.currentReservation.getStationPos());
         }
 
         // A job it has that the registry doesn't (saved with it, before a restart or its chunk
@@ -538,13 +534,6 @@ public class JobManager {
         if (state != null) {
             pool.captureProgress(state, JobKey.of(reservation));
         }
-
-        Palworks.LOGGER.debug(
-                "{} abandoned {} at {}; won't retry it until terrain changes or it moves (max {} ticks)",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                pos,
-                JobAssigner.JOB_FAILURE_BLACKLIST_TICKS);
     }
 
     /**
@@ -558,15 +547,8 @@ public class JobManager {
     public void onJobInvalidated(Pokemon pokemon, ReservationId reservation, Level level) {
         if (!(level instanceof ServerLevel)) return;
 
-        BlockPos pos = reservation.getStationPos();
         pool.remove(JobKey.of(reservation));
         workers.markIdle(pokemon.getUuid());
-
-        Palworks.LOGGER.debug(
-                "{}'s {} at {} no longer exists - removed from pool",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                pos);
     }
 
     /**
@@ -584,12 +566,6 @@ public class JobManager {
         }
         pool.release(key, level.getGameTime());
         workers.markIdle(pokemon.getUuid());
-
-        Palworks.LOGGER.debug(
-                "{} can't do its {} at {} any more - given back to the pool",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                reservation.getStationPos());
     }
 
     /**

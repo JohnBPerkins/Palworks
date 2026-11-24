@@ -1,7 +1,6 @@
 package dev.palworks.job;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -234,7 +233,6 @@ final class PickupQueue {
     private void createCollectDropsJob(ServerLevel level, BlockPos pos, @Nullable UUID suggested) {
         List<ItemEntity> items = new ArrayList<>(JobChecks.itemsToPickUp(level, pos));
         if (items.isEmpty()) {
-            Palworks.LOGGER.debug("No items found at {} for collect drops job", pos);
             return;
         }
 
