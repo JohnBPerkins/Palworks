@@ -40,12 +40,15 @@ public final class WorkStatusHud {
     private static final int SLOT_HEIGHT = 30;
     private static final int SLOT_SPACING = 4;
     private static final int SELECTED_OFFSET_X = 6;
-    // Cobblemon's state icon fills x 8-20, y 3-11.5 of the card: the work icon sits just left of it,
-    // level with it. Not further left: off the screen's edge, an unselected card's icon was cut off.
+    // Cobblemon's state icon fills x 8-20, y 3-11.5 of the card: the work icon sits left of it,
+    // level with it (x 0-7, y 4-11), a pixel short of it so they don't touch. The 8 pixels left of
+    // it are all the card has there, and further left is off the screen, which cut an unselected
+    // card's icon off; so the icon is 7 pixels, not the 8 that half a 16-pixel item would make,
+    // and its pixels aren't all the same size.
     private static final int ICON_X = 0;
-    private static final int ICON_Y = 3;
+    private static final int ICON_Y = 4;
 
-    private static final int ICON_SIZE = 8;
+    private static final int ICON_SIZE = 7;
 
     private WorkStatusHud() {}
 
