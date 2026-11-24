@@ -15,6 +15,7 @@ import java.util.WeakHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -99,6 +100,11 @@ final class BodyClearance {
     /** {@link #nearHurt} so far, by node. */
     private final Long2BooleanMap nearHurt = new Long2BooleanOpenHashMap();
 
+    private final Long2BooleanMap fitsAt = new Long2BooleanOpenHashMap();
+
+    // Nothing but blocks can be in the body's way where the search goes: see searchIn
+    private boolean onlyBlocksInTheWay;
+
     /** Floors worked out so far, by node: NaN where there's none in that node's row. */
     private final Long2DoubleMap floors = new Long2DoubleOpenHashMap();
     /** How bad standing at a node is (its worst path-type malus), by node: negative for "never". */
@@ -154,7 +160,25 @@ final class BodyClearance {
      * and the like), and no block that would hurt it ({@link #hurtsIn}).
      */
     boolean clear(AABB space) {
-        return !hurtsIn(space) && level.noCollision(mob, space);
+        if (hurtsIn(space)) {
+            return false;
+        }
+        return onlyBlocksInTheWay ? level.noBlockCollision(mob, space) : level.noCollision(mob, space);
+    }
+
+    /**
+     * Told the space a search is about to try the body in, all of it. {@code level.noCollision}
+     * looks up the entities round every box it's asked about, and a search asks about thousands,
+     * nearly always to find none that count: only a solid one does (a boat, a shulker). So they're
+     * looked for once, over the whole space, and if there are none {@link #clear} asks about blocks
+     * only from here on. Not by the world border, which {@code noCollision} counts too: it looks
+     * at the border for an entity within twice the box's size of it, and no box tried is more than
+     * the body and two blocks across.
+     */
+    void searchIn(AABB space) {
+        onlyBlocksInTheWay = level.getWorldBorder().getDistanceToBorder(mob) >= 2.0 * (mob.getBbWidth() + 2.0)
+                && level.getEntities(mob, space, EntitySelector.NO_SPECTATORS.and(mob::canCollideWith))
+                        .isEmpty();
     }
 
     /**
@@ -242,6 +266,21 @@ final class BodyClearance {
     /** Whether the body fits standing on {@code floorY} with its middle at (cx, cz). */
     boolean fits(double cx, double floorY, double cz) {
         return clear(box(cx, floorY, cz));
+    }
+
+    /**
+     * {@link #fits} at a node, on the floor {@link #floorAtNode} found there. Remembered: a search
+     * comes to a node from each of the eight round it, and to one the body doesn't fit at it would
+     * try the body again every time.
+     */
+    boolean fitsAtNode(int x, int y, int z, double floorY) {
+        long key = BlockPos.asLong(x, y, z);
+        if (fitsAt.containsKey(key)) {
+            return fitsAt.get(key);
+        }
+        boolean fits = fits(centre(x), floorY, centre(z));
+        fitsAt.put(key, fits);
+        return fits;
     }
 
     /**

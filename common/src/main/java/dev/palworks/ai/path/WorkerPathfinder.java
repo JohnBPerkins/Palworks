@@ -148,6 +148,7 @@ public final class WorkerPathfinder {
         int margin = (farTrip ? FAR_MARGIN : MARGIN) + (int) Math.ceil(body.halfWidth * 2);
         int verticalMargin = farTrip ? FAR_VERTICAL_MARGIN : VERTICAL_MARGIN;
         Bounds bounds = new Bounds(start, body.node(goalX), goalRow, body.node(goalZ), margin, verticalMargin);
+        body.searchIn(bounds.space(body));
         int maxExpanded = farTrip ? FAR_MAX_EXPANDED : MAX_EXPANDED;
         Step reached = search(body, mob, start, bounds, maxExpanded, goalX, goalFloor, goalRow, goalZ);
         if (reached == null) {
@@ -294,6 +295,22 @@ public final class WorkerPathfinder {
 
         boolean contains(int x, int y, int z) {
             return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+        }
+
+        /**
+         * All the space the body is tried in by a search in these bounds, and two blocks over each
+         * way: at its nodes' middles and where the mob is (within a block of its node's), from as
+         * far below the lowest row as it's looked for a floor to drop to.
+         */
+        AABB space(BodyClearance body) {
+            double over = body.halfWidth + 2.0;
+            return new AABB(
+                    body.centre(minX) - over,
+                    minY - body.maxDrop - 2.0,
+                    body.centre(minZ) - over,
+                    body.centre(maxX) + over,
+                    maxY + body.height + 2.0,
+                    body.centre(maxZ) + over);
         }
     }
 
@@ -469,7 +486,7 @@ public final class WorkerPathfinder {
         }
         double toX = body.centre(x);
         double toZ = body.centre(z);
-        if (!body.fits(toX, floor, toZ)) {
+        if (!body.fitsAtNode(x, y, z, floor)) {
             return null;
         }
         float malus = body.malusAt(x, y, z);
