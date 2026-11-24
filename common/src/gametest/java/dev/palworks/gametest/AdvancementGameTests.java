@@ -2,6 +2,7 @@ package dev.palworks.gametest;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.advancement.WorkerAdvancements;
 import dev.palworks.mood.Mood;
 import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
@@ -10,6 +11,8 @@ import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
@@ -26,7 +29,6 @@ public class AdvancementGameTests {
             ROOT,
             "day_one",
             "fired_up",
-            "bonfire",
             "brewmaster",
             "rain_dance",
             "sow_and_tell",
@@ -42,8 +44,6 @@ public class AdvancementGameTests {
             "ground_breaking",
             "rough_diamonds",
             "jack_of_all_trades",
-            "overachiever",
-            "legendary_labour",
             "chow_time",
             "sweet_dreams",
             "power_nap",
@@ -75,7 +75,40 @@ public class AdvancementGameTests {
                         && holder.id().getPath().startsWith("workers/"))
                 .count();
         helper.assertTrue(loaded == ALL.size(), loaded + " loaded, but this test knows of " + ALL.size());
+        // Ours don't push anyone else's out: vanilla's tabs and Cobblemon's load as well
+        ServerAdvancementManager all = helper.getLevel().getServer().getAdvancements();
+        for (String other : List.of(
+                "minecraft:story/root",
+                "minecraft:adventure/root",
+                "minecraft:husbandry/root",
+                "minecraft:nether/root",
+                "minecraft:end/root",
+                "cobblemon:catching/root_catching")) {
+            helper.assertTrue(all.get(ResourceLocation.parse(other)) != null, other + " didn't load");
+        }
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "advancement_join", timeoutTicks = 200)
+    public void workersAlreadyWorkingAreCountedWhenTheirOwnerJoins(GameTestHelper helper) {
+        // A pasture's workers start working as the world loads, before their owner has joined, and
+        // what they earn then is let go: joining counts them
+        Workers.isolate(helper);
+        ServerPlayer owner = Workers.owner(helper, START);
+        Workers.sendOut(helper, owner, SQUIRTLE, START);
+        AdvancementHolder root = advancement(helper, ROOT);
+
+        helper.runAfterDelay(20, () -> {
+            for (String criterion :
+                    owner.getAdvancements().getOrStartProgress(root).getCompletedCriteria()) {
+                owner.getAdvancements().revoke(root, criterion);
+            }
+            helper.assertFalse(
+                    has(helper, owner, ROOT), "taken away, as if it had started working while they were away");
+            WorkerAdvancements.onPlayerJoin(owner);
+            helper.assertTrue(has(helper, owner, ROOT), "joining counts the worker already out");
+            helper.succeed();
+        });
     }
 
     @GameTest(template = Templates.EMPTY, batch = "advancement_water", timeoutTicks = 600)
