@@ -1,9 +1,14 @@
 package dev.palworks.gametest;
 
+import dev.palworks.animation.WorkAnimations;
 import dev.palworks.crop.TallPlants;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
+import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.job.handler.Step;
 import dev.palworks.suitability.Suitability;
+import java.util.EnumSet;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -18,6 +23,7 @@ import net.minecraft.world.level.block.Blocks;
  */
 public class TallPlantGameTests {
     private static final String BULBASAUR = "bulbasaur level=20"; // Grass: Gathering
+    private static final String GASTLY = "gastly level=20"; // Ghost: Nether work
     private static final BlockPos START = new BlockPos(1, 1, 1);
     private static final BlockPos BASE = new BlockPos(3, 1, 3);
 
@@ -120,11 +126,13 @@ public class TallPlantGameTests {
 
     @GameTest(template = Templates.EMPTY)
     public void theirItemsSayGatheringWorksThem(GameTestHelper helper) {
-        for (Item item : new Item[] {
-            Items.SUGAR_CANE, Items.CACTUS, Items.BAMBOO, Items.KELP, Items.WEEPING_VINES, Items.TWISTING_VINES
-        }) {
+        for (Item item : new Item[] {Items.SUGAR_CANE, Items.CACTUS, Items.BAMBOO, Items.KELP}) {
             helper.assertTrue(
                     JobChecks.workedWith(item).contains(Suitability.GATHERING), item + " is worked by Gathering");
+        }
+        for (Item item : new Item[] {Items.WEEPING_VINES, Items.TWISTING_VINES}) {
+            helper.assertValueEqual(
+                    JobChecks.workedWith(item), EnumSet.of(Suitability.NETHER), item + " is worked by Nether work");
         }
         helper.succeed();
     }
@@ -158,14 +166,43 @@ public class TallPlantGameTests {
     }
 
     @GameTest(template = Templates.EMPTY, timeoutTicks = 600)
-    public void aGathererCutsWeepingVinesUnderALowCeiling(GameTestHelper helper) {
+    public void aNetherWorkerCutsWeepingVinesUnderALowCeiling(GameTestHelper helper) {
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos base = weepingVines(helper);
+        Workers.sendOut(helper, GASTLY, START);
+        helper.succeedWhen(() -> {
+            helper.assertBlockPresent(Blocks.AIR, base.below());
+            helper.assertBlockPresent(Blocks.WEEPING_VINES, base);
+        });
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void netherVinesAreCutWithNetherWorksMove(GameTestHelper helper) {
+        helper.assertValueEqual(
+                JobHandlerRegistry.forJob(JobType.HARVEST_NETHER_VINES).steps().stream()
+                        .map(Step::animation)
+                        .toList(),
+                List.of(WorkAnimations.NETHER_HARVEST),
+                "Night Shade, not the other tall plants' Razor Leaf");
+        helper.assertValueEqual(
+                JobHandlerRegistry.forJob(JobType.HARVEST_KELP).steps().stream()
+                        .map(Step::animation)
+                        .toList(),
+                List.of(WorkAnimations.HARVEST),
+                "the others keep Razor Leaf");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, timeoutTicks = 400)
+    public void aGathererLeavesNetherVinesAlone(GameTestHelper helper) {
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.GRASS_BLOCK);
         BlockPos base = weepingVines(helper);
         Workers.sendOut(helper, BULBASAUR, START);
-        helper.succeedWhen(() -> {
-            helper.assertBlockPresent(Blocks.AIR, base.below());
-            helper.assertBlockPresent(Blocks.WEEPING_VINES, base);
+        helper.runAfterDelay(300, () -> {
+            helper.assertBlockPresent(Blocks.WEEPING_VINES_PLANT, base.below());
+            helper.succeed();
         });
     }
 

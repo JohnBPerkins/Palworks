@@ -2,5 +2,14 @@
   "types": {
     "ghost": 1
   },
-  "species": {}
+  "species": {
+    "cobblemon:combusken": 1,
+    "cobblemon:blaziken": 1,
+    "cobblemon:monferno": 1,
+    "cobblemon:infernape": 1,
+    "cobblemon:pignite": 1,
+    "cobblemon:emboar": 1,
+    "cobblemon:durant": 1,
+    "cobblemon:falinks": 1
+  }
 }

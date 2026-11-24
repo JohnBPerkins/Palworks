@@ -35,6 +35,15 @@ public final class WorkAnimations {
     public static final WorkAnimation HARVEST = WorkAnimation.move("harvest", "razorleaf", 30, 0.5, WorkStance.NEAR);
 
     /**
+     * Harvesting nether wart and cutting nether vines (Nether work): Night Shade, a ranged move,
+     * from where Razor Leaf is played. Its timeline starts the beam and the target particles at
+     * 1.27s (1.25 + 0.02), but in game the beam is seen to land at 1.6s, tuned by eye; aimed at the
+     * middle of the block.
+     */
+    public static final WorkAnimation NETHER_HARVEST =
+            WorkAnimation.move("nether_harvest", "nightshade", 32, 0.5, WorkStance.NEAR);
+
+    /**
      * Planting a seed: Leech Seed, a ranged move. Its seeds are thrown from 1.25s, over 0.6s, and
      * each takes 0.6s to land and sprout, so the last lands at about 2.45s: the seed goes in then,
      * as the sprouts appear, towards the end of the body animation. Aimed at the ground it's
@@ -73,7 +82,7 @@ public final class WorkAnimations {
 
     /** All of them. */
     public static final List<WorkAnimation> ALL =
-            List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP, WATER, MINE, SUMMON_BOULDER);
+            List.of(IGNITE_FURNACE, HARVEST, NETHER_HARVEST, PLANT, CHOP, WATER, MINE, SUMMON_BOULDER);
 
     /**
      * The animation a species plays in place of {@code animation}: the default, with whatever the

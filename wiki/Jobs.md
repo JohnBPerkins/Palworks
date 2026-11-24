@@ -9,7 +9,7 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | [Light brewing stands](#light-brewing-stands) | Kindling | Working |
 | [Water crops](#water-crops) | Watering | Working |
 | [Harvest crops](#harvest-crops) | Gathering | Working |
-| [Cut tall plants](#cut-tall-plants) | Gathering | Working |
+| [Cut tall plants](#cut-tall-plants) | Gathering; Nether Work for nether vines | Working |
 | [Plant crops](#plant-crops) | Planting | Working |
 | [Nether wart](#nether-wart) | Nether Work | Working |
 | [Chop trees](#chop-trees) | Lumbering | Working |
@@ -86,11 +86,11 @@ Nether wart is Nether work: see [below](#nether-wart).
 
 ## Cut tall plants
 
-**Who:** Gathering, for now. These will probably move to the particular Pokémon suited to each
-plant later.
+**Who:** Gathering, for now; Nether Work for the nether vines. These will probably move to the
+particular Pokémon suited to each plant later.
 
-A Gathering worker cuts **sugar cane**, **cactus**, **bamboo**, **kelp**, **weeping vines** and
-**twisting vines** as soon as they've grown a second block. It cuts everything but the block the
+A Gathering worker cuts **sugar cane**, **cactus**, **bamboo** and **kelp**, and a Nether Work
+worker cuts **weeping vines** and **twisting vines**, as soon as they've grown a second block. It cuts everything but the block the
 plant grows from, which stays and grows back, as you'd farm them yourself. Each block drops what
 it would by hand (a vine only drops itself now and then), and a Transporting worker picks the drops
 up.
@@ -124,12 +124,14 @@ Pitcher pods can't be planted.
 
 ## Nether wart
 
-**Who:** Nether Work (Ghost types)
+**Who:** Nether Work (Ghost types, plus a few lumberjacks at home in the Nether: Blaziken, Infernape,
+Emboar and their middle forms, Durant, Falinks; see [who can](Nether-Workers))
 
 Works like [planting](#plant-crops) and [harvesting](#harvest-crops), but on **soul sand** with
 **nether wart**, brought from a chest by a Transporting worker. Regular Planting and Gathering workers leave nether wart alone.
 
-A worker with both Nether Work and Lumbering also chops **crimson and warped trees** (see
+Nether Work workers also cut **weeping and twisting vines** (see [Cut tall plants](#cut-tall-plants)),
+and one with both Nether Work and Lumbering chops **crimson and warped trees** (see
 [Chop trees](#chop-trees)).
 
 ## Chop trees

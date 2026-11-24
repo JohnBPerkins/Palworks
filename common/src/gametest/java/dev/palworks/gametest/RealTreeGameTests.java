@@ -193,6 +193,33 @@ public class RealTreeGameTests {
         });
     }
 
+    // Huge fungi as they grow from a bone-mealed fungus, on their nylium, chopped by a Ghost
+    // lumberjack (nether trees take Lumbering + Nether)
+
+    @GameTest(template = Templates.ARENA, batch = "real_crimson", timeoutTicks = 300)
+    public void aegislashChopsARealCrimsonFungusAndReplantsIt(GameTestHelper helper) {
+        chopRealTree(
+                helper,
+                TreeFeatures.CRIMSON_FUNGUS_PLANTED,
+                11,
+                "aegislash",
+                Blocks.CRIMSON_FUNGUS,
+                Blocks.CRIMSON_NYLIUM,
+                () -> {});
+    }
+
+    @GameTest(template = Templates.ARENA, batch = "real_warped", timeoutTicks = 300)
+    public void aegislashChopsARealWarpedFungusAndReplantsIt(GameTestHelper helper) {
+        chopRealTree(
+                helper,
+                TreeFeatures.WARPED_FUNGUS_PLANTED,
+                12,
+                "aegislash",
+                Blocks.WARPED_FUNGUS,
+                Blocks.WARPED_NYLIUM,
+                () -> {});
+    }
+
     // Timeout: a chop should be done in about 100-150 ticks. 300 leaves room for a walk around the
     // canopy, but not for waiting out the 30s reservation expiry (thousands of test ticks).
 
