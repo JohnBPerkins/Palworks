@@ -8,6 +8,7 @@ import dev.palworks.worker.WorkerState;
 import dev.palworks.worker.WorkerStateManager;
 import java.util.List;
 import net.minecraft.advancements.AdvancementHolder;
+import net.minecraft.advancements.DisplayInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -68,7 +69,13 @@ public class AdvancementGameTests {
         // One that fails to decode (a renamed job type, a block that isn't there) is left out with a
         // log line, so look for each by name, and for no others
         for (String name : ALL) {
-            helper.assertTrue(advancement(helper, name) != null, "palworks:workers/" + name + " didn't load");
+            AdvancementHolder holder = advancement(helper, name);
+            helper.assertTrue(holder != null, "palworks:workers/" + name + " didn't load");
+            // Every one says so when it's earned, the root too (vanilla's roots don't)
+            DisplayInfo display = holder.value().display().orElseThrow();
+            helper.assertTrue(
+                    display.shouldShowToast() && display.shouldAnnounceChat(),
+                    name + " should show a toast and a chat message when it's earned");
         }
         long loaded = helper.getLevel().getServer().getAdvancements().getAllAdvancements().stream()
                 .filter(holder -> Palworks.MOD_ID.equals(holder.id().getNamespace())
