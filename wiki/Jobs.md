@@ -124,7 +124,8 @@ Pitcher pods can't be planted.
 
 ## Nether wart
 
-**Who:** Nether Work (Ghost types)
+**Who:** Nether Work (Ghost types, plus a few lumberjacks at home in the Nether: Blaziken, Infernape,
+Emboar and their middle forms, Durant, Falinks; see [who can](Nether-Workers))
 
 Works like [planting](#plant-crops) and [harvesting](#harvest-crops), but on **soul sand** with
 **nether wart**, brought from a chest by a Transporting worker. Regular Planting and Gathering workers leave nether wart alone.
