@@ -1,0 +1,23 @@
+{
+  "parent": "palworks:workers/root",
+  "display": {
+    "icon": {
+      "id": "minecraft:apple"
+    },
+    "title": {
+      "translate": "advancements.palworks.chow_time.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.chow_time.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "ate": {
+      "trigger": "palworks:worker_event",
+      "conditions": {
+        "event": "ate"
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "minecraft:wheat"
+    },
+    "title": {
+      "translate": "advancements.palworks.reap_what_you_sow.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.reap_what_you_sow.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "harvest_crops"
+        ],
+        "skill": "gathering"
+      }
+    }
+  }
+}

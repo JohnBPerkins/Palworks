@@ -1,0 +1,23 @@
+{
+  "parent": "palworks:workers/root",
+  "display": {
+    "icon": {
+      "id": "minecraft:oak_sign"
+    },
+    "title": {
+      "translate": "advancements.palworks.walkout.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.walkout.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "strike": {
+      "trigger": "palworks:worker_event",
+      "conditions": {
+        "event": "went_on_strike"
+      }
+    }
+  }
+}

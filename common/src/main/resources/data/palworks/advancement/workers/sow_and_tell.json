@@ -1,0 +1,26 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "minecraft:wheat_seeds"
+    },
+    "title": {
+      "translate": "advancements.palworks.sow_and_tell.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.sow_and_tell.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "plant_seeds"
+        ],
+        "skill": "planting"
+      }
+    }
+  }
+}

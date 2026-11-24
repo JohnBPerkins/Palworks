@@ -1,0 +1,35 @@
+{
+  "parent": "palworks:workers/root",
+  "display": {
+    "icon": {
+      "id": "palworks:straw_bed"
+    },
+    "title": {
+      "translate": "advancements.palworks.sweet_dreams.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.sweet_dreams.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "night": {
+      "trigger": "palworks:worker_event",
+      "conditions": {
+        "event": "slept_in_bed"
+      }
+    },
+    "nap": {
+      "trigger": "palworks:worker_event",
+      "conditions": {
+        "event": "napped_in_bed"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "night",
+      "nap"
+    ]
+  ]
+}

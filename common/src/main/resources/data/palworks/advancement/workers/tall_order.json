@@ -1,0 +1,28 @@
+{
+  "parent": "palworks:workers/reap_what_you_sow",
+  "display": {
+    "icon": {
+      "id": "minecraft:sugar_cane"
+    },
+    "title": {
+      "translate": "advancements.palworks.tall_order.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.tall_order.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "harvest_sugar_cane",
+          "harvest_cactus",
+          "harvest_bamboo",
+          "harvest_kelp"
+        ]
+      }
+    }
+  }
+}

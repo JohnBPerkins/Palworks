@@ -1,0 +1,25 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "cobblemon:tumblestone"
+    },
+    "title": {
+      "translate": "advancements.palworks.rock_collector.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.rock_collector.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ]
+      }
+    }
+  }
+}

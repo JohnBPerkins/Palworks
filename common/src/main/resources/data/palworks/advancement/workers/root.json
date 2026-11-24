@@ -1,0 +1,25 @@
+{
+  "display": {
+    "icon": {
+      "id": "cobblemon:poke_ball"
+    },
+    "title": {
+      "translate": "advancements.palworks.root.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.root.description"
+    },
+    "frame": "task",
+    "background": "minecraft:textures/block/coarse_dirt.png",
+    "show_toast": false,
+    "announce_to_chat": false
+  },
+  "criteria": {
+    "working": {
+      "trigger": "palworks:workers",
+      "conditions": {
+        "min": 1
+      }
+    }
+  }
+}

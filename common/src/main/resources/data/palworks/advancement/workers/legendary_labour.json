@@ -1,0 +1,26 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "cobblemon:master_ball"
+    },
+    "title": {
+      "translate": "advancements.palworks.legendary_labour.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.legendary_labour.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "labels": [
+          "legendary",
+          "mythical"
+        ]
+      }
+    }
+  }
+}

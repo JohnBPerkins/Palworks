@@ -1,0 +1,23 @@
+{
+  "parent": "palworks:workers/root",
+  "display": {
+    "icon": {
+      "id": "minecraft:barrel"
+    },
+    "title": {
+      "translate": "advancements.palworks.small_business.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.small_business.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "working": {
+      "trigger": "palworks:workers",
+      "conditions": {
+        "min": 5
+      }
+    }
+  }
+}
