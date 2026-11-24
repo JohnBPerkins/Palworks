@@ -123,14 +123,14 @@ loom.runs.matching { it.name == "gameTest" }.configureEach {
 }
 
 // Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers of many species,
-// with every tick timed and spark profiling, in two scenarios: `dense` (one packed farm) and `spread` (40 small
-// bases far apart). Its own source set and mod (palworks_stress, never published), so it runs alone,
+// with every tick timed and spark profiling, in three scenarios: `dense` (one packed farm), `spread`
+// (40 small bases far apart) and `night` (the packed farm from sunset to sunrise). Its own source set and mod (palworks_stress, never published), so it runs alone,
 // without the in-game tests: Fabric's GameTest API runs every test its mods register. It reuses the
 // in-game tests' helpers (Workers, Scenes), compiled in but not registered.
-// `./gradlew :fabric:runStressTest` runs both scenarios (runStressDense, then runStressSpread), each
+// `./gradlew :fabric:runStressTest` runs them all (runStressDense, runStressSpread, runStressNight), each
 // in its own server so one's workers can't add to the other's load, and each writes its results to
 // build/stress/<scenario>.json.
-def stressScenarios = ["dense", "spread"]
+def stressScenarios = ["dense", "spread", "night"]
 
 sourceSets {
     stress {
@@ -183,6 +183,7 @@ stressScenarios.each { scenario ->
     }
 }
 tasks.matching { it.name == "runStressSpread" }.configureEach { mustRunAfter "runStressDense" }
+tasks.matching { it.name == "runStressNight" }.configureEach { mustRunAfter "runStressDense", "runStressSpread" }
 tasks.register("runStressTest") {
     group = "fabric"
     description = "Runs every stress test scenario, each in its own server"
