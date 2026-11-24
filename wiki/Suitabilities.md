@@ -40,7 +40,7 @@ for its species.
 | Gathering | Harvest ripe crops and berries | Working |
 | Lumbering | Chop trees and replant saplings | Working |
 | Transporting | Pick up drops, deliver them to chests and troughs, restock troughs | Working |
-| Nether Work | Plant and harvest nether wart; chop crimson and warped trees (with Lumbering) | Working |
+| Nether Work | Plant and harvest nether wart, cut weeping and twisting vines; chop crimson and warped trees (with Lumbering) | Working |
 | Mining | Mine boulders, amethyst, tumblestone and type gems | Working |
 | Unearthing | Raise boulders for miners | Working |
 | Handiwork | Crafting | Not yet |
