@@ -36,11 +36,12 @@ public final class WorkAnimations {
 
     /**
      * Harvesting nether wart and cutting nether vines (Nether work): Night Shade, a ranged move,
-     * from where Razor Leaf is played. Its pulse reaches the target at 1.27s (1.25 + 0.02); aimed
-     * at the middle of the block.
+     * from where Razor Leaf is played. Its timeline starts the beam and the target particles at
+     * 1.27s (1.25 + 0.02), but in game the beam is seen to land at 1.6s, tuned by eye; aimed at the
+     * middle of the block.
      */
     public static final WorkAnimation NETHER_HARVEST =
-            WorkAnimation.move("nether_harvest", "nightshade", 25, 0.5, WorkStance.NEAR);
+            WorkAnimation.move("nether_harvest", "nightshade", 32, 0.5, WorkStance.NEAR);
 
     /**
      * Planting a seed: Leech Seed, a ranged move. Its seeds are thrown from 1.25s, over 0.6s, and
