@@ -255,6 +255,26 @@ public class WorkerGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = Templates.EMPTY)
+    public void aMovesMarkerIsInNobodysWay(GameTestHelper helper) {
+        // The marker a move aims at is only a position. It used to be solid, and a Pokémon's size
+        // whatever its scale: no worker could be sent to stand in or by a block another was
+        // working (its way there was refused, and the job remembered as out of reach), and
+        // anything walking by walked into it
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, GASTLY, START);
+        BlockPos block = helper.absolutePos(new BlockPos(3, 1, 5));
+        WorkAnimator.play(worker, WorkAnimations.NETHER_HARVEST, block);
+
+        List<GenericBedrockEntity> markers =
+                helper.getLevel().getEntitiesOfClass(GenericBedrockEntity.class, new AABB(block).inflate(1));
+        helper.assertValueEqual(markers.size(), 1, "markers");
+        helper.assertTrue(
+                helper.getLevel().noCollision(worker, new AABB(block).deflate(0.1)),
+                "the marker is in the way of a body in the block it's at");
+        helper.succeed();
+    }
+
     @GameTest(template = Templates.EMPTY, batch = "worker_play_out", timeoutTicks = 800)
     public void workerFacesItsWorkUntilItsAnimationIsOver(GameTestHelper helper) {
         // The next crop along is close enough to start on where it stands: it still mustn't turn

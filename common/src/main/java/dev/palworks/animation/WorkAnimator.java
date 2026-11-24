@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
@@ -74,6 +75,9 @@ public final class WorkAnimator {
      */
     static final ResourceLocation MARKER_MODEL = ResourceLocation.fromNamespaceAndPath("cobblemon", "evolution");
 
+    /** The aspect that says a marker is one of ours: see {@link #isMarker}. */
+    static final String MARKER_ASPECT = "palworks-marker";
+
     private WorkAnimator() {}
 
     /**
@@ -102,6 +106,7 @@ public final class WorkAnimator {
             // default (Cobblemon's Substitute doll) has them at full size whatever the marker's scale:
             // "middle" half a block up, "target" half a block up and half a block to one side.
             marker.setCategory(MARKER_MODEL);
+            marker.setAspects(Set.of(MARKER_ASPECT));
             marker.moveTo(target.getX() + 0.5, target.getY() + animation.aimY(), target.getZ() + 0.5, 0.0f, 0.0f);
             level.addFreshEntity(marker);
 
@@ -128,6 +133,14 @@ public final class WorkAnimator {
                     worker.getName().getString(),
                     e.toString());
         }
+    }
+
+    /**
+     * Whether this is a marker of ours: only somewhere for a move to aim, so never in anything's
+     * way (see GenericBedrockEntityMixin). Told by an aspect, which clients are sent too.
+     */
+    public static boolean isMarker(GenericBedrockEntity entity) {
+        return entity.getAspects().contains(MARKER_ASPECT);
     }
 
     /**
