@@ -1,0 +1,25 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "minecraft:chest"
+    },
+    "title": {
+      "translate": "advancements.palworks.special_delivery.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.special_delivery.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "deliver_items"
+        ]
+      }
+    }
+  }
+}

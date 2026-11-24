@@ -1,6 +1,7 @@
 package dev.palworks.job.handler;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.advancement.WorkerAdvancements;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -10,6 +11,7 @@ import dev.palworks.worker.WorkerState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 /** Everything a {@link JobHandler} needs to act at the work site. */
 public record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
@@ -43,8 +45,18 @@ public record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState s
      * {@link dev.palworks.mood.Mood#didWork}). Only where the work really happened.
      */
     void didWork(int units) {
+        didWork(units, level.getBlockState(pos()), 1);
+    }
+
+    /**
+     * {@link #didWork(int)}, for work that changed its block out of recognition (broke it): {@code
+     * worked} is the block as it was, and {@code amount} how much of it there was (a tree's logs),
+     * for its owner's advancements (see WorkerAdvancements).
+     */
+    void didWork(int units, BlockState worked, int amount) {
         dev.palworks.hunger.Hunger.didWork(pokemon, state, units);
         dev.palworks.mood.Mood.didWork(pokemon, state, units);
+        WorkerAdvancements.jobDone(pokemon, level, reservation.getJobType(), pos(), worked, amount);
     }
 
     /**

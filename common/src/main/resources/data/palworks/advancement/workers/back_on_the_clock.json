@@ -1,0 +1,23 @@
+{
+  "parent": "palworks:workers/walkout",
+  "display": {
+    "icon": {
+      "id": "minecraft:clock"
+    },
+    "title": {
+      "translate": "advancements.palworks.back_on_the_clock.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.back_on_the_clock.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "back": {
+      "trigger": "palworks:worker_event",
+      "conditions": {
+        "event": "back_to_work"
+      }
+    }
+  }
+}

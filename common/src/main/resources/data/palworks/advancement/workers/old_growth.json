@@ -1,0 +1,26 @@
+{
+  "parent": "palworks:workers/timber",
+  "display": {
+    "icon": {
+      "id": "minecraft:dark_oak_log"
+    },
+    "title": {
+      "translate": "advancements.palworks.old_growth.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.old_growth.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "chop_tree"
+        ],
+        "min_amount": 128
+      }
+    }
+  }
+}

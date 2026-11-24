@@ -1,0 +1,25 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "minecraft:iron_axe"
+    },
+    "title": {
+      "translate": "advancements.palworks.timber.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.timber.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "chop_tree"
+        ]
+      }
+    }
+  }
+}

@@ -10,6 +10,7 @@ import dev.palworks.suitability.SuitabilityDetector;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
 
 /** Mining a grown crystal (amethyst, tumblestone, a type gem): see {@link CrystalAdapter}. */
 final class MineCrystalHandler implements JobHandler {
@@ -26,11 +27,12 @@ final class MineCrystalHandler implements JobHandler {
         // Mined as with the pickaxe its Mining level stands for (more Fortune the higher it is)
         int miningLevel = SuitabilityDetector.getSuitabilityLevel(ctx.pokemon(), Suitability.MINING);
         ItemStack tool = MiningTool.forLevel(ctx.level().registryAccess(), miningLevel);
+        BlockState crystal = ctx.level().getBlockState(pos);
         // What it drops is the worker's, for transporters to pick up (see TrackedDrops)
         boolean mined = TrackedDrops.breaking(
                 ctx.pokemon().getUuid(), pos, () -> CrystalAdapter.harvest(ctx.level(), pos, ctx.entity(), tool));
         if (mined) {
-            ctx.didWork(1);
+            ctx.didWork(1, crystal, 1);
             Palworks.LOGGER.debug("{} mined the crystal at {}", ctx.name(), pos);
         }
     }

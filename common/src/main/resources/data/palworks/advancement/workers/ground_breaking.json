@@ -1,0 +1,25 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "minecraft:cobblestone"
+    },
+    "title": {
+      "translate": "advancements.palworks.ground_breaking.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.ground_breaking.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "summon_boulder"
+        ]
+      }
+    }
+  }
+}

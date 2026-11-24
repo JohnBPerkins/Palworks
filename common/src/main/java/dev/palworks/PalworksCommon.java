@@ -7,6 +7,7 @@ import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.registry.ReloadListenerRegistry;
+import dev.palworks.advancement.WorkerAdvancements;
 import dev.palworks.animation.WorkAnimationReloadListener;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.ModBlocks;
@@ -39,6 +40,7 @@ public final class PalworksCommon {
 
         ModBlocks.register();
         ModMenuTypes.register();
+        WorkerAdvancements.register();
 
         // Work suitabilities (data/<namespace>/palworks/suitability) and species' own work
         // animations (data/<namespace>/palworks/work_animations), from datapacks
@@ -84,6 +86,9 @@ public final class PalworksCommon {
         TickEvent.SERVER_POST.register(WorkLevelSync::onServerTick);
         PlayerEvent.PLAYER_QUIT.register(player -> WorkLevelSync.forget(player.getUUID()));
         LifecycleEvent.SERVER_STOPPED.register(server -> WorkLevelSync.clear());
+
+        // Workers that started working before their owner joined count for the owner's advancements
+        PlayerEvent.PLAYER_JOIN.register(WorkerAdvancements::onPlayerJoin);
 
         // Show what workers are doing as aspects, for posers to animate from
         WorkAspectSync.register();

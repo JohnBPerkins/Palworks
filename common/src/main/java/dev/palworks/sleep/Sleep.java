@@ -70,13 +70,15 @@ public final class Sleep {
 
     /**
      * Something disturbed this worker (it was hit or hurt): if it's asleep, or in its bed, it wakes
-     * and stays up for {@link #WOKEN_TICKS}. WorkerAI wakes it on its next tick.
+     * and stays up for {@link #WOKEN_TICKS}. WorkerAI wakes it on its next tick. Whether it woke it.
      */
-    public static void disturb(PokemonEntity entity) {
+    public static boolean disturb(PokemonEntity entity) {
         WorkerState state = WorkerStateManager.get(entity.getPokemon());
         if (state != null && (state.isAsleep() || state.isInBed())) {
             state.setWokenUntil(entity.level().getGameTime() + WOKEN_TICKS);
+            return true;
         }
+        return false;
     }
 
     /** Whether it's awake after being woken (from its night's sleep or a nap), and stays up a while yet. */

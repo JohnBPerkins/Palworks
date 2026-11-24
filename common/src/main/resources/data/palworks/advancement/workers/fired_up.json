@@ -1,0 +1,25 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "minecraft:fire_charge"
+    },
+    "title": {
+      "translate": "advancements.palworks.fired_up.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.fired_up.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "fuel_furnace"
+        ]
+      }
+    }
+  }
+}

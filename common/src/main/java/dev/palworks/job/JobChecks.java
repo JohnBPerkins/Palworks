@@ -148,7 +148,7 @@ public final class JobChecks {
     }
 
     /** {@link #skillsFor(Level, JobType, BlockPos)}, by the block at the job and the one under it. */
-    private static Set<Suitability> skillsFor(JobType type, BlockState at, BlockState below) {
+    public static Set<Suitability> skillsFor(JobType type, BlockState at, BlockState below) {
         return switch (type) {
             case HARVEST_CROPS ->
                 at.is(Blocks.NETHER_WART) ? EnumSet.of(Suitability.NETHER) : type.requiredSuitabilities();

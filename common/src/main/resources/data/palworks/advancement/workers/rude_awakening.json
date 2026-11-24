@@ -1,0 +1,24 @@
+{
+  "parent": "palworks:workers/sweet_dreams",
+  "display": {
+    "icon": {
+      "id": "minecraft:wooden_sword"
+    },
+    "title": {
+      "translate": "advancements.palworks.rude_awakening.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.rude_awakening.description"
+    },
+    "frame": "task",
+    "hidden": true
+  },
+  "criteria": {
+    "woke": {
+      "trigger": "palworks:worker_event",
+      "conditions": {
+        "event": "woke_a_worker"
+      }
+    }
+  }
+}

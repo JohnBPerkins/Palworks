@@ -1,0 +1,179 @@
+{
+  "parent": "palworks:workers/rock_collector",
+  "display": {
+    "icon": {
+      "id": "cobblemon:fairy_gem"
+    },
+    "title": {
+      "translate": "advancements.palworks.gem_collection.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.gem_collection.description"
+    },
+    "frame": "challenge"
+  },
+  "criteria": {
+    "normal": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:normal_gem_cluster"
+      }
+    },
+    "fire": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:fire_gem_cluster"
+      }
+    },
+    "water": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:water_gem_cluster"
+      }
+    },
+    "grass": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:grass_gem_cluster"
+      }
+    },
+    "electric": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:electric_gem_cluster"
+      }
+    },
+    "ice": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:ice_gem_cluster"
+      }
+    },
+    "fighting": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:fighting_gem_cluster"
+      }
+    },
+    "poison": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:poison_gem_cluster"
+      }
+    },
+    "ground": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:ground_gem_cluster"
+      }
+    },
+    "flying": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:flying_gem_cluster"
+      }
+    },
+    "psychic": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:psychic_gem_cluster"
+      }
+    },
+    "bug": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:bug_gem_cluster"
+      }
+    },
+    "rock": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:rock_gem_cluster"
+      }
+    },
+    "ghost": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:ghost_gem_cluster"
+      }
+    },
+    "dragon": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:dragon_gem_cluster"
+      }
+    },
+    "dark": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:dark_gem_cluster"
+      }
+    },
+    "steel": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:steel_gem_cluster"
+      }
+    },
+    "fairy": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_crystal"
+        ],
+        "blocks": "cobblemon:fairy_gem_cluster"
+      }
+    }
+  }
+}

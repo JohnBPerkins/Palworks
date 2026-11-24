@@ -1,0 +1,29 @@
+{
+  "parent": "palworks:workers/ground_breaking",
+  "display": {
+    "icon": {
+      "id": "minecraft:diamond_ore"
+    },
+    "title": {
+      "translate": "advancements.palworks.rough_diamonds.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.rough_diamonds.description"
+    },
+    "frame": "goal"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "mine_boulder"
+        ],
+        "blocks": [
+          "minecraft:diamond_ore",
+          "minecraft:deepslate_diamond_ore"
+        ]
+      }
+    }
+  }
+}

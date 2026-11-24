@@ -1,0 +1,26 @@
+{
+  "parent": "palworks:workers/special_delivery",
+  "display": {
+    "icon": {
+      "id": "palworks:oak_trough"
+    },
+    "title": {
+      "translate": "advancements.palworks.room_service.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.room_service.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "deliver_items"
+        ],
+        "blocks": "#palworks:troughs"
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Mining one block of a boulder (see {@link Boulders}): broken as with the pickaxe the miner's
@@ -36,9 +37,10 @@ final class MineBoulderHandler implements JobHandler {
         }
         int miningLevel = SuitabilityDetector.getSuitabilityLevel(ctx.pokemon(), Suitability.MINING);
         ItemStack tool = MiningTool.forBoulderBlock(level.registryAccess(), miningLevel, level.getBlockState(pos));
+        BlockState mined = level.getBlockState(pos);
         // What it drops is the worker's, for transporters to pick up (see TrackedDrops)
         TrackedDrops.breaking(ctx.pokemon().getUuid(), pos, () -> MiningTool.breakWith(level, pos, ctx.entity(), tool));
-        ctx.didWork(1);
+        ctx.didWork(1, mined, 1);
         Palworks.LOGGER.debug("{} mined a boulder's block at {}", ctx.name(), pos);
     }
 }

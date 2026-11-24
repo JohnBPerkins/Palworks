@@ -1,0 +1,23 @@
+{
+  "parent": "palworks:workers/sweet_dreams",
+  "display": {
+    "icon": {
+      "id": "palworks:red_wool_bed"
+    },
+    "title": {
+      "translate": "advancements.palworks.power_nap.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.power_nap.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "nap": {
+      "trigger": "palworks:worker_event",
+      "conditions": {
+        "event": "napped_in_bed"
+      }
+    }
+  }
+}

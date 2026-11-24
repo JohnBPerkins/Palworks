@@ -1,0 +1,20 @@
+{
+  "parent": "palworks:workers/root",
+  "display": {
+    "icon": {
+      "id": "palworks:oak_trough"
+    },
+    "title": {
+      "translate": "advancements.palworks.day_one.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.day_one.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job"
+    }
+  }
+}

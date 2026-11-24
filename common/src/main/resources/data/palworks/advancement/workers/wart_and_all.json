@@ -1,0 +1,26 @@
+{
+  "parent": "palworks:workers/day_one",
+  "display": {
+    "icon": {
+      "id": "minecraft:nether_wart"
+    },
+    "title": {
+      "translate": "advancements.palworks.wart_and_all.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.wart_and_all.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "harvest_crops"
+        ],
+        "skill": "nether"
+      }
+    }
+  }
+}

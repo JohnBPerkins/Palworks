@@ -1,0 +1,25 @@
+{
+  "parent": "palworks:workers/fired_up",
+  "display": {
+    "icon": {
+      "id": "minecraft:brewing_stand"
+    },
+    "title": {
+      "translate": "advancements.palworks.brewmaster.title"
+    },
+    "description": {
+      "translate": "advancements.palworks.brewmaster.description"
+    },
+    "frame": "task"
+  },
+  "criteria": {
+    "job": {
+      "trigger": "palworks:worker_job",
+      "conditions": {
+        "jobs": [
+          "fuel_brewing_stand"
+        ]
+      }
+    }
+  }
+}

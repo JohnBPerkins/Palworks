@@ -1,6 +1,8 @@
 package dev.palworks.job.handler;
 
 import dev.palworks.Palworks;
+import dev.palworks.advancement.WorkerAdvancements;
+import dev.palworks.advancement.WorkerEvent;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.block.TroughBlockEntity;
 import dev.palworks.hunger.Hunger;
@@ -41,6 +43,7 @@ final class EatFoodHandler implements JobHandler {
             return false;
         }
         Hunger.feed(ctx.pokemon(), 1);
+        WorkerAdvancements.event(ctx.pokemon(), WorkerEvent.ATE);
         Palworks.LOGGER.debug(
                 "{} ate from the trough at {} (fullness {}/{}, {} feed left there)",
                 ctx.name(),
