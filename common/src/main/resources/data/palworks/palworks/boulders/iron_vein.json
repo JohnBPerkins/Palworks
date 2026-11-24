@@ -1,0 +1,20 @@
+{
+  "types": [
+    "steel"
+  ],
+  "species": [
+    "cobblemon:nosepass"
+  ],
+  "pattern": "graded",
+  "stone": {
+    "minecraft:deepslate": 2,
+    "minecraft:tuff": 2,
+    "minecraft:stone": 3
+  },
+  "ores": {
+    "minecraft:coal_ore": 1,
+    "minecraft:iron_ore": 5,
+    "minecraft:gold_ore": 1,
+    "minecraft:raw_iron_block": 1
+  }
+}

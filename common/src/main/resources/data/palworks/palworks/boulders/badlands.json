@@ -1,0 +1,20 @@
+{
+  "types": [
+    "ground"
+  ],
+  "species": [],
+  "pattern": "strata",
+  "stone": {
+    "minecraft:terracotta": 1,
+    "minecraft:orange_terracotta": 1,
+    "minecraft:yellow_terracotta": 1,
+    "minecraft:red_sandstone": 1,
+    "minecraft:brown_terracotta": 1
+  },
+  "ores": {
+    "minecraft:gold_ore": 4,
+    "minecraft:iron_ore": 3,
+    "minecraft:copper_ore": 2,
+    "minecraft:redstone_ore": 1
+  }
+}

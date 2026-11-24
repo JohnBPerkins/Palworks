@@ -1,0 +1,17 @@
+{
+  "types": [
+    "bug"
+  ],
+  "species": [],
+  "pattern": "strata",
+  "stone": {
+    "minecraft:sandstone": 2,
+    "minecraft:bone_block": 1,
+    "minecraft:smooth_sandstone": 1
+  },
+  "ores": {
+    "minecraft:coal_ore": 4,
+    "minecraft:gold_ore": 1,
+    "minecraft:diamond_ore": 1
+  }
+}

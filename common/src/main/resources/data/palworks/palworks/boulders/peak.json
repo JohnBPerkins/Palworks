@@ -1,0 +1,17 @@
+{
+  "types": [
+    "flying"
+  ],
+  "species": [],
+  "pattern": "capped",
+  "stone": {
+    "minecraft:calcite": 2,
+    "minecraft:stone": 4,
+    "minecraft:andesite": 2
+  },
+  "ores": {
+    "minecraft:coal_ore": 2,
+    "minecraft:iron_ore": 3,
+    "minecraft:emerald_ore": 2
+  }
+}

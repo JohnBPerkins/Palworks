@@ -42,8 +42,14 @@ public enum JobType {
 
     // Mining: crystals that grow back (see dev.palworks.crystal.CrystalAdapter)
     MINE_CRYSTAL(Suitability.MINING, 7),
-    // Mining ores (not scanned for yet: see JobScanner's MINING_JOBS_ENABLED)
-    MINE_RESOURCE(Suitability.MINING, 7),
+    // Mining: a block of a boulder Unearthing raised (see dev.palworks.boulder.Boulders), the
+    // only blocks a miner breaks; nothing in the world itself is mined
+    MINE_BOULDER(Suitability.MINING, 7),
+
+    // Unearthing: raise a boulder for miners on open ground, one standing at a time for each
+    // worker (see dev.palworks.boulder). Made for the worker as it's handed out (JobAssigner), with
+    // the boulder rolled and a site found for it; after its other work, like watering
+    SUMMON_BOULDER(Suitability.UNEARTHING, 4),
 
     // Transporting
     COLLECT_DROPS(Suitability.TRANSPORTING, 9), // Pick up dropped items from the ground

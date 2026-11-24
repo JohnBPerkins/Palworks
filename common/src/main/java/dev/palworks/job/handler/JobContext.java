@@ -47,6 +47,15 @@ public record JobContext(Pokemon pokemon, Mob entity, Level level, WorkerState s
         dev.palworks.mood.Mood.didWork(pokemon, state, units);
     }
 
+    /**
+     * The work also took {@code units} more out of the worker than its mood shows: fullness only
+     * (see {@link dev.palworks.hunger.Hunger#didWork}), for work that's hungry work (raising a
+     * boulder).
+     */
+    void usedFood(int units) {
+        dev.palworks.hunger.Hunger.didWork(pokemon, state, units);
+    }
+
     /** Data steps leave for later steps (saved, and handed over with the job). */
     net.minecraft.nbt.CompoundTag data() {
         return state.getJobData();
