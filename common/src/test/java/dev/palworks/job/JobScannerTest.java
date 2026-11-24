@@ -1,12 +1,18 @@
 package dev.palworks.job;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 
@@ -69,5 +75,39 @@ class JobScannerTest {
         assertTrue(
                 most <= chunks / perTick,
                 "no chunk waited more than " + chunks / perTick + " ticks, but one waited " + most);
+    }
+
+    /**
+     * The chunks to scan are worked out again only when what they come from changes: a worker (or
+     * its home) in another chunk or at another height, a worker more or less, or the ranges set.
+     */
+    @Test
+    void whatTheChunksToScanComeFromChangesWithAWorkersChunkAndHeightOnly() {
+        WorkerInfo worker = new WorkerInfo(UUID.randomUUID(), new BlockPos(3, 64, 5));
+        long[] before = JobScanner.scanCentres(List.of(worker), 2, 8);
+
+        worker.position = new BlockPos(15, 64, 0); // the same chunk, the same height
+        assertArrayEquals(before, JobScanner.scanCentres(List.of(worker), 2, 8));
+        worker.home = new BlockPos(0, 64, 15); // a home that covers the same as the worker does
+        assertArrayEquals(before, JobScanner.scanCentres(List.of(worker), 2, 8));
+        worker.home = null;
+
+        worker.position = new BlockPos(16, 64, 0);
+        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 2, 8)), "the next chunk east");
+        worker.position = new BlockPos(3, 64, -1);
+        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 2, 8)), "the next chunk north");
+        worker.position = new BlockPos(3, 65, 5);
+        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 2, 8)), "a block up");
+
+        worker.position = new BlockPos(3, 64, 5);
+        assertArrayEquals(before, JobScanner.scanCentres(List.of(worker), 2, 8));
+        worker.home = new BlockPos(100, 64, 5);
+        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 2, 8)), "a home elsewhere");
+        worker.home = null;
+
+        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 3, 8)), "a wider range");
+        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker), 2, 9)), "a taller range");
+        WorkerInfo another = new WorkerInfo(UUID.randomUUID(), new BlockPos(3, 64, 5));
+        assertFalse(Arrays.equals(before, JobScanner.scanCentres(List.of(worker, another), 2, 8)), "another worker");
     }
 }

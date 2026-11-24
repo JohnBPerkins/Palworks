@@ -14,7 +14,10 @@ import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.tree.TreeDetector;
 import dev.palworks.tree.TreeSize;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -80,6 +83,10 @@ final class JobScanner {
     // blocks only gets one tree search and one job. Cleared at the start of each chunk scan.
     private final Set<BlockPos> treeBlocksSeenThisScan = new HashSet<>();
 
+    // The chunks to cover, and what they were worked out from (see getChunkScanRangesNearWorkers)
+    private long[] scanRangesFrom = new long[0];
+    private Map<ChunkPos, int[]> scanRanges = Map.of();
+
     JobScanner(JobPool pool) {
         this.pool = pool;
     }
@@ -98,9 +105,12 @@ final class JobScanner {
         // already indexed but not over all of that band counts as never scanned.
         Map<ChunkPos, int[]> scanRanges = getChunkScanRangesNearWorkers(level, workers);
         ToLongFunction<ChunkPos> lastScan = chunk -> {
-            int[] band = scanRanges.get(chunk);
             ChunkIndex index = chunkCaches.get(chunk);
-            return index != null && !index.coversBand(band[0], band[1]) ? NEVER_SCANNED : lastScan(chunk);
+            if (index == null || index.isDirty()) {
+                return NEVER_SCANNED;
+            }
+            int[] band = scanRanges.get(chunk);
+            return index.coversBand(band[0], band[1]) ? index.scanTime() : NEVER_SCANNED;
         };
 
         for (ChunkPos chunk : dueChunks(scanRanges.keySet(), lastScan, currentTime)) {
@@ -211,12 +221,6 @@ final class JobScanner {
     /** {@link #dueChunks}' "last scanned" for a chunk never scanned, or changed since its scan. */
     static final long NEVER_SCANNED = Long.MIN_VALUE;
 
-    /** When a chunk was last scanned, or {@link #NEVER_SCANNED} if it never was or it's changed since. */
-    private long lastScan(ChunkPos chunk) {
-        ChunkIndex cache = chunkCaches.get(chunk);
-        return cache == null || cache.isDirty() ? NEVER_SCANNED : cache.scanTime();
-    }
-
     /**
      * The chunks due a scan, most overdue first: those never scanned (or changed since their scan),
      * then those whose scan is oldest. In this order every chunk gets its turn, however many there
@@ -246,13 +250,19 @@ final class JobScanner {
      * Get chunks near active workers, each mapped to the [minY, maxY) band to scan.
      * The band is bounded to a vertical window around the contributing worker(s) so the
      * scan can cover every layer (no Y gaps) without sweeping the entire build height.
+     * The last tick's, while every worker and home is in the same chunk at the same height as then
+     * ({@link #scanCentres}): this is asked every tick, and it's a few dozen chunks per worker.
      */
     private Map<ChunkPos, int[]> getChunkScanRangesNearWorkers(ServerLevel level, Collection<WorkerInfo> workers) {
+        int chunkRadius = WorkRange.chunkRadius();
+        int verticalRadius = WorkRange.vertical(); // Y range above/below a worker to scan
+        long[] centres = scanCentres(workers, chunkRadius, verticalRadius);
+        if (Arrays.equals(centres, scanRangesFrom)) {
+            return scanRanges;
+        }
         Map<ChunkPos, int[]> ranges = new HashMap<>();
         int worldMinY = level.getMinBuildHeight();
         int worldMaxY = level.getMaxBuildHeight();
-        int chunkRadius = WorkRange.chunkRadius();
-        int verticalRadius = WorkRange.vertical(); // Y range above/below a worker to scan
 
         for (WorkerInfo worker : workers) {
             addScanRange(ranges, worker.position, chunkRadius, verticalRadius, worldMinY, worldMaxY);
@@ -263,7 +273,29 @@ final class JobScanner {
             }
         }
 
+        scanRangesFrom = centres;
+        scanRanges = ranges;
         return ranges;
+    }
+
+    /**
+     * All that {@link #getChunkScanRangesNearWorkers} goes by, as numbers to compare: the two
+     * ranges set, then each worker's chunk and height and its home's (its own again if it has no
+     * home, which covers the same). The same numbers give the same chunks and bands.
+     */
+    static long[] scanCentres(Collection<WorkerInfo> workers, int chunkRadius, int verticalRadius) {
+        LongList centres = new LongArrayList(2 * workers.size() + 1);
+        centres.add(((long) chunkRadius << 32) | (verticalRadius & 0xFFFFFFFFL));
+        for (WorkerInfo worker : workers) {
+            long at = scanCentre(worker.position);
+            centres.add(at);
+            centres.add(worker.home != null ? scanCentre(worker.home) : at);
+        }
+        return centres.toLongArray();
+    }
+
+    private static long scanCentre(BlockPos pos) {
+        return BlockPos.asLong(pos.getX() >> 4, pos.getY(), pos.getZ() >> 4);
     }
 
     /** Add the chunks within {@code chunkRadius} of {@code center} to scan, in a band round its height. */
