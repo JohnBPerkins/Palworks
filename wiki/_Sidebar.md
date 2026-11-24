@@ -12,6 +12,7 @@
 - [Hunger and Troughs](Hunger)
 - [Sleep and Beds](Sleep)
 - [Mood](Mood)
+- [Advancements](Advancements)
 
 **Reference**
 - [Configuration](Configuration)
