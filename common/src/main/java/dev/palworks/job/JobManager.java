@@ -6,6 +6,7 @@ import dev.palworks.Palworks;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
+import dev.palworks.boulder.Boulders;
 import dev.palworks.crop.Watering;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.WorkerDebugSync;
@@ -114,12 +115,21 @@ public class JobManager {
         if (oldState.getBlock() != newState.getBlock()) {
             Watering.forget(level, pos);
         }
+        // A boulder's block that's gone (mined, broken, blown up) isn't the boulder's any more,
+        // whether or not there are workers here now. Only on the server thread: the level's saved
+        // data isn't to be touched from others (a mod's change there is still never mined, as a
+        // boulder block is only work while it's the block placed: Boulders.isMinable)
+        List<BlockPos> boulderLeft =
+                level.getServer().isSameThread() ? Boulders.get(level).onBlockChanged(pos, newState) : List.of();
         JobManager manager = byLevel.get(level);
         if (manager == null) {
             return;
         }
-        // The jobs it gives, if its chunk has been scanned, are looked at again next tick
+        // The jobs it gives, if its chunk has been scanned, are looked at again next tick, and, if
+        // it was the last of a boulder's top layer, the rest of that boulder too (a layer further
+        // down is work now)
         manager.scanner.onBlockChanged(pos);
+        boulderLeft.forEach(manager.scanner::onBlockChanged);
         if (!manager.assigner.hasUnreachable()) {
             return;
         }

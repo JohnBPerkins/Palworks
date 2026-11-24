@@ -11,6 +11,9 @@ import dev.palworks.animation.WorkAnimationReloadListener;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.ModBlocks;
 import dev.palworks.block.TroughBlock;
+import dev.palworks.boulder.BoulderKindReloadListener;
+import dev.palworks.boulder.BoulderOreLevelsReloadListener;
+import dev.palworks.boulder.BoulderRise;
 import dev.palworks.command.PalworksCommands;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.hunger.StartingFullness;
@@ -46,6 +49,12 @@ public final class PalworksCommon {
         // How much fullness each trough food gives (data/<namespace>/palworks/trough_food)
         ReloadListenerRegistry.register(
                 PackType.SERVER_DATA, new TroughFoodReloadListener(), TroughFoodReloadListener.ID);
+        // What boulders are made of (data/<namespace>/palworks/boulders) and the Unearthing level
+        // each ore takes (data/<namespace>/palworks/boulder_ores)
+        ReloadListenerRegistry.register(
+                PackType.SERVER_DATA, new BoulderKindReloadListener(), BoulderKindReloadListener.ID);
+        ReloadListenerRegistry.register(
+                PackType.SERVER_DATA, new BoulderOreLevelsReloadListener(), BoulderOreLevelsReloadListener.ID);
 
         CommandRegistrationEvent.EVENT.register(
                 (dispatcher, registryAccess, selection) -> dispatcher.register(PalworksCommands.build()));
@@ -63,6 +72,8 @@ public final class PalworksCommon {
         // What workers and players drop is picked up by transporters, and nothing else on the
         // ground: marked as it spawns, and given a pickup job as it comes into the world
         EntityEvent.ADD.register(TrackedDrops::onEntityAdded);
+        // A rising boulder's blocks (display entities) are never loaded back: see BoulderRise
+        EntityEvent.ADD.register(BoulderRise::onEntityAdded);
 
         // Admins' in-game changes to work suitabilities (/palworks suitability), saved with the world
         LifecycleEvent.SERVER_STARTING.register(server -> SuitabilityOverrides.load(

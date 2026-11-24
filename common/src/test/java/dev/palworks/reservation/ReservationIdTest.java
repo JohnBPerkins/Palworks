@@ -41,7 +41,7 @@ class ReservationIdTest {
 
     @Test
     void timestampIsRetained() {
-        ReservationId a = new ReservationId(POS, JobType.MINE_RESOURCE, 12_345L);
+        ReservationId a = new ReservationId(POS, JobType.MINE_BOULDER, 12_345L);
         assertEquals(12_345L, a.getTimestamp());
     }
 

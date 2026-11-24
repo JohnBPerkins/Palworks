@@ -31,6 +31,7 @@
       "dev.palworks.gametest.JobIndexGameTests",
       "dev.palworks.gametest.PaceGameTests",
       "dev.palworks.gametest.CrystalGameTests",
+      "dev.palworks.gametest.BoulderGameTests",
       "dev.palworks.gametest.BrewingGameTests"
     ]
   },

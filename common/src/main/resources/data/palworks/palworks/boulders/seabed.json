@@ -1,0 +1,18 @@
+{
+  "types": [
+    "water"
+  ],
+  "species": [],
+  "pattern": "patches",
+  "stone": {
+    "minecraft:prismarine": 3,
+    "minecraft:dark_prismarine": 1,
+    "minecraft:clay": 2,
+    "minecraft:stone": 2
+  },
+  "ores": {
+    "minecraft:copper_ore": 3,
+    "minecraft:lapis_ore": 3,
+    "minecraft:sea_lantern": 1
+  }
+}

@@ -141,7 +141,8 @@ final class JobPool {
                 || job.type() == JobType.BRING_SEEDS
                 || job.type() == JobType.EAT_FOOD
                 || job.type() == JobType.FETCH_FOOD
-                || job.type() == JobType.SLEEP) {
+                || job.type() == JobType.SLEEP
+                || job.type() == JobType.SUMMON_BOULDER) {
             return;
         }
         job.release(gameTime);

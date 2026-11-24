@@ -1,10 +1,12 @@
 package dev.palworks.job;
 
 import dev.palworks.Palworks;
+import dev.palworks.boulder.Boulders;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.crop.TallPlants;
 import dev.palworks.crop.Watering;
 import dev.palworks.crystal.CrystalAdapter;
+import dev.palworks.crystal.MiningTool;
 import dev.palworks.job.JobPool.JobKey;
 import dev.palworks.job.WorkerRegistry.WorkerInfo;
 import dev.palworks.station.BrewingStandHelper;
@@ -53,7 +55,6 @@ final class JobScanner {
     // (looking it up, its sections' palettes, replacing its cache): at most 32 a tick, enough to
     // keep 1280 fresh, so a server's many mostly empty chunks are spread over the ticks
     private static final int CHUNK_SCAN_COST = 1024;
-    private static final boolean MINING_JOBS_ENABLED = false; // Flip on once MINE_RESOURCE breaks ores
 
     private final JobPool pool;
 
@@ -382,26 +383,18 @@ final class JobScanner {
                         cache.addPlace(pos.immutable(), state);
 
                         // Check for job opportunities at this position
-                        JobRecord job = scanPositionForJob(level, pos, state);
-                        // Indexed even if a worker has it: when it's done, or given back, the
-                        // block's next change says whether it's still there
-                        if (job != null) {
-                            cache.addJob(pos.immutable(), JobKey.of(job));
-                        }
-                        if (job != null && !pool.isReserved(JobKey.of(job))) {
-                            if (Palworks.LOGGER.isTraceEnabled()) {
-                                Palworks.LOGGER.trace(
-                                        "Chunk scan: Found {} at {} (scanned pos was {}, job pos is {})",
-                                        job.type(),
-                                        job.position(),
-                                        new BlockPos(worldX, y, worldZ),
-                                        job.position());
-                            }
-                            pool.offer(job);
-                        }
+                        offerFound(cache, pos, scanPositionForJob(level, pos, state));
                     }
                 }
             }
+        }
+
+        // Boulders' blocks are found by where they are, not what they are: most are plain stone,
+        // which the sections above skip (JobChecks.canNeverBeWork). The ones in this band are
+        // looked at here, whatever their section holds.
+        for (BlockPos boulderBlock : Boulders.get(level).blocksIn(chunkPos, scanMinY, scanMaxY)) {
+            blocksScanned++;
+            offerFound(cache, boulderBlock, scanPositionForJob(level, boulderBlock, level.getBlockState(boulderBlock)));
         }
 
         // Jobs the last scan of this chunk found but this one didn't are gone (a player harvested the
@@ -413,6 +406,24 @@ final class JobScanner {
 
         chunkCaches.put(chunkPos, cache);
         return blocksScanned;
+    }
+
+    /**
+     * A job the chunk scan found at {@code pos} (if any): put in the chunk's index even if a worker
+     * has it (when it's done, or given back, the block's next change says whether it's still there),
+     * and offered unless someone has it.
+     */
+    private void offerFound(ChunkIndex cache, BlockPos pos, @Nullable JobRecord job) {
+        if (job == null) {
+            return;
+        }
+        cache.addJob(pos.immutable(), JobKey.of(job));
+        if (!pool.isReserved(JobKey.of(job))) {
+            if (Palworks.LOGGER.isTraceEnabled()) {
+                Palworks.LOGGER.trace("Chunk scan: Found {} at {} (scanned at {})", job.type(), job.position(), pos);
+            }
+            pool.offer(job);
+        }
     }
 
     /** Remove the available jobs an earlier scan found that a newer scan of the same chunk didn't. */
@@ -527,10 +538,16 @@ final class JobScanner {
             return JobRecord.of(JobType.MINE_CRYSTAL, pos, now);
         }
 
-        // Check for mining jobs (ores). Off until mining is implemented (MINE_RESOURCE's handler
-        // doesn't break the ore yet), so workers don't walk to ores and stand there forever.
-        if (MINING_JOBS_ENABLED && state.is(JobBlockTags.ORES)) {
-            return JobRecord.of(JobType.MINE_RESOURCE, pos, now);
+        // A boulder's block, at its top (Mining): the only blocks a miner breaks. A wooden
+        // pickaxe gets nothing from most ores, so those wait for a miner of level 2 or more.
+        if (level instanceof ServerLevel serverLevel
+                && Boulders.get(serverLevel).isMinable(pos, state)) {
+            return JobRecord.of(
+                    JobType.MINE_BOULDER,
+                    pos,
+                    now,
+                    JobType.MINE_BOULDER.requiredSuitabilities(),
+                    MiningTool.levelToHarvest(state));
         }
 
         return null;

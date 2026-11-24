@@ -6,6 +6,7 @@
 - [Suitabilities](Suitabilities)
 - [Work skills by Pokémon](Work-Skills-by-Pokemon)
 - [Jobs](Jobs)
+- [Boulders](Boulders)
 
 **Looking after workers**
 - [Hunger and Troughs](Hunger)

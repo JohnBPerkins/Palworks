@@ -1,12 +1,17 @@
 package dev.palworks.command;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.architectury.platform.Platform;
+import dev.palworks.boulder.BoulderKind;
+import dev.palworks.boulder.BoulderKinds;
 import java.util.function.Consumer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -64,6 +69,26 @@ public final class PalworksCommands {
 
                 // Build a test area (furnaces and brewing stands, every crop and tree) from where the player stands
                 .then(Commands.literal("testarea").executes(ctx -> run(ctx, DebugCommand::buildTestArea)))
+
+                // A grid of boulders to look at: every kind and style at a level (5 if not given), or
+                // one kind at every level
+                .then(Commands.literal("boulders")
+                        .executes(ctx -> run(ctx, player -> DebugCommand.buildBoulderShowcase(player, 5, null)))
+                        .then(Commands.argument("level", IntegerArgumentType.integer(1, 5))
+                                .executes(ctx -> run(
+                                        ctx,
+                                        player -> DebugCommand.buildBoulderShowcase(
+                                                player, IntegerArgumentType.getInteger(ctx, "level"), null))))
+                        .then(Commands.literal("kind")
+                                .then(Commands.argument("kind", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+                                                BoulderKinds.current().all().stream()
+                                                        .map(BoulderKind::id),
+                                                builder))
+                                        .executes(ctx -> run(
+                                                ctx,
+                                                player -> DebugCommand.buildBoulderShowcase(
+                                                        player, 5, StringArgumentType.getString(ctx, "kind")))))))
 
                 // Make the nearest owned Pokémon drowsy now, as Cobblemon does (in its resting hours)
                 .then(Commands.literal("sleep").executes(ctx -> run(ctx, DebugCommand::makeNearestDrowsy)))

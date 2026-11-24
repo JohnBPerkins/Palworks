@@ -63,8 +63,17 @@ public final class WorkAnimations {
      */
     public static final WorkAnimation MINE = WorkAnimation.move("mine", "pound", 25, 0.25, WorkStance.AGAINST);
 
+    /**
+     * Raising a boulder: a ground move, its shockwave at the middle of where the boulder rises (the
+     * floor dust lands at 0.65s). From further off than other work: ring 5 or more from the middle,
+     * past the widest boulder (8 across: 4 each way), so the worker never stands where it rises.
+     */
+    public static final WorkAnimation SUMMON_BOULDER =
+            WorkAnimation.move("summon_boulder", "bulldoze", 13, 0.0, new WorkStance(1.5, 5, 7, 2.0));
+
     /** All of them. */
-    public static final List<WorkAnimation> ALL = List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP, WATER, MINE);
+    public static final List<WorkAnimation> ALL =
+            List.of(IGNITE_FURNACE, HARVEST, PLANT, CHOP, WATER, MINE, SUMMON_BOULDER);
 
     /**
      * The animation a species plays in place of {@code animation}: the default, with whatever the

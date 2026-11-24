@@ -17,7 +17,8 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | [Deliver items](#deliver-items) | Transporting | Working |
 | [Restock troughs](#restock-troughs) | Transporting | Working |
 | [Mine crystals](#mine-crystals) | Mining | Working |
-| [Mine ores](#mine-ores) | Mining | Not yet |
+| [Raise boulders](#raise-boulders) | Unearthing | Working |
+| [Mine boulders](#mine-boulders) | Mining | Working |
 
 Crafting (Handiwork), and work for Medicine Production, Generating Electricity, Cooling and
 Farming are planned; nothing uses them yet.
@@ -198,7 +199,7 @@ fetches a stack of food from a chest that has some and takes it to the trough.
 
 ## Mine crystals
 
-**Who:** Mining (Ground, Rock and Fighting types)
+**Who:** Mining (Ground and Fighting types)
 
 Mining workers mine crystals once they're fully grown, getting exactly what you'd get breaking them
 with a pickaxe: a wooden one at level 1, a diamond one at level 2, and a diamond one with Fortune I
@@ -220,14 +221,52 @@ is left alone.
 
 A Transporting worker then picks up the drops.
 
-## Mine ores
+## Raise boulders
 
-**Who:** Mining (Ground, Rock and Fighting types)
-**Status:** not yet
+**Who:** Unearthing (Rock types, and Groudon)
+**Blocks:** none: it needs open, flat ground
 
-Mining is switched off until workers can break ore: they don't look for ores at all yet. The blocks
-that will count as ore come from the `#palworks:ores` tag. See
-[Datapacks and Tags](Datapacks-and-Tags).
+An Unearthing worker stamps the ground and a boulder rises out of it, for Mining workers to break
+up. Each worker keeps one boulder of its own standing, and raises the next once that one is mined
+away. It raises one only when it has no other work to do. It's hungry work: a boulder costs a
+point of fullness for every 20 blocks, and at least one.
+
+What a boulder is made of depends on the worker's type besides Rock. A Geodude (Rock and Ground)
+raises banded terracotta, an Alolan Geodude (Rock and Electric) granite with copper, and an Aron
+(Steel) deepslate and stone with iron. About one boulder in eight has ore, here and there in
+it. How big it is, and how much ore the ones with ore have, depend on its
+[work level](Suitabilities#work-levels). See [Boulders](Boulders) for every kind.
+
+A boulder only goes on open, flat ground in the worker's work range, with room round it:
+
+- Its footprint needs nothing on it at all, not even grass or a flower. **Nothing is ever broken or
+  replaced to make room.**
+- Two blocks all round it need nothing solid on them: a flower there is fine, and is left alone.
+- All of it, footprint and border, must be full blocks at one height: no steps, holes, slabs or
+  water.
+
+A pasture covered in grass has nowhere to put one, so clear a patch of ground for it (or lay a
+floor of stone or dirt). A pastured worker only uses ground inside its pasture's range, and one in
+your party ground near you.
+
+## Mine boulders
+
+**Who:** Mining (Ground and Fighting types: a Rock/Ground Pokémon like Geodude mines, a Rock type alone raises boulders)
+**Blocks:** the blocks of boulders that [Unearthing](#raise-boulders) workers raised
+
+Miners break boulders down a block at a time, from the top. A small miner climbs the boulder's
+sides, which always step up a block at a time; a big one reaches higher, up to its own height and
+two blocks more, so a Rhyperior mines a tall boulder's top from the ground. Natural stone and ore in the world are
+never mined: only boulders, and [crystals](#mine-crystals). Each block drops what it would for a
+player with the pickaxe the miner's [work level](Suitabilities#work-levels) stands for: stone gives
+cobblestone, and ore gives more with Fortune from level 3. Packed and blue ice are mined as with
+Silk Touch, so they drop themselves.
+
+A level 1 miner mines with a wooden pickaxe, which gets nothing from iron, copper, lapis, gold,
+redstone, diamond or emerald ore. It leaves those for a miner of level 2 or more, so with only
+level 1 miners some of a boulder stays standing.
+
+A Transporting worker then picks up the drops.
 
 ## Job priority
 
@@ -237,11 +276,13 @@ is. From most to least important:
 1. Deliver items, bring seeds to a planter, pick up seeds brought to it
 2. Pick up drops, restock troughs
 3. Harvest crops
-4. Light furnaces and brewing stands, mine crystals
+4. Light furnaces and brewing stands, mine crystals, mine boulders
 5. Fetch seeds from a chest
 6. Plant crops
 7. Chop trees
 8. Water crops
+
+An Unearthing worker raises a boulder only when none of these is left for it.
 
 Eating at a [trough](Hunger) when hungry and going to [bed](Sleep) at bedtime come before any work.
 While there's a ripe crop to harvest, Planting workers don't plant.

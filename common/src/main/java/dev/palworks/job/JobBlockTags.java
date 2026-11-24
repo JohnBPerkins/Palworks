@@ -28,7 +28,4 @@ public final class JobBlockTags {
      * ignored.
      */
     public static final TagKey<Block> BREWING_STANDS = TagKey.create(Registries.BLOCK, Palworks.id("brewing_stands"));
-
-    /** Blocks a MINING worker will break for {@link JobType#MINE_RESOURCE}. */
-    public static final TagKey<Block> ORES = TagKey.create(Registries.BLOCK, Palworks.id("ores"));
 }

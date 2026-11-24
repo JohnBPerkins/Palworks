@@ -1,0 +1,17 @@
+{
+  "types": [],
+  "species": [
+    "cobblemon:nacli",
+    "cobblemon:naclstack",
+    "cobblemon:garganacl"
+  ],
+  "pattern": "strata",
+  "stone": {
+    "minecraft:calcite": 2,
+    "minecraft:diorite": 1,
+    "minecraft:quartz_block": 1
+  },
+  "ores": {
+    "minecraft:nether_quartz_ore": 1
+  }
+}

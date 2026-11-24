@@ -1,0 +1,20 @@
+{
+  "types": [
+    "fire"
+  ],
+  "species": [
+    "cobblemon:groudon"
+  ],
+  "pattern": "graded",
+  "stone": {
+    "minecraft:basalt": 3,
+    "minecraft:blackstone": 3,
+    "minecraft:netherrack": 2
+  },
+  "ores": {
+    "minecraft:coal_ore": 4,
+    "minecraft:nether_quartz_ore": 3,
+    "minecraft:nether_gold_ore": 3,
+    "minecraft:ancient_debris": 1
+  }
+}

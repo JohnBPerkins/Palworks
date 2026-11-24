@@ -40,13 +40,13 @@ public final class JobHandlerRegistry {
             case WATER_CROPS -> new WaterCropsHandler();
             case CHOP_TREE -> new ChopTreeHandler();
             case MINE_CRYSTAL -> new MineCrystalHandler();
+            case MINE_BOULDER -> new MineBoulderHandler();
+            case SUMMON_BOULDER -> new SummonBoulderHandler();
             case EAT_FOOD -> new EatFoodHandler();
             case FETCH_FOOD -> new FetchFoodHandler();
             case BRING_SEEDS -> new BringSeedsHandler();
             case TAKE_SEEDS -> new TakeSeedsHandler();
             case SLEEP -> new SleepHandler();
-            // Stands 4s but doesn't break the ore yet (mining isn't scanned for until it does)
-            case MINE_RESOURCE -> () -> List.of(Step.pause("wait", species -> 80));
         };
     }
 

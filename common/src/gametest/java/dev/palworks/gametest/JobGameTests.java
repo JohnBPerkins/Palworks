@@ -59,7 +59,6 @@ public class JobGameTests {
             String what = block + " ";
             helper.assertTrue(JobChecks.canNeverBeWork(state), what + "counts as never work");
             helper.assertFalse(state.is(JobBlockTags.FURNACES), what + "is a furnace");
-            helper.assertFalse(state.is(JobBlockTags.ORES), what + "is an ore");
             helper.assertFalse(JobChecks.isChest(state), what + "is a chest");
             helper.assertFalse(TreeDetector.isTreeBlock(state), what + "is part of a tree");
             helper.assertTrue(CropAdapter.attachedFruitPos(state, abs) == null, what + "has a fruit");

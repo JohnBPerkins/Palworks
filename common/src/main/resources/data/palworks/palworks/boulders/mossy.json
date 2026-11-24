@@ -1,0 +1,16 @@
+{
+  "types": [
+    "grass"
+  ],
+  "species": [],
+  "pattern": "capped",
+  "stone": {
+    "minecraft:moss_block": 2,
+    "minecraft:mossy_cobblestone": 3,
+    "minecraft:stone": 2
+  },
+  "ores": {
+    "minecraft:copper_ore": 3,
+    "minecraft:iron_ore": 2
+  }
+}

@@ -2,6 +2,9 @@ package dev.palworks.command;
 
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.boulder.BoulderKind;
+import dev.palworks.boulder.BoulderKinds;
+import dev.palworks.debug.BoulderShowcase;
 import dev.palworks.debug.DebugInfo;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.debug.TestArea;
@@ -58,6 +61,36 @@ public class DebugCommand {
                 player.sendSystemMessage(Component.literal("§e- " + problem));
             }
         }
+    }
+
+    /**
+     * Build a grid of boulders east and south of the player (see {@link BoulderShowcase}): every
+     * kind in every style at {@code level}, or, with {@code kindId}, that kind in every style at
+     * every level.
+     */
+    public static void buildBoulderShowcase(ServerPlayer player, int level, @Nullable String kindId) {
+        if (!(player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+            return;
+        }
+        if (BoulderKinds.current().all().isEmpty()) {
+            player.sendSystemMessage(Component.literal("§eNo boulder kinds are loaded (data/*/palworks/boulders)."));
+            return;
+        }
+        BoulderShowcase.Result result;
+        if (kindId == null) {
+            result = BoulderShowcase.everyKind(
+                    serverLevel, player.blockPosition().offset(2, 0, 2), level);
+        } else {
+            BoulderKind kind = BoulderKinds.current().get(kindId);
+            if (kind == null) {
+                player.sendSystemMessage(Component.literal("§eNo boulder kind \"" + kindId + "\"."));
+                return;
+            }
+            result = BoulderShowcase.oneKind(serverLevel, player.blockPosition().offset(2, 0, 2), kind);
+        }
+        player.sendSystemMessage(Component.literal(String.format(
+                "Built %d boulders from %s to %s.",
+                result.boulders(), result.min().toShortString(), result.max().toShortString())));
     }
 
     /** Clear all worker reservations (force fresh job assignments). */
