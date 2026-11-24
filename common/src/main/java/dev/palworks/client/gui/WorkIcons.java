@@ -49,6 +49,7 @@ public final class WorkIcons {
     private static final Icon APPLE = item("apple");
     private static final Icon BAMBOO = item("bamboo");
     private static final Icon BARRIER = item("barrier");
+    private static final Icon BREWING_STAND = item("brewing_stand");
     private static final Icon CACTUS = item("cactus");
     private static final Icon CHEST = item("chest");
     private static final Icon FIRE_CHARGE = item("fire_charge");
@@ -100,6 +101,7 @@ public final class WorkIcons {
     public static Icon forJob(JobType job) {
         return switch (job) {
             case FUEL_FURNACE -> FIRE_CHARGE;
+            case FUEL_BREWING_STAND -> BREWING_STAND;
             case PLANT_SEEDS -> OAK_SAPLING;
             case TAKE_SEEDS -> OAK_SAPLING;
             case HARVEST_CROPS -> WHEAT;

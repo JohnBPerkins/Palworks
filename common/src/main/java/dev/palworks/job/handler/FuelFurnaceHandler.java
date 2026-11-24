@@ -38,7 +38,7 @@ final class FuelFurnaceHandler implements JobHandler {
     }
 
     private static boolean staysAtItsFurnace(JobContext ctx) {
-        return KindlingHeat.staysAtItsFurnace(kindlingLevel(ctx));
+        return KindlingHeat.staysToRelight(kindlingLevel(ctx));
     }
 
     private static void ignite(JobContext ctx) {

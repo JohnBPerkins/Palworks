@@ -22,10 +22,17 @@ class KindlingHeatTest {
     }
 
     @Test
-    void onlyALevelOneKindlerStaysAtItsFurnace() {
-        assertTrue(KindlingHeat.staysAtItsFurnace(1));
+    void eachLevelsEmberBrewsAsManyTimesAsItSmeltsItems() {
+        for (int level = 1; level <= 5; level++) {
+            assertEquals(KindlingHeat.itemsPerEmber(level), KindlingHeat.brewsPerEmber(level), "level " + level);
+        }
+    }
+
+    @Test
+    void onlyALevelOneKindlerStaysToRelight() {
+        assertTrue(KindlingHeat.staysToRelight(1));
         for (int level = 2; level <= 5; level++) {
-            assertFalse(KindlingHeat.staysAtItsFurnace(level), "level " + level);
+            assertFalse(KindlingHeat.staysToRelight(level), "level " + level);
         }
     }
 }

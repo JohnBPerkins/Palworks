@@ -29,6 +29,7 @@ public final class JobHandlerRegistry {
     private static JobHandler create(JobType type) {
         return switch (type) {
             case FUEL_FURNACE -> new FuelFurnaceHandler();
+            case FUEL_BREWING_STAND -> new FuelBrewingStandHandler();
             case GET_SEEDS -> new GetSeedsHandler();
             case COLLECT_DROPS -> new CollectDropsHandler();
             case DELIVER_ITEMS -> new DeliverItemsHandler();

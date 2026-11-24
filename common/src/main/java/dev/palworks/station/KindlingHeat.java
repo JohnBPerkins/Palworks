@@ -3,8 +3,9 @@ package dev.palworks.station;
 /**
  * How long a kindler's Ember keeps a furnace burning, by its Kindling level: as fuel does, so many
  * items' smelting a light (1, 2, 4, 8 or 16 in a furnace; twice as many in a blast furnace or a
- * smoker, which cook twice as fast). A level 1 kindler stays at its furnace and lights it again for
- * each item; one of a higher level lights it and moves on, and comes back once it's gone out.
+ * smoker, which cook twice as fast). A brewing stand gets as many brews (blaze powder gives 20). A
+ * level 1 kindler stays at its furnace or stand and lights it again for each; one of a higher level
+ * lights it and moves on, and comes back once it's gone out.
  * Pure logic (no Minecraft types) so it can be unit-tested.
  */
 public final class KindlingHeat {
@@ -24,8 +25,16 @@ public final class KindlingHeat {
         return ITEM_TICKS * itemsPerEmber(kindlingLevel) + 1;
     }
 
-    /** Whether a kindler of this level stays at its furnace to light it again (only level 1's does). */
-    public static boolean staysAtItsFurnace(int kindlingLevel) {
+    /** How many brews a brewing stand gets from one Ember from a kindler of this level. */
+    public static int brewsPerEmber(int kindlingLevel) {
+        return itemsPerEmber(kindlingLevel);
+    }
+
+    /**
+     * Whether a kindler of this level stays at its furnace or stand to light it again (only level
+     * 1's does).
+     */
+    public static boolean staysToRelight(int kindlingLevel) {
         return itemsPerEmber(kindlingLevel) == 1;
     }
 }

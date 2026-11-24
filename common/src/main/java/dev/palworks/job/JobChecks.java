@@ -15,6 +15,7 @@ import dev.palworks.hunger.TroughFood;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.sleep.Sleep;
+import dev.palworks.station.BrewingStandHelper;
 import dev.palworks.station.ChestHelper;
 import dev.palworks.station.FurnaceHelper;
 import dev.palworks.suitability.Suitability;
@@ -99,12 +100,14 @@ public final class JobChecks {
      * check it on their way to a job, so they drop it instead of finishing the walk when it's gone
      * (crop already harvested, tree chopped, chest emptied...), and as they work, so they stop
      * when it goes, and a step's effect never lands on a job that isn't there. A job changes some
-     * things itself as it goes, so a few checks are looser than the scan's: a furnace the worker
-     * has lit is still its job (see FurnaceHelper.canUseHeat).
+     * things itself as it goes, so a few checks are looser than the scan's: a furnace or brewing
+     * stand the worker has lit is still its job (see FurnaceHelper.canUseHeat,
+     * BrewingStandHelper.canUseCharge).
      */
     public static boolean isJobStillThere(Level level, JobType type, BlockPos pos) {
         return switch (type) {
             case FUEL_FURNACE -> FurnaceHelper.canUseHeat(level, pos);
+            case FUEL_BREWING_STAND -> BrewingStandHelper.canUseCharge(level, pos);
             case HARVEST_CROPS -> CropAdapter.isFullyGrown(level, pos) || CropAdapter.isAttachedFruit(level, pos);
             case HARVEST_SUGAR_CANE, HARVEST_CACTUS, HARVEST_BAMBOO, HARVEST_KELP, HARVEST_NETHER_VINES ->
                 TallPlants.ripeJobAt(level, pos) == type;
@@ -308,7 +311,7 @@ public final class JobChecks {
     /**
      * The work skills an item's block is worked with: the checks the scan finds jobs by
      * (JobScanner.scanPositionForJob), and the chests and troughs transporters deliver to, asked of
-     * the kind of block only, not of one in the world. A furnace is lit (Kindling) whether it has
+     * the kind of block only, not of one in the world. A furnace or brewing stand is lit (Kindling) whether it has
      * anything to smelt now or not, a crop is harvested (Gathering) once it's ripe, a log is chopped
      * (Lumbering) when it's part of a tree. Also the seeds planters plant and the saplings
      * lumberjacks replant. For the "Worked by" tooltip (see client.gui.WorkedByTooltip); nothing
@@ -330,6 +333,9 @@ public final class JobChecks {
         BlockState state = blockItem.getBlock().defaultBlockState();
         if (state.is(JobBlockTags.FURNACES)) {
             skills.addAll(JobType.FUEL_FURNACE.requiredSuitabilities());
+        }
+        if (state.is(JobBlockTags.BREWING_STANDS)) {
+            skills.addAll(JobType.FUEL_BREWING_STAND.requiredSuitabilities());
         }
         // A stem's own fruit is harvested (the scan finds it from the stem)
         if (CropAdapter.isHarvestable(state) || state.getBlock() instanceof StemBlock) {
