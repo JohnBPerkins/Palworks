@@ -259,26 +259,40 @@ public class BoulderGameTests {
     // ---- Mining them ----
 
     @GameTest(template = Templates.EMPTY)
-    public void aBoulderIsMinedFromItsTopTwoLayersDown(GameTestHelper helper) {
+    public void aBoulderIsMinedOnlyAsHighAsAMinerOnTheGroundReaches(GameTestHelper helper) {
         Scenes.floor(helper, Blocks.STONE);
         ServerLevel level = level(helper);
-        // A 4-high column beside a 1-high one
+        // A 5-high column beside a 2-high one
         Boulders.get(level)
                 .place(
                         level,
                         helper.absolutePos(CORNER),
-                        plan(List.of(STONE, STONE, STONE, STONE, STONE), new int[] {1}, new int[] {4}),
+                        plan(List.of(STONE, STONE, STONE, STONE, STONE, STONE, IRON_ORE), new int[] {2}, new int[] {5}),
                         null);
         BlockPos low = CORNER;
         BlockPos column = CORNER.east();
-        helper.assertTrue(minable(helper, column.above(3)), "its top");
-        helper.assertFalse(minable(helper, column.above(2)), "one with a block on it");
-        helper.assertFalse(minable(helper, low), "the low one, three layers down");
-        helper.destroyBlock(column.above(3));
-        helper.assertTrue(minable(helper, column.above(2)), "the next down, once the top's gone");
-        helper.assertFalse(minable(helper, low), "the low one, still too far down");
+        helper.assertTrue(minable(helper, low.above()), "the short column's top");
+        helper.assertFalse(minable(helper, low), "under it");
+        helper.assertTrue(minable(helper, column.above(2)), "the tall one's third block");
+        helper.assertFalse(minable(helper, column.above(3)), "above reach");
+        helper.assertFalse(minable(helper, column.above(4)), "its top, above reach");
+        helper.assertFalse(minable(helper, column.above(1)), "under the third");
+
+        // Mined as a miner does: what's above drops a block, the ore on top with it
+        BlockPos third = helper.absolutePos(column.above(2));
         helper.destroyBlock(column.above(2));
-        helper.assertTrue(minable(helper, low), "the low one, in the top two layers now");
+        Boulders.get(level).settleAbove(level, third);
+        helper.assertBlockPresent(Blocks.STONE, column.above(2));
+        helper.assertBlockPresent(Blocks.IRON_ORE, column.above(3));
+        helper.assertBlockPresent(Blocks.AIR, column.above(4));
+        helper.assertTrue(minable(helper, column.above(2)), "the third again, what dropped into it");
+        helper.assertFalse(minable(helper, column.above(3)), "the ore, still above reach");
+        helper.assertTrue(
+                Boulders.get(level).boulderAt(helper.absolutePos(column.above(3))) != null,
+                "the ore still the boulder's");
+        helper.assertTrue(
+                Boulders.get(level).boulderAt(helper.absolutePos(column.above(4))) == null,
+                "nothing where its top was");
         helper.succeed();
     }
 
@@ -359,6 +373,29 @@ public class BoulderGameTests {
             helper.assertValueEqual(Scenes.itemsOnGround(helper, ice.asItem()), 1, ice + " dropped");
         }
         helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "boulder_tall", timeoutTicks = 2400)
+    public void aMinerClearsAColumnTooTallToReachTheTopOf(GameTestHelper helper) {
+        // Six high: only its bottom three can be reached from the ground, so it's worked from
+        // there, coming down a block each time, until it's gone
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.STONE);
+        ServerLevel level = level(helper);
+        Boulders.get(level)
+                .place(
+                        level,
+                        helper.absolutePos(CORNER),
+                        plan(List.of(STONE, STONE, STONE, STONE, STONE, STONE), new int[] {6}),
+                        null);
+        Workers.sendOut(helper, "graveler level=30", START);
+
+        helper.succeedWhen(() -> {
+            for (int up = 0; up < 6; up++) {
+                helper.assertBlockPresent(Blocks.AIR, CORNER.above(up));
+            }
+            helper.assertValueEqual(Scenes.itemsOnGround(helper, Items.COBBLESTONE), 6, "cobblestone");
+        });
     }
 
     @GameTest(template = Templates.EMPTY)
