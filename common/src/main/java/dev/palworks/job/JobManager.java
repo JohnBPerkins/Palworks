@@ -3,6 +3,7 @@ package dev.palworks.job;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.advancement.WorkerAdvancements;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
@@ -347,6 +348,21 @@ public class JobManager {
         if (entity instanceof PokemonEntity pokemonEntity) {
             workers.putEntity(uuid, pokemonEntity);
         }
+        if (newlyActive && level instanceof ServerLevel serverLevel) {
+            WorkerAdvancements.startedWorking(pokemon, serverLevel.getServer());
+        }
+    }
+
+    /** How many of this player's Pokémon are working in this level now. */
+    public int workersOwnedBy(UUID owner) {
+        int count = 0;
+        for (WorkerInfo worker : workers.all()) {
+            Pokemon pokemon = workers.pokemon(worker.pokemonUUID);
+            if (pokemon != null && owner.equals(pokemon.getOwnerUUID())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**

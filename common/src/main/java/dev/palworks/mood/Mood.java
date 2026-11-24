@@ -1,6 +1,8 @@
 package dev.palworks.mood;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
+import dev.palworks.advancement.WorkerAdvancements;
+import dev.palworks.advancement.WorkerEvent;
 import dev.palworks.config.PalworksConfig;
 import dev.palworks.hunger.Hunger;
 import dev.palworks.reservation.ReservationId;
@@ -63,7 +65,7 @@ public final class Mood {
     /** The worker has done {@code units} of work (see Hunger.didWork): it wears its mood down. */
     public static void didWork(Pokemon pokemon, WorkerState state, int units) {
         if (appliesTo(pokemon, state)) {
-            change(state, -MoodMath.workDrain(units, config().workPerPoint()));
+            change(pokemon, state, -MoodMath.workDrain(units, config().workPerPoint()));
         }
     }
 
@@ -81,6 +83,7 @@ public final class Mood {
         ReservationId job = state.getCurrentReservation();
         boolean atWork = job != null && job.getJobType().isWork();
         change(
+                pokemon,
                 state,
                 MoodMath.changePerTick(
                         hungry,
@@ -91,11 +94,15 @@ public final class Mood {
                         config.recoveryPerDay()));
     }
 
-    private static void change(WorkerState state, double amount) {
+    private static void change(Pokemon pokemon, WorkerState state, double amount) {
         if (amount == 0) {
             return;
         }
+        boolean wasStriking = state.isStriking();
         state.setMood(state.getMood() + amount);
-        state.setStriking(MoodMath.striking(state.isStriking(), state.getMood(), config().strikeUntil()));
+        state.setStriking(MoodMath.striking(wasStriking, state.getMood(), config().strikeUntil()));
+        if (state.isStriking() != wasStriking) {
+            WorkerAdvancements.event(pokemon, wasStriking ? WorkerEvent.BACK_TO_WORK : WorkerEvent.WENT_ON_STRIKE);
+        }
     }
 }

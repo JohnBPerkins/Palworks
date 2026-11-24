@@ -4,6 +4,9 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.common.EntityEvent;
 import dev.architectury.event.events.common.PlayerEvent;
+import dev.palworks.advancement.WorkerAdvancements;
+import dev.palworks.advancement.WorkerEvent;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
  * What wakes a sleeping worker in the night (see {@link Sleep#disturb}): being hit by a player
@@ -16,8 +19,11 @@ public final class SleepDisturbances {
 
     public static void register() {
         PlayerEvent.ATTACK_ENTITY.register((player, level, target, hand, hit) -> {
-            if (!level.isClientSide && target instanceof PokemonEntity pokemon) {
-                Sleep.disturb(pokemon);
+            if (!level.isClientSide
+                    && target instanceof PokemonEntity pokemon
+                    && Sleep.disturb(pokemon)
+                    && player instanceof ServerPlayer hitter) {
+                WorkerAdvancements.event(hitter, WorkerEvent.WOKE_A_WORKER);
             }
             return EventResult.pass();
         });

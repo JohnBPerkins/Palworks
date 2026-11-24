@@ -3,6 +3,8 @@ package dev.palworks.ai;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
+import dev.palworks.advancement.WorkerAdvancements;
+import dev.palworks.advancement.WorkerEvent;
 import dev.palworks.ai.path.WorkerFlight;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.SlowedPause;
@@ -716,6 +718,7 @@ public class WorkerAI {
                 if (!state.isInBed()) {
                     lieDown(entity, reservation.getStationPos());
                     state.setInBed(true);
+                    WorkerAdvancements.event(pokemon, WorkerEvent.SLEPT_IN_BED);
                 }
                 fallAsleep(pokemon, state);
                 state.addSleepTick(true);
@@ -773,6 +776,7 @@ public class WorkerAI {
         if (!state.isInBed()) {
             lieDown(entity, bedJob.getStationPos());
             state.setInBed(true);
+            WorkerAdvancements.event(pokemon, WorkerEvent.NAPPED_IN_BED);
         }
         if (!state.isAsleep()) {
             state.setAsleep(true); // not fallAsleep: it's Tired until it's slept it off

@@ -7,6 +7,7 @@ import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.registry.ReloadListenerRegistry;
+import dev.palworks.advancement.WorkerAdvancements;
 import dev.palworks.animation.WorkAnimationReloadListener;
 import dev.palworks.animation.WorkAspectSync;
 import dev.palworks.block.ModBlocks;
@@ -39,6 +40,7 @@ public final class PalworksCommon {
 
         ModBlocks.register();
         ModMenuTypes.register();
+        WorkerAdvancements.register();
 
         // Work suitabilities (data/<namespace>/palworks/suitability) and species' own work
         // animations (data/<namespace>/palworks/work_animations), from datapacks

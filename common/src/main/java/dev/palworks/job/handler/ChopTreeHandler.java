@@ -16,6 +16,7 @@ import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 final class ChopTreeHandler implements JobHandler {
@@ -118,6 +119,7 @@ final class ChopTreeHandler implements JobHandler {
             DecayingCanopies.get(serverLevel).add(treeResult.getLogPositions());
         }
 
+        BlockState trunk = level.getBlockState(treePos);
         int logsChopped = 0;
         for (BlockPos logPos : treeResult.getLogPositions()) {
             if (level.destroyBlock(logPos, true)) {
@@ -128,7 +130,7 @@ final class ChopTreeHandler implements JobHandler {
             level.destroyBlock(canopyPos, true);
         }
         // A tree counts by its size, but only so far: one huge tree doesn't empty the worker
-        ctx.didWork(HungerMath.treeUnits(logsChopped));
+        ctx.didWork(HungerMath.treeUnits(logsChopped), trunk, logsChopped);
 
         Palworks.LOGGER.debug(
                 "{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
