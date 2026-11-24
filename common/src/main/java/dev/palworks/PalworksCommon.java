@@ -87,6 +87,9 @@ public final class PalworksCommon {
         PlayerEvent.PLAYER_QUIT.register(player -> WorkLevelSync.forget(player.getUUID()));
         LifecycleEvent.SERVER_STOPPED.register(server -> WorkLevelSync.clear());
 
+        // Workers that started working before their owner joined count for the owner's advancements
+        PlayerEvent.PLAYER_JOIN.register(WorkerAdvancements::onPlayerJoin);
+
         // Show what workers are doing as aspects, for posers to animate from
         WorkAspectSync.register();
         // And what's holding them back (hungry), for clients to show over their heads

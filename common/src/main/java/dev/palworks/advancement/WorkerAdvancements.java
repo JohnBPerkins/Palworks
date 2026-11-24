@@ -78,9 +78,20 @@ public final class WorkerAdvancements {
     /** Another of its owner's Pokémon has started working: how many are now, in every level. */
     public static void startedWorking(Pokemon pokemon, MinecraftServer server) {
         ServerPlayer owner = owner(pokemon);
-        if (owner == null) {
-            return;
+        if (owner != null) {
+            countWorkers(owner, server);
         }
+    }
+
+    /**
+     * The player has joined: their workers are counted now too, as those that started working before
+     * they joined (a pasture's, as the world loaded) were let go while they were offline.
+     */
+    public static void onPlayerJoin(ServerPlayer player) {
+        countWorkers(player, player.server);
+    }
+
+    private static void countWorkers(ServerPlayer owner, MinecraftServer server) {
         UUID ownerUuid = owner.getUUID();
         int working = 0;
         for (ServerLevel level : server.getAllLevels()) {
