@@ -80,6 +80,7 @@ public class JobGameTests {
         expected.put(Items.FURNACE, EnumSet.of(Suitability.KINDLING));
         expected.put(Items.BLAST_FURNACE, EnumSet.of(Suitability.KINDLING));
         expected.put(Items.SMOKER, EnumSet.of(Suitability.KINDLING));
+        expected.put(Items.BREWING_STAND, EnumSet.of(Suitability.KINDLING));
         Set<Suitability> fieldCrop = EnumSet.of(Suitability.WATERING, Suitability.PLANTING, Suitability.GATHERING);
         expected.put(Items.WHEAT_SEEDS, fieldCrop);
         expected.put(Items.CARROT, fieldCrop);

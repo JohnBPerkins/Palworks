@@ -30,7 +30,8 @@
       "dev.palworks.gametest.MoodGameTests",
       "dev.palworks.gametest.JobIndexGameTests",
       "dev.palworks.gametest.PaceGameTests",
-      "dev.palworks.gametest.CrystalGameTests"
+      "dev.palworks.gametest.CrystalGameTests",
+      "dev.palworks.gametest.BrewingGameTests"
     ]
   },
   "mixins": [
