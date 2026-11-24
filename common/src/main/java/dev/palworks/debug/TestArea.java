@@ -722,8 +722,8 @@ public final class TestArea {
     // ---- Tall plants ----
 
     /**
-     * One of each plant Gathering workers cut down to its base (TallPlants), grown past its second
-     * block, so ready to cut. Each sign is two blocks off: a cactus beside a sign would break.
+     * One of each plant workers cut down to its base (TallPlants: Gathering, the vines Nether work),
+     * grown past its second block, so ready to cut. Each sign is two blocks off: a cactus beside a sign would break.
      */
     private void tallPlants(int z) {
         sign(at(1, 0, z - 1), "== Tall plants ==");
