@@ -52,9 +52,18 @@ public final class WorkSkillsOverlay {
      * model 1000 forward ("so they aren't overlapped"), and the PC its boxes; drawn last but at 0,
      * anything of ours under them was hidden, tooltip and all. This is in front of them and the
      * model (which reaches a little either side of where it's drawn), and behind Cobblemon's own
-     * tooltips (another 400 forward). Ours is 400 in front of this, so it's in front of everything.
+     * tooltips (another 400 forward).
      */
     private static final float OVERLAY_Z = 1200;
+
+    /**
+     * How much further forward our tooltips are drawn (they add 400 of their own). At 400 in front
+     * of the overlay (1600) the summary drew over them: its party column is drawn 1500 forward, and
+     * a Pokémon model reaches in front of where it's drawn by its depth times its scale, the party's
+     * and the portrait's alike. This is far in front of all of it; anything up to 10000 forward is
+     * still on screen.
+     */
+    private static final float TOOLTIP_Z = 3000;
 
     // PCGUI: its size, and where its portrait is
     private static final int PC_WIDTH = 349;
@@ -179,7 +188,7 @@ public final class WorkSkillsOverlay {
                 lines.add(Component.translatable(
                         mood.mood() >= HAPPY_FROM ? "palworks.ui.mood.happy" : "palworks.ui.mood.content"));
             }
-            graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
+            drawInFront(graphics, font, lines, mouseX, mouseY);
         }
     }
 
@@ -259,7 +268,16 @@ public final class WorkSkillsOverlay {
             lines.add(Component.translatable("palworks.ui.work_skills.hold_shift")
                     .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
         }
+        drawInFront(graphics, font, lines, mouseX, mouseY);
+    }
+
+    /** A tooltip, in front of everything on the screen (see {@link #TOOLTIP_Z}). */
+    private static void drawInFront(GuiGraphics graphics, Font font, List<Component> lines, int mouseX, int mouseY) {
+        PoseStack pose = graphics.pose();
+        pose.pushPose();
+        pose.translate(0, 0, TOOLTIP_Z);
         graphics.renderComponentTooltip(font, lines, mouseX, mouseY);
+        pose.popPose();
     }
 
     /** What a level of a levelled skill gives, as text. */
