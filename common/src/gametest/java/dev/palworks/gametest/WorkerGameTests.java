@@ -10,6 +10,8 @@ import com.google.gson.JsonParser;
 import com.mojang.brigadier.tree.CommandNode;
 import dev.palworks.ai.WorkStance;
 import dev.palworks.ai.WorkerAI;
+import dev.palworks.animation.WorkAnimation;
+import dev.palworks.animation.WorkAnimations;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspects;
 import dev.palworks.command.PalworksCommands;
@@ -26,6 +28,7 @@ import dev.palworks.job.JobType;
 import dev.palworks.job.StepRunner;
 import dev.palworks.job.WorkRange;
 import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.job.handler.Step;
 import dev.palworks.reservation.ReservationId;
 import dev.palworks.sleep.Sleep;
 import dev.palworks.suitability.Suitability;
@@ -38,6 +41,7 @@ import dev.palworks.worker.WorkerStateManager;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -872,10 +876,23 @@ public class WorkerGameTests {
     public void ghostTypesHarvestNetherWart(GameTestHelper helper) {
         Workers.isolate(helper);
         ripeWart(helper);
-        Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether
+        PokemonEntity gastly = Workers.sendOut(helper, "gastly level=20", START); // Ghost/Poison: Nether
 
-        helper.succeedWhen(
-                () -> helper.assertTrue(helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, HARVESTED));
+        // Nether work's move, Night Shade (the harvest's second step), not the crops' Razor Leaf
+        List<Step> steps = JobHandlerRegistry.forJob(JobType.HARVEST_CROPS).steps();
+        Set<WorkAnimation> played = new HashSet<>();
+        helper.onEachTick(() -> {
+            WorkerState state = WorkerStateManager.getOrCreate(gastly.getPokemon());
+            if (state.getCurrentReservation() != null
+                    && state.getCurrentReservation().getJobType() == JobType.HARVEST_CROPS
+                    && state.getStepTicks() > 0) {
+                played.add(steps.get(state.getJobStep()).animation());
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(helper.getBlockState(WART).getValue(NetherWartBlock.AGE) == 0, HARVESTED);
+            helper.assertValueEqual(played, Set.of(WorkAnimations.NETHER_HARVEST), "the moves it played");
+        });
     }
 
     /** Soul sand for nether wart along z=5, and a chest holding these, for a planting test. */

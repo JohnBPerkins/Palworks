@@ -1,7 +1,7 @@
 package dev.palworks.job.handler;
 
 import dev.palworks.Palworks;
-import dev.palworks.animation.WorkAnimations;
+import dev.palworks.animation.WorkAnimation;
 import dev.palworks.crop.TallPlants;
 import dev.palworks.drops.TrackedDrops;
 import java.util.List;
@@ -9,13 +9,16 @@ import net.minecraft.core.BlockPos;
 
 /**
  * Harvests a tall plant (sugar cane, cactus, bamboo, kelp, nether vines: TallPlants) from its second
- * block, the job's: everything but its base, with HarvestCropsHandler's move. One handler for all
- * their job types.
+ * block, the job's: everything but its base, with HarvestCropsHandler's moves (the nether vines,
+ * Nether work, with its Night Shade). One handler class for all their job types.
  */
 final class HarvestTallPlantHandler implements JobHandler {
 
-    private final List<Step> steps =
-            List.of(Step.animated("harvest", 20, WorkAnimations.HARVEST, Step.effect(this::work)));
+    private final List<Step> steps;
+
+    HarvestTallPlantHandler(WorkAnimation move) {
+        steps = List.of(Step.animated("harvest", 20, move, Step.effect(this::work)));
+    }
 
     @Override
     public List<Step> steps() {

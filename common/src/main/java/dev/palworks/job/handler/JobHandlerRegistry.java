@@ -35,8 +35,9 @@ public final class JobHandlerRegistry {
             case DELIVER_ITEMS -> new DeliverItemsHandler();
             case PLANT_SEEDS -> new PlantSeedsHandler();
             case HARVEST_CROPS -> new HarvestCropsHandler();
-            case HARVEST_SUGAR_CANE, HARVEST_CACTUS, HARVEST_BAMBOO, HARVEST_KELP, HARVEST_NETHER_VINES ->
-                new HarvestTallPlantHandler();
+            case HARVEST_SUGAR_CANE, HARVEST_CACTUS, HARVEST_BAMBOO, HARVEST_KELP ->
+                new HarvestTallPlantHandler(WorkAnimations.HARVEST);
+            case HARVEST_NETHER_VINES -> new HarvestTallPlantHandler(WorkAnimations.NETHER_HARVEST);
             case WATER_CROPS -> new WaterCropsHandler();
             case CHOP_TREE -> new ChopTreeHandler();
             case MINE_CRYSTAL -> new MineCrystalHandler();
@@ -48,16 +49,6 @@ public final class JobHandlerRegistry {
             case TAKE_SEEDS -> new TakeSeedsHandler();
             case SLEEP -> new SleepHandler();
         };
-    }
-
-    /** How long this job's steps take a worker of this species, all told (once round, for one that repeats). */
-    public static int jobTicks(JobType job, Mob worker) {
-        String species = WorkAnimations.speciesOf(worker);
-        int ticks = 0;
-        for (Step step : forJob(job).steps()) {
-            ticks += step.ticksFor(species);
-        }
-        return ticks;
     }
 
     /** How a worker does this job. */

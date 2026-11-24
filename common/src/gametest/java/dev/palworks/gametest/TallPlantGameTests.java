@@ -1,10 +1,14 @@
 package dev.palworks.gametest;
 
+import dev.palworks.animation.WorkAnimations;
 import dev.palworks.crop.TallPlants;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobType;
+import dev.palworks.job.handler.JobHandlerRegistry;
+import dev.palworks.job.handler.Step;
 import dev.palworks.suitability.Suitability;
 import java.util.EnumSet;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -171,6 +175,23 @@ public class TallPlantGameTests {
             helper.assertBlockPresent(Blocks.AIR, base.below());
             helper.assertBlockPresent(Blocks.WEEPING_VINES, base);
         });
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void netherVinesAreCutWithNetherWorksMove(GameTestHelper helper) {
+        helper.assertValueEqual(
+                JobHandlerRegistry.forJob(JobType.HARVEST_NETHER_VINES).steps().stream()
+                        .map(Step::animation)
+                        .toList(),
+                List.of(WorkAnimations.NETHER_HARVEST),
+                "Night Shade, not the other tall plants' Razor Leaf");
+        helper.assertValueEqual(
+                JobHandlerRegistry.forJob(JobType.HARVEST_KELP).steps().stream()
+                        .map(Step::animation)
+                        .toList(),
+                List.of(WorkAnimations.HARVEST),
+                "the others keep Razor Leaf");
+        helper.succeed();
     }
 
     @GameTest(template = Templates.EMPTY, timeoutTicks = 400)
