@@ -27,14 +27,15 @@ public enum JobType {
     // Gathering
     HARVEST_CROPS(Suitability.GATHERING, 8),
     // Plants that grow a block at a time from one that stays (see dev.palworks.crop.TallPlants):
-    // everything above it is cut once it has a second block. Gathering for now, but each will
-    // probably become a skill of its own, held by particular species (a Tropius for bamboo...), which
-    // is why each has its own job type: then only its skill here changes.
+    // everything above it is cut once it has a second block. Gathering for now (nether vines are
+    // Nether work, as wart is), but each will probably become a skill of its own, held by particular
+    // species (a Tropius for bamboo...), which is why each has its own job type: then only its skill
+    // here changes.
     HARVEST_SUGAR_CANE(Suitability.GATHERING, 8),
     HARVEST_CACTUS(Suitability.GATHERING, 8),
     HARVEST_BAMBOO(Suitability.GATHERING, 8),
     HARVEST_KELP(Suitability.GATHERING, 8),
-    HARVEST_NETHER_VINES(Suitability.GATHERING, 8), // weeping and twisting vines
+    HARVEST_NETHER_VINES(Suitability.NETHER, 8), // weeping and twisting vines
 
     // Watering: upkeep, never urgent, so a worker that does other work too does that first
     WATER_CROPS(Suitability.WATERING, 3),
