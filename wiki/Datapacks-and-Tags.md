@@ -66,6 +66,12 @@ The blocks [Kindling](Jobs#light-furnaces) workers light: by default the furnace
 smoker. A modded block needs a furnace block entity to work (one without still says Kindling in its
 tooltip).
 
+## `#palworks:brewing_stands`
+
+The blocks [Kindling](Jobs#light-brewing-stands) workers light in place of blaze powder: by default
+the brewing stand. A modded block needs a brewing stand block entity to work (one without still
+says Kindling in its tooltip).
+
 ## `#palworks:ores`
 
 The blocks [Mining](Jobs#mine-ores) workers will go to once they mine ores (for now they only
@@ -88,7 +94,7 @@ To add ores from another mod, create this file in your datapack:
 ```
 
 Keep `"replace": false` so your entries are added to the defaults instead of replacing them. The
-furnaces tag works the same way.
+furnaces and brewing stands tags work the same way.
 
 ## Logs: `#minecraft:logs`
 

@@ -1,7 +1,7 @@
 # Work Animations
 
 While a Pokémon works, it plays a placeholder Cobblemon move as its work animation: Ember to light
-a furnace, Razor Leaf to harvest, Leech Seed to plant, Water Gun to water, Scratch to chop and
+a furnace or brewing stand, Razor Leaf to harvest, Leech Seed to plant, Water Gun to water, Scratch to chop and
 Pound to mine. Each
 animation has a **stance**, which sets where the worker stands. A contact move like Scratch is played right up
 against the block; ranged moves are played from a little way back. Bigger Pokémon stand further
@@ -29,8 +29,8 @@ work animation. Use files at `data/<namespace>/palworks/work_animations/<name>.j
 ```
 
 - **`species`**: one species, or a list of them. A species without a namespace is Cobblemon's.
-- **`animations`**: the changes for each animation, by id. The ids are `ignite_furnace`, `harvest`,
-  `plant`, `water`, `chop` and `mine`. Anything you leave out keeps its default.
+- **`animations`**: the changes for each animation, by id. The ids are `ignite_furnace` (brewing
+  stands too), `harvest`, `plant`, `water`, `chop` and `mine`. Anything you leave out keeps its default.
   - **`move`**: the action effect to play. Give a Cobblemon move name (`furycutter`) or a full id
     (`myaddon:chop`).
   - **`impact_ticks`**: how many ticks in the effect lands on the block. The work (the harvest, the

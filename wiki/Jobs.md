@@ -6,6 +6,7 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | Job | Who does it | Status |
 |---|---|---|
 | [Light furnaces](#light-furnaces) | Kindling | Working |
+| [Light brewing stands](#light-brewing-stands) | Kindling | Working |
 | [Water crops](#water-crops) | Watering | Working |
 | [Harvest crops](#harvest-crops) | Gathering | Working |
 | [Cut tall plants](#cut-tall-plants) | Gathering | Working |
@@ -18,8 +19,8 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | [Mine crystals](#mine-crystals) | Mining | Working |
 | [Mine ores](#mine-ores) | Mining | Not yet |
 
-Crafting (Handiwork), brewing (Medicine Production), and work for Generating Electricity, Cooling
-and Farming are planned; nothing uses them yet.
+Crafting (Handiwork), and work for Medicine Production, Generating Electricity, Cooling and
+Farming are planned; nothing uses them yet.
 
 ## Light furnaces
 
@@ -35,6 +36,24 @@ a furnace, goes on to light others, and comes back once it goes out.
 Workers only light a furnace whose input can be smelted in it, so a blast furnace full of raw food
 is left alone. So is one with no room in its output slot for what it would smelt, until you take
 some out.
+
+## Light brewing stands
+
+**Who:** Kindling (Fire types)
+**Blocks:** brewing stand (the `#palworks:brewing_stands` tag)
+
+Put bottles and an ingredient in a brewing stand. **You don't need blaze powder.** A Kindling
+worker walks over and uses Ember on the stand, which brews as if it had been fuelled. Anything the
+stand can brew works: vanilla potions, and Cobblemon's medicine (a Medicinal Leek and water bottles
+make Medicinal Brew, then an Oran Berry makes Potions, and so on).
+
+One Ember gives as many brews as the worker's [work level](Suitabilities#work-levels) smelts items
+in a furnace. At level 1 that's one brew, so the worker stays by the stand until it's done, and
+lights it again if what's in it now can brew into something more. Higher levels leave the stand
+with brews to spare: the worker goes on to other work, and comes back once they're used up.
+
+Workers only light a stand that can brew what's in it, and leave alone one with blaze powder or
+brews of its own left. They don't fill the stand or take the potions out: that's up to you.
 
 ## Water crops
 
@@ -218,7 +237,7 @@ is. From most to least important:
 1. Deliver items, bring seeds to a planter, pick up seeds brought to it
 2. Pick up drops, restock troughs
 3. Harvest crops
-4. Light furnaces, mine crystals
+4. Light furnaces and brewing stands, mine crystals
 5. Fetch seeds from a chest
 6. Plant crops
 7. Chop trees
