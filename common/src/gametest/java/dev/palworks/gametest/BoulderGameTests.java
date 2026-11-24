@@ -363,8 +363,8 @@ public class BoulderGameTests {
 
     @GameTest(template = Templates.EMPTY, batch = "boulder_big_miner", timeoutTicks = 2400)
     public void aBigMinerReachesATallBouldersTopFromTheGround(GameTestHelper helper) {
-        // A single column five high: no steps to stand on, and a Tyranitar wouldn't fit one anyway.
-        // About three high itself, it reaches the top from the ground and mines it down.
+        // A single column five high: no steps to stand on, and a Rhyperior wouldn't fit one anyway.
+        // Nearly three high itself, it reaches the top from the ground and mines it down.
         Workers.isolate(helper);
         Scenes.floor(helper, Blocks.STONE);
         ServerLevel level = level(helper);
@@ -374,7 +374,7 @@ public class BoulderGameTests {
                         helper.absolutePos(CORNER),
                         plan(List.of(STONE, STONE, STONE, STONE, STONE), new int[] {5}),
                         null);
-        Workers.sendOut(helper, "tyranitar level=50", START);
+        Workers.sendOut(helper, "rhyperior level=50", START); // Ground/Rock: it mines
 
         helper.succeedWhen(() -> {
             for (int up = 0; up < 5; up++) {

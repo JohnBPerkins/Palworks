@@ -426,7 +426,7 @@ public final class WorkPositions {
     private static final double WORK_HEIGHT_REACH = 2.0;
     /**
      * How far below a boulder's block a miner can stand and still mine it: its own height and two
-     * more, and never less than other work. A big miner (a Tyranitar, about 3 high, so 5) can't
+     * more, and never less than other work. A big miner (a Rhyperior, nearly 3 high, so nearly 5) can't
      * stand on a boulder's one-block steps, but reaches a tall boulder's top from the ground; a small
      * one climbs the steps.
      */
