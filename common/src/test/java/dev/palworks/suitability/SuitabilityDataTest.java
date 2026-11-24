@@ -335,7 +335,7 @@ class SuitabilityDataTest {
     @Test
     void shippedSpeciesFollowTheirStats() throws IOException {
         SuitabilityData data = shipped();
-        assertEquals(81, data.speciesCount());
+        assertEquals(86, data.speciesCount());
         // Fighting gives Lumbering and Mining; Machamp's species entry adds Handiwork. All from its stats.
         assertEquals(
                 Map.of(LUMBERING, 3, MINING, 3, HANDIWORK, 3),
@@ -355,6 +355,11 @@ class SuitabilityDataTest {
         assertEquals(Map.of(LUMBERING, 4), levels(data, List.of("dark", "steel"), "cobblemon:kingambit", 550));
         assertEquals(
                 Map.of(LUMBERING, 3, NETHER, 3), levels(data, List.of("steel", "ghost"), "cobblemon:aegislash", 500));
+        // Lumberjacks that aren't Ghost types, given Nether by a species entry: its stats' level
+        assertEquals(
+                Map.of(KINDLING, 3, LUMBERING, 3, MINING, 3, NETHER, 3),
+                levels(data, List.of("fire", "fighting"), "cobblemon:blaziken", 530));
+        assertEquals(Map.of(LUMBERING, 3, NETHER, 3), levels(data, List.of("bug", "steel"), "cobblemon:durant", 484));
         assertEquals(
                 Map.of(PLANTING, 4, GATHERING, 4, LUMBERING, 4),
                 levels(data, List.of("grass", "steel"), "cobblemon:kartana", 570));

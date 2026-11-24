@@ -832,6 +832,18 @@ public class WorkerGameTests {
         });
     }
 
+    @GameTest(template = Templates.EMPTY, batch = "worker_nether_yes", timeoutTicks = 1000)
+    public void netherLumberjacksThatArentGhostTypesChopNetherTreesToo(GameTestHelper helper) {
+        Workers.isolate(helper);
+        crimsonFungus(helper);
+        Workers.sendOut(helper, "pignite level=20", START); // Fire/Fighting: Lumbering, Nether by species
+
+        helper.succeedWhen(() -> {
+            helper.assertBlockNotPresent(Blocks.CRIMSON_STEM, new BlockPos(3, 2, 5));
+            helper.assertBlockPresent(Blocks.CRIMSON_FUNGUS, new BlockPos(3, 1, 5));
+        });
+    }
+
     // ---- Nether wart is Nether work, not Gathering ----
 
     private static final BlockPos WART = new BlockPos(3, 1, 5);
