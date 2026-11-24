@@ -18,6 +18,7 @@ import me.lucko.spark.api.statistic.misc.DoubleAverageInfo;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -56,7 +57,7 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public class StressGameTests {
     /** Bump when a scenario changes, so CI doesn't compare runs of different scenarios. */
-    static final int SCENARIO_VERSION = 2;
+    static final int SCENARIO_VERSION = 3;
 
     static final String DENSE = "dense";
     static final String SPREAD = "spread";
@@ -335,7 +336,7 @@ public class StressGameTests {
         long[] stopping = {0};
         boolean[] wasRipe = new boolean[crops.size()];
         boolean[] hadTrunk = new boolean[trees.size()];
-        helper.onEachTick(() -> {
+        eachTick(helper, () -> {
             long time = helper.getLevel().getGameTime();
             // Count the work done while measuring: a crop going from ripe to replanted, a trunk going
             if (time % COUNT_INTERVAL == 0) {
@@ -362,10 +363,14 @@ public class StressGameTests {
                 if (System.nanoTime() - measureStart[0] >= MEASURE_NANOS) {
                     measuring[0] = false;
                     report(helper, farm, ticks[0], harvests[0], chops[0]);
-                    helper.assertTrue(
-                            harvests[0] >= MIN_HARVESTS,
-                            "the workers barely worked (" + harvests[0] + " harvests in " + ticks[0]
-                                    + " ticks), so the timings mean nothing");
+                    if (harvests[0] < MIN_HARVESTS) {
+                        // Failed from the test's own schedule, next tick: thrown from here, a step
+                        // of a sequence (see eachTick), it would only say "not yet"
+                        String barelyWorked = "the workers barely worked (" + harvests[0] + " harvests in " + ticks[0]
+                                + " ticks), so the timings mean nothing";
+                        helper.runAfterDelay(1, () -> helper.fail(barelyWorked));
+                        return;
+                    }
                     // Saved to config/spark in the run directory, for CI to keep (never uploaded:
                     // the run sets spark's upload address to nowhere)
                     command(helper, "spark profiler stop --save-to-file");
@@ -383,6 +388,19 @@ public class StressGameTests {
             measuring[0] = true;
             measureStart[0] = System.nanoTime();
             command(helper, "spark profiler start");
+        });
+    }
+
+    /**
+     * Run {@code action} every tick until the test ends. Not {@code helper.onEachTick}: that
+     * schedules a runnable for every tick up to the test's timeout, and each tick the test goes
+     * through all of them, which with this test's timeout was over a quarter of every tick it
+     * measured. A sequence step that's never done is run once a tick instead.
+     */
+    private static void eachTick(GameTestHelper helper, Runnable action) {
+        helper.startSequence().thenWaitUntil(() -> {
+            action.run();
+            throw new GameTestAssertException("runs every tick, until the test ends");
         });
     }
 
