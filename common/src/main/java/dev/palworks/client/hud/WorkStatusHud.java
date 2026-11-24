@@ -40,13 +40,15 @@ public final class WorkStatusHud {
     private static final int SLOT_HEIGHT = 30;
     private static final int SLOT_SPACING = 4;
     private static final int SELECTED_OFFSET_X = 6;
-    // Cobblemon's state icon fills x 8-20, y 3-11.5 of the card: the work icon sits left of it,
-    // level with it (x 0-7, y 4-11), a pixel short of it so they don't touch. The 8 pixels left of
-    // it are all the card has there, and further left is off the screen, which cut an unselected
-    // card's icon off; so the icon is 7 pixels, not the 8 that half a 16-pixel item would make,
-    // and its pixels aren't all the same size.
+    // Cobblemon's state icon fills x 8-20, y 3-11.5 of the card, its art to every edge. The work
+    // icon sits left of it, a pixel short so they don't touch: the 8 pixels there are all the card
+    // has, and further left is off the screen, which cut an unselected card's icon off, so it's 7
+    // pixels (x 0-7), not the 8 that half a 16-pixel item would make, and its pixels aren't all the
+    // same size. Level with the state icon is y 3.75, between screen pixels at GUI scale 2; at 3.5
+    // art in the middle of its square sits a quarter of a pixel high, and art that sits half a
+    // texel low (a pickaxe, a sapling, sugar cane, the brewing stand) is level.
     private static final int ICON_X = 0;
-    private static final int ICON_Y = 4;
+    private static final float ICON_Y = 3.5F;
 
     private static final int ICON_SIZE = 7;
 
@@ -84,7 +86,7 @@ public final class WorkStatusHud {
             }
 
             int x = ICON_X + (selectedSlot == index ? SELECTED_OFFSET_X : 0);
-            int y = startY + (SLOT_HEIGHT + SLOT_SPACING) * index + ICON_Y;
+            float y = startY + (SLOT_HEIGHT + SLOT_SPACING) * index + ICON_Y;
             drawIcon(graphics, activity, x, y);
         }
     }
@@ -96,7 +98,7 @@ public final class WorkStatusHud {
         return activity == null || activity.phase() == WorkActivity.Phase.IDLE ? null : activity;
     }
 
-    private static void drawIcon(GuiGraphics graphics, WorkActivity activity, int x, int y) {
+    private static void drawIcon(GuiGraphics graphics, WorkActivity activity, int x, float y) {
         JobType job = activity.job();
         WorkIcons.Icon icon;
         if (activity.phase() == WorkActivity.Phase.OFF) {
