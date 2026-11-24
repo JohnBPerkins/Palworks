@@ -13,6 +13,7 @@ import dev.palworks.crystal.CrystalAdapter;
 import dev.palworks.debug.TestArea;
 import dev.palworks.job.JobType;
 import dev.palworks.station.BrewingStandHelper;
+import dev.palworks.tree.TreeDetector;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -167,6 +168,21 @@ public class TestAreaGameTests {
     }
 
     /**
+     * What the lowest blocks of the nether trees' stems stand on: not nylium, which turns to
+     * netherrack under them, where their fungus can't be replanted.
+     */
+    private static Set<Block> netherStemsOn(GameTestHelper helper, TestArea.Result area) {
+        Set<Block> on = new HashSet<>();
+        for (BlockPos pos : BlockPos.betweenClosed(area.min(), area.max())) {
+            BlockState below = helper.getLevel().getBlockState(pos.below());
+            if (TreeDetector.isNetherStem(helper.getLevel().getBlockState(pos)) && !TreeDetector.isNetherStem(below)) {
+                on.add(below.getBlock());
+            }
+        }
+        return on;
+    }
+
+    /**
      * Natural leaves that aren't attached to a log the way the game requires (within 6 steps of one
      * through leaves; any further and they decay): leftovers that would float in the air.
      */
@@ -290,6 +306,7 @@ public class TestAreaGameTests {
         }
         check(helper, area, expected, "when built");
         assertRanchAndCrystals(helper, area);
+        helper.assertValueEqual(netherStemsOn(helper, area), Set.of(Blocks.SOUL_SOIL), "what nether trees stand on");
         // Nothing pops off, dries out or washes away a moment later
         helper.runAfterDelay(40, () -> {
             check(helper, area, expected, "40 ticks later");

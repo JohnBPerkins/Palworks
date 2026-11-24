@@ -24,6 +24,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -722,8 +723,8 @@ public final class TestArea {
     // ---- Tall plants ----
 
     /**
-     * One of each plant Gathering workers cut down to its base (TallPlants), grown past its second
-     * block, so ready to cut. Each sign is two blocks off: a cactus beside a sign would break.
+     * One of each plant workers cut down to its base (TallPlants: Gathering, the vines Nether work),
+     * grown past its second block, so ready to cut. Each sign is two blocks off: a cactus beside a sign would break.
      */
     private void tallPlants(int z) {
         sign(at(1, 0, z - 1), "== Tall plants ==");
@@ -872,6 +873,11 @@ public final class TestArea {
         if (!fits) {
             throw new IllegalStateException(
                     "no seed of " + TREE_SEEDS + " grew one that fits its " + w + "x" + d + " plot");
+        }
+        if (tree.floor().defaultBlockState().is(BlockTags.NYLIUM)) {
+            // A huge fungus only grows on nylium, but nylium under a stem turns to netherrack in time,
+            // which no fungus can be replanted on. Soul soil, which a fungus grows on too, never changes.
+            layTreeFloor(cell, top, Blocks.SOUL_SOIL);
         }
         for (BlockPos pos : BlockPos.betweenClosed(
                 cell.offset(-CANOPY_MARGIN, 0, -CANOPY_MARGIN), top.offset(CANOPY_MARGIN, 0, CANOPY_MARGIN))) {

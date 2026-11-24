@@ -5,11 +5,21 @@ import dev.palworks.animation.WorkAnimations;
 import dev.palworks.drops.TrackedDrops;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
 
 final class HarvestCropsHandler implements JobHandler {
 
-    private final List<Step> steps =
-            List.of(Step.animated("harvest", 20, WorkAnimations.HARVEST, Step.effect(this::work)));
+    // Nether wart is Nether work, so it's harvested with Nether work's move: one of these steps is
+    // played, by what's there
+    private final List<Step> steps = List.of(
+            Step.animated("harvest", 20, WorkAnimations.HARVEST, Step.effect(this::work))
+                    .onlyIf(ctx -> !isWart(ctx)),
+            Step.animated("harvest wart", 20, WorkAnimations.NETHER_HARVEST, Step.effect(this::work))
+                    .onlyIf(HarvestCropsHandler::isWart));
+
+    private static boolean isWart(JobContext ctx) {
+        return ctx.level().getBlockState(ctx.pos()).is(Blocks.NETHER_WART);
+    }
 
     @Override
     public List<Step> steps() {

@@ -6,6 +6,7 @@ import com.cobblemon.mod.common.api.storage.pc.PCStore;
 import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.ai.WorkStance;
+import dev.palworks.animation.WorkAnimations;
 import dev.palworks.block.ModBlocks;
 import dev.palworks.block.TroughBlock;
 import dev.palworks.block.TroughBlockEntity;
@@ -642,7 +643,13 @@ public class HungerGameTests {
                 working[0]++;
             }
         });
-        int fullSpeed = CROPS * JobHandlerRegistry.jobTicks(JobType.HARVEST_CROPS, worker);
+        // The harvest's first step, Razor Leaf, is wheat's (its second, Night Shade, is nether wart's)
+        int fullSpeed = CROPS
+                * JobHandlerRegistry.forJob(JobType.HARVEST_CROPS)
+                        .steps()
+                        .get(0)
+                        .length()
+                        .applyAsInt(WorkAnimations.speciesOf(worker));
         helper.succeedWhen(() -> {
             for (BlockPos crop : crops) {
                 helper.assertFalse(
