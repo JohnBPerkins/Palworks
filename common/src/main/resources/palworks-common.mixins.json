@@ -16,6 +16,7 @@
     "CobblemonNetworkMixin",
     "ContainerOpenersCounterMixin",
     "DrowsySensorMixin",
+    "GenericBedrockEntityMixin",
     "LeavesBlockMixin",
     "OmniPathNodeMakerMixin",
     "PokemonEntityInteractMixin",

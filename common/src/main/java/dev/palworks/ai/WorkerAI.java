@@ -14,7 +14,6 @@ import dev.palworks.block.WorkerBedBlock;
 import dev.palworks.debug.DebugManager;
 import dev.palworks.hunger.EatingDisplay;
 import dev.palworks.hunger.Hunger;
-import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
 import dev.palworks.job.JobManager;
 import dev.palworks.job.JobType;
@@ -285,7 +284,7 @@ public class WorkerAI {
         // sized to this mon: the exact tile (e.g. in front of a furnace's face)
         JobType jobType = reservation.getJobType();
         WorkStance stance = JobHandlerRegistry.stanceFor(jobType, entity);
-        BlockPos standPos = WorkPositions.standingPosFor(level, targetPos, jobType, entity, stance);
+        BlockPos standPos = StandMemo.standingPosFor(level, targetPos, jobType, entity, stance);
         if (standPos == null) {
             // The job itself may be gone (e.g. its tree was chopped, leaving nothing to stand by),
             // or not one it can do any more: drop it for that, not as unreachable, which would
@@ -384,17 +383,6 @@ public class WorkerAI {
     private static boolean workAtJob(
             Pokemon pokemon, Mob entity, Level level, WorkerState state, ReservationId reservation) {
         BlockPos targetPos = reservation.getStationPos();
-        // Only log on first tick of work
-        if (Palworks.LOGGER.isDebugEnabled() && !state.isWorking()) {
-            WorkerInventory inventory = WorkerInventoryManager.getOrCreate(pokemon);
-            String inventoryInfo = inventory.isEmpty() ? "empty" : inventory.getTotalItemCount() + " items";
-            Palworks.LOGGER.debug(
-                    "{} arrived at {} job, starting work (inventory: {})",
-                    pokemon.getSpecies().getName(),
-                    reservation.getJobType(),
-                    inventoryInfo);
-        }
-
         // Keep worker stationary while working (for animations). Only horizontally: zeroing its
         // vertical motion too stops gravity registering it as on the ground, and ground
         // navigation won't plan a path for a mob that isn't on the ground.
@@ -608,13 +596,6 @@ public class WorkerAI {
             Level level,
             WorkerState state,
             ReservationId reservation) {
-        Palworks.LOGGER.debug(
-                "{}'s {} job at {} {} (step {}) - stopping",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                reservation.getStationPos(),
-                reason == StepRunner.Outcome.GONE ? "is gone" : "isn't one it can do any more",
-                state.getJobStep());
         if (level instanceof ServerLevel serverLevel) {
             JobManager jobs = JobManager.getInstance(serverLevel);
             if (reason == StepRunner.Outcome.GONE) {

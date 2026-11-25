@@ -6,6 +6,8 @@ import dev.palworks.ai.path.WorkerPathfinder.Reach;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.SlabBlock;
@@ -135,6 +137,29 @@ public class PathingGameTests {
             assertReach(helper, worker, GOAL, Reach.NO, "a 1.2-wide Machamp through a 1-wide gap");
             carve(helper, 5, 1, 4, 9, 3, 4); // now 2 wide
             assertReach(helper, worker, GOAL, Reach.YES, "a 1.2-wide Machamp through a 2-wide gap");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Something solid that isn't a block is in the way too: a boat left in a passage. (A search
+     * looks for those once, over all the space it covers, and only tries the body against them
+     * if there are any.)
+     */
+    @GameTest(template = Templates.ARENA, batch = "pathing_boat", timeoutTicks = 200)
+    public void aBoatInAPassageIsInTheWay(GameTestHelper helper) {
+        Workers.isolate(helper);
+        solid(helper);
+        rooms(helper, 3);
+        carve(helper, 5, 1, 3, 9, 3, 3); // a passage 1 wide
+        PokemonEntity worker = Workers.sendOut(helper, BULBASAUR, START);
+
+        helper.runAfterDelay(SETTLE_TICKS, () -> {
+            assertReach(helper, worker, GOAL, Reach.YES, "a Bulbasaur through an empty passage");
+            Boat boat = helper.spawn(EntityType.BOAT, new BlockPos(7, 1, 3));
+            assertReach(helper, worker, GOAL, Reach.NO, "a Bulbasaur through a passage with a boat in it");
+            boat.discard();
+            assertReach(helper, worker, GOAL, Reach.YES, "a Bulbasaur through the passage with the boat gone");
             helper.succeed();
         });
     }

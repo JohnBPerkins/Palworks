@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.boulder.BoulderPlan;
 import dev.palworks.boulder.BoulderRise;
@@ -63,7 +62,6 @@ final class SummonBoulderHandler implements JobHandler {
         int units = Math.max(1, (placed.size() + BLOCKS_PER_UNIT - 1) / BLOCKS_PER_UNIT);
         ctx.didWork(units);
         ctx.usedFood(Math.max(LEAST_FOOD_UNITS, placed.size()) - units);
-        Palworks.LOGGER.debug("{} raised a boulder of {} blocks at {}", ctx.name(), placed.size(), ctx.pos());
         return true;
     }
 

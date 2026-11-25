@@ -1,7 +1,6 @@
 package dev.palworks.job;
 
 import com.cobblemon.mod.common.pokemon.Pokemon;
-import dev.palworks.Palworks;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventoryManager;
@@ -234,7 +233,6 @@ final class PickupQueue {
     private void createCollectDropsJob(ServerLevel level, BlockPos pos, @Nullable UUID suggested) {
         List<ItemEntity> items = new ArrayList<>(JobChecks.itemsToPickUp(level, pos));
         if (items.isEmpty()) {
-            Palworks.LOGGER.debug("No items found at {} for collect drops job", pos);
             return;
         }
 
@@ -243,13 +241,10 @@ final class PickupQueue {
         // Offer it to the suggested worker first (same checks as any job: suitability, reachable);
         // otherwise it goes to the pool for anyone
         WorkerInfo suggestedWorker = suggested == null ? null : workers.get(suggested);
-        if (suggestedWorker != null
-                && suggestedWorker.idle
-                && assigner.assignFirstReachable(suggestedWorker, List.of(collectJob)) != null) {
-            Palworks.LOGGER.debug("Assigned collect drops job at {} to the worker that dropped them", pos);
-        } else {
+        if (suggestedWorker == null
+                || !suggestedWorker.idle
+                || assigner.assignFirstReachable(suggestedWorker, List.of(collectJob)) == null) {
             pool.offer(collectJob);
-            Palworks.LOGGER.debug("Added collect drops job to the pool at {} ({} items)", pos, items.size());
         }
     }
 

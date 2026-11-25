@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.station.BrewingStandHelper;
 import dev.palworks.station.KindlingHeat;
@@ -41,7 +40,6 @@ final class FuelBrewingStandHandler implements JobHandler {
         int brews = KindlingHeat.brewsPerEmber(kindlingLevel(ctx));
         BrewingStandHelper.charge(ctx.level(), ctx.pos(), brews);
         ctx.didWork(1);
-        Palworks.LOGGER.debug("{} lit brewing stand at {} for {} brews", ctx.name(), ctx.pos(), brews);
     }
 
     @Override

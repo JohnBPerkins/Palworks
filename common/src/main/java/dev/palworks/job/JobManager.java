@@ -4,6 +4,7 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import dev.palworks.Palworks;
 import dev.palworks.advancement.WorkerAdvancements;
+import dev.palworks.ai.StandMemo;
 import dev.palworks.ai.path.WorkerNavigator;
 import dev.palworks.animation.WorkAnimator;
 import dev.palworks.animation.WorkAspectSync;
@@ -106,7 +107,8 @@ public class JobManager {
     /**
      * Called for every block change on the server (see the ServerLevel mixins). A watered crop that's
      * broken or replaced by another block loses its watering cooldown (growing, a change of age,
-     * keeps it). The scanner looks at the block again (see JobScanner#onBlockChanged). If the
+     * keeps it). Workers standing by it have where they stand worked out again (see StandMemo). The
+     * scanner looks at the block again (see JobScanner#onBlockChanged). If the
      * block's collision changed (something became passable or blocked: a gate or door toggled, a block
      * broken or placed), workers nearby forget which jobs they couldn't reach, so they re-check
      * on their next assignment. Must stay cheap: returns early unless some worker has failures.
@@ -116,6 +118,8 @@ public class JobManager {
         if (oldState.getBlock() != newState.getBlock()) {
             Watering.forget(level, pos);
         }
+        // Where the workers by it stand is worked out again (it's remembered while nothing changes)
+        StandMemo.onBlockChanged(level, pos);
         // A boulder's block that's gone (mined, broken, blown up) isn't the boulder's any more,
         // whether or not there are workers here now. Only on the server thread: the level's saved
         // data isn't to be touched from others (a mod's change there is still never mined, as a
@@ -305,10 +309,6 @@ public class JobManager {
         ReservationId stateReservation = state.getCurrentReservation();
         if (info.currentReservation != null && stateReservation == null) {
             pool.release(JobKey.of(info.currentReservation), level.getGameTime());
-            Palworks.LOGGER.debug(
-                    "{} dropped its reservation; released job at {} back to the pool",
-                    pokemon.getSpecies().getName(),
-                    info.currentReservation.getStationPos());
         }
 
         // A job it has that the registry doesn't (saved with it, before a restart or its chunk
@@ -493,9 +493,6 @@ public class JobManager {
         BlockPos jobPos = completedReservation.getStationPos();
         UUID workerUUID = pokemon.getUuid();
 
-        Palworks.LOGGER.debug(
-                "{} completed {} job at {}", pokemon.getSpecies().getName(), completedReservation.getJobType(), jobPos);
-
         // Handle consecutive jobs for harvesting
         if (completedReservation.getJobType() == JobType.HARVEST_CROPS) {
             // No replant job: harvesting resets the crop in place (paid for with one of its seeds),
@@ -537,13 +534,6 @@ public class JobManager {
         if (state != null) {
             pool.captureProgress(state, JobKey.of(reservation));
         }
-
-        Palworks.LOGGER.debug(
-                "{} abandoned {} at {}; won't retry it until terrain changes or it moves (max {} ticks)",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                pos,
-                JobAssigner.JOB_FAILURE_BLACKLIST_TICKS);
     }
 
     /**
@@ -557,15 +547,8 @@ public class JobManager {
     public void onJobInvalidated(Pokemon pokemon, ReservationId reservation, Level level) {
         if (!(level instanceof ServerLevel)) return;
 
-        BlockPos pos = reservation.getStationPos();
         pool.remove(JobKey.of(reservation));
         workers.markIdle(pokemon.getUuid());
-
-        Palworks.LOGGER.debug(
-                "{}'s {} at {} no longer exists - removed from pool",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                pos);
     }
 
     /**
@@ -583,12 +566,6 @@ public class JobManager {
         }
         pool.release(key, level.getGameTime());
         workers.markIdle(pokemon.getUuid());
-
-        Palworks.LOGGER.debug(
-                "{} can't do its {} at {} any more - given back to the pool",
-                pokemon.getSpecies().getName(),
-                reservation.getJobType(),
-                reservation.getStationPos());
     }
 
     /**
@@ -597,8 +574,6 @@ public class JobManager {
      */
     public void onTreeChopped(Pokemon pokemon, BlockPos basePos, Level level) {
         if (!(level instanceof ServerLevel serverLevel)) return;
-
-        Palworks.LOGGER.debug("{} chopped tree at base {}", pokemon.getSpecies().getName(), basePos);
 
         DebugManager.broadcastActivity(
                 serverLevel,

@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.job.JobChecks;
 import dev.palworks.job.JobManager;
@@ -55,24 +54,18 @@ final class CollectDropsHandler implements JobHandler {
     // Whatever of these fits (into stacks of the same item first, then free slots)
     private static void pickUp(JobContext ctx, List<ItemEntity> items) {
         WorkerInventory inventory = ctx.inventory();
-        int pickedUp = 0;
         for (ItemEntity itemEntity : items) {
             ItemStack stack = itemEntity.getItem();
             int leftover = inventory.addItem(stack);
             if (leftover == stack.getCount()) {
                 continue; // none of it fits
             }
-            pickedUp += stack.getCount() - leftover;
             if (leftover == 0) {
                 itemEntity.discard();
             } else {
                 // Only part of it fit: leave the rest on the ground (it used to be deleted)
                 itemEntity.setItem(stack.copyWithCount(leftover));
             }
-        }
-
-        if (pickedUp > 0) {
-            Palworks.LOGGER.debug("{} collected {} dropped items from ground at {}", ctx.name(), pickedUp, ctx.pos());
         }
     }
 }

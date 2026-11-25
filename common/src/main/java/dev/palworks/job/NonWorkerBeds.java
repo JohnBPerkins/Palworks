@@ -84,14 +84,14 @@ final class NonWorkerBeds {
         }
         BlockPos pasture = WorkerEligibility.pastureOf(entity);
         BlockPos bed = freeBedFor(level, entity, pasture != null ? pasture : entity.blockPosition());
-        Palworks.LOGGER.debug(
-                "{} is sleepy: {}",
-                entity.getPokemon().getSpecies().getName(),
-                bed == null ? "no bed free" : "off to the bed at " + bed.toShortString());
         if (bed == null) {
             retryAfter.put(uuid, now + LOOK_AGAIN_TICKS);
             return null;
         }
+        Palworks.LOGGER.debug(
+                "{} is sleepy: off to the bed at {}",
+                entity.getPokemon().getSpecies().getName(),
+                bed.toShortString());
         Claim claim = new Claim(bed, now, now, false);
         claims.put(uuid, claim);
         return claim;

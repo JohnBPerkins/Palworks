@@ -133,13 +133,13 @@ loom {
 }
 
 // Stress test (see StressGameTests and "Performance" in CONTRIBUTING): 200 workers of many species,
-// with spark measuring tick times, in two scenarios: `dense` (one packed farm) and `spread` (40 small
-// bases far apart). Its own source set and mod (palworks_stress, never published, src/stress), so it
+// with every tick timed and spark profiling, in three scenarios: `dense` (one packed farm), `spread`
+// (40 small bases far apart) and `night` (the packed farm from sunset to sunrise). Its own source set and mod (palworks_stress, never published, src/stress), so it
 // runs only that (by its template namespace): the in-game test mod is loaded too, for its helpers,
-// but none of its tests run. `./gradlew :neoforge:runStressTest` runs both scenarios
-// (runStressDense, then runStressSpread), each in its own server so one's workers can't add to the
+// but none of its tests run. `./gradlew :neoforge:runStressTest` runs them all
+// (runStressDense, runStressSpread, runStressNight), each in its own server so one's workers can't add to the
 // other's load, and each writes its results to build/stress/<scenario>.json.
-def stressScenarios = ["dense", "spread"]
+def stressScenarios = ["dense", "spread", "night"]
 
 sourceSets {
     stress {
@@ -154,8 +154,6 @@ sourceSets {
 
 dependencies {
     stressCompileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.21"
-    // spark's API, bundled in its jar, to read tick times (spark itself is in dev runs, above)
-    stressCompileOnly("maven.modrinth:spark:1.10.124-neoforge-1.21.1") { transitive = false }
 }
 
 loom {
@@ -209,6 +207,7 @@ stressScenarios.each { scenario ->
     }
 }
 tasks.matching { it.name == "runStressSpread" }.configureEach { mustRunAfter "runStressDense" }
+tasks.matching { it.name == "runStressNight" }.configureEach { mustRunAfter "runStressDense", "runStressSpread" }
 tasks.register("runStressTest") {
     group = "neoforge"
     description = "Runs every stress test scenario, each in its own server"

@@ -2,9 +2,11 @@ package dev.palworks.gametest;
 
 import static dev.palworks.gametest.Scenes.abs;
 
+import dev.palworks.ai.StandMemo;
 import dev.palworks.ai.WorkPositions;
 import dev.palworks.crop.CropAdapter;
 import dev.palworks.job.JobType;
+import dev.palworks.job.handler.JobHandlerRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -24,6 +26,8 @@ import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.chunk.LevelChunk;
+import org.jetbrains.annotations.Nullable;
 
 /** Harvesting (real loot, minus one seed, reset in place), gourds, berries, and planting. */
 public class CropGameTests {
@@ -205,6 +209,73 @@ public class CropGameTests {
         BlockPos rel = stand.subtract(helper.absolutePos(BlockPos.ZERO));
         helper.assertTrue(rel.getX() < 4, "on the crop's side of the wall, got " + rel);
         helper.succeed();
+    }
+
+    // ---- Where it stands, remembered (StandMemo) ----
+
+    /** A ripe crop on a grass floor, and a pig east of it that stays where it's put. */
+    private static Mob pigByACrop(GameTestHelper helper) {
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        crop(helper, Blocks.FARMLAND, ((CropBlock) Blocks.WHEAT).getStateForAge(7));
+        return helper.spawnWithNoFreeWill(EntityType.PIG, new BlockPos(6, 1, 3));
+    }
+
+    @Nullable
+    private static BlockPos rememberedStand(GameTestHelper helper, Mob mob) {
+        return StandMemo.standingPosFor(
+                helper.getLevel(),
+                helper.absolutePos(CROP),
+                JobType.HARVEST_CROPS,
+                mob,
+                JobHandlerRegistry.stanceFor(JobType.HARVEST_CROPS, mob));
+    }
+
+    /** Put a stone in a tile without the level knowing (straight into its chunk): no block change is told of. */
+    private static void stoneUnseen(GameTestHelper helper, BlockPos abs) {
+        LevelChunk chunk = helper.getLevel().getChunkAt(abs);
+        chunk.getSection(chunk.getSectionIndex(abs.getY()))
+                .setBlockState(abs.getX() & 15, abs.getY() & 15, abs.getZ() & 15, Blocks.STONE.defaultBlockState());
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void whereAWorkerStandsIsRememberedUntilABlockByItsJobChanges(GameTestHelper helper) {
+        // A worker's tick asks where it stands every tick, and standing at its work the answer is
+        // the last one: it's only worked out again when a block near the job changes
+        Mob mob = pigByACrop(helper);
+        BlockPos stand = rememberedStand(helper, mob);
+        helper.assertTrue(stand != null, "somewhere to stand");
+
+        // Nothing told of this stone on its tile, so the tile's still the one remembered
+        stoneUnseen(helper, stand);
+        helper.assertValueEqual(rememberedStand(helper, mob), stand, "its tile, remembered");
+
+        // A block changes by the crop, the usual way: worked out again, round the stone
+        helper.setBlock(CROP.offset(0, 0, 2), Blocks.COBBLESTONE);
+        BlockPos next = rememberedStand(helper, mob);
+        helper.assertTrue(
+                next != null && !next.equals(stand), "another tile, once a block by its job changed, got " + next);
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void whereAWorkerStandsIsWorkedOutAgainWhenItMovesAndBeforeLong(GameTestHelper helper) {
+        Mob mob = pigByACrop(helper);
+        BlockPos east = rememberedStand(helper, mob);
+
+        // It's the nearest tile to it: from the crop's other side, another one
+        BlockPos west = helper.absolutePos(new BlockPos(0, 1, 3));
+        mob.setPos(west.getX() + 0.5, west.getY(), west.getZ() + 0.5);
+        BlockPos stand = rememberedStand(helper, mob);
+        helper.assertTrue(stand != null && !stand.equals(east), "the nearest tile to where it is now, got " + stand);
+
+        // And remembered only so long, for what no block change tells of
+        stoneUnseen(helper, stand);
+        helper.assertValueEqual(rememberedStand(helper, mob), stand, "its tile, remembered");
+        helper.runAfterDelay(StandMemo.KEPT_TICKS, () -> {
+            BlockPos next = rememberedStand(helper, mob);
+            helper.assertTrue(next != null && !next.equals(stand), "worked out again after a while, got " + next);
+            helper.succeed();
+        });
     }
 
     // ---- Gourds ----

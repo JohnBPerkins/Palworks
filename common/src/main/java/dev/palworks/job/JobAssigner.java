@@ -156,7 +156,6 @@ final class JobAssigner {
         }
 
         long now = level.getGameTime();
-        int assignedCount = 0;
         for (WorkerInfo worker : idleWorkers) {
             lastConsidered.put(worker.pokemonUUID, now);
             // Before its jobs are listed: what it remembers as unreachable is left out of the list,
@@ -180,9 +179,7 @@ final class JobAssigner {
                     // No bed it can get to from here, but one by its pasture: it heads home.
                     if (!Sleep.isWoken(entity, sleeper) && (sleeper == null || !sleeper.isAsleep())) {
                         List<JobRecord> beds = bedCandidates(level, worker, entity);
-                        if (assignFirstReachable(worker, beds) != null) {
-                            assignedCount++;
-                        } else {
+                        if (assignFirstReachable(worker, beds) == null) {
                             headHome(level, worker, beds);
                         }
                     }
@@ -199,7 +196,6 @@ final class JobAssigner {
             if (pokemon != null && Hunger.wantsFood(pokemon)) {
                 List<JobRecord> troughs = troughCandidates(level, worker);
                 if (assignFirstReachable(worker, troughs) != null) {
-                    assignedCount++;
                     continue;
                 }
                 if (headHome(level, worker, troughs)) {
@@ -214,7 +210,6 @@ final class JobAssigner {
             if (pokemon != null && entity != null && Sleep.wantsNap(entity, WorkerStateManager.get(pokemon))) {
                 List<JobRecord> beds = bedCandidates(level, worker, entity);
                 if (assignFirstReachable(worker, beds) != null) {
-                    assignedCount++;
                     continue;
                 }
                 if (headHome(level, worker, beds)) {
@@ -234,9 +229,6 @@ final class JobAssigner {
             if (pokemon != null) {
                 askForSeedsIfOut(worker, now);
                 SeedTrip trip = bringSeeds(worker, pokemon, now);
-                if (trip == SeedTrip.ON_ITS_WAY) {
-                    assignedCount++;
-                }
                 if (trip != SeedTrip.NONE) {
                     continue;
                 }
@@ -263,9 +255,7 @@ final class JobAssigner {
                     // Pickups left that it has room for. If none can be reached right now, they're
                     // remembered as unreachable and drop out of the list, and it delivers once
                     // they're all gone; until then it doesn't go to a chest half full.
-                    if (assignFirstReachable(worker, pickups) != null) {
-                        assignedCount++;
-                    }
+                    assignFirstReachable(worker, pickups);
                     continue;
                 }
 
@@ -276,7 +266,6 @@ final class JobAssigner {
                     if (held != null) {
                         held.setCantDeliver(false);
                     }
-                    assignedCount++;
                     continue;
                 }
                 // No chest it can use: none with room, or none it can get to (one it couldn't pathfind
@@ -295,7 +284,6 @@ final class JobAssigner {
             if (pokemon != null && worker.suitabilities.contains(Suitability.TRANSPORTING)) {
                 List<JobRecord> restock = restockCandidates(level, worker);
                 if (!restock.isEmpty() && assignFirstReachable(worker, restock) != null) {
-                    assignedCount++;
                     continue;
                 }
             }
@@ -307,18 +295,12 @@ final class JobAssigner {
                 assigned = assignFirstReachable(worker, summonCandidates(worker, pokemon, now));
             }
             if (assigned != null) {
-                assignedCount++;
                 if (assigned.type() == JobType.GET_SEEDS && pokemon != null) {
                     takeOnSeedRequest(worker, WorkerInventoryManager.getOrCreate(pokemon), assigned.position());
                 }
             } else if (held != null) {
                 held.setCantReach(hasWorkOutOfReach(worker));
             }
-        }
-
-        if (assignedCount > 0) {
-            Palworks.LOGGER.debug(
-                    "Assigned {} jobs to idle workers ({} idle workers available)", assignedCount, idleWorkers.size());
         }
     }
 
@@ -913,12 +895,6 @@ final class JobAssigner {
         pool.reserve(job);
 
         String dist = String.format("%.1f", Math.sqrt(worker.position.distSqr(job.position())));
-        Palworks.LOGGER.debug(
-                "Assigned {} job at {} to worker {} (distance: {})",
-                job.type(),
-                job.position(),
-                pokemon.getSpecies().getName(),
-                dist);
         // Send chat message to nearby players
         DebugManager.broadcastActivity(
                 level,

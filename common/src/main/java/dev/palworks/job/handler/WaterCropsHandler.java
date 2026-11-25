@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.crop.Watering;
 import dev.palworks.suitability.Suitability;
@@ -26,13 +25,7 @@ final class WaterCropsHandler implements JobHandler {
             return;
         }
         int wateringLevel = SuitabilityDetector.getSuitabilityLevel(ctx.pokemon(), Suitability.WATERING);
-        boolean fertilized = Watering.water(level, ctx.pos(), Watering.fertilizeChance(wateringLevel));
+        Watering.water(level, ctx.pos(), Watering.fertilizeChance(wateringLevel));
         ctx.didWork(1);
-        Palworks.LOGGER.debug(
-                "{} (Watering {}) watered the crop at {}{}",
-                ctx.name(),
-                wateringLevel,
-                ctx.pos(),
-                fertilized ? " and fertilized it" : "");
     }
 }

@@ -1,6 +1,5 @@
 package dev.palworks.job.handler;
 
-import dev.palworks.Palworks;
 import dev.palworks.animation.WorkAnimations;
 import dev.palworks.boulder.Boulders;
 import dev.palworks.crystal.MiningTool;
@@ -41,6 +40,5 @@ final class MineBoulderHandler implements JobHandler {
         // What it drops is the worker's, for transporters to pick up (see TrackedDrops)
         TrackedDrops.breaking(ctx.pokemon().getUuid(), pos, () -> MiningTool.breakWith(level, pos, ctx.entity(), tool));
         ctx.didWork(1, mined, 1);
-        Palworks.LOGGER.debug("{} mined a boulder's block at {}", ctx.name(), pos);
     }
 }

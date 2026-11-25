@@ -64,6 +64,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -81,6 +82,7 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.pathfinder.Node;
 import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -252,6 +254,48 @@ public class WorkerGameTests {
                 marker.getCategory(), ResourceLocation.fromNamespaceAndPath("cobblemon", "evolution"), "its model");
         helper.assertValueEqual(
                 marker.position(), Vec3.atCenterOf(block), "where it is: the block's centre, Night Shade's aim");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aMovesMarkerIsInNobodysWay(GameTestHelper helper) {
+        // The marker a move aims at is only a position. It used to be solid, and a Pokémon's size
+        // whatever its scale: no worker could be sent to stand in or by a block another was
+        // working (its way there was refused, and the job remembered as out of reach), and
+        // anything walking by walked into it
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, GASTLY, START);
+        BlockPos block = helper.absolutePos(new BlockPos(3, 1, 5));
+        WorkAnimator.play(worker, WorkAnimations.NETHER_HARVEST, block);
+
+        List<GenericBedrockEntity> markers =
+                helper.getLevel().getEntitiesOfClass(GenericBedrockEntity.class, new AABB(block).inflate(1));
+        helper.assertValueEqual(markers.size(), 1, "markers");
+        helper.assertTrue(
+                helper.getLevel().noCollision(worker, new AABB(block).deflate(0.1)),
+                "the marker is in the way of a body in the block it's at");
+        helper.succeed();
+    }
+
+    @GameTest(template = Templates.EMPTY)
+    public void aMovesMarkerIsntThereToClickOrHit(GameTestHelper helper) {
+        // Nor is it something to aim at: a crosshair over the block being worked used to land on
+        // the unseen marker in it, so a click there did nothing and an arrow stopped in mid-air
+        Workers.isolate(helper);
+        PokemonEntity worker = Workers.sendOut(helper, GASTLY, START);
+        BlockPos block = helper.absolutePos(new BlockPos(3, 1, 5));
+        WorkAnimator.play(worker, WorkAnimations.NETHER_HARVEST, block);
+
+        List<GenericBedrockEntity> markers =
+                helper.getLevel().getEntitiesOfClass(GenericBedrockEntity.class, new AABB(block).inflate(1));
+        helper.assertValueEqual(markers.size(), 1, "markers");
+        // A line straight through the marker, asked about as a player's crosshair asks
+        Vec3 middle = markers.get(0).getBoundingBox().getCenter();
+        Vec3 from = middle.add(-2.0, 0.0, 0.0);
+        Vec3 to = middle.add(2.0, 0.0, 0.0);
+        EntityHitResult hit = ProjectileUtil.getEntityHitResult(
+                worker, from, to, new AABB(from, to).inflate(1.0), e -> !e.isSpectator() && e.isPickable(), 16.0);
+        helper.assertTrue(hit == null, "a crosshair over the block being worked lands on the marker");
         helper.succeed();
     }
 

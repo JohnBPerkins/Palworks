@@ -21,10 +21,13 @@ public final class SleepPose {
 
     /**
      * Each tick it sleeps: hold it still, facing the way it lay down, in its sleep pose if it has
-     * one. Called after Cobblemon's brain has had its tick, so it undoes any turn its look took.
+     * one. Called after Cobblemon's brain has had its tick, so it undoes any turn its look took, and
+     * forgets anywhere its wandering gave it to walk to: Cobblemon doesn't know it's asleep, and
+     * plans a path for each walk target it's left with.
      */
     public static void hold(PokemonEntity entity) {
         entity.getNavigation().stop();
+        entity.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
         entity.setDeltaMovement(0, entity.getDeltaMovement().y, 0);
         keepFacing(entity);
         if (!Sleep.hasSleepPose(entity)) {

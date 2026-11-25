@@ -169,7 +169,12 @@ public final class Workers {
      * WorkerEligibility.isFromParty). It's sent out fed.
      */
     public static PokemonEntity sendOutPastured(GameTestHelper helper, String properties, BlockPos rel) {
-        ServerPlayer owner = owner(helper, rel);
+        return sendOutPastured(helper, owner(helper, rel), properties, rel);
+    }
+
+    /** Send out a pastured Pokémon (see above) of {@code owner}'s at a spot in the test. */
+    public static PokemonEntity sendOutPastured(
+            GameTestHelper helper, ServerPlayer owner, String properties, BlockPos rel) {
         BlockPos abs = helper.absolutePos(rel);
         Pokemon pokemon = create(properties);
         pokemon.setCurrentFullness(pokemon.getMaxFullness());

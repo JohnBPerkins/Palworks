@@ -132,15 +132,6 @@ final class ChopTreeHandler implements JobHandler {
         // A tree counts by its size, but only so far: one huge tree doesn't empty the worker
         ctx.didWork(HungerMath.treeUnits(logsChopped), trunk, logsChopped);
 
-        Palworks.LOGGER.debug(
-                "{} chopped tree at {} - {} logs and {} canopy blocks destroyed, base at {}, sapling: {}",
-                ctx.name(),
-                treePos,
-                logsChopped,
-                canopy.size(),
-                basePos,
-                saplingItem);
-
         // For the replant step (saved with the job, so it survives a pause or a handover)
         if (saplingItem != null) {
             ctx.data()
@@ -189,7 +180,10 @@ final class ChopTreeHandler implements JobHandler {
                 replanted++;
             }
         }
-        Palworks.LOGGER.debug("{} replanted {} of {} {}", ctx.name(), replanted, spots.length / 3, saplingItem);
+        if (replanted < spots.length / 3) {
+            Palworks.LOGGER.debug(
+                    "{} replanted only {} of {} {}", ctx.name(), replanted, spots.length / 3, saplingItem);
+        }
     }
 
     private static final String DATA_SAPLING = "sapling";
