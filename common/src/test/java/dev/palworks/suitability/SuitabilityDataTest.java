@@ -370,7 +370,7 @@ class SuitabilityDataTest {
     @Test
     void shippedSpeciesFollowTheirStats() throws IOException {
         SuitabilityData data = shipped();
-        assertEquals(294, data.speciesCount());
+        assertEquals(298, data.speciesCount());
         // Fighting gives Lumbering and Mining; Machamp's species entries add Handiwork and Transporting
         // (it hauls heavy loads). All from its stats.
         assertEquals(
