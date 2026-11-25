@@ -29,7 +29,10 @@ import java.util.function.Consumer;
  *   <li>{@code species}: extra species, by id ({@code cobblemon:scizor}; without a namespace it's
  *       Cobblemon's). Its number is added to the species' own level as a type's is (1 the usual, 2
  *       one more), and is used instead of what its types give for that job. 0 takes the job away
- *       from that species even if one of its types gives it.</li>
+ *       from that species even if one of its types gives it. A key with a form name after the
+ *       species id is that form's own entry ({@code cobblemon:ponyta galar}; Cobblemon's form names,
+ *       the standard form being {@code normal}): it works as a species entry does, for that form
+ *       only, and is used over the species' entry.</li>
  *   <li>Levels go from 1 to {@value #MAX_LEVEL} (0 too, for species).</li>
  * </ul>
  * Files for the same job from different namespaces merge, like vanilla tags, so an addon can add a
@@ -62,13 +65,19 @@ public final class SuitabilityData {
 
     private static final String DEFAULT_SPECIES_NAMESPACE = "cobblemon";
 
+    /** Cobblemon's name for a species' standard form, as in {@code FormData}. */
+    public static final String STANDARD_FORM = "Normal";
+
     public static final SuitabilityData EMPTY = new SuitabilityData(Map.of(), Map.of(), Map.of(), 0);
 
     private static volatile SuitabilityData current = EMPTY;
 
     /** Type Showdown id -> job levels. */
     private final Map<String, Map<Suitability, Integer>> types;
-    /** Species id ("cobblemon:scizor") -> job levels, added to its power level as a type's; 0 removes a job. */
+    /**
+     * Species id ("cobblemon:scizor"), or a form's ("cobblemon:ponyta galar", {@link #formKey}) ->
+     * job levels, added to its power level as a type's; 0 removes a job.
+     */
     private final Map<String, Map<Suitability, Integer>> species;
     /** Admins' in-game levels: species id -> job levels, used as they are; 0 removes a job. */
     private final Map<String, Map<Suitability, Integer>> fixed;
@@ -105,7 +114,7 @@ public final class SuitabilityData {
         return types.size();
     }
 
-    /** How many species have a job (or a job taken away) of their own. */
+    /** How many species and forms have a job (or a job taken away) of their own. */
     public int speciesCount() {
         return species.size();
     }
@@ -129,12 +138,17 @@ public final class SuitabilityData {
         return level;
     }
 
-    /**
-     * Job levels for a Pokémon of this species, whose evolution line is {@code line}: its own form
-     * first, then the one it evolved from, and so on back to the first. Only jobs with a level
-     * above 0 are included.
-     */
+    /** {@link #levels(String, String, List)} for the species' standard form. */
     public Map<Suitability, Integer> levels(String speciesId, List<Form> line) {
+        return levels(speciesId, STANDARD_FORM, line);
+    }
+
+    /**
+     * Job levels for a Pokémon of this species and form (Cobblemon's form name, {@code Galar}),
+     * whose evolution line is {@code line}: its own form first, then the one it evolved from, and
+     * so on back to the first. Only jobs with a level above 0 are included.
+     */
+    public Map<Suitability, Integer> levels(String speciesId, String formName, List<Form> line) {
         Map<Suitability, Integer> result = new EnumMap<>(Suitability.class);
         int power = line.isEmpty() ? 1 : powerLevel(line.get(0).baseStatTotal());
         if (!line.isEmpty()) {
@@ -153,15 +167,23 @@ public final class SuitabilityData {
                 }
             }
         }
-        for (Map.Entry<Suitability, Integer> e :
-                species.getOrDefault(speciesId, Map.of()).entrySet()) {
-            put(result, e.getKey(), e.getValue() == 0 ? 0 : level(power, e.getValue()));
+        // The species' entry, then the form's own over it
+        for (String id : List.of(speciesId, formKey(speciesId, formName))) {
+            for (Map.Entry<Suitability, Integer> e :
+                    species.getOrDefault(id, Map.of()).entrySet()) {
+                put(result, e.getKey(), e.getValue() == 0 ? 0 : level(power, e.getValue()));
+            }
         }
         for (Map.Entry<Suitability, Integer> e :
                 fixed.getOrDefault(speciesId, Map.of()).entrySet()) {
             put(result, e.getKey(), e.getValue());
         }
         return result;
+    }
+
+    /** A form's key among the species entries: {@code cobblemon:ponyta galar}. */
+    public static String formKey(String speciesId, String formName) {
+        return speciesId + " " + formName.toLowerCase(Locale.ROOT);
     }
 
     /** A power level plus a file's number less 1, kept to 1 to {@value #MAX_LEVEL}. */

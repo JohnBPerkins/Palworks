@@ -58,7 +58,7 @@ public class DatapackSuitabilityProvider implements SuitabilityProvider {
 
     private static Levels compute(SuitabilityData data, Key key) {
         String speciesId = key.form().getSpecies().getResourceIdentifier().toString();
-        Map<Suitability, Integer> levels = data.levels(speciesId, line(key));
+        Map<Suitability, Integer> levels = data.levels(speciesId, key.form().getName(), line(key));
         Set<Suitability> suitabilities = EnumSet.noneOf(Suitability.class);
         suitabilities.addAll(levels.keySet());
         return new Levels(Collections.unmodifiableMap(levels), Collections.unmodifiableSet(suitabilities));

@@ -3,6 +3,7 @@ package dev.palworks.wiki;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.palworks.suitability.SuitabilityData;
 import dev.palworks.suitability.SuitabilityData.Form;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -44,6 +45,11 @@ final class CobblemonSpecies {
     record Entry(int dex, String id, String name, String form, List<String> types, int baseStatTotal, List<Form> line) {
         String displayName() {
             return form == null ? name : name + " (" + form + ")";
+        }
+
+        /** Cobblemon's form name, as suitability levels take it: the standard form's too. */
+        String formName() {
+            return form == null ? SuitabilityData.STANDARD_FORM : form;
         }
     }
 

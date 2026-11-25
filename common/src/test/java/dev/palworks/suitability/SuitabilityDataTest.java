@@ -104,6 +104,40 @@ class SuitabilityDataTest {
     }
 
     @Test
+    void aFormsEntryIsForThatFormAloneAndGoesOverItsSpecies() {
+        SuitabilityData data = load(Map.of(
+                "palworks:healing",
+                "{\"species\": {\"cobblemon:ponyta galar\": 1}}",
+                "palworks:kindling",
+                "{\"types\": {\"fire\": 1}, \"species\": {\"cobblemon:rapidash\": 2, \"rapidash galar\": 0}}"));
+        // Galarian Ponyta heals; Kanto Ponyta (the same species) only does what its Fire type gives
+        assertEquals(
+                Map.of(HEALING, 2),
+                data.levels("cobblemon:ponyta", "Galar", List.of(new Form(List.of("psychic"), 410))));
+        assertEquals(
+                Map.of(KINDLING, 2),
+                data.levels("cobblemon:ponyta", "Normal", List.of(new Form(List.of("fire"), 410))));
+        // The species' entry is every form's (500: 3, so 4), unless the form has its own: here a 0,
+        // without a namespace (so Cobblemon's)
+        assertEquals(
+                Map.of(KINDLING, 4),
+                data.levels("cobblemon:rapidash", "Normal", List.of(new Form(List.of("fire"), 500))));
+        assertEquals(
+                Map.of(),
+                data.levels("cobblemon:rapidash", "Galar", List.of(new Form(List.of("psychic", "fairy"), 500))));
+    }
+
+    @Test
+    void theStandardFormsOwnEntryIsNormal() {
+        SuitabilityData data = load(Map.of("palworks:farming", "{\"species\": {\"cobblemon:persian normal\": 1}}"));
+        List<Form> kanto = List.of(new Form(List.of("normal"), 440));
+        assertEquals(Map.of(FARMING, 2), data.levels("cobblemon:persian", "Normal", kanto));
+        assertEquals(Map.of(FARMING, 2), data.levels("cobblemon:persian", kanto));
+        assertEquals(Map.of(), data.levels("cobblemon:persian", "Alola", List.of(new Form(List.of("dark"), 440))));
+        assertEquals(1, data.speciesCount());
+    }
+
+    @Test
     void aSpeciesEntryIsUsedInsteadOfItsTypesForThatJob() {
         SuitabilityData data = load(
                 Map.of("palworks:kindling", "{\"types\": {\"fire\": 4}, \"species\": {\"cobblemon:charmander\": 2}}"));

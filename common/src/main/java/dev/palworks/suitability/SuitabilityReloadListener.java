@@ -33,7 +33,7 @@ public class SuitabilityReloadListener extends SimpleJsonResourceReloadListener 
                 SuitabilityData.fromFiles(byId, message -> Palworks.LOGGER.warn("[suitability] {}", message));
         SuitabilityOverrides.setDatapack(data);
         Palworks.LOGGER.info(
-                "Loaded work suitabilities: {} jobs, {} types, {} species",
+                "Loaded work suitabilities: {} jobs, {} types, {} species and forms",
                 data.jobCount(),
                 data.typeCount(),
                 data.speciesCount());
