@@ -44,7 +44,7 @@ for its species.
 | Mining | Mine boulders, amethyst, tumblestone and type gems | Working |
 | Unearthing | Raise boulders for miners | Working |
 | Handiwork | Crafting | Not yet |
-| Medicine Production | Planned | Not yet |
+| Medicine Production | Brewing potions and medicine | Not yet |
 | Healing | Healing players | Not yet |
 | Generating Electricity | Powering devices | Not yet |
 | Cooling | Cooling containers | Not yet |

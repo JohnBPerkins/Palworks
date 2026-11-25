@@ -5,6 +5,7 @@ import static dev.palworks.suitability.Suitability.FARMING;
 import static dev.palworks.suitability.Suitability.GATHERING;
 import static dev.palworks.suitability.Suitability.GENERATING_ELECTRICITY;
 import static dev.palworks.suitability.Suitability.HANDIWORK;
+import static dev.palworks.suitability.Suitability.HEALING;
 import static dev.palworks.suitability.Suitability.KINDLING;
 import static dev.palworks.suitability.Suitability.LUMBERING;
 import static dev.palworks.suitability.Suitability.MEDICINE_PRODUCTION;
@@ -301,7 +302,6 @@ class SuitabilityDataTest {
     @Test
     void shippedTypesMatchTheOldTable() throws IOException {
         SuitabilityData data = shipped();
-        assertEquals(Map.of(FARMING, 1), levels(data, List.of("normal"), "x:y"));
         assertEquals(Map.of(KINDLING, 1), levels(data, List.of("fire"), "x:y"));
         assertEquals(Map.of(WATERING, 1), levels(data, List.of("water"), "x:y"));
         assertEquals(Map.of(PLANTING, 1, GATHERING, 1), levels(data, List.of("grass"), "x:y"));
@@ -313,11 +313,12 @@ class SuitabilityDataTest {
         assertEquals(Map.of(UNEARTHING, 1), levels(data, List.of("rock"), "x:y"));
         assertEquals(Map.of(MINING, 1), levels(data, List.of("ground"), "x:y"));
         assertEquals(Map.of(TRANSPORTING, 1), levels(data, List.of("flying"), "x:y"));
-        assertEquals(Map.of(MEDICINE_PRODUCTION, 1), levels(data, List.of("psychic"), "x:y"));
         assertEquals(Map.of(NETHER, 1), levels(data, List.of("ghost"), "x:y"));
         // Steel isn't Lumbering: most Steel types have nothing to cut with (Magnemite, Klink,
-        // Bronzor); the blade users are species entries.
-        for (String none : List.of("poison", "bug", "dragon", "dark", "fairy", "steel")) {
+        // Bronzor); the blade users are species entries. Normal gave Farming and Psychic Medicine
+        // Production until most of them turned out to have no link to either: the producers and
+        // the brewers are species entries now. Healing has no type either, Fairy included.
+        for (String none : List.of("normal", "psychic", "poison", "bug", "dragon", "dark", "fairy", "steel")) {
             assertEquals(Map.of(), levels(data, List.of(none), "x:y"), none);
         }
         // Rock/Ground: Ground gives Mining, Rock gives Unearthing, so it does both
@@ -335,16 +336,17 @@ class SuitabilityDataTest {
     @Test
     void shippedSpeciesFollowTheirStats() throws IOException {
         SuitabilityData data = shipped();
-        assertEquals(86, data.speciesCount());
-        // Fighting gives Lumbering and Mining; Machamp's species entry adds Handiwork. All from its stats.
+        assertEquals(294, data.speciesCount());
+        // Fighting gives Lumbering and Mining; Machamp's species entries add Handiwork and Transporting
+        // (it hauls heavy loads). All from its stats.
         assertEquals(
-                Map.of(LUMBERING, 3, MINING, 3, HANDIWORK, 3),
+                Map.of(LUMBERING, 3, MINING, 3, HANDIWORK, 3, TRANSPORTING, 3),
                 levels(data, List.of("fighting"), "cobblemon:machamp", 505));
         assertEquals(
-                Map.of(LUMBERING, 2, MINING, 2, HANDIWORK, 2),
+                Map.of(LUMBERING, 2, MINING, 2, HANDIWORK, 2, TRANSPORTING, 2),
                 levels(data, List.of("fighting"), "cobblemon:machoke", 405));
         assertEquals(
-                Map.of(LUMBERING, 1, MINING, 1, HANDIWORK, 1),
+                Map.of(LUMBERING, 1, MINING, 1, HANDIWORK, 1, TRANSPORTING, 1),
                 levels(data, List.of("fighting"), "cobblemon:machop", 305));
         assertEquals(Map.of(LUMBERING, 3), levels(data, List.of("bug", "steel"), "cobblemon:scizor", 500));
         assertEquals(
@@ -365,15 +367,18 @@ class SuitabilityDataTest {
                 levels(data, List.of("grass", "steel"), "cobblemon:kartana", 570));
         assertEquals(Map.of(LUMBERING, 3), levels(data, List.of("dragon"), "cobblemon:haxorus", 540));
         assertEquals(
-                Map.of(LUMBERING, 2, WATERING, 2, FARMING, 2),
-                levels(data, List.of("normal", "water"), "cobblemon:bibarel", 410));
-        assertEquals(Map.of(FARMING, 3), levels(data, List.of("normal"), "cobblemon:miltank", 490));
-        assertEquals(Map.of(FARMING, 3), levels(data, List.of("normal"), "cobblemon:chansey", 450));
+                Map.of(LUMBERING, 2, WATERING, 2), levels(data, List.of("normal", "water"), "cobblemon:bibarel", 410));
+        assertEquals(
+                Map.of(FARMING, 3, HEALING, 3, MEDICINE_PRODUCTION, 3),
+                levels(data, List.of("normal"), "cobblemon:miltank", 490));
+        assertEquals(
+                Map.of(FARMING, 3, HEALING, 3, MEDICINE_PRODUCTION, 3),
+                levels(data, List.of("normal"), "cobblemon:chansey", 450));
         assertEquals(
                 Map.of(PLANTING, 3, GATHERING, 3, TRANSPORTING, 3, FARMING, 3),
                 levels(data, List.of("grass", "flying"), "cobblemon:tropius", 460));
         // Slaking's stats are a legendary's, so it's level 5 at what it does
-        assertEquals(Map.of(FARMING, 5, HANDIWORK, 5), levels(data, List.of("normal"), "cobblemon:slaking", 670));
+        assertEquals(Map.of(HANDIWORK, 5), levels(data, List.of("normal"), "cobblemon:slaking", 670));
         // Steel alone gives nothing
         assertEquals(
                 Map.of(GENERATING_ELECTRICITY, 1),

@@ -160,7 +160,7 @@ class WikiGeneratorTest {
         assertTrue(page.startsWith("Before\n\n| Type |") && page.endsWith("|\n\nAfter\n"), page);
         assertTrue(generator
                 .fill("<!-- generated:skill-table -->", "Test.md")
-                .contains("| Lumbering | Fighting | 32 | [Every Pokémon](Lumbering-Workers) |"));
+                .contains("| Lumbering | Fighting | 50 | [Every Pokémon](Lumbering-Workers) |"));
     }
 
     @Test

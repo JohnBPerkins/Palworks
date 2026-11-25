@@ -2,5 +2,11 @@
   "types": {
     "grass": 1
   },
-  "species": {}
+  "species": {
+    "cobblemon:landorus": 1,
+    "cobblemon:floette": 1,
+    "cobblemon:florges": 1,
+    "cobblemon:xerneas": 1,
+    "cobblemon:calyrex": 1
+  }
 }
