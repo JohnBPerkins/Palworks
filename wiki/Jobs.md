@@ -20,8 +20,8 @@ A **job** is a piece of work a [worker](Workers) can do. Workers find jobs on th
 | [Raise boulders](#raise-boulders) | Unearthing | Working |
 | [Mine boulders](#mine-boulders) | Mining | Working |
 
-Crafting (Handiwork), and work for Medicine Production, Generating Electricity, Cooling and
-Farming are planned; nothing uses them yet.
+Crafting (Handiwork), and work for Medicine Production, Healing, Generating Electricity, Cooling
+and Farming are planned; nothing uses them yet.
 
 ## Light furnaces
 

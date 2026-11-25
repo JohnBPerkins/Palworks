@@ -45,6 +45,7 @@ for its species.
 | Unearthing | Raise boulders for miners | Working |
 | Handiwork | Crafting | Not yet |
 | Medicine Production | Planned | Not yet |
+| Healing | Healing players | Not yet |
 | Generating Electricity | Powering devices | Not yet |
 | Cooling | Cooling containers | Not yet |
 | Farming | Producing ranch items | Not yet |

@@ -32,7 +32,7 @@ the same type or species a level, the higher one wins, and a species' `0` wins o
 change a default, put a file at the same path as ours in your datapack.
 
 The work skills are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
-`gathering`, `lumbering`, `mining`, `unearthing`, `medicine_production`, `cooling`, `transporting`, `nether` and
+`gathering`, `lumbering`, `mining`, `unearthing`, `medicine_production`, `healing`, `cooling`, `transporting`, `nether` and
 `farming`. The defaults are in
 [`common/src/main/resources/data/palworks/palworks/suitability`](https://github.com/JohnBPerkins/Palworks/tree/main/common/src/main/resources/data/palworks/palworks/suitability),
 and the [work skill pages](Suitabilities#every-work-skill) list who they give each skill to.
