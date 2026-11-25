@@ -18,8 +18,8 @@ import net.minecraft.world.phys.Vec3;
  * The order a transporter goes round a pickup job's items in: planned once, from where it is when
  * it starts, each next the nearest to the one before, so it walks one short round rather than back
  * and forth. It sticks to the plan (its walk isn't replanned as it goes, see WorkPositions) and only
- * plans again when the items in it are all gone (picked up, or taken by someone else), for any new
- * ones that have landed meanwhile.
+ * plans again when there's nothing left in it for it to take (all picked up, taken by someone else,
+ * or more than it has room for), for any new ones that have landed meanwhile.
  *
  * <p>Server thread only, like the rest of the worker AI.
  */
@@ -32,19 +32,40 @@ final class PickupRoute {
 
     /**
      * The job's items still to pick up that the worker has room for, in the order it goes round
-     * them: the rest of its plan, or a new plan if that's done (or it's for another job). Ones it has
-     * no room for are passed by: going to one, it would find it couldn't take it, and stand there.
+     * them: the rest of its plan, or a new plan if there's none of that (or it's for another job).
+     * Ones it has no room for are passed by: going to one, it would find it couldn't take it, and
+     * stand there. A plan with only those left is done with too: more of what it carries may have
+     * landed since, which {@code JobChecks.canWorkerDo} counts, and with nowhere to go for it the
+     * job was given up as one with nowhere to stand.
      */
     static List<ItemEntity> itemsInOrder(Level level, BlockPos jobPos, Mob worker) {
-        List<ItemEntity> withRoom = new ArrayList<>();
-        WorkerInventory inventory =
-                worker instanceof PokemonEntity mon ? WorkerInventoryManager.getOrCreate(mon.getPokemon()) : null;
-        for (ItemEntity item : planned(level, jobPos, worker)) {
-            if (inventory != null && inventory.roomFor(item.getItem()) > 0) {
-                withRoom.add(item);
+        if (!(worker instanceof PokemonEntity mon)) {
+            return List.of();
+        }
+        WorkerInventory inventory = WorkerInventoryManager.getOrCreate(mon.getPokemon());
+        Route route = ROUTES.get(worker);
+        if (route != null && route.jobPos.equals(jobPos)) {
+            List<ItemEntity> left = toTake(level, inventory, route.items);
+            if (!left.isEmpty()) {
+                ROUTES.put(worker, new Route(jobPos, left));
+                return left;
             }
         }
-        return withRoom;
+        List<ItemEntity> planned =
+                plan(toTake(level, inventory, JobChecks.itemsToPickUp(level, jobPos)), worker.position());
+        ROUTES.put(worker, new Route(jobPos.immutable(), planned));
+        return planned;
+    }
+
+    /** Those of these items that are still to pick up and that the worker has room for. */
+    private static List<ItemEntity> toTake(Level level, WorkerInventory inventory, List<ItemEntity> items) {
+        List<ItemEntity> toTake = new ArrayList<>(items.size());
+        for (ItemEntity item : items) {
+            if (JobChecks.isToPickUp(level, item) && inventory.roomFor(item.getItem()) > 0) {
+                toTake.add(item);
+            }
+        }
+        return toTake;
     }
 
     /** Whether there's an item within the worker's reach that it has room for. */
@@ -59,25 +80,6 @@ final class PickupRoute {
             }
         }
         return false;
-    }
-
-    private static List<ItemEntity> planned(Level level, BlockPos jobPos, Mob worker) {
-        Route route = ROUTES.get(worker);
-        if (route != null && route.jobPos.equals(jobPos)) {
-            List<ItemEntity> left = new ArrayList<>(route.items.size());
-            for (ItemEntity item : route.items) {
-                if (JobChecks.isToPickUp(level, item)) {
-                    left.add(item);
-                }
-            }
-            if (!left.isEmpty()) {
-                ROUTES.put(worker, new Route(jobPos, left));
-                return left;
-            }
-        }
-        List<ItemEntity> planned = plan(JobChecks.itemsToPickUp(level, jobPos), worker.position());
-        ROUTES.put(worker, new Route(jobPos.immutable(), planned));
-        return planned;
     }
 
     /** These items, each next the nearest to the one before, from {@code start}. */
