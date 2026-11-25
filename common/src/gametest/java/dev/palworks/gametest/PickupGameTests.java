@@ -4,8 +4,11 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import dev.palworks.drops.TrackedDrops;
 import dev.palworks.inventory.WorkerInventory;
 import dev.palworks.inventory.WorkerInventoryManager;
+import dev.palworks.job.JobType;
+import dev.palworks.reservation.ReservationId;
 import dev.palworks.suitability.Suitability;
 import dev.palworks.suitability.SuitabilityOverrides;
+import dev.palworks.worker.WorkerStateManager;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
@@ -169,6 +172,46 @@ public class PickupGameTests {
                     3,
                     "kinds of item in its first delivery (it should pick all three up before going to the chest)");
         });
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "pickup_dropped_meanwhile", timeoutTicks = 400)
+    public void aTransporterTakesMoreOfWhatItCarriesDroppedAfterItSetOff(GameTestHelper helper) {
+        // One slot. Wheat and a carrot lie apart, and once it's on its way to them more wheat is
+        // dropped by them: what a harvester does, a crop at a time. With the first wheat picked up it
+        // has room for the new wheat and not for the carrot. It takes the new wheat too, and puts
+        // both away in one trip. (Its round was planned before the new wheat landed, and with
+        // nothing left on the round that it had room for, it used to give the pickup up as one
+        // with nowhere to stand, not to be tried again for 30 s.)
+        Workers.isolate(helper);
+        Scenes.floor(helper, Blocks.GRASS_BLOCK);
+        BlockPos chestPos = new BlockPos(1, 1, 5);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        PokemonEntity pidgey = Workers.sendOut(helper, PIDGEY, TRANSPORTER);
+        dropForPickup(helper, new BlockPos(5, 1, 3), Items.WHEAT, 1);
+        dropForPickup(helper, new BlockPos(5, 1, 5), Items.CARROT, 1);
+
+        // How much wheat is in the chest the first time any is: both, if it made one trip
+        int[] firstDelivery = {0};
+        helper.onEachTick(() -> {
+            if (firstDelivery[0] == 0) {
+                firstDelivery[0] = inChest(helper, chestPos, Items.WHEAT);
+            }
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    ReservationId job =
+                            WorkerStateManager.getOrCreate(pidgey.getPokemon()).getCurrentReservation();
+                    helper.assertTrue(job != null && job.getJobType() == JobType.COLLECT_DROPS, "on its way");
+                })
+                .thenIdle(2) // its round is planned
+                .thenExecute(() -> dropForPickup(helper, new BlockPos(3, 1, 5), Items.WHEAT, 1))
+                .thenWaitUntil(
+                        () -> helper.assertValueEqual(inChest(helper, chestPos, Items.WHEAT), 2, "wheat in the chest"))
+                .thenExecute(() -> helper.assertValueEqual(
+                        firstDelivery[0],
+                        2,
+                        "wheat in its first delivery (it should take both before going to the chest)"))
+                .thenSucceed();
     }
 
     @GameTest(template = Templates.EMPTY, batch = "pickup_matching", timeoutTicks = 600)

@@ -214,15 +214,15 @@ public class SeedDeliveryGameTests {
         sendOut(helper, PIDGEY, TRANSPORTER);
 
         // Put away the moment the seeds are left for it, before it can pick them up
-        boolean[] recalled = {false};
+        ItemEntity[] left = {null};
         helper.onEachTick(() -> {
-            if (recalled[0]) {
+            if (left[0] != null) {
                 return;
             }
             for (ItemEntity item : helper.getLevel()
                     .getEntitiesOfClass(ItemEntity.class, helper.getBounds().inflate(4))) {
                 if (TrackedDrops.handedTo(item) != null) {
-                    recalled[0] = true;
+                    left[0] = item;
                     planter.getPokemon().recall();
                     return;
                 }
@@ -232,9 +232,27 @@ public class SeedDeliveryGameTests {
         // Nobody takes them for a while (a minute), then they're an ordinary pickup, and the
         // transporter puts them back
         helper.succeedWhen(() -> {
-            helper.assertTrue(recalled[0], "seeds were left for the planter");
-            helper.assertValueEqual(inChest(chest, Items.WHEAT_SEEDS), 8, "seeds back in the chest");
+            helper.assertTrue(left[0] != null, "seeds were left for the planter");
+            helper.assertValueEqual(
+                    inChest(chest, Items.WHEAT_SEEDS),
+                    8,
+                    "seeds back in the chest (" + whatBecameOf(helper, left[0]) + ")");
         });
+    }
+
+    /**
+     * What's become of seeds left for a planter, for a failure to say: this test has failed in CI
+     * three times (November 2026) with the seeds never made a pickup, and never in a local run,
+     * where it could be looked at.
+     */
+    private static String whatBecameOf(GameTestHelper helper, ItemEntity seeds) {
+        return "the seeds left: " + seeds.getItem()
+                + (seeds.isAlive() ? ", alive" : ", removed: " + seeds.getRemovalReason())
+                + ", at " + seeds.position()
+                + (seeds.onGround() ? ", landed" : ", not landed")
+                + ", " + seeds.tickCount + " ticks old"
+                + ", tags " + seeds.getTags()
+                + (helper.getLevel().getEntity(seeds.getUUID()) != null ? "" : ", not found in the level by its id");
     }
 
     @GameTest(template = Templates.EMPTY, batch = "seeds_thrown", timeoutTicks = 800)
