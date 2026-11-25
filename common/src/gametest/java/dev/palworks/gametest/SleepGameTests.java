@@ -27,6 +27,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -860,6 +862,32 @@ public class SleepGameTests {
                     helper.assertTrue(stateOf(squirtle).isAsleep(), "still asleep");
                     helper.assertTrue(turned[0] < 1, "its body didn't turn: it turned " + turned[0]);
                     helper.assertTrue(turned[1] < 1, "nor its head: it turned " + turned[1]);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = Templates.EMPTY, batch = "sleep_still", timeoutTicks = 600)
+    public void aSleeperForgetsWhereItWasWalkingTo(GameTestHelper helper) {
+        // Asleep where it is (no bed), and given somewhere to walk to, as Cobblemon's wandering gives
+        // it (Cobblemon doesn't know it's asleep). Held still, it never gets there, and Cobblemon plans
+        // a path for each one it's given: so a sleeper forgets it the tick it gets it, where Cobblemon
+        // would keep it through that tick
+        Workers.isolate(helper);
+        BlockPos spot = new BlockPos(7, 1, 7);
+        PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, spot);
+        setTime(helper, MIDNIGHT);
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(stateOf(squirtle).isAsleep(), "asleep"))
+                .thenExecute(() -> squirtle.getBrain()
+                        .setMemory(
+                                MemoryModuleType.WALK_TARGET,
+                                new WalkTarget(helper.absolutePos(spot.offset(4, 0, 0)), 0.3F, 0)))
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    helper.assertTrue(stateOf(squirtle).isAsleep(), "still asleep");
+                    helper.assertFalse(
+                            squirtle.getBrain().hasMemoryValue(MemoryModuleType.WALK_TARGET),
+                            "it has nowhere in mind to walk to");
                 })
                 .thenSucceed();
     }
