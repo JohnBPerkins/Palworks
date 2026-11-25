@@ -86,15 +86,15 @@ public class SleepGameTests {
         Workers.isolate(helper);
         helper.setBlock(BED, ModBlocks.STRAW_BED.get());
         PokemonEntity squirtle = Workers.sendOutPastured(helper, SQUIRTLE, new BlockPos(1, 1, 1));
-        PokemonEntity rattata = Workers.sendOutPastured(helper, "rattata level=20", new BlockPos(1, 1, 6));
+        PokemonEntity pichu = Workers.sendOutPastured(helper, "pichu level=20", new BlockPos(1, 1, 6));
         setTime(helper, MIDNIGHT);
 
-        PokemonEntity[] sleepers = {squirtle, rattata};
+        PokemonEntity[] sleepers = {squirtle, pichu};
         helper.startSequence()
                 .thenWaitUntil(() -> {
                     helper.assertTrue(
-                            stateOf(squirtle).isAsleep() && stateOf(rattata).isAsleep(), "both asleep");
-                    helper.assertTrue(inBed(squirtle) != inBed(rattata), "one in the bed, the other not");
+                            stateOf(squirtle).isAsleep() && stateOf(pichu).isAsleep(), "both asleep");
+                    helper.assertTrue(inBed(squirtle) != inBed(pichu), "one in the bed, the other not");
                     for (PokemonEntity sleeper : sleepers) {
                         helper.assertTrue(
                                 posedAsleep(sleeper), sleeper.getPokemon().getSpecies() + " lies asleep");
@@ -110,15 +110,15 @@ public class SleepGameTests {
                 })
                 .thenExecute(() -> {
                     boolean squirtleTired = stateOf(squirtle).isTired();
-                    PokemonEntity bedSleeper = squirtleTired ? rattata : squirtle;
-                    PokemonEntity groundSleeper = squirtleTired ? squirtle : rattata;
+                    PokemonEntity bedSleeper = squirtleTired ? pichu : squirtle;
+                    PokemonEntity groundSleeper = squirtleTired ? squirtle : pichu;
                     helper.assertFalse(stateOf(bedSleeper).isTired(), "the one in the bed is rested");
                     helper.assertTrue(stateOf(groundSleeper).isTired(), "the other is Tired");
                     helper.assertTrue(
                             WorkSpeed.of(groundSleeper.getPokemon(), stateOf(groundSleeper)) < 1, "and slower");
                 })
                 .thenWaitUntil(() -> {
-                    PokemonEntity groundSleeper = stateOf(squirtle).isTired() ? squirtle : rattata;
+                    PokemonEntity groundSleeper = stateOf(squirtle).isTired() ? squirtle : pichu;
                     helper.assertTrue(groundSleeper.getAspects().contains(WorkerStatus.TIRED.aspect()), "showing it");
                 })
                 .thenSucceed();
@@ -719,26 +719,27 @@ public class SleepGameTests {
         helper.setBlock(small, ModBlocks.STRAW_BED.get());
         // A wool one, the nicer kind, which sleeps as a straw one does
         placeBed(helper, (WorkerBedBlock) ModBlocks.woolBed(DyeColor.RED, 3).get(), huge);
-        PokemonEntity snorlax = Workers.sendOutPastured(helper, "snorlax level=30", new BlockPos(1, 1, 1));
-        PokemonEntity rattata = Workers.sendOutPastured(helper, "rattata level=20", new BlockPos(3, 1, 6));
+        PokemonEntity bouffalant = Workers.sendOutPastured(helper, "bouffalant level=30", new BlockPos(1, 1, 1));
+        PokemonEntity pichu = Workers.sendOutPastured(helper, "pichu level=20", new BlockPos(3, 1, 6));
         setTime(helper, MIDNIGHT);
 
         helper.succeedWhen(() -> {
-            helper.assertTrue(inBed(snorlax), "Snorlax asleep in a bed");
-            helper.assertTrue(inBed(rattata), "Rattata asleep in a bed");
+            helper.assertTrue(inBed(bouffalant), "Bouffalant asleep in a bed");
+            helper.assertTrue(inBed(pichu), "Pichu asleep in a bed");
             helper.assertTrue(
-                    stateOf(snorlax).getCurrentReservation().getStationPos().equals(helper.absolutePos(huge)),
-                    "Snorlax (2.3 wide) in the huge one");
+                    stateOf(bouffalant).getCurrentReservation().getStationPos().equals(helper.absolutePos(huge)),
+                    "Bouffalant (2.3 wide) in the huge one");
             helper.assertTrue(
-                    stateOf(rattata).getCurrentReservation().getStationPos().equals(helper.absolutePos(small)),
-                    "Rattata in the small one, leaving the huge one for Snorlax");
+                    stateOf(pichu).getCurrentReservation().getStationPos().equals(helper.absolutePos(small)),
+                    "Pichu in the small one, leaving the huge one for Bouffalant");
             // In the middle of the huge bed
             helper.assertTrue(
-                    snorlax.position()
+                    bouffalant
+                                    .position()
                                     .distanceToSqr(helper.absoluteVec(
                                             new net.minecraft.world.phys.Vec3(5.5, 1 + WorkerBedBlock.HEIGHT, 2.5)))
                             < 1e-4,
-                    "lying in its very middle, on top: " + snorlax.position());
+                    "lying in its very middle, on top: " + bouffalant.position());
         });
     }
 
@@ -753,7 +754,7 @@ public class SleepGameTests {
     public void partyAndSwitchedOffWorkersDontSleep(GameTestHelper helper) {
         Workers.isolate(helper);
         PokemonEntity party = Workers.sendOut(helper, SQUIRTLE, new BlockPos(1, 1, 1));
-        PokemonEntity off = Workers.sendOutPastured(helper, "rattata level=20", new BlockPos(6, 1, 6));
+        PokemonEntity off = Workers.sendOutPastured(helper, "pichu level=20", new BlockPos(6, 1, 6));
         WorkerStateManager.setEnabled(off.getPokemon(), false);
         setTime(helper, MIDNIGHT);
         helper.runAfterDelay(200, () -> {
@@ -803,20 +804,20 @@ public class SleepGameTests {
     @GameTest(template = Templates.EMPTY, batch = "sleep_no_pose", timeoutTicks = 400)
     public void aSpeciesWithNoSleepAnimationStillSleeps(GameTestHelper helper) {
         Workers.isolate(helper);
-        PokemonEntity eevee = Workers.sendOutPastured(helper, "eevee level=20", new BlockPos(1, 1, 1));
-        helper.assertFalse(Sleep.hasSleepPose(eevee), "Cobblemon has Eevee never sleep");
+        PokemonEntity herdier = Workers.sendOutPastured(helper, "herdier level=20", new BlockPos(1, 1, 1));
+        helper.assertFalse(Sleep.hasSleepPose(herdier), "Cobblemon has Herdier never sleep");
         setTime(helper, MIDNIGHT);
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(stateOf(eevee).isAsleep(), "asleep all the same"))
-                .thenExecute(() -> helper.assertFalse(posedAsleep(eevee), "in its normal pose"))
+                .thenWaitUntil(() -> helper.assertTrue(stateOf(herdier).isAsleep(), "asleep all the same"))
+                .thenExecute(() -> helper.assertFalse(posedAsleep(herdier), "in its normal pose"))
                 .thenIdle(10)
                 .thenExecute(() -> setTime(helper, MORNING))
-                .thenWaitUntil(() -> helper.assertFalse(stateOf(eevee).isAsleep(), "awake"))
-                .thenExecute(() -> helper.assertTrue(stateOf(eevee).isTired(), "and Tired: no bed"))
-                // By day it's asked whether Cobblemon has it napping: Eevee's brain hasn't even the
+                .thenWaitUntil(() -> helper.assertFalse(stateOf(herdier).isAsleep(), "awake"))
+                .thenExecute(() -> helper.assertTrue(stateOf(herdier).isTired(), "and Tired: no bed"))
+                // By day it's asked whether Cobblemon has it napping: Herdier's brain hasn't even the
                 // memory (Cobblemon never lets it sleep), and asking used to crash the server
                 .thenIdle(60)
-                .thenExecute(() -> helper.assertFalse(Sleep.cobblemonHasItAsleep(eevee), "not napping"))
+                .thenExecute(() -> helper.assertFalse(Sleep.cobblemonHasItAsleep(herdier), "not napping"))
                 .thenSucceed();
     }
 

@@ -24,6 +24,10 @@ comes from datapack files, one per work skill:
   the level its stats give, `2` one more. It's used instead of what the species' types give for that
   skill. A species without a namespace is Cobblemon's (`scizor` = `cobblemon:scizor`). `0` takes the
   skill away from that species, even if one of its types gives it.
+- **A form of its own**: put the form's name after the species, as Cobblemon names it
+  (`"cobblemon:ponyta galar": 1`; a species' standard form is `normal`). It works as a species entry
+  does, for that form alone, and is used over its species' entry: `"cobblemon:persian alola": 0`
+  takes a skill away from Alolan Persian only.
 
 Files for the same skill from different namespaces **merge**, like vanilla tags: an addon can add
 `data/myaddon/palworks/suitability/kindling.json` with just its own entries. Where two files give
@@ -32,7 +36,7 @@ the same type or species a level, the higher one wins, and a species' `0` wins o
 change a default, put a file at the same path as ours in your datapack.
 
 The work skills are `kindling`, `watering`, `planting`, `generating_electricity`, `handiwork`,
-`gathering`, `lumbering`, `mining`, `unearthing`, `medicine_production`, `cooling`, `transporting`, `nether` and
+`gathering`, `lumbering`, `mining`, `unearthing`, `medicine_production`, `healing`, `cooling`, `transporting`, `nether` and
 `farming`. The defaults are in
 [`common/src/main/resources/data/palworks/palworks/suitability`](https://github.com/JohnBPerkins/Palworks/tree/main/common/src/main/resources/data/palworks/palworks/suitability),
 and the [work skill pages](Suitabilities#every-work-skill) list who they give each skill to.

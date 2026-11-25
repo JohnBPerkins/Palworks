@@ -2,5 +2,10 @@
   "types": {
     "electric": 1
   },
-  "species": {}
+  "species": {
+    "cobblemon:klink": 1,
+    "cobblemon:klang": 1,
+    "cobblemon:klinklang": 1,
+    "cobblemon:archaludon": 1
+  }
 }

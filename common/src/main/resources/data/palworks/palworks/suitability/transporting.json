@@ -2,5 +2,29 @@
   "types": {
     "flying": 1
   },
-  "species": {}
+  "species": {
+    "cobblemon:machop": 1,
+    "cobblemon:machoke": 1,
+    "cobblemon:machamp": 1,
+    "cobblemon:kangaskhan": 1,
+    "cobblemon:lapras": 1,
+    "cobblemon:swampert": 1,
+    "cobblemon:latias": 1,
+    "cobblemon:latios": 1,
+    "cobblemon:regigigas": 1,
+    "cobblemon:timburr": 1,
+    "cobblemon:gurdurr": 1,
+    "cobblemon:conkeldurr": 1,
+    "cobblemon:gogoat": 1,
+    "cobblemon:klefki": 1,
+    "cobblemon:hoopa": 1,
+    "cobblemon:mudbray": 1,
+    "cobblemon:mudsdale": 1,
+    "cobblemon:bewear": 1,
+    "cobblemon:cufant": 1,
+    "cobblemon:copperajah": 1,
+    "cobblemon:cyclizar": 1,
+    "cobblemon:koraidon": 1,
+    "cobblemon:miraidon": 1
+  }
 }

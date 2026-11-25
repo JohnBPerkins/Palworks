@@ -74,7 +74,7 @@ final class PokemonList {
             if (!keys.add(key)) {
                 throw new IllegalStateException("Two rows for " + key);
             }
-            Map<Suitability, Integer> levels = data.levels(entry.id(), entry.line());
+            Map<Suitability, Integer> levels = data.levels(entry.id(), entry.formName(), entry.line());
             Map<String, String> hand = kept.getOrDefault(key, Map.of());
             List<String> row = new ArrayList<>();
             row.add(String.valueOf(entry.dex()));

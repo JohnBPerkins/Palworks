@@ -3,5 +3,26 @@
     "ground": 1,
     "fighting": 1
   },
-  "species": {}
+  "species": {
+    "cobblemon:dunsparce": 1,
+    "cobblemon:tyranitar": 1,
+    "cobblemon:sableye": 1,
+    "cobblemon:aron": 1,
+    "cobblemon:lairon": 1,
+    "cobblemon:aggron": 1,
+    "cobblemon:dwebble": 1,
+    "cobblemon:crustle": 1,
+    "cobblemon:stunfisk": 0,
+    "cobblemon:bunnelby": 1,
+    "cobblemon:guzzlord": 1,
+    "cobblemon:cufant": 1,
+    "cobblemon:copperajah": 1,
+    "cobblemon:quaquaval": 0,
+    "cobblemon:tinkatink": 1,
+    "cobblemon:tinkatuff": 1,
+    "cobblemon:tinkaton": 1,
+    "cobblemon:orthworm": 1,
+    "cobblemon:flamigo": 0,
+    "cobblemon:dudunsparce": 1
+  }
 }

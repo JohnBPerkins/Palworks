@@ -242,7 +242,7 @@ public final class WikiGenerator {
         Map<Entry, Map<Suitability, Integer>> levels = new LinkedHashMap<>();
         Map<String, Map<Suitability, Integer>> standard = new HashMap<>();
         for (Entry entry : species) {
-            Map<Suitability, Integer> own = data.levels(entry.id(), entry.line());
+            Map<Suitability, Integer> own = data.levels(entry.id(), entry.formName(), entry.line());
             if (entry.form() == null) {
                 standard.put(entry.id(), own);
                 levels.put(entry, own);
@@ -283,7 +283,9 @@ public final class WikiGenerator {
         Set<String> listed = new TreeSet<>();
         species.forEach(e -> listed.add(e.id()));
         List<String> missing = speciesEntries(job).keySet().stream()
+                .map(id -> id.split(" ", 2)[0]) // a form's entry is its species' and form name
                 .filter(id -> !listed.contains(id))
+                .distinct()
                 .map(id -> capitalize(id.substring(id.indexOf(':') + 1)))
                 .sorted()
                 .toList();
@@ -374,7 +376,11 @@ public final class WikiGenerator {
     }
 
     private String why(Suitability job, Entry entry) {
-        if (speciesEntries(job).containsKey(entry.id())) {
+        Map<String, Integer> entries = speciesEntries(job);
+        if (entries.containsKey(SuitabilityData.formKey(entry.id(), entry.formName()))) {
+            return "form";
+        }
+        if (entries.containsKey(entry.id())) {
             return "species";
         }
         List<String> types = typesGiving(job);

@@ -766,18 +766,27 @@ public class WorkerGameTests {
     @GameTest(template = Templates.EMPTY, batch = "worker_evolve_gain", timeoutTicks = 800)
     public void anEvolvedWorkerTakesTheJobsOfItsNewType(GameTestHelper helper) {
         Workers.isolate(helper);
-        // Eevee (Normal) can't harvest; Leafeon (Grass) can. Its jobs used to be worked out once
-        // and saved, so it kept Eevee's forever. (setSpecies stands in for a real evolution.)
-        Scenes.floor(helper, Blocks.GRASS_BLOCK);
-        ripeWheatRow(helper);
-        PokemonEntity worker = Workers.sendOut(helper, "eevee level=20", START);
+        // Fletchling (Normal/Flying) can't light a furnace; Fletchinder (Fire/Flying) can. Its jobs
+        // used to be worked out once and saved, so it kept Fletchling's forever. (setSpecies stands
+        // in for a real evolution.)
+        Scenes.floor(helper, Blocks.STONE);
+        BlockPos furnacePos = new BlockPos(3, 1, 6);
+        helper.setBlock(
+                furnacePos, Blocks.FURNACE.defaultBlockState().setValue(AbstractFurnaceBlock.FACING, Direction.NORTH));
+        var furnace = (AbstractFurnaceBlockEntity) helper.getLevel().getBlockEntity(helper.absolutePos(furnacePos));
+        furnace.setItem(0, new ItemStack(Items.RAW_IRON, 2));
+        PokemonEntity worker = Workers.sendOut(helper, "fletchling level=20", START);
 
         helper.runAfterDelay(100, () -> {
-            assertWheatRow(helper, 7, "left alone by an Eevee");
-            worker.getPokemon().setSpecies(PokemonSpecies.INSTANCE.getByName("leafeon"));
+            helper.assertFalse(
+                    helper.getBlockState(furnacePos).getValue(AbstractFurnaceBlock.LIT), "left alone by a Fletchling");
+            worker.getPokemon().setSpecies(PokemonSpecies.INSTANCE.getByName("fletchinder"));
         });
         helper.runAfterDelay(
-                101, () -> helper.succeedWhen(() -> assertWheatRow(helper, 0, "harvested once it's a Leafeon")));
+                101,
+                () -> helper.succeedWhen(() -> helper.assertTrue(
+                        helper.getBlockState(furnacePos).getValue(AbstractFurnaceBlock.LIT),
+                        "lit once it's a Fletchinder")));
     }
 
     @GameTest(template = Templates.EMPTY, batch = "suitability_reload")
